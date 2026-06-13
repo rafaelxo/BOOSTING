@@ -1,0 +1,153 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
+import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui'
+import { formatCurrency } from '@/lib/utils'
+import { Lock, CreditCard, ShieldCheck } from 'lucide-react'
+
+export function StepPayment() {
+  const navigate = useNavigate()
+  const { profile } = useAuthStore()
+  const store = useOrderBuilderStore()
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Recompute extrasPrice fresh (avoids stale value if user skipped the Extras step
+  // after changing rank in Configure)
+  const freshExtrasPrice = Math.round(
+    store.selectedExtras.reduce((sum, { extra }) => {
+      if (extra.price_modifier > 0) return sum + extra.price_modifier
+      if (extra.price_modifier_pct > 0) return sum + (store.basePrice * extra.price_modifier_pct) / 100
+      return sum
+    }, 0) * 100
+  ) / 100
+
+  const totalPrice = store.basePrice + freshExtrasPrice
+
+  async function handleCheckout() {
+    if (!profile) return
+
+    setIsProcessing(true)
+    setError(null)
+
+    try {
+      // 1. Create the order record in DB
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: profile.id,
+          service_id: store.serviceId ?? store.serviceType ?? '',
+          game_id: store.gameId ?? store.gameSlug ?? '',
+          status: 'awaiting_payment',
+          queue_type: store.queueType,
+          server: store.server,
+          current_rank: store.currentRank as object,
+          target_rank: store.targetRank as object | null,
+          wins_purchased: store.winsPurchased,
+          sessions_purchased: store.sessionsPurchased,
+          extras: store.selectedExtras.map(({ extra }) => ({
+            extra_id: extra.id,
+            name: extra.name,
+            price: extra.price_modifier > 0
+              ? extra.price_modifier
+              : Math.round(store.basePrice * extra.price_modifier_pct) / 100,
+          })) as object,
+          base_price: store.basePrice,
+          extras_price: freshExtrasPrice,
+          total_price: totalPrice,
+          estimated_hours: store.estimatedHours,
+          customer_notes: store.customerNotes || null,
+          booster_notes: null,
+          assigned_booster_id: null,
+          stripe_payment_intent_id: null,
+          stripe_payment_status: null,
+          completed_at: null,
+        })
+        .select()
+        .single()
+
+      if (orderError) throw orderError
+
+      // 2. Create Stripe Checkout Session via Supabase Edge Function
+      const { data: checkoutData, error: checkoutError } = await supabase.functions.invoke(
+        'create-checkout-session',
+        {
+          body: {
+            order_id: order.id,
+            amount: Math.round(totalPrice * 100), // in cents
+            currency: 'usd',
+            success_url: `${window.location.origin}/orders/${order.id}?payment=success`,
+            cancel_url: `${window.location.origin}/orders/new`,
+          },
+        }
+      )
+
+      if (checkoutError) throw checkoutError
+
+      // 3. Redirect to Stripe Checkout
+      if (checkoutData?.url) {
+        store.reset()
+        window.location.href = checkoutData.url
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to initiate checkout. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-ink mb-1">Secure Payment</h2>
+      <p className="text-sm text-ink-secondary mb-6">
+        You'll be redirected to Stripe's secure checkout to complete your payment.
+      </p>
+
+      <div className="space-y-5">
+        {/* Order total */}
+        <div className="card-brand p-5 flex items-center justify-between rounded-2xl">
+          <div>
+            <p className="text-xs text-ink-secondary">Order Total</p>
+            <p className="text-2xl font-extrabold text-ink mt-0.5">{formatCurrency(totalPrice)}</p>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center shadow-brand">
+            <CreditCard className="h-6 w-6 text-white" />
+          </div>
+        </div>
+
+        {/* Security notes */}
+        <div className="space-y-3">
+          {[
+            { icon: Lock, text: 'Your card details are encrypted end-to-end and processed by Stripe.' },
+            { icon: ShieldCheck, text: 'We never store your card number, CVV, or expiry on our servers.' },
+          ].map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-start gap-2.5 text-xs text-ink-secondary">
+              <Icon className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
+              {text}
+            </div>
+          ))}
+        </div>
+
+        {error && (
+          <p className="text-sm text-danger bg-danger/10 rounded-xl px-4 py-3">{error}</p>
+        )}
+
+        <Button
+          size="lg"
+          className="w-full"
+          loading={isProcessing}
+          onClick={handleCheckout}
+          leftIcon={<Lock className="h-4 w-4" />}
+        >
+          Pay {formatCurrency(totalPrice)} — Secure Checkout
+        </Button>
+
+        <p className="text-xs text-ink-muted text-center">
+          Powered by Stripe. PCI-DSS compliant payment processing.
+        </p>
+      </div>
+    </div>
+  )
+}
