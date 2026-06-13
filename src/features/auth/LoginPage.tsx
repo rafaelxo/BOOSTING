@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
 import { Zap, Mail, Lock } from 'lucide-react'
-import { Button, Input, FormField, LanguageToggle } from '@/components/ui'
+import { Button, Input, FormField, ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
 
@@ -87,7 +87,7 @@ export function LoginPage() {
               Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
-          <LanguageToggle />
+          <ThemeToggle />
         </div>
 
         <div className="card p-6 space-y-5">

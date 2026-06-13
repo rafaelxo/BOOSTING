@@ -6,7 +6,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { signOut, supabase } from '@/lib/supabase'
-import { Avatar, LogoMark } from '@/components/ui'
+import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -130,6 +130,7 @@ export function BoosterLayout() {
           <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Peak</span></div>
           <div className="hidden md:block" />
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
               <Bell className="h-[18px] w-[18px]" />
             </button>

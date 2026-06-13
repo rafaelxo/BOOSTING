@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { signOut } from '@/lib/supabase'
-import { Avatar, LogoMark, LanguageToggle } from '@/components/ui'
+import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
 import { useState } from 'react'
 
 export function CustomerLayout() {
@@ -104,7 +104,7 @@ export function CustomerLayout() {
           </Link>
           <div className="hidden md:block" />
           <div className="flex items-center gap-3">
-            <LanguageToggle />
+            <ThemeToggle />
             <button className="relative p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
               <Bell className="h-[18px] w-[18px]" />
             </button>

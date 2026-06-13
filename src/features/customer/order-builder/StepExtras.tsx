@@ -2,21 +2,22 @@ import { useEffect } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { CheckCircle2, Zap, Eye, Radio, Trophy, EyeOff, Tv } from 'lucide-react'
+import { CheckCircle2, Zap, Eye, Radio, Trophy, EyeOff, Tv, Users } from 'lucide-react'
 import type { ServiceExtra } from '@/types'
 
 // Static extras (in production these come from DB)
 const EXTRAS: ServiceExtra[] = [
-  { id: 'priority', service_id: null, name: 'Priority Processing', description: 'Atribuição imediata ao booster mais bem avaliado. Início mais rápido.', price_modifier: 0, price_modifier_pct: 15, is_active: true, sort_order: 1, icon: 'zap' },
-  { id: 'solo_only', service_id: null, name: 'Solo Queue Only', description: 'O booster joga apenas SoloQ. Sem duo ou flex.', price_modifier: 0, price_modifier_pct: 10, is_active: true, sort_order: 2, icon: 'trophy' },
-  { id: 'mono_champ', service_id: null, name: 'Mono Champion', description: 'Seu campeão favorito em cada partida. Especifique nas observações.', price_modifier: 0, price_modifier_pct: 5, is_active: true, sort_order: 3, icon: 'eye' },
-  { id: 'live_stream', service_id: null, name: 'Live Stream', description: 'Assista seu booster via link de stream privado.', price_modifier: 4.99, price_modifier_pct: 0, is_active: true, sort_order: 4, icon: 'tv' },
-  { id: 'live_monitoring', service_id: null, name: 'Live Monitoring', description: 'Nossa equipe monitora seu pedido e envia atualizações periódicas.', price_modifier: 2.99, price_modifier_pct: 0, is_active: true, sort_order: 5, icon: 'radio' },
-  { id: 'appear_offline', service_id: null, name: 'Appear Offline', description: 'Sua conta fica offline durante todo o serviço.', price_modifier: 0, price_modifier_pct: 0, is_active: true, sort_order: 6, icon: 'eye-off' },
+  { id: 'duo_boost',  service_id: null, name: 'Duo Boost',          description: 'Jogue ao lado do seu booster em duo queue. +52% sobre o valor base.', price_modifier: 0, price_modifier_pct: 52, is_active: true, sort_order: 1, icon: 'users'   },
+  { id: 'priority',   service_id: null, name: 'Priority Processing', description: 'Atribuição imediata ao booster mais bem avaliado. Início mais rápido.', price_modifier: 0, price_modifier_pct: 15, is_active: true, sort_order: 2, icon: 'zap'     },
+  { id: 'solo_only',  service_id: null, name: 'Solo Queue Only',     description: 'O booster joga apenas SoloQ. Sem duo ou flex.',                          price_modifier: 0, price_modifier_pct: 10, is_active: true, sort_order: 3, icon: 'trophy'  },
+  { id: 'mono_champ', service_id: null, name: 'Mono Champion',       description: 'Seu campeão favorito em cada partida. Especifique nas observações.',      price_modifier: 0, price_modifier_pct:  5, is_active: true, sort_order: 4, icon: 'eye'     },
+  { id: 'live_stream',    service_id: null, name: 'Live Stream',      description: 'Assista seu booster via link de stream privado.',                      price_modifier: 4.99, price_modifier_pct: 0, is_active: true, sort_order: 5, icon: 'tv'      },
+  { id: 'live_monitoring',service_id: null, name: 'Live Monitoring',  description: 'Nossa equipe monitora seu pedido e envia atualizações periódicas.',    price_modifier: 2.99, price_modifier_pct: 0, is_active: true, sort_order: 6, icon: 'radio'   },
+  { id: 'appear_offline', service_id: null, name: 'Appear Offline',   description: 'Sua conta fica offline durante todo o serviço.',                       price_modifier:    0, price_modifier_pct: 0, is_active: true, sort_order: 7, icon: 'eye-off' },
 ]
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  zap: Zap, eye: Eye, radio: Radio, trophy: Trophy, 'eye-off': EyeOff, tv: Tv,
+  zap: Zap, eye: Eye, radio: Radio, trophy: Trophy, 'eye-off': EyeOff, tv: Tv, users: Users,
 }
 
 export function StepExtras() {

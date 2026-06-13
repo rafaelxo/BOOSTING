@@ -7,7 +7,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { signOut } from '@/lib/supabase'
-import { Avatar, LogoMark } from '@/components/ui'
+import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -133,6 +133,7 @@ export function AdminLayout() {
         <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
           <p className="text-sm text-ink-muted font-medium">{t('admin.nav.panel')}</p>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
               <Bell className="h-[18px] w-[18px]" />
             </button>

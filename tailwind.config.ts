@@ -6,13 +6,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Base — dark neutral, complementa o verde
+        // Base — driven by CSS variables, responds to theme toggle
         bg: {
-          base:     '#0B0D0C',
-          surface:  '#0F1211',
-          card:     '#151A18',
-          elevated: '#1C2421',
-          overlay:  '#232D2A',
+          base:     'rgb(var(--color-bg-base) / <alpha-value>)',
+          surface:  'rgb(var(--color-bg-surface) / <alpha-value>)',
+          card:     'rgb(var(--color-bg-card) / <alpha-value>)',
+          elevated: 'rgb(var(--color-bg-elevated) / <alpha-value>)',
+          overlay:  'rgb(var(--color-bg-overlay) / <alpha-value>)',
         },
         // Brand — verde
         brand: {
@@ -27,12 +27,12 @@ export default {
           hover:   '#D9A300',
           muted:   '#2E2400',
         },
-        // Text
+        // Text — driven by CSS variables
         ink: {
-          DEFAULT:   '#EEF2EE',
-          secondary: '#9FA8A0',
-          muted:     '#6A7870',
-          inverse:   '#0B0D0C',
+          DEFAULT:   'rgb(var(--color-ink) / <alpha-value>)',
+          secondary: 'rgb(var(--color-ink-secondary) / <alpha-value>)',
+          muted:     'rgb(var(--color-ink-muted) / <alpha-value>)',
+          inverse:   'rgb(var(--color-ink-inverse) / <alpha-value>)',
         },
         // Status
         success: { DEFAULT: '#10B981', muted: '#0A2E20' },
@@ -63,11 +63,11 @@ export default {
         '3xl': '1.5rem',
       },
       boxShadow: {
-        card:         '0 1px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
-        'card-hover': '0 8px 24px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3)',
-        brand:        '0 0 24px rgba(34,197,94,0.35)',
-        accent:       '0 0 20px rgba(245,184,0,0.3)',
-        glow:         '0 0 60px rgba(34,197,94,0.12)',
+        card:         'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
+        brand:        'var(--shadow-brand)',
+        accent:       'var(--shadow-accent)',
+        glow:         'var(--shadow-glow)',
       },
       backgroundImage: {
         'gradient-brand':  'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',

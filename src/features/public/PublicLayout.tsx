@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Menu, X } from 'lucide-react'
-import { Button, LanguageToggle, LogoMark } from '@/components/ui'
+import { Button, ThemeToggle, LogoMark } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -103,7 +103,7 @@ export function PublicLayout() {
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3 ml-auto">
             <LiveIndicator />
-            <LanguageToggle />
+            <ThemeToggle />
             {isAuthenticated() ? (
               <Button asChild size="sm">
                 <Link to={dashboardLink}>{t('nav.dashboard')}</Link>
@@ -145,7 +145,7 @@ export function PublicLayout() {
               </Link>
             ))}
             <div className="pt-3 flex gap-2">
-              <LanguageToggle />
+              <ThemeToggle />
               <Button asChild variant="secondary" size="sm" className="flex-1">
                 <Link to="/login">{t('nav.signIn')}</Link>
               </Button>

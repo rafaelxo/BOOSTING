@@ -2,33 +2,8 @@ import { useEffect } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
+import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE } from '@/lib/pricing'
 import type { Division, QueueType, RankTier } from '@/types'
-
-// ─── Price engine (mirrors HomePage configurator) ─────────────────────────────
-const DIVISIONS_ORDER: Division[] = ['IV', 'III', 'II', 'I']
-const NO_DIV: RankTier[] = ['master', 'grandmaster', 'challenger']
-
-function rankValue(tier: RankTier, div: Division | null): number {
-  const ti = RANK_TIER_ORDER.indexOf(tier)
-  if (NO_DIV.includes(tier)) return ti * 40 + 28
-  const di = DIVISIONS_ORDER.indexOf(div ?? 'IV')
-  return ti * 40 + di * 8
-}
-
-function calcEloPrice(
-  fTier: RankTier, fDiv: Division | null,
-  tTier: RankTier, tDiv: Division | null
-): { price: number; hours: number } {
-  const diff = rankValue(tTier, tDiv) - rankValue(fTier, fDiv)
-  if (diff <= 0) return { price: 0, hours: 0 }
-  const price = Math.round((diff * 0.55 + 9.99) * 100) / 100
-  const hours = Math.max(1, Math.round(diff * 0.45))
-  return { price, hours }
-}
-
-const WIN_BOOST_PRICE_PER_WIN = 3.99
-const COACHING_PRICE: Record<number, number> = { 1: 19.99, 2: 34.99 }
-const PLACEMENT_BASE = 14.99
 
 const SERVERS = ['NA', 'EUW', 'EUNE', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'JP', 'KR']
 const DIVISIONS: Division[] = ['I', 'II', 'III', 'IV']
@@ -108,17 +83,22 @@ export function StepConfigure() {
 
   // ── Recalculate price whenever any input changes ──────────────────────────
   useEffect(() => {
-    if (serviceType === 'elo_boost' || serviceType === 'placement_matches') {
-      if (!currentRank) return
-      if (serviceType === 'elo_boost' && !targetRank) return
-      const { price, hours } = serviceType === 'elo_boost'
-        ? calcEloPrice(currentRank.tier, currentRank.division ?? null, targetRank!.tier, targetRank!.division ?? null)
-        : { price: PLACEMENT_BASE, hours: 3 }
+    if (serviceType === 'elo_boost') {
+      if (!currentRank || !targetRank) return
+      const { price, hours } = calcEloPrice(
+        currentRank.tier, currentRank.division ?? null,
+        targetRank.tier, targetRank.division ?? null,
+      )
       setBasePrice(price)
       setEstimatedHours(hours || null)
+    } else if (serviceType === 'placement_matches') {
+      if (!currentRank) return
+      setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
+      setEstimatedHours(3)
     } else if (serviceType === 'win_boost') {
-      if (!winsPurchased) return
-      setBasePrice(Math.round(winsPurchased * WIN_BOOST_PRICE_PER_WIN * 100) / 100)
+      if (!winsPurchased || !currentRank) return
+      const pricePerWin = getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
+      setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
     } else if (serviceType === 'coaching') {
       if (!sessionsPurchased) return
@@ -178,7 +158,7 @@ export function StepConfigure() {
         )}
 
         {/* Rank selectors */}
-        {(serviceType === 'elo_boost' || serviceType === 'placement_matches') && (
+        {serviceType === 'elo_boost' && (
           <>
             <RankSelect
               label="Rank Atual"
@@ -193,6 +173,15 @@ export function StepConfigure() {
               onChange={(tier, division) => setTargetRank({ tier, division })}
             />
           </>
+        )}
+
+        {(serviceType === 'placement_matches' || serviceType === 'win_boost') && (
+          <RankSelect
+            label={serviceType === 'placement_matches' ? 'Rank Desejado' : 'Rank Atual'}
+            selectedTier={currentRank?.tier ?? null}
+            selectedDivision={currentRank?.division ?? null}
+            onChange={(tier, division) => setCurrentRank({ tier, division })}
+          />
         )}
 
         {/* Wins for win boost */}

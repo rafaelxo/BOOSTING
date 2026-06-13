@@ -15,28 +15,20 @@ import { useCurrency } from '@/hooks/useCurrency'
 
 // ─── Price engine ──────────────────────────────────────────────────────────────
 
+import { calcEloPrice } from '@/lib/pricing'
+
 const DIVISIONS = ['IV', 'III', 'II', 'I'] as const
 type Division = (typeof DIVISIONS)[number]
-const NO_DIV_TIERS: RankTier[] = ['master', 'grandmaster', 'challenger']
-
-function rankValue(tier: RankTier, div: Division): number {
-  const ti = RANK_TIER_ORDER.indexOf(tier)
-  if (NO_DIV_TIERS.includes(tier)) return ti * 40 + 28
-  const di = DIVISIONS.indexOf(div)
-  return ti * 40 + di * 8
-}
 
 function calcPrice(fTier: RankTier, fDiv: Division, tTier: RankTier, tDiv: Division): number {
-  const diff = rankValue(tTier, tDiv) - rankValue(fTier, fDiv)
-  if (diff <= 0) return 0
-  return Math.round((diff * 0.55 + 9.99) * 100) / 100
+  return calcEloPrice(fTier, fDiv, tTier, tDiv).price
 }
 
 function estHours(fTier: RankTier, fDiv: Division, tTier: RankTier, tDiv: Division): string {
-  const diff = rankValue(tTier, tDiv) - rankValue(fTier, fDiv)
-  if (diff <= 0) return '—'
-  const lo = Math.max(1, Math.round(diff * 0.3))
-  const hi = Math.round(diff * 0.6)
+  const { hours } = calcEloPrice(fTier, fDiv, tTier, tDiv)
+  if (hours === 0) return '—'
+  const lo = Math.max(1, Math.round(hours * 0.6))
+  const hi = Math.round(hours * 1.4)
   return `${lo}–${hi}h`
 }
 
