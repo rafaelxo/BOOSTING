@@ -9,7 +9,7 @@ export function LogoMark({ className }: { className?: string }) {
         backgroundSize: '145%',
       }}
       role="img"
-      aria-label="EloBoost logo"
+      aria-label="EloPeak logo"
     />
   )
 }

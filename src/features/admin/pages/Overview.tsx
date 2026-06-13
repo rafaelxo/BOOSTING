@@ -6,6 +6,7 @@ import { formatCurrency, timeAgo } from '@/lib/utils'
 import type { Order } from '@/types'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { useTranslation } from 'react-i18next'
 
 function useAdminStats() {
   return useQuery({
@@ -34,6 +35,7 @@ function useAdminStats() {
 
 export function AdminOverview() {
   const { data: stats, isLoading } = useAdminStats()
+  const { t } = useTranslation()
 
   const recentOrders = stats?.orders.slice(0, 8) ?? []
 
@@ -50,10 +52,10 @@ export function AdminOverview() {
   return (
     <div className="max-w-7xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink">Overview</h1>
+        <h1 className="text-2xl font-bold text-ink">{t('admin.overview.title')}</h1>
         <div className="flex items-center gap-2 text-xs text-ink-muted">
           <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-slow" />
-          Live
+          {t('admin.overview.live')}
         </div>
       </div>
 
@@ -65,10 +67,10 @@ export function AdminOverview() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total Revenue', value: formatCurrency(stats?.totalRevenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
-            { label: 'Active Orders', value: stats?.activeOrdersCount ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand-muted', trend: null },
-            { label: 'Pending Boosters', value: stats?.pendingBoostersCount ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
-            { label: 'Open Tickets', value: `${stats?.openTicketsCount ?? 0}${stats?.urgentTickets ? ` (${stats.urgentTickets} urgent)` : ''}`, icon: AlertCircle, color: stats?.urgentTickets ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
+            { label: t('admin.overview.totalRevenue'), value: formatCurrency(stats?.totalRevenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
+            { label: t('admin.overview.activeOrders'), value: stats?.activeOrdersCount ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand-muted', trend: null },
+            { label: t('admin.overview.pendingBoosters'), value: stats?.pendingBoostersCount ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
+            { label: t('admin.overview.openTickets'), value: `${stats?.openTicketsCount ?? 0}${stats?.urgentTickets ? ` (${stats.urgentTickets} ${t('admin.overview.urgent')})` : ''}`, icon: AlertCircle, color: stats?.urgentTickets ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
           ].map(({ label, value, icon: Icon, color, trend }) => (
             <Card key={label} padding="md">
               <div className="flex items-start justify-between mb-3">
@@ -87,7 +89,7 @@ export function AdminOverview() {
       <div className="grid lg:grid-cols-2 gap-5">
         {/* Orders chart */}
         <Card padding="md">
-          <h3 className="text-sm font-semibold text-ink mb-4">Orders This Week</h3>
+          <h3 className="text-sm font-semibold text-ink mb-4">{t('admin.overview.ordersWeek')}</h3>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData}>
               <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} />
@@ -104,8 +106,8 @@ export function AdminOverview() {
         {/* Recent orders */}
         <Card padding="md">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-ink">Recent Orders</h3>
-            <Link to="/admin/orders" className="text-xs text-brand hover:underline">View all</Link>
+            <h3 className="text-sm font-semibold text-ink">{t('admin.overview.recentOrders')}</h3>
+            <Link to="/admin/orders" className="text-xs text-brand hover:underline">{t('admin.overview.viewAll')}</Link>
           </div>
           <div className="space-y-2">
             {recentOrders.map((order) => (

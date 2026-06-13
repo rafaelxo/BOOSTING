@@ -6,9 +6,11 @@ import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { PayoutRecord } from '@/types'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { useTranslation } from 'react-i18next'
 
 export function BoosterEarningsPage() {
   const { profile } = useAuthStore()
+  const { t } = useTranslation()
 
   const { data: payouts, isLoading } = useQuery({
     queryKey: ['booster-payouts', profile?.id],

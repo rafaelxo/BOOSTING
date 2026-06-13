@@ -1,24 +1,41 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Briefcase, Filter } from 'lucide-react'
+import { Briefcase, Filter, Lock } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
 import type { Order, QueueType } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 const SERVER_OPTIONS = ['All', 'NA', 'EUW', 'EUNE', 'BR', 'OCE', 'KR']
-const QUEUE_OPTIONS: { label: string; value: QueueType | 'all' }[] = [
-  { label: 'All Queues', value: 'all' },
-  { label: 'Solo/Duo', value: 'solo_duo' },
-  { label: 'Flex', value: 'flex' },
-]
 
 export function AvailableJobsPage() {
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const [server, setServer] = useState('All')
   const [queue, setQueue] = useState<QueueType | 'all'>('all')
+  const { t } = useTranslation()
+
+  const QUEUE_OPTIONS: { label: string; value: QueueType | 'all' }[] = [
+    { label: 'All Queues', value: 'all' },
+    { label: t('booster.jobs.soloQueue'), value: 'solo_duo' },
+    { label: t('booster.jobs.flexQueue'), value: 'flex' },
+  ]
+
+  // Reuse cached value from BoosterLayout
+  const { data: boosterProfile } = useQuery({
+    queryKey: ['booster-profile', profile?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('booster_profiles')
+        .select('status')
+        .eq('user_id', profile!.id)
+        .maybeSingle()
+      return data
+    },
+    enabled: !!profile?.id,
+  })
 
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['available-jobs'],
@@ -60,18 +77,37 @@ export function AvailableJobsPage() {
     return true
   }) ?? []
 
+  // Block access until the booster profile is approved by an admin
+  if (boosterProfile && boosterProfile.status !== 'approved') {
+    const statusMessages: Record<string, { title: string; desc: string }> = {
+      pending:      { title: t('booster.jobs.locked.pending'), desc: t('booster.jobs.locked.pendingDesc') },
+      under_review: { title: t('booster.jobs.locked.under_review'), desc: t('booster.jobs.locked.under_reviewDesc') },
+      suspended:    { title: t('booster.jobs.locked.suspended'), desc: t('booster.jobs.locked.suspendedDesc') },
+    }
+    const msg = statusMessages[boosterProfile.status] ?? { title: t('booster.jobs.locked.default'), desc: t('booster.jobs.locked.defaultDesc') }
+    return (
+      <div className="max-w-4xl">
+        <EmptyState
+          icon={Lock}
+          title={msg.title}
+          description={msg.desc}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-4xl space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Available Jobs</h1>
+          <h1 className="text-2xl font-bold text-ink">{t('booster.jobs.title')}</h1>
           <p className="text-sm text-ink-secondary mt-1">
-            {filtered.length} job{filtered.length !== 1 ? 's' : ''} available
+            {t('booster.jobs.count', { count: filtered.length })}
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs text-ink-muted">
           <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-slow" />
-          Live
+          {t('booster.jobs.live')}
         </div>
       </div>
 
@@ -122,7 +158,7 @@ export function AvailableJobsPage() {
                   <span className="text-xs font-mono text-ink-muted">#{job.id.slice(0, 8).toUpperCase()}</span>
                   <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">{job.server}</span>
                   <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">
-                    {job.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
+                    {job.queue_type === 'solo_duo' ? t('booster.jobs.soloQueue') : t('booster.jobs.flexQueue')}
                   </span>
                 </div>
                 {job.current_rank && job.target_rank && (

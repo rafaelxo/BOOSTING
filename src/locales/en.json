@@ -27,7 +27,7 @@
     "signIn": "Sign In",
     "register": "Register",
     "dashboard": "Dashboard",
-    "copyright": "© {{year}} EloBoost. All rights reserved.",
+    "copyright": "© {{year}} EloPeak. All rights reserved.",
     "privacy": "Privacy",
     "terms": "Terms",
     "available247": "Service available 24/7"
@@ -266,5 +266,344 @@
       "successDesc": "We sent a confirmation link to your email. Click it to activate your account.",
       "backToLogin": "Back to sign in"
     }
+  },
+  "booster": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "jobs": "Available Jobs",
+      "earnings": "Earnings",
+      "profile": "My Profile",
+      "signOut": "Sign out",
+      "role": "Booster",
+      "pendingBanner": "Application pending",
+      "pendingBannerDesc": "Our team is reviewing your profile."
+    },
+    "dashboard": {
+      "title": "Booster Dashboard",
+      "activeCount": "{{count}} active assignment",
+      "activeCountPlural": "{{count}} active assignments",
+      "noActive": "No active assignments right now.",
+      "browseJobs": "Browse Jobs",
+      "stats": {
+        "active": "Active Orders",
+        "completed": "Completed",
+        "earned": "Total Earned",
+        "rating": "Rating"
+      },
+      "activeTitle": "Active Assignments",
+      "viewAll": "View all →",
+      "empty": "No active assignments",
+      "emptyDesc": "Browse available jobs to pick up a new order.",
+      "pending": {
+        "title": "Application Under Review",
+        "desc": "Your booster application is being reviewed by our team. We'll notify you once approved.",
+        "statusLabel": "Status:"
+      }
+    },
+    "jobs": {
+      "title": "Available Jobs",
+      "count": "{{count}} job available",
+      "countPlural": "{{count}} jobs available",
+      "live": "Live",
+      "accept": "Accept",
+      "yourCut": "Your cut (75%)",
+      "posted": "Posted {{time}}",
+      "soloQueue": "Solo/Duo",
+      "flexQueue": "Flex",
+      "empty": "No jobs available",
+      "emptyDesc": "Check back soon — orders come in frequently.",
+      "locked": {
+        "pending": "Application under review",
+        "pendingDesc": "Our team is reviewing your profile. You'll be notified once approved.",
+        "under_review": "Final review in progress",
+        "under_reviewDesc": "Almost there! Your profile is in its final review stage.",
+        "suspended": "Account suspended",
+        "suspendedDesc": "Contact support for more information.",
+        "default": "Profile not active",
+        "defaultDesc": "Contact support."
+      }
+    },
+    "job": {
+      "details": "Job Details",
+      "server": "Server",
+      "queue": "Queue",
+      "from": "From",
+      "to": "To",
+      "soloQueue": "Solo/Duo",
+      "flexQueue": "Flex",
+      "customerNotes": "Customer Notes",
+      "chat": "Order Chat",
+      "messagePlaceholder": "Message customer...",
+      "earnings": "Earnings",
+      "yourCutOf": "Your cut (75% of {{amount}})",
+      "actions": "Actions",
+      "startOrder": "Start Order",
+      "pause": "Pause",
+      "resume": "Resume",
+      "markComplete": "Mark Complete"
+    },
+    "earnings": {
+      "title": "Earnings",
+      "totalEarned": "Total Earned",
+      "thisMonth": "This Month",
+      "pendingPayout": "Pending Payout",
+      "monthlyChart": "Monthly Earnings",
+      "payoutHistory": "Payout History",
+      "noPayouts": "No payouts yet. Complete orders to start earning.",
+      "order": "Order #{{id}}",
+      "earned": "Earned"
+    },
+    "profile": {
+      "title": "My Profile & Reputation",
+      "reviews": "{{count}} reviews",
+      "ordersDone": "Orders Done",
+      "avgRating": "Avg Rating",
+      "peakRank": "Peak Rank"
+    },
+    "onboarding": {
+      "title": "Complete Your Booster Profile",
+      "subtitle": "Fill in your details and our team will review your application.",
+      "displayName": "Display Name",
+      "bio": "Bio",
+      "bioHint": "Tell customers about your experience and style.",
+      "bioPlaceholder": "e.g. Diamond 1 ADC main, 5+ years of boosting experience...",
+      "peakRank": "Peak Rank",
+      "games": "Games",
+      "servers": "Servers",
+      "submit": "Submit Application"
+    }
+  },
+  "admin": {
+    "nav": {
+      "operations": "Operations",
+      "finance": "Finance",
+      "support": "Support",
+      "system": "System",
+      "overview": "Overview",
+      "orders": "Orders",
+      "boosters": "Boosters",
+      "customers": "Customers",
+      "payments": "Payments",
+      "refunds": "Refunds",
+      "tickets": "Tickets",
+      "reviews": "Reviews",
+      "services": "Services",
+      "audit": "Audit Logs",
+      "signOut": "Sign out",
+      "role": "Admin",
+      "panel": "Admin Panel"
+    },
+    "overview": {
+      "title": "Overview",
+      "live": "Live",
+      "totalRevenue": "Total Revenue",
+      "activeOrders": "Active Orders",
+      "pendingBoosters": "Pending Boosters",
+      "openTickets": "Open Tickets",
+      "urgent": "urgent",
+      "ordersWeek": "Orders This Week",
+      "recentOrders": "Recent Orders",
+      "viewAll": "View all"
+    },
+    "orders": {
+      "title": "Orders",
+      "search": "Search order ID...",
+      "filters": {
+        "all": "All",
+        "active": "Active",
+        "awaiting": "Awaiting",
+        "disputed": "Disputed",
+        "completed": "Completed"
+      },
+      "table": {
+        "id": "Order ID",
+        "service": "Service",
+        "server": "Server",
+        "amount": "Amount",
+        "status": "Status",
+        "created": "Created"
+      },
+      "empty": "No orders found"
+    },
+    "boosters": {
+      "title": "Boosters",
+      "filters": {
+        "all": "All",
+        "pending": "Pending",
+        "under_review": "Under Review",
+        "approved": "Approved",
+        "suspended": "Suspended"
+      },
+      "table": {
+        "name": "Name",
+        "games": "Games",
+        "rating": "Rating",
+        "completed": "Completed",
+        "status": "Status",
+        "joined": "Joined",
+        "actions": "Actions"
+      },
+      "approve": "Approve",
+      "reject": "Reject",
+      "suspend": "Suspend",
+      "reinstate": "Reinstate",
+      "empty": "No boosters found"
+    },
+    "customers": {
+      "title": "Customers",
+      "table": {
+        "username": "Username",
+        "email": "Email",
+        "totalOrders": "Total Orders",
+        "totalSpent": "Total Spent",
+        "joined": "Joined"
+      },
+      "empty": "No customers yet"
+    },
+    "payments": {
+      "title": "Payments",
+      "totalCollected": "Total Collected",
+      "table": {
+        "id": "Payment ID",
+        "order": "Order",
+        "amount": "Amount",
+        "method": "Method",
+        "status": "Status",
+        "date": "Date"
+      },
+      "empty": "No payments yet"
+    },
+    "refunds": {
+      "title": "Refunds",
+      "table": {
+        "id": "Refund ID",
+        "order": "Order",
+        "amount": "Amount",
+        "reason": "Reason",
+        "status": "Status",
+        "date": "Date"
+      },
+      "empty": "No refunds issued"
+    },
+    "tickets": {
+      "title": "Support Tickets",
+      "table": {
+        "subject": "Subject",
+        "priority": "Priority",
+        "status": "Status",
+        "assigned": "Assigned",
+        "created": "Created",
+        "actions": "Actions"
+      },
+      "unassigned": "Unassigned",
+      "assignToMe": "Assign to me",
+      "empty": "No tickets"
+    },
+    "audit": {
+      "title": "Audit Logs",
+      "table": {
+        "actor": "Actor",
+        "action": "Action",
+        "entity": "Entity",
+        "ip": "IP",
+        "time": "Time"
+      },
+      "empty": "No audit events yet"
+    }
+  },
+  "pricing": {
+    "sectionLabel": "Transparent pricing",
+    "title": "Pricing",
+    "subtitle": "Prices shown are base rates for solo queue on NA. Final price is calculated in the order builder based on your server, current rank, queue type, and extras.",
+    "eloBoost": "Elo Boost — Per Division",
+    "winBoost": "Win Boost",
+    "coaching": "Coaching",
+    "extrasTitle": "Available Extras",
+    "from": "From",
+    "to": "To",
+    "price": "Price",
+    "wins": "{{count}} Wins",
+    "sessions": "{{count}} session of {{hours}}h",
+    "sessionsPlural": "{{count}} sessions of {{hours}}h",
+    "startingFrom": "Starting from",
+    "orderNow": "Order Now",
+    "configureOrder": "Configure Order",
+    "extras": {
+      "priority": "Priority Processing",
+      "priorityDesc": "Instant assignment to top-rated booster",
+      "solo": "Solo Queue Only",
+      "soloDesc": "No duo lobbies",
+      "mono": "Mono Champion",
+      "monoDesc": "Specific champion every game",
+      "stream": "Live Stream",
+      "streamDesc": "Private stream of your games",
+      "monitoring": "Live Monitoring",
+      "monitoringDesc": "Staff-monitored order with updates",
+      "offline": "Appear Offline",
+      "offlineDesc": "Invisible on friends list",
+      "free": "Free"
+    }
+  },
+  "security": {
+    "title": "Security",
+    "subtitle": "How we protect you and your account.",
+    "sectionLabel": "Trust & Security",
+    "pillars": {
+      "accountProtection": "Account Protection",
+      "authSessions": "Authentication & Sessions",
+      "paymentSecurity": "Payment Security",
+      "privacy": "Privacy & Data",
+      "accessControl": "Access Control",
+      "infrastructure": "Infrastructure"
+    },
+    "items": {
+      "vpn": "VPN enabled on every gaming session",
+      "offline": "'Appear Offline' mode — your friends list stays clean",
+      "noCredentials": "No storing of your login credentials beyond the session",
+      "cleanIp": "Boosters operate from devices with clean IP history",
+      "bcrypt": "Supabase Auth with bcrypt password hashing",
+      "jwt": "Secure JWT sessions with auto-rotation",
+      "revocation": "Session revocation on password change",
+      "2fa": "2FA available for your account",
+      "stripe": "Card data never touches our servers — Stripe handles it all",
+      "pci": "PCI-DSS compliant payment processing",
+      "webhook": "Webhook signature validation on every event",
+      "idempotent": "Idempotent payment operations prevent double-charging",
+      "minimal": "Minimal data collection — only what's needed",
+      "noEmail": "Booster never sees your full email or personal details",
+      "privateUrls": "All stored files use private URLs with expiry",
+      "deletion": "Data deletion available on account close",
+      "rls": "Row-Level Security — customers only see their own orders",
+      "boosters": "Boosters can only access jobs assigned to them",
+      "audit": "Admin access is fully audited and logged",
+      "serverSide": "Roles are enforced server-side, never trusting the client",
+      "encrypted": "All data encrypted at rest and in transit (TLS 1.3)",
+      "soc2": "Hosted on Supabase (SOC 2 Type II certified)",
+      "backups": "Regular automated backups"
+    }
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "sectionLabel": "FAQ",
+    "q1": "Is elo boosting safe?",
+    "a1": "We use VPN on all sessions, appear-offline mode, and never store your credentials beyond the active order. Our boosters have clean IP histories and follow strict account-safety protocols. We've completed 48,000+ orders without a single permanent ban from our methods.",
+    "q2": "How long will my order take?",
+    "a2": "Most orders begin within 30 minutes of payment confirmation. Estimated delivery times are shown before checkout and depend on rank gap, queue type, and server. Priority add-on guarantees a top-rated booster is assigned immediately.",
+    "q3": "Can I watch my booster play?",
+    "a3": "Yes — add the 'Live Stream' extra during checkout and you'll receive a private stream link after your order starts. You can watch every game in real time.",
+    "q4": "What if the order isn't completed?",
+    "a4": "We offer a 100% completion guarantee. If a booster cannot finish your order for any reason, we reassign it or issue a full refund. No questions asked.",
+    "q5": "Do I share my account password?",
+    "a5": "For solo boosting, yes — you share login credentials through our encrypted platform, and they are cleared from our systems as soon as the order finishes. For duo boosting, you play alongside our booster and no credentials are needed.",
+    "q6": "Can I request a specific champion or role?",
+    "a6": "Yes. During the order configuration step you can specify role and champion preferences. Add the 'Mono Champion' extra for guaranteed one-champion play.",
+    "q7": "What servers do you support?",
+    "a7": "We support all major League of Legends servers: NA, EUW, EUNE, BR, LAN, LAS, OCE, TR, RU, JP, and KR.",
+    "q8": "How are boosters vetted?",
+    "a8": "All boosters apply through our platform and go through a multi-step verification: rank proof, identity check, test games review, and a waiting period under observation. Only Diamond IV+ boosters are approved.",
+    "q9": "What payment methods do you accept?",
+    "a9": "We accept all major credit and debit cards (Visa, Mastercard, Amex), Apple Pay, and Google Pay, processed securely through Stripe.",
+    "q10": "Can I chat with my booster?",
+    "a10": "Absolutely. Every order includes an in-order chat where you can message your booster directly."
   }
 }

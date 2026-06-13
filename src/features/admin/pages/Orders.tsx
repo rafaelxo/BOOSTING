@@ -7,18 +7,20 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, timeAgo } from '@/lib/utils'
 import type { Order, OrderStatus } from '@/types'
-
-const STATUS_OPTS: { label: string; value: OrderStatus | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Active', value: 'in_progress' },
-  { label: 'Awaiting', value: 'awaiting_assignment' },
-  { label: 'Disputed', value: 'disputed' },
-  { label: 'Completed', value: 'completed' },
-]
+import { useTranslation } from 'react-i18next'
 
 export function AdminOrdersPage() {
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
   const [search, setSearch] = useState('')
+  const { t } = useTranslation()
+
+  const STATUS_OPTS: { label: string; value: OrderStatus | 'all' }[] = [
+    { label: t('admin.orders.filters.all'), value: 'all' },
+    { label: t('admin.orders.filters.active'), value: 'in_progress' },
+    { label: t('admin.orders.filters.awaiting'), value: 'awaiting_assignment' },
+    { label: t('admin.orders.filters.disputed'), value: 'disputed' },
+    { label: t('admin.orders.filters.completed'), value: 'completed' },
+  ]
 
   const { data: orders, isLoading } = useQuery({
     queryKey: ['admin-orders', status],
@@ -38,12 +40,12 @@ export function AdminOrdersPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-ink">Orders</h1>
+      <h1 className="text-2xl font-bold text-ink">{t('admin.orders.title')}</h1>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
-          <input className="input-base pl-9" placeholder="Search order ID..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="input-base pl-9" placeholder={t('admin.orders.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1">
           {STATUS_OPTS.map(({ label, value }) => (
@@ -62,17 +64,17 @@ export function AdminOrdersPage() {
         {isLoading ? (
           <div className="p-4"><Skeleton className="h-64 w-full" /></div>
         ) : !filtered.length ? (
-          <EmptyState icon={Search} title="No orders found" />
+          <EmptyState icon={Search} title={t('admin.orders.empty')} />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Server</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>{t('admin.orders.table.id')}</TableHead>
+                <TableHead>{t('admin.orders.table.service')}</TableHead>
+                <TableHead>{t('admin.orders.table.server')}</TableHead>
+                <TableHead>{t('admin.orders.table.amount')}</TableHead>
+                <TableHead>{t('admin.orders.table.status')}</TableHead>
+                <TableHead>{t('admin.orders.table.created')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

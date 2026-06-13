@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { RANK_TIER_LABEL, RANK_TIER_ORDER, cn } from '@/lib/utils'
 import type { RankTier } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 const schema = z.object({
   display_name: z.string().min(2).max(32),

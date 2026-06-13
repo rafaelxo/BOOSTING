@@ -83,7 +83,7 @@ export function RegisterPage() {
               <Zap className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-ink">
-              Elo<span className="text-brand">Boost</span>
+              Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
           <LanguageToggle />

@@ -5,9 +5,11 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank } from '@/lib/utils'
 import type { BoosterProfile } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 export function BoosterProfilePage() {
   const { profile } = useAuthStore()
+  const { t } = useTranslation()
 
   const { data: boosterProfile, isLoading } = useQuery({
     queryKey: ['booster-profile', profile?.id],

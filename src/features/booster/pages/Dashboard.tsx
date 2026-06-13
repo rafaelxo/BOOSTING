@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
 import type { Order, BoosterProfile } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 function useBoosterProfile(userId: string) {
   return useQuery({
@@ -40,6 +41,7 @@ function useAssignedOrders(boosterId: string) {
 
 export function BoosterDashboard() {
   const { profile } = useAuthStore()
+  const { t } = useTranslation()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
   const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id ?? '')
 
@@ -53,12 +55,11 @@ export function BoosterDashboard() {
           <div className="h-14 w-14 rounded-2xl bg-warning/10 flex items-center justify-center mx-auto mb-4">
             <Clock className="h-7 w-7 text-warning" />
           </div>
-          <h2 className="text-xl font-bold text-ink mb-2">Application Under Review</h2>
+          <h2 className="text-xl font-bold text-ink mb-2">{t('booster.dashboard.pending.title')}</h2>
           <p className="text-ink-secondary text-sm">
-            Your booster application is currently being reviewed by our team.
-            We'll notify you once your account is approved.
+            {t('booster.dashboard.pending.desc')}
           </p>
-          <p className="mt-3 text-xs text-ink-muted">Status: <strong className="text-warning">{boosterProfile?.status ?? 'pending'}</strong></p>
+          <p className="mt-3 text-xs text-ink-muted">{t('booster.dashboard.pending.statusLabel')} <strong className="text-warning">{boosterProfile?.status ?? 'pending'}</strong></p>
         </Card>
       </div>
     )
@@ -72,17 +73,17 @@ export function BoosterDashboard() {
     <div className="max-w-5xl space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Booster Dashboard</h1>
+          <h1 className="text-2xl font-bold text-ink">{t('booster.dashboard.title')}</h1>
           <p className="text-ink-secondary mt-1">
             {activeOrders?.length
-              ? `${activeOrders.length} active assignment${activeOrders.length > 1 ? 's' : ''}`
-              : 'No active assignments right now.'}
+              ? t('booster.dashboard.activeCount', { count: activeOrders.length })
+              : t('booster.dashboard.noActive')}
           </p>
         </div>
         <Button asChild>
           <Link to="/booster/jobs">
             <Briefcase className="h-4 w-4" />
-            Browse Jobs
+            {t('booster.dashboard.browseJobs')}
           </Link>
         </Button>
       </div>
@@ -90,10 +91,10 @@ export function BoosterDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Active Orders', value: activeOrders?.length ?? 0, icon: Briefcase, color: 'text-brand bg-brand-muted' },
-          { label: 'Completed', value: completedCount, icon: TrendingUp, color: 'text-success bg-success/10' },
-          { label: 'Total Earned', value: formatCurrency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
-          { label: 'Rating', value: `${rating.toFixed(1)} ⭐`, icon: Star, color: 'text-warning bg-warning/10' },
+          { label: t('booster.dashboard.stats.active'), value: activeOrders?.length ?? 0, icon: Briefcase, color: 'text-brand bg-brand-muted' },
+          { label: t('booster.dashboard.stats.completed'), value: completedCount, icon: TrendingUp, color: 'text-success bg-success/10' },
+          { label: t('booster.dashboard.stats.earned'), value: formatCurrency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
+          { label: t('booster.dashboard.stats.rating'), value: `${rating.toFixed(1)} ⭐`, icon: Star, color: 'text-warning bg-warning/10' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} padding="md">
             <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
@@ -108,9 +109,9 @@ export function BoosterDashboard() {
       {/* Active assignments */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-ink">Active Assignments</h2>
+          <h2 className="text-base font-semibold text-ink">{t('booster.dashboard.activeTitle')}</h2>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/booster/jobs">View all →</Link>
+            <Link to="/booster/jobs">{t('booster.dashboard.viewAll')}</Link>
           </Button>
         </div>
 
@@ -119,9 +120,9 @@ export function BoosterDashboard() {
         ) : !activeOrders?.length ? (
           <EmptyState
             icon={Briefcase}
-            title="No active assignments"
-            description="Browse available jobs to pick up a new order."
-            action={{ label: 'Browse Jobs', onClick: () => {} }}
+            title={t('booster.dashboard.empty')}
+            description={t('booster.dashboard.emptyDesc')}
+            action={{ label: t('booster.dashboard.browseJobs'), onClick: () => {} }}
           />
         ) : (
           <div className="space-y-3">

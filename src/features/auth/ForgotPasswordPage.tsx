@@ -47,7 +47,7 @@ export function ForgotPasswordPage() {
           <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
             <Zap className="h-5 w-5 text-white" />
           </div>
-          <span className="text-xl font-bold text-ink">Elo<span className="text-brand">Boost</span></span>
+          <span className="text-xl font-bold text-ink">Elo<span className="text-brand">Peak</span></span>
         </Link>
 
         <div className="card p-6 space-y-5">

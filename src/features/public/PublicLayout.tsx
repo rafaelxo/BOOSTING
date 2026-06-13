@@ -62,7 +62,7 @@ export function PublicLayout() {
           <Link to="/" className="flex items-center gap-2.5 shrink-0">
             <LogoMark className="h-9 w-9" />
             <span className="text-lg font-extrabold tracking-tight text-ink">
-              Elo<span className="text-brand">Boost</span>
+              Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
 
@@ -170,7 +170,7 @@ export function PublicLayout() {
             <div className="col-span-2 md:col-span-2">
               <Link to="/" className="flex items-center gap-2 mb-4">
                 <LogoMark className="h-8 w-8" />
-                <span className="font-extrabold text-ink">Elo<span className="text-brand">Boost</span></span>
+                <span className="font-extrabold text-ink">Elo<span className="text-brand">Peak</span></span>
               </Link>
               <p className="text-sm text-ink-secondary max-w-xs leading-relaxed mb-4">
                 {t('footer.tagline')}

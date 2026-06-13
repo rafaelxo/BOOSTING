@@ -9,19 +9,21 @@ import { signOut, supabase } from '@/lib/supabase'
 import { Avatar, LogoMark } from '@/components/ui'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-
-const NAV_ITEMS = [
-  { href: '/booster',           icon: LayoutDashboard, label: 'Dashboard'      },
-  { href: '/booster/jobs',      icon: Briefcase,       label: 'Available Jobs' },
-  { href: '/booster/earnings',  icon: DollarSign,      label: 'Earnings'       },
-  { href: '/booster/profile',   icon: User,            label: 'My Profile'     },
-]
+import { useTranslation } from 'react-i18next'
 
 export function BoosterLayout() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { profile } = useAuthStore()
   const [profileOpen, setProfileOpen] = useState(false)
+  const { t } = useTranslation()
+
+  const NAV_ITEMS = [
+    { href: '/booster',           icon: LayoutDashboard, label: t('booster.nav.dashboard')  },
+    { href: '/booster/jobs',      icon: Briefcase,       label: t('booster.nav.jobs')        },
+    { href: '/booster/earnings',  icon: DollarSign,      label: t('booster.nav.earnings')    },
+    { href: '/booster/profile',   icon: User,            label: t('booster.nav.profile')     },
+  ]
 
   // Check if booster has completed onboarding
   const { data: boosterProfile, isLoading } = useQuery({
@@ -58,19 +60,19 @@ export function BoosterLayout() {
           <Link to="/" className="flex items-center gap-2.5 flex-1 min-w-0">
             <LogoMark className="h-8 w-8 shrink-0" />
             <span className="font-bold text-ink truncate">
-              Elo<span className="text-brand">Boost</span>
+              Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/15 text-success border border-success/25 shrink-0">
-            Booster
+            {t('booster.nav.role')}
           </span>
         </div>
 
         {/* Pending banner */}
         {isPending && (
           <div className="mx-4 mt-4 p-3 rounded-xl bg-warning/10 border border-warning/25">
-            <p className="text-xs font-semibold text-warning">Application pending</p>
-            <p className="text-[11px] text-ink-muted mt-0.5">Our team is reviewing your profile.</p>
+            <p className="text-xs font-semibold text-warning">{t('booster.nav.pendingBanner')}</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">{t('booster.nav.pendingBannerDesc')}</p>
           </div>
         )}
 
@@ -115,7 +117,7 @@ export function BoosterLayout() {
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors"
               >
-                <LogOut className="h-4 w-4" /> Sign out
+                <LogOut className="h-4 w-4" /> {t('booster.nav.signOut')}
               </button>
             </div>
           )}
@@ -125,7 +127,7 @@ export function BoosterLayout() {
       {/* ── Main area ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
-          <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Boost</span></div>
+          <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Peak</span></div>
           <div className="hidden md:block" />
           <div className="flex items-center gap-2">
             <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">

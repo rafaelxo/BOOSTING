@@ -39,7 +39,7 @@ export function CustomerLayout() {
           <Link to="/" className="flex items-center gap-2.5">
             <LogoMark className="h-8 w-8" />
             <span className="font-bold text-ink">
-              Elo<span className="text-brand">Boost</span>
+              Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
         </div>
@@ -100,7 +100,7 @@ export function CustomerLayout() {
           {/* Mobile logo */}
           <Link to="/" className="md:hidden flex items-center gap-2">
             <LogoMark className="h-7 w-7" />
-            <span className="font-bold text-ink text-sm">Elo<span className="text-brand">Boost</span></span>
+            <span className="font-bold text-ink text-sm">Elo<span className="text-brand">Peak</span></span>
           </Link>
           <div className="hidden md:block" />
           <div className="flex items-center gap-3">

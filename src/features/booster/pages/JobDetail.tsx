@@ -7,13 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
 import type { Order, OrderMessage, OrderStatus } from '@/types'
-
-const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
-  { from: ['assigned'], to: 'in_progress', label: 'Start Order', icon: Play, variant: 'primary' },
-  { from: ['in_progress'], to: 'paused', label: 'Pause', icon: Pause, variant: 'secondary' },
-  { from: ['paused'], to: 'in_progress', label: 'Resume', icon: Play, variant: 'primary' },
-  { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: 'Mark Complete', icon: CheckCircle2, variant: 'success' as const },
-]
+import { useTranslation } from 'react-i18next'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +16,14 @@ export function JobDetailPage() {
   const navigate = useNavigate()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
+
+  const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
+    { from: ['assigned'], to: 'in_progress', label: t('booster.job.startOrder'), icon: Play, variant: 'primary' },
+    { from: ['in_progress'], to: 'paused', label: t('booster.job.pause'), icon: Pause, variant: 'secondary' },
+    { from: ['paused'], to: 'in_progress', label: t('booster.job.resume'), icon: Play, variant: 'primary' },
+    { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
+  ]
 
   const { data: order } = useQuery({
     queryKey: ['order', id],

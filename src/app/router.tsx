@@ -60,12 +60,14 @@ function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' | 'supp
 
   if (!isInitialized || isLoading) return <PageLoader />
   if (!isAuthenticated()) return <Navigate to="/login" replace />
+  if (!profile) return <PageLoader />
 
-  if (role && profile?.role !== role) {
+  if (role && profile.role !== role) {
     // Redirect to correct portal
-    if (profile?.role === 'admin' || profile?.role === 'support') return <Navigate to="/admin" replace />
-    if (profile?.role === 'booster') return <Navigate to="/booster" replace />
-    return <Navigate to="/dashboard" replace />
+    if (profile.role === 'admin' || profile.role === 'support') return <Navigate to="/admin" replace />
+    if (profile.role === 'booster') return <Navigate to="/booster" replace />
+    if (profile.role === 'customer') return <Navigate to="/dashboard" replace />
+    return <Navigate to="/login" replace />
   }
 
   return <Outlet />
