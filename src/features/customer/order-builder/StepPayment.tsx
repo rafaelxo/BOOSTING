@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
@@ -8,7 +7,6 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { Lock, CreditCard, ShieldCheck } from 'lucide-react'
 
 export function StepPayment() {
-  const navigate = useNavigate()
   const { profile } = useAuthStore()
   const store = useOrderBuilderStore()
   const currency = useCurrency()
@@ -44,8 +42,8 @@ export function StepPayment() {
           status: 'awaiting_payment',
           queue_type: store.queueType,
           server: store.server,
-          current_rank: store.currentRank as object,
-          target_rank: store.targetRank as object | null,
+          current_rank: store.currentRank as never,
+          target_rank: store.targetRank as never,
           wins_purchased: store.winsPurchased,
           sessions_purchased: store.sessionsPurchased,
           extras: store.selectedExtras.map(({ extra }) => ({
@@ -54,7 +52,7 @@ export function StepPayment() {
             price: extra.price_modifier > 0
               ? extra.price_modifier
               : Math.round(store.basePrice * extra.price_modifier_pct) / 100,
-          })) as object,
+          })) as never,
           base_price: store.basePrice,
           extras_price: freshExtrasPrice,
           total_price: totalPrice,

@@ -30,7 +30,7 @@ export function CreateTicketModal({ onClose, onCreated, orderId }: Props) {
     const { data: ticket, error } = await supabase
       .from('support_tickets')
       .insert({
-        customer_id: profile?.id,
+        customer_id: profile!.id,
         order_id: orderId ?? null,
         status: 'open',
         priority: 'medium',
@@ -44,8 +44,8 @@ export function CreateTicketModal({ onClose, onCreated, orderId }: Props) {
     // Add first message
     await supabase.from('ticket_messages').insert({
       ticket_id: ticket.id,
-      sender_id: profile?.id,
-      sender_role: profile?.role,
+      sender_id: profile!.id,
+      sender_role: profile!.role,
       content: data.message,
       is_internal: false,
     })

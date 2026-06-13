@@ -1,5 +1,5 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatRank, RANK_TIER_LABEL } from '@/lib/utils'
+import { formatRank } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight } from 'lucide-react'

@@ -17,10 +17,11 @@ export function TicketDetailPage() {
   const { data: ticket } = useQuery({
     queryKey: ['ticket', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('support_tickets').select('*').eq('id', id).single()
+      const { data, error } = await supabase.from('support_tickets').select('*').eq('id', id!).single()
       if (error) throw error
       return data as SupportTicket
     },
+    enabled: !!id,
   })
 
   const { data: messages } = useQuery({
@@ -29,21 +30,22 @@ export function TicketDetailPage() {
       const { data, error } = await supabase
         .from('ticket_messages')
         .select('*')
-        .eq('ticket_id', id)
+        .eq('ticket_id', id!)
         .eq('is_internal', false)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as TicketMessage[]
     },
+    enabled: !!id,
     refetchInterval: 5000,
   })
 
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
       const { error } = await supabase.from('ticket_messages').insert({
-        ticket_id: id,
-        sender_id: profile?.id,
-        sender_role: profile?.role,
+        ticket_id: id!,
+        sender_id: profile!.id,
+        sender_role: profile!.role,
         content,
         is_internal: false,
       })

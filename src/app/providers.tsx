@@ -22,19 +22,48 @@ const queryClient = new QueryClient({
   },
 })
 
+const PROFILE_CACHE_KEY = 'eb_profile_cache'
+
+function getCachedProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function setCachedProfile(profile: unknown) {
+  try {
+    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
+    else localStorage.removeItem(PROFILE_CACHE_KEY)
+  } catch { /* quota exceeded — non-fatal */ }
+}
+
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setProfile, setLoading, setInitialized } = useAuthStore()
 
   useEffect(() => {
-    // onAuthStateChange fires INITIAL_SESSION from localStorage — no extra network call.
-    // Using only this avoids the double-fetch caused by calling getSession() separately.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setSession(session)
         if (session?.user) {
+          // Hydrate from cache instantly so the UI unblocks without waiting for network
+          if (event === 'INITIAL_SESSION') {
+            const cached = getCachedProfile()
+            if (cached && cached.id === session.user.id) {
+              setProfile(cached)
+              setLoading(false)
+              setInitialized(true)
+              // Revalidate in background — don't await
+              refreshProfile(session.user.id)
+              return
+            }
+          }
           await fetchProfile(session.user.id)
         } else {
           setProfile(null)
+          setCachedProfile(null)
           setLoading(false)
           setInitialized(true)
         }
@@ -61,9 +90,25 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .single()
 
-    setProfile(data)
+    if (data) {
+      setCachedProfile(data)
+      setProfile(data)
+    }
     setLoading(false)
     setInitialized(true)
+  }
+
+  async function refreshProfile(userId: string) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (data) {
+      setCachedProfile(data)
+      setProfile(data)
+    }
   }
 
   return <>{children}</>

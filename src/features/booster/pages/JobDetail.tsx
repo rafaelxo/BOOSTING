@@ -1,11 +1,11 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Play, Pause, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Send, Play, Pause, CheckCircle2 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank, timeAgo } from '@/lib/utils'
+import { formatRank } from '@/lib/utils'
 import type { Order, OrderMessage, OrderStatus } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -14,7 +14,6 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
@@ -30,10 +29,11 @@ export function JobDetailPage() {
   const { data: order } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id).single()
+      const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
       if (error) throw error
-      return data as Order
+      return data as unknown as Order
     },
+    enabled: !!id,
   })
 
   const { data: messages } = useQuery({
@@ -42,11 +42,12 @@ export function JobDetailPage() {
       const { data, error } = await supabase
         .from('order_messages')
         .select('*')
-        .eq('order_id', id)
+        .eq('order_id', id!)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as OrderMessage[]
     },
+    enabled: !!id,
     refetchInterval: 5000,
   })
 
@@ -57,14 +58,14 @@ export function JobDetailPage() {
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
       if (!order) return
-      const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id)
+      const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id!)
       if (error) throw error
       // Log status history
       await supabase.from('order_status_history').insert({
-        order_id: id,
+        order_id: id!,
         from_status: order.status,
         to_status: newStatus,
-        changed_by: profile?.id,
+        changed_by: profile!.id,
       })
     },
     onSuccess: () => {
@@ -75,9 +76,9 @@ export function JobDetailPage() {
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
       const { error } = await supabase.from('order_messages').insert({
-        order_id: id,
-        sender_id: profile?.id,
-        sender_role: profile?.role,
+        order_id: id!,
+        sender_id: profile!.id,
+        sender_role: profile!.role,
         content,
         is_read: false,
       })

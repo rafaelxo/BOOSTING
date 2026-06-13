@@ -16,7 +16,7 @@ function useOrder(id: string, refetchInterval?: number) {
     queryFn: async () => {
       const { data, error } = await supabase.from('orders').select('*').eq('id', id).single()
       if (error) throw error
-      return data as Order
+      return data as unknown as Order
     },
     refetchInterval,
   })
@@ -94,9 +94,9 @@ export function OrderDetailPage() {
   const sendMessage = useMutation({
     mutationFn: async (content: string) => {
       const { error } = await supabase.from('order_messages').insert({
-        order_id: id,
-        sender_id: profile?.id,
-        sender_role: profile?.role,
+        order_id: id!,
+        sender_id: profile!.id,
+        sender_role: profile!.role,
         content,
         is_read: false,
       })

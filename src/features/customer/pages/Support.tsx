@@ -19,7 +19,7 @@ export function SupportPage() {
       const { data, error } = await supabase
         .from('support_tickets')
         .select('*')
-        .eq('customer_id', profile?.id)
+        .eq('customer_id', profile!.id)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as SupportTicket[]

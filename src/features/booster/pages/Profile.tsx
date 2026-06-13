@@ -14,9 +14,9 @@ export function BoosterProfilePage() {
   const { data: boosterProfile, isLoading } = useQuery({
     queryKey: ['booster-profile', profile?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('booster_profiles').select('*').eq('user_id', profile?.id).single()
+      const { data, error } = await supabase.from('booster_profiles').select('*').eq('user_id', profile!.id).single()
       if (error) throw error
-      return data as BoosterProfile
+      return data as unknown as BoosterProfile
     },
     enabled: !!profile?.id,
   })

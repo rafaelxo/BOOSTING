@@ -14,10 +14,11 @@ export function AdminBoosterDetailPage() {
   const { data: booster } = useQuery({
     queryKey: ['admin-booster', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('booster_profiles').select('*').eq('id', id).single()
+      const { data, error } = await supabase.from('booster_profiles').select('*').eq('id', id!).single()
       if (error) throw error
-      return data as BoosterProfile
+      return data as unknown as BoosterProfile
     },
+    enabled: !!id,
   })
 
   if (!booster) return null

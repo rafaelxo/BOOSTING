@@ -19,7 +19,7 @@ function useBoosterProfile(userId: string) {
         .eq('user_id', userId)
         .single()
       if (error) throw error
-      return data as BoosterProfile
+      return data as unknown as BoosterProfile
     },
   })
 }
@@ -35,7 +35,7 @@ function useAssignedOrders(boosterId: string) {
         .in('status', ['assigned', 'in_progress', 'paused', 'awaiting_customer'])
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Order[]
+      return data as unknown as Order[]
     },
   })
 }

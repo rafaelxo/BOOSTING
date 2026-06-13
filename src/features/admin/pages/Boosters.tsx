@@ -29,19 +29,19 @@ export function AdminBoostersPage() {
     queryFn: async () => {
       const { data, error } = await supabase.from('booster_profiles').select('*').order('created_at', { ascending: false })
       if (error) throw error
-      return data as BoosterProfile[]
+      return data as unknown as BoosterProfile[]
     },
   })
 
   const updateBoosterStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status }: { id: string; status: 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected' }) => {
       const { error } = await supabase
         .from('booster_profiles')
         .update({ status, verified_at: status === 'approved' ? new Date().toISOString() : null })
         .eq('id', id)
       if (error) throw error
       await supabase.from('audit_logs').insert({
-        actor_id: profile?.id, actor_role: profile?.role,
+        actor_id: profile!.id, actor_role: profile!.role,
         action: `booster.${status}`, entity_type: 'booster_profile', entity_id: id,
       })
     },

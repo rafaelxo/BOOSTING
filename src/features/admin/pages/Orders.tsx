@@ -31,7 +31,7 @@ export function AdminOrdersPage() {
       if (status !== 'all') q = q.eq('status', status)
       const { data, error } = await q
       if (error) throw error
-      return data as Order[]
+      return data as unknown as Order[]
     },
     refetchInterval: 20000,
   })

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { DollarSign, TrendingUp, Clock, CheckCircle2 } from 'lucide-react'
+import { DollarSign, TrendingUp, Clock } from 'lucide-react'
 import { Card, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -20,7 +20,7 @@ export function BoosterEarningsPage() {
       const { data, error } = await supabase
         .from('payout_records')
         .select('*')
-        .eq('booster_id', profile?.id)
+        .eq('booster_id', profile!.id)
         .order('created_at', { ascending: false })
       if (error) throw error
       return data as PayoutRecord[]

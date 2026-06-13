@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { ShoppingBag, DollarSign, Users, AlertCircle, TrendingUp, Clock } from 'lucide-react'
+import { ShoppingBag, DollarSign, Users, AlertCircle } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
 import type { Order } from '@/types'
 import { Link } from 'react-router-dom'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 

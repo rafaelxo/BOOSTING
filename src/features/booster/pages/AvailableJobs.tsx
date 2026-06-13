@@ -49,7 +49,7 @@ export function AvailableJobsPage() {
         .order('created_at', { ascending: true })
         .limit(50)
       if (error) throw error
-      return data as Order[]
+      return data as unknown as Order[]
     },
     refetchInterval: 15000,
   })
@@ -60,7 +60,7 @@ export function AvailableJobsPage() {
         .from('orders')
         .update({
           status: 'assigned',
-          assigned_booster_id: profile?.id,
+          assigned_booster_id: profile!.id,
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId)

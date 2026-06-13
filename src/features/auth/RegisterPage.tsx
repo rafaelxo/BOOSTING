@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -25,7 +25,6 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function RegisterPage() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const isBooster = searchParams.get('role') === 'booster'

@@ -32,7 +32,7 @@ export function AdminTicketsPage() {
     mutationFn: async (ticketId: string) => {
       const { error } = await supabase
         .from('support_tickets')
-        .update({ assigned_to: profile?.id, status: 'in_progress' })
+        .update({ assigned_to: profile!.id, status: 'in_progress' })
         .eq('id', ticketId)
       if (error) throw error
     },

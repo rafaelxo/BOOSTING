@@ -21,7 +21,7 @@ function useRecentOrders(customerId: string) {
         .limit(5)
 
       if (error) throw error
-      return data as Order[]
+      return data as unknown as Order[]
     },
   })
 }

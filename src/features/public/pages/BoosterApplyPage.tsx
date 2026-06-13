@@ -120,7 +120,7 @@ export function BoosterApplyPage() {
         has_coaching: data.has_coaching,
         // attach user_id if already logged in
         user_id: isAuthenticated() ? profile?.id : null,
-        status: 'pending',
+        status: 'pending' as const,
       }
 
       const { error: dbErr } = await supabase

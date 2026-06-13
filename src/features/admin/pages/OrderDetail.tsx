@@ -4,7 +4,7 @@ import { ArrowLeft, RefreshCw, UserCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDateTime, formatRank } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
 
@@ -22,21 +22,22 @@ export function AdminOrderDetailPage() {
   const { data: order } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id).single()
+      const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
       if (error) throw error
-      return data as Order
+      return data as unknown as Order
     },
+    enabled: !!id,
   })
 
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
       if (!order) return
-      await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id)
+      await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id!)
       await supabase.from('order_status_history').insert({
-        order_id: id, from_status: order.status, to_status: newStatus, changed_by: profile?.id, reason: 'Admin override',
+        order_id: id!, from_status: order.status, to_status: newStatus, changed_by: profile!.id, reason: 'Admin override',
       })
       await supabase.from('audit_logs').insert({
-        actor_id: profile?.id, actor_role: profile?.role, action: 'order.status_override',
+        actor_id: profile!.id, actor_role: profile!.role, action: 'order.status_override',
         entity_type: 'order', entity_id: id!, diff: { from: order.status, to: newStatus },
       })
     },
