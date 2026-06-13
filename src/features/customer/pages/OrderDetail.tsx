@@ -6,7 +6,8 @@ import { Send, ArrowLeft, Clock, MessageCircle, CheckCircle2, Loader2 } from 'lu
 import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatDateTime, timeAgo, formatRank } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
 
 function useOrder(id: string, refetchInterval?: number) {
@@ -57,6 +58,7 @@ export function OrderDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { profile } = useAuthStore()
   const { t } = useTranslation()
+  const currency = useCurrency()
   const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -184,7 +186,7 @@ export function OrderDetailPage() {
                     (order.target_rank as { division: string }).division
                   ) : '—',
                 },
-                { label: t('customer.order.totalPaid'),   value: formatCurrency(order.total_price) },
+                { label: t('customer.order.totalPaid'),   value: currency(order.total_price) },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-xs text-ink-muted">{label}</p>

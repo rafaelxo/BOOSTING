@@ -4,13 +4,14 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui'
-import { formatCurrency } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import { Lock, CreditCard, ShieldCheck } from 'lucide-react'
 
 export function StepPayment() {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
   const store = useOrderBuilderStore()
+  const currency = useCurrency()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -110,7 +111,7 @@ export function StepPayment() {
         <div className="card-brand p-5 flex items-center justify-between rounded-2xl">
           <div>
             <p className="text-xs text-ink-secondary">Order Total</p>
-            <p className="text-2xl font-extrabold text-ink mt-0.5">{formatCurrency(totalPrice)}</p>
+            <p className="text-2xl font-extrabold text-ink mt-0.5">{currency(totalPrice)}</p>
           </div>
           <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center shadow-brand">
             <CreditCard className="h-6 w-6 text-white" />
@@ -141,7 +142,7 @@ export function StepPayment() {
           onClick={handleCheckout}
           leftIcon={<Lock className="h-4 w-4" />}
         >
-          Pay {formatCurrency(totalPrice)} — Secure Checkout
+          Pay {currency(totalPrice)} — Secure Checkout
         </Button>
 
         <p className="text-xs text-ink-muted text-center">

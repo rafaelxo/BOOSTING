@@ -4,9 +4,10 @@ import { Briefcase, DollarSign, Star, TrendingUp, Clock, ChevronRight } from 'lu
 import { Button, Card, OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
+import { formatRank, timeAgo } from '@/lib/utils'
 import type { Order, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
+import { useCurrency } from '@/hooks/useCurrency'
 
 function useBoosterProfile(userId: string) {
   return useQuery({
@@ -42,6 +43,7 @@ function useAssignedOrders(boosterId: string) {
 export function BoosterDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
+  const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
   const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id ?? '')
 
@@ -93,7 +95,7 @@ export function BoosterDashboard() {
         {[
           { label: t('booster.dashboard.stats.active'), value: activeOrders?.length ?? 0, icon: Briefcase, color: 'text-brand bg-brand-muted' },
           { label: t('booster.dashboard.stats.completed'), value: completedCount, icon: TrendingUp, color: 'text-success bg-success/10' },
-          { label: t('booster.dashboard.stats.earned'), value: formatCurrency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
+          { label: t('booster.dashboard.stats.earned'), value: currency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
           { label: t('booster.dashboard.stats.rating'), value: `${rating.toFixed(1)} ⭐`, icon: Star, color: 'text-warning bg-warning/10' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} padding="md">
@@ -144,7 +146,7 @@ export function BoosterDashboard() {
                     <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(order.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-success">{formatCurrency(order.total_price * 0.75)}</span>
+                    <span className="text-sm font-bold text-success">{currency(order.total_price * 0.75)}</span>
                     <OrderStatusBadge status={order.status} />
                     <ChevronRight className="h-4 w-4 text-ink-muted" />
                   </div>

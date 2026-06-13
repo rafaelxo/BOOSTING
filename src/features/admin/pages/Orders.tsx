@@ -5,14 +5,16 @@ import { Search } from 'lucide-react'
 import { OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, timeAgo } from '@/lib/utils'
+import { timeAgo } from '@/lib/utils'
 import type { Order, OrderStatus } from '@/types'
 import { useTranslation } from 'react-i18next'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export function AdminOrdersPage() {
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
   const [search, setSearch] = useState('')
   const { t } = useTranslation()
+  const currency = useCurrency()
 
   const STATUS_OPTS: { label: string; value: OrderStatus | 'all' }[] = [
     { label: t('admin.orders.filters.all'), value: 'all' },
@@ -87,7 +89,7 @@ export function AdminOrdersPage() {
                   </TableCell>
                   <TableCell className="text-ink capitalize">{(order.service_id as string).replace(/_/g, ' ')}</TableCell>
                   <TableCell>{order.server}</TableCell>
-                  <TableCell className="font-semibold text-ink">{formatCurrency(order.total_price)}</TableCell>
+                  <TableCell className="font-semibold text-ink">{currency(order.total_price)}</TableCell>
                   <TableCell><OrderStatusBadge status={order.status} /></TableCell>
                   <TableCell>{timeAgo(order.created_at)}</TableCell>
                 </TableRow>

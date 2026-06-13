@@ -14,7 +14,6 @@ import { ServicesPage } from '@/features/public/pages/ServicesPage'
 import { PricingPage } from '@/features/public/pages/PricingPage'
 import { SecurityPage } from '@/features/public/pages/SecurityPage'
 import { FAQPage } from '@/features/public/pages/FAQPage'
-import { ReviewsPage } from '@/features/public/pages/ReviewsPage'
 import { BoosterApplyPage } from '@/features/public/pages/BoosterApplyPage'
 
 // Auth pages
@@ -52,7 +51,6 @@ import { AdminRefundsPage } from '@/features/admin/pages/Refunds'
 import { AdminTicketsPage } from '@/features/admin/pages/Tickets'
 import { AdminAuditPage } from '@/features/admin/pages/AuditLogs'
 import { AdminServicesPage } from '@/features/admin/pages/Services'
-import { AdminReviewsPage } from '@/features/admin/pages/Reviews'
 
 // Route guards
 function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' | 'support' }) {
@@ -96,7 +94,6 @@ export const router = createBrowserRouter([
       { path: '/pricing', element: <PricingPage /> },
       { path: '/security', element: <SecurityPage /> },
       { path: '/faq', element: <FAQPage /> },
-      { path: '/reviews', element: <ReviewsPage /> },
       { path: '/apply', element: <BoosterApplyPage /> },
     ],
   },
@@ -167,7 +164,6 @@ export const router = createBrowserRouter([
           { path: '/admin/tickets', element: <AdminTicketsPage /> },
           { path: '/admin/audit', element: <AdminAuditPage /> },
           { path: '/admin/services', element: <AdminServicesPage /> },
-          { path: '/admin/reviews', element: <AdminReviewsPage /> },
         ],
       },
     ],

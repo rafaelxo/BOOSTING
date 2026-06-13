@@ -528,6 +528,9 @@
     "startingFrom": "Starting from",
     "orderNow": "Order Now",
     "configureOrder": "Configure Order",
+    "winsUnit": "wins",
+    "sessionLabel": "session · {{hours}}h each",
+    "sessionsLabel": "{{count}} sessions · {{hours}}h each",
     "extras": {
       "priority": "Priority Processing",
       "priorityDesc": "Instant assignment to top-rated booster",
@@ -604,6 +607,8 @@
     "q9": "What payment methods do you accept?",
     "a9": "We accept all major credit and debit cards (Visa, Mastercard, Amex), Apple Pay, and Google Pay, processed securely through Stripe.",
     "q10": "Can I chat with my booster?",
-    "a10": "Absolutely. Every order includes an in-order chat where you can message your booster directly."
+    "a10": "Absolutely. Every order includes an in-order chat where you can message your booster directly.",
+    "cantFind": "Can't find what you're looking for?",
+    "contactSupport": "Contact support"
   }
 }

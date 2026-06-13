@@ -1,6 +1,6 @@
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
 import { Stepper, Button, Card } from '@/components/ui'
-import { formatCurrency } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star } from 'lucide-react'
 
 // Step components
@@ -31,6 +31,7 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 
 export function OrderBuilderPage() {
   const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType } = useOrderBuilderStore()
+  const currency = useCurrency()
 
   const currentIdx = steps.indexOf(step)
   const completedSteps = steps.slice(0, currentIdx)
@@ -104,7 +105,7 @@ export function OrderBuilderPage() {
                         <div key={extra.id} className="flex justify-between text-xs">
                           <span className="text-ink-secondary">{extra.name}</span>
                           <span className="text-ink font-medium">
-                            {extra.price_modifier > 0 ? `+${formatCurrency(extra.price_modifier)}` :
+                            {extra.price_modifier > 0 ? `+${currency(extra.price_modifier)}` :
                              extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Free'}
                           </span>
                         </div>
@@ -122,17 +123,17 @@ export function OrderBuilderPage() {
                 <>
                   <div className="flex justify-between text-xs">
                     <span className="text-ink-secondary">Base price</span>
-                    <span className="text-ink">{formatCurrency(basePrice)}</span>
+                    <span className="text-ink">{currency(basePrice)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-ink-secondary">Add-ons</span>
-                    <span className="text-ink">+{formatCurrency(extrasPrice)}</span>
+                    <span className="text-ink">+{currency(extrasPrice)}</span>
                   </div>
                 </>
               )}
               <div className="flex justify-between pt-1">
                 <span className="text-sm font-semibold text-ink">Total</span>
-                <span className="text-base font-bold text-brand">{formatCurrency(totalPrice)}</span>
+                <span className="text-base font-bold text-brand">{currency(totalPrice)}</span>
               </div>
             </div>
           </Card>

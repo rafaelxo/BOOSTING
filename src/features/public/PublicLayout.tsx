@@ -86,10 +86,9 @@ export function PublicLayout() {
               )}
             </div>
             {[
-              { href: '/pricing',  label: t('nav.pricing')   },
-              { href: '/reviews',  label: t('nav.reviews')   },
-              { href: '/security', label: t('nav.security')  },
-              { href: '/faq',      label: t('nav.faq')       },
+              { href: '/pricing',  label: t('nav.pricing')  },
+              { href: '/security', label: t('nav.security') },
+              { href: '/faq',      label: t('nav.faq')      },
             ].map(({ href, label }) => (
               <Link key={href} to={href}
                 className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -134,10 +133,9 @@ export function PublicLayout() {
         {mobileOpen && (
           <div className="lg:hidden border-t border-bg-elevated bg-bg-surface px-5 py-5 space-y-1 animate-slide-down">
             {[
-              { href: '/pricing',  label: t('nav.pricing')  },
-              { href: '/reviews',  label: t('nav.reviews')  },
-              { href: '/security', label: t('nav.security') },
-              { href: '/faq',      label: t('nav.faq')      },
+              { href: '/pricing',  label: t('nav.pricing')      },
+              { href: '/security', label: t('nav.security')     },
+              { href: '/faq',      label: t('nav.faq')          },
               { href: '/apply',    label: t('nav.applyBooster') },
             ].map(({ href, label }) => (
               <Link key={href} to={href} onClick={() => setMobileOpen(false)}
@@ -189,7 +187,6 @@ export function PublicLayout() {
                 { href: '/pricing',                      label: t('footer.pricing')  },
               ]},
               { title: t('footer.company'), links: [
-                { href: '/reviews',  label: t('footer.reviews')  },
                 { href: '/security', label: t('footer.security') },
                 { href: '/faq',      label: t('footer.faq')      },
                 { href: '/apply',    label: t('nav.applyBooster')},

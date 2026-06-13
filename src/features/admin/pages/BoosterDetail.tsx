@@ -3,11 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, formatDate, formatRank } from '@/lib/utils'
+import { formatDate, formatRank } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { BoosterProfile } from '@/types'
 
 export function AdminBoosterDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const currency = useCurrency()
 
   const { data: booster } = useQuery({
     queryKey: ['admin-booster', id],
@@ -59,7 +61,7 @@ export function AdminBoosterDetailPage() {
           <div className="space-y-3">
             {[
               ['Completed Orders', booster.total_completed],
-              ['Total Earnings', formatCurrency(booster.total_earnings)],
+              ['Total Earnings', currency(booster.total_earnings)],
               ['Rating', `${booster.rating.toFixed(1)} ⭐ (${booster.rating_count} reviews)`],
             ].map(([l, v]) => (
               <div key={l as string} className="flex justify-between text-sm">

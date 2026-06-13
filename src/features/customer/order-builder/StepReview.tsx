@@ -1,5 +1,6 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatCurrency, formatRank, RANK_TIER_LABEL } from '@/lib/utils'
+import { formatRank, RANK_TIER_LABEL } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight } from 'lucide-react'
 
@@ -19,6 +20,7 @@ export function StepReview() {
     basePrice, extrasPrice, estimatedHours, customerNotes,
     nextStep,
   } = useOrderBuilderStore()
+  const currency = useCurrency()
 
   const totalPrice = basePrice + extrasPrice
 
@@ -71,7 +73,7 @@ export function StepReview() {
                   label={extra.name}
                   value={
                     extra.price_modifier > 0
-                      ? `+${formatCurrency(extra.price_modifier)}`
+                      ? `+${currency(extra.price_modifier)}`
                       : extra.price_modifier_pct > 0
                         ? `+${extra.price_modifier_pct}%`
                         : 'Free'
@@ -96,13 +98,13 @@ export function StepReview() {
         <div>
           <p className="section-label mb-2">Pricing</p>
           <div className="card p-0 px-2">
-            <ReviewRow label="Base Price" value={formatCurrency(basePrice)} />
+            <ReviewRow label="Base Price" value={currency(basePrice)} />
             {extrasPrice > 0 && (
-              <ReviewRow label="Add-ons" value={`+${formatCurrency(extrasPrice)}`} />
+              <ReviewRow label="Add-ons" value={`+${currency(extrasPrice)}`} />
             )}
             <div className="flex items-center justify-between py-3">
               <span className="text-base font-bold text-ink">Total</span>
-              <span className="text-xl font-extrabold text-brand">{formatCurrency(totalPrice)}</span>
+              <span className="text-xl font-extrabold text-brand">{currency(totalPrice)}</span>
             </div>
           </div>
         </div>
@@ -129,7 +131,7 @@ export function StepReview() {
           disabled={totalPrice <= 0}
           rightIcon={<ChevronRight className="h-5 w-5" />}
         >
-          Proceed to Payment — {formatCurrency(totalPrice)}
+          Proceed to Payment — {currency(totalPrice)}
         </Button>
         {totalPrice <= 0 && (
           <p className="text-xs text-danger text-center">Configure your order to see the price.</p>

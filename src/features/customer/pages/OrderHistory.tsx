@@ -6,12 +6,14 @@ import { ShoppingBag, Search } from 'lucide-react'
 import { OrderStatusBadge, EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, timeAgo } from '@/lib/utils'
+import { timeAgo } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
 
 export function OrderHistoryPage() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
+  const currency = useCurrency()
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all')
   const [search, setSearch] = useState('')
 
@@ -106,7 +108,7 @@ export function OrderHistoryPage() {
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <span className="hidden sm:block text-sm font-semibold text-ink">
-                  {formatCurrency(order.total_price)}
+                  {currency(order.total_price)}
                 </span>
                 <OrderStatusBadge status={order.status} />
               </div>

@@ -4,7 +4,8 @@ import { ArrowLeft, RefreshCw, UserCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatDateTime, formatRank } from '@/lib/utils'
+import { formatDateTime, formatRank } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
 
 const ADMIN_STATUS_OPTIONS: OrderStatus[] = [
@@ -16,6 +17,7 @@ export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
+  const currency = useCurrency()
 
   const { data: order } = useQuery({
     queryKey: ['admin-order', id],
@@ -66,9 +68,9 @@ export function AdminOrderDetailPage() {
                 ['Service', (order.service_id as string).replace(/_/g, ' ')],
                 ['Server', order.server],
                 ['Queue', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
-                ['Base Price', formatCurrency(order.base_price)],
-                ['Extras', formatCurrency(order.extras_price)],
-                ['Total', formatCurrency(order.total_price)],
+                ['Base Price', currency(order.base_price)],
+                ['Extras', currency(order.extras_price)],
+                ['Total', currency(order.total_price)],
                 ['Booster', order.assigned_booster_id ? order.assigned_booster_id.slice(0, 12) + '...' : 'Unassigned'],
               ].map(([l, v]) => (
                 <div key={l as string}>

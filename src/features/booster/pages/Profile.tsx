@@ -26,7 +26,7 @@ export function BoosterProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-ink">My Profile & Reputation</h1>
+      <h1 className="text-2xl font-bold text-ink">{t('booster.profile.title')}</h1>
 
       <Card padding="lg">
         <div className="flex items-start gap-5">
@@ -36,7 +36,7 @@ export function BoosterProfilePage() {
             <div className="flex items-center gap-2 mt-1">
               <Star className="h-4 w-4 fill-accent text-accent" />
               <span className="text-sm font-semibold text-ink">{boosterProfile.rating.toFixed(1)}</span>
-              <span className="text-xs text-ink-muted">({boosterProfile.rating_count} reviews)</span>
+              <span className="text-xs text-ink-muted">{t('booster.profile.reviews', { count: boosterProfile.rating_count })}</span>
             </div>
             <div className="flex flex-wrap gap-2 mt-3">
               {boosterProfile.games.map(g => (
@@ -58,12 +58,12 @@ export function BoosterProfilePage() {
         <Card padding="md" className="text-center">
           <Trophy className="h-6 w-6 text-accent mx-auto mb-2" />
           <p className="text-2xl font-bold text-ink">{boosterProfile.total_completed}</p>
-          <p className="text-xs text-ink-secondary">Orders Done</p>
+          <p className="text-xs text-ink-secondary">{t('booster.profile.ordersDone')}</p>
         </Card>
         <Card padding="md" className="text-center">
           <Star className="h-6 w-6 fill-accent text-accent mx-auto mb-2" />
           <p className="text-2xl font-bold text-ink">{boosterProfile.rating.toFixed(1)}</p>
-          <p className="text-xs text-ink-secondary">Avg Rating</p>
+          <p className="text-xs text-ink-secondary">{t('booster.profile.avgRating')}</p>
         </Card>
         <Card padding="md" className="text-center">
           <TrendingUp className="h-6 w-6 text-brand mx-auto mb-2" />
@@ -72,7 +72,7 @@ export function BoosterProfilePage() {
               ? formatRank(boosterProfile.peak_rank.tier, boosterProfile.peak_rank.division)
               : '—'}
           </p>
-          <p className="text-xs text-ink-secondary">Peak Rank</p>
+          <p className="text-xs text-ink-secondary">{t('booster.profile.peakRank')}</p>
         </Card>
       </div>
     </div>

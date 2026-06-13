@@ -5,9 +5,10 @@ import { ArrowLeft, Send, Play, Pause, CheckCircle2, AlertCircle } from 'lucide-
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
+import { formatRank, timeAgo } from '@/lib/utils'
 import type { Order, OrderMessage, OrderStatus } from '@/types'
 import { useTranslation } from 'react-i18next'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,6 +18,7 @@ export function JobDetailPage() {
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
+  const currency = useCurrency()
 
   const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
     { from: ['assigned'], to: 'in_progress', label: t('booster.job.startOrder'), icon: Play, variant: 'primary' },
@@ -109,26 +111,26 @@ export function JobDetailPage() {
         <div className="lg:col-span-2 space-y-5">
           {/* Order info */}
           <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-4">Job Details</h3>
+            <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div><p className="text-xs text-ink-muted">Server</p><p className="text-sm font-semibold text-ink">{order.server}</p></div>
-              <div><p className="text-xs text-ink-muted">Queue</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'}</p></div>
+              <div><p className="text-xs text-ink-muted">{t('booster.job.server')}</p><p className="text-sm font-semibold text-ink">{order.server}</p></div>
+              <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
               {order.current_rank && (
                 <div>
-                  <p className="text-xs text-ink-muted">From</p>
+                  <p className="text-xs text-ink-muted">{t('booster.job.from')}</p>
                   <p className="text-sm font-semibold text-ink">{formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)}</p>
                 </div>
               )}
               {order.target_rank && (
                 <div>
-                  <p className="text-xs text-ink-muted">To</p>
+                  <p className="text-xs text-ink-muted">{t('booster.job.to')}</p>
                   <p className="text-sm font-semibold text-ink">{formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)}</p>
                 </div>
               )}
             </div>
             {order.customer_notes && (
               <div className="bg-bg-elevated rounded-xl p-3">
-                <p className="text-xs text-ink-muted mb-1">Customer Notes</p>
+                <p className="text-xs text-ink-muted mb-1">{t('booster.job.customerNotes')}</p>
                 <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
               </div>
             )}
@@ -136,7 +138,7 @@ export function JobDetailPage() {
 
           {/* Chat */}
           <Card padding="none" className="flex flex-col">
-            <div className="p-4 border-b border-bg-elevated text-sm font-semibold text-ink">Order Chat</div>
+            <div className="p-4 border-b border-bg-elevated text-sm font-semibold text-ink">{t('booster.job.chat')}</div>
             <div className="overflow-y-auto p-4 space-y-3 min-h-[250px] max-h-[350px]">
               {messages?.map((msg) => {
                 const isMe = msg.sender_id === profile?.id
@@ -156,7 +158,7 @@ export function JobDetailPage() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && message.trim()) { e.preventDefault(); sendMessage.mutate(message.trim()) } }}
-                placeholder="Message customer..."
+                placeholder={t('booster.job.messagePlaceholder')}
                 className="input-base flex-1 py-2 text-sm"
               />
               <Button size="icon" onClick={() => message.trim() && sendMessage.mutate(message.trim())} loading={sendMessage.isPending}>
@@ -169,14 +171,14 @@ export function JobDetailPage() {
         {/* Actions panel */}
         <div className="space-y-4">
           <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-3">Earnings</h3>
-            <p className="text-2xl font-bold text-success">{formatCurrency(order.total_price * 0.75)}</p>
-            <p className="text-xs text-ink-muted mt-0.5">Your cut (75% of {formatCurrency(order.total_price)})</p>
+            <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.earnings')}</h3>
+            <p className="text-2xl font-bold text-success">{currency(order.total_price * 0.75)}</p>
+            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
           </Card>
 
           {availableActions.length > 0 && (
             <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3">Actions</h3>
+              <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
               <div className="space-y-2">
                 {availableActions.map(({ to, label, icon: Icon, variant }) => (
                   <Button

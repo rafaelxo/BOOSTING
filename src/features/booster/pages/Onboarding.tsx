@@ -24,6 +24,7 @@ const SERVER_OPTIONS = ['NA', 'EUW', 'EUNE', 'BR', 'KR', 'OCE']
 export function BoosterOnboardingPage() {
   const { profile } = useAuthStore()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [selectedGames, setSelectedGames] = useState<string[]>(['lol'])
   const [selectedServers, setSelectedServers] = useState<string[]>(['NA'])
   const [peakTier, setPeakTier] = useState<RankTier | null>(null)
@@ -62,27 +63,27 @@ export function BoosterOnboardingPage() {
   return (
     <div className="max-w-xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Complete Your Booster Profile</h1>
+        <h1 className="text-2xl font-bold text-ink">{t('booster.onboarding.title')}</h1>
         <p className="text-sm text-ink-secondary mt-1">
-          Fill in your details and our team will review your application.
+          {t('booster.onboarding.subtitle')}
         </p>
       </div>
 
       <Card padding="lg">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <FormField label="Display Name" error={errors.display_name?.message} required>
+          <FormField label={t('booster.onboarding.displayName')} error={errors.display_name?.message} required>
             <Input placeholder="YourBoosterName" {...register('display_name')} />
           </FormField>
 
-          <FormField label="Bio" hint="Tell customers about your experience and style.">
+          <FormField label={t('booster.onboarding.bio')} hint={t('booster.onboarding.bioHint')}>
             <textarea
-              placeholder="e.g. Diamond 1 ADC main, 5+ years of boosting experience..."
+              placeholder={t('booster.onboarding.bioPlaceholder')}
               className="input-base min-h-[80px] resize-none"
               {...register('bio')}
             />
           </FormField>
 
-          <FormField label="Peak Rank" error={errors.peak_tier?.message} required>
+          <FormField label={t('booster.onboarding.peakRank')} error={errors.peak_tier?.message} required>
             <div className="flex flex-wrap gap-1.5">
               {RANK_TIER_ORDER.map((tier) => (
                 <button
@@ -102,7 +103,7 @@ export function BoosterOnboardingPage() {
             </div>
           </FormField>
 
-          <FormField label="Games" required>
+          <FormField label={t('booster.onboarding.games')} required>
             <div className="flex gap-2">
               {GAME_OPTIONS.map((g) => (
                 <button
@@ -122,7 +123,7 @@ export function BoosterOnboardingPage() {
             </div>
           </FormField>
 
-          <FormField label="Servers" required>
+          <FormField label={t('booster.onboarding.servers')} required>
             <div className="flex flex-wrap gap-1.5">
               {SERVER_OPTIONS.map((s) => (
                 <button
@@ -143,7 +144,7 @@ export function BoosterOnboardingPage() {
           </FormField>
 
           <Button type="submit" className="w-full" loading={isSubmitting}>
-            Submit Application
+            {t('booster.onboarding.submit')}
           </Button>
         </form>
       </Card>

@@ -7,10 +7,12 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { timeAgo } from '@/lib/utils'
 import type { SupportTicket } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 export function AdminTicketsPage() {
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['admin-tickets'],
@@ -39,40 +41,40 @@ export function AdminTicketsPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-ink">Support Tickets</h1>
+      <h1 className="text-2xl font-bold text-ink">{t('admin.tickets.title')}</h1>
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !tickets?.length ? <EmptyState icon={HeadphonesIcon} title="No tickets" /> : (
+          !tickets?.length ? <EmptyState icon={HeadphonesIcon} title={t('admin.tickets.empty')} /> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Subject</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t('admin.tickets.table.subject')}</TableHead>
+                <TableHead>{t('admin.tickets.table.priority')}</TableHead>
+                <TableHead>{t('admin.tickets.table.status')}</TableHead>
+                <TableHead>{t('admin.tickets.table.assigned')}</TableHead>
+                <TableHead>{t('admin.tickets.table.created')}</TableHead>
+                <TableHead>{t('admin.tickets.table.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tickets.map((t) => (
-                <TableRow key={t.id}>
+              {tickets.map((ticket) => (
+                <TableRow key={ticket.id}>
                   <TableCell>
-                    <Link to={`/admin/tickets/${t.id}`} className="text-brand hover:underline text-sm font-medium">
-                      {t.subject}
+                    <Link to={`/admin/tickets/${ticket.id}`} className="text-brand hover:underline text-sm font-medium">
+                      {ticket.subject}
                     </Link>
                   </TableCell>
-                  <TableCell><TicketPriorityBadge priority={t.priority} /></TableCell>
-                  <TableCell><TicketStatusBadge status={t.status} /></TableCell>
-                  <TableCell className="text-xs">{t.assigned_to ? t.assigned_to.slice(0, 8) + '...' : <span className="text-ink-muted">Unassigned</span>}</TableCell>
-                  <TableCell>{timeAgo(t.created_at)}</TableCell>
+                  <TableCell><TicketPriorityBadge priority={ticket.priority} /></TableCell>
+                  <TableCell><TicketStatusBadge status={ticket.status} /></TableCell>
+                  <TableCell className="text-xs">{ticket.assigned_to ? ticket.assigned_to.slice(0, 8) + '...' : <span className="text-ink-muted">{t('admin.tickets.unassigned')}</span>}</TableCell>
+                  <TableCell>{timeAgo(ticket.created_at)}</TableCell>
                   <TableCell>
-                    {!t.assigned_to && (
+                    {!ticket.assigned_to && (
                       <button
-                        onClick={() => assignTicket.mutate(t.id)}
+                        onClick={() => assignTicket.mutate(ticket.id)}
                         className="text-xs text-brand hover:underline"
                       >
-                        Assign to me
+                        {t('admin.tickets.assignToMe')}
                       </button>
                     )}
                   </TableCell>

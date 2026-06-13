@@ -8,11 +8,21 @@ import { useAuthStore } from '@/stores/authStore'
 import { formatDate } from '@/lib/utils'
 import type { BoosterProfile } from '@/types'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export function AdminBoostersPage() {
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<string>('all')
+  const { t } = useTranslation()
+
+  const filterLabels: Record<string, string> = {
+    all: t('admin.boosters.filters.all'),
+    pending: t('admin.boosters.filters.pending'),
+    under_review: t('admin.boosters.filters.under_review'),
+    approved: t('admin.boosters.filters.approved'),
+    suspended: t('admin.boosters.filters.suspended'),
+  }
 
   const { data: boosters, isLoading } = useQuery({
     queryKey: ['admin-boosters'],
@@ -42,30 +52,30 @@ export function AdminBoostersPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-ink">Boosters</h1>
+      <h1 className="text-2xl font-bold text-ink">{t('admin.boosters.title')}</h1>
 
       <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1 w-fit">
         {['all', 'pending', 'under_review', 'approved', 'suspended'].map((s) => (
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>
-            {s.replace('_', ' ')}
+            {filterLabels[s] ?? s}
           </button>
         ))}
       </div>
 
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !filtered.length ? <EmptyState icon={Shield} title="No boosters found" /> : (
+          !filtered.length ? <EmptyState icon={Shield} title={t('admin.boosters.empty')} /> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Games</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Completed</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>{t('admin.boosters.table.name')}</TableHead>
+                <TableHead>{t('admin.boosters.table.games')}</TableHead>
+                <TableHead>{t('admin.boosters.table.rating')}</TableHead>
+                <TableHead>{t('admin.boosters.table.completed')}</TableHead>
+                <TableHead>{t('admin.boosters.table.status')}</TableHead>
+                <TableHead>{t('admin.boosters.table.joined')}</TableHead>
+                <TableHead>{t('admin.boosters.table.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,22 +97,22 @@ export function AdminBoostersPage() {
                         <>
                           <Button size="xs" variant="success" leftIcon={<CheckCircle2 className="h-3 w-3" />}
                             onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
-                            Approve
+                            {t('admin.boosters.approve')}
                           </Button>
                           <Button size="xs" variant="danger" leftIcon={<XCircle className="h-3 w-3" />}
                             onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'rejected' })}>
-                            Reject
+                            {t('admin.boosters.reject')}
                           </Button>
                         </>
                       ) : b.status === 'approved' ? (
                         <Button size="xs" variant="danger-ghost"
                           onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'suspended' })}>
-                          Suspend
+                          {t('admin.boosters.suspend')}
                         </Button>
                       ) : b.status === 'suspended' ? (
                         <Button size="xs" variant="secondary"
                           onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
-                          Reinstate
+                          {t('admin.boosters.reinstate')}
                         </Button>
                       ) : null}
                     </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import { CheckCircle2, Zap, Eye, Radio, Trophy, EyeOff, Tv } from 'lucide-react'
 import type { ServiceExtra } from '@/types'
 
@@ -20,6 +21,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 
 export function StepExtras() {
   const { selectedExtras, toggleExtra, basePrice, setExtrasPrice } = useOrderBuilderStore()
+  const currency = useCurrency()
   const selectedIds = new Set(selectedExtras.map(e => e.extra.id))
 
   // Keep extrasPrice in sync whenever selection or basePrice changes
@@ -39,7 +41,7 @@ export function StepExtras() {
   }
 
   function formatExtraPrice(extra: ServiceExtra): string {
-    if (extra.price_modifier > 0) return `+${formatCurrency(extra.price_modifier)}`
+    if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
     if (extra.price_modifier_pct > 0) return `+${extra.price_modifier_pct}%`
     return 'Free'
   }

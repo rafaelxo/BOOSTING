@@ -1,78 +1,79 @@
 import { Shield, Lock, Eye, Cpu, Server, CreditCard } from 'lucide-react'
-
-const PILLARS = [
-  {
-    icon: Shield,
-    title: 'Account Protection',
-    items: [
-      'VPN enabled on every gaming session',
-      '"Appear Offline" mode — your friends list stays clean',
-      'No storing of your login credentials beyond the session',
-      'Boosters operate from devices with clean IP history',
-    ],
-  },
-  {
-    icon: Lock,
-    title: 'Authentication & Sessions',
-    items: [
-      'Supabase Auth with bcrypt password hashing',
-      'Secure JWT sessions with auto-rotation',
-      'Session revocation on password change',
-      '2FA available for your account',
-    ],
-  },
-  {
-    icon: CreditCard,
-    title: 'Payment Security',
-    items: [
-      'Card data never touches our servers — Stripe handles it all',
-      'PCI-DSS compliant payment processing',
-      'Webhook signature validation on every event',
-      'Idempotent payment operations prevent double-charging',
-    ],
-  },
-  {
-    icon: Eye,
-    title: 'Privacy & Data',
-    items: [
-      'Minimal data collection — only what\'s needed',
-      'Booster never sees your full email or personal details',
-      'All stored files use private URLs with expiry',
-      'Data deletion available on account close',
-    ],
-  },
-  {
-    icon: Cpu,
-    title: 'Access Control',
-    items: [
-      'Row-Level Security — customers only see their own orders',
-      'Boosters can only access jobs assigned to them',
-      'Admin access is fully audited and logged',
-      'Roles are enforced server-side, never trusting the client',
-    ],
-  },
-  {
-    icon: Server,
-    title: 'Infrastructure',
-    items: [
-      'All data encrypted at rest and in transit (TLS 1.3)',
-      'Hosted on Supabase (SOC 2 Type II certified)',
-      'Regular automated backups',
-      'Audit log for every sensitive action',
-    ],
-  },
-]
+import { useTranslation } from 'react-i18next'
 
 export function SecurityPage() {
+  const { t } = useTranslation()
+
+  const PILLARS = [
+    {
+      icon: Shield,
+      title: t('security.pillars.accountProtection'),
+      items: [
+        t('security.items.vpn'),
+        t('security.items.offline'),
+        t('security.items.noCredentials'),
+        t('security.items.cleanIp'),
+      ],
+    },
+    {
+      icon: Lock,
+      title: t('security.pillars.authSessions'),
+      items: [
+        t('security.items.bcrypt'),
+        t('security.items.jwt'),
+        t('security.items.revocation'),
+        t('security.items.2fa'),
+      ],
+    },
+    {
+      icon: CreditCard,
+      title: t('security.pillars.paymentSecurity'),
+      items: [
+        t('security.items.stripe'),
+        t('security.items.pci'),
+        t('security.items.webhook'),
+        t('security.items.idempotent'),
+      ],
+    },
+    {
+      icon: Eye,
+      title: t('security.pillars.privacy'),
+      items: [
+        t('security.items.minimal'),
+        t('security.items.noEmail'),
+        t('security.items.privateUrls'),
+        t('security.items.deletion'),
+      ],
+    },
+    {
+      icon: Cpu,
+      title: t('security.pillars.accessControl'),
+      items: [
+        t('security.items.rls'),
+        t('security.items.boosters'),
+        t('security.items.audit'),
+        t('security.items.serverSide'),
+      ],
+    },
+    {
+      icon: Server,
+      title: t('security.pillars.infrastructure'),
+      items: [
+        t('security.items.encrypted'),
+        t('security.items.soc2'),
+        t('security.items.backups'),
+      ],
+    },
+  ]
+
   return (
     <div className="py-16">
       <div className="container-app max-w-5xl space-y-16">
         <div className="text-center">
-          <p className="section-label mb-3">Transparency</p>
-          <h1 className="text-4xl font-extrabold text-ink mb-4">Security & Trust</h1>
+          <p className="section-label mb-3">{t('security.sectionLabel')}</p>
+          <h1 className="text-4xl font-extrabold text-ink mb-4">{t('security.title')}</h1>
           <p className="text-lg text-ink-secondary max-w-xl mx-auto">
-            We treat your account and data with the same care we'd want for our own.
-            Here's exactly what we do to keep you safe.
+            {t('security.subtitle')}
           </p>
         </div>
 

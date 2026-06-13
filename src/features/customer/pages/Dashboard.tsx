@@ -5,7 +5,8 @@ import { Plus, ShoppingBag, MessageCircle, Zap } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, timeAgo } from '@/lib/utils'
+import { timeAgo } from '@/lib/utils'
+import { useCurrency } from '@/hooks/useCurrency'
 import type { Order } from '@/types'
 
 function useRecentOrders(customerId: string) {
@@ -28,6 +29,7 @@ function useRecentOrders(customerId: string) {
 export function CustomerDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
+  const currency = useCurrency()
   const { data: orders, isLoading } = useRecentOrders(profile?.id ?? '')
 
   const activeOrders = orders?.filter(o =>
@@ -73,7 +75,7 @@ export function CustomerDashboard() {
           { label: t('customer.dashboard.stats.active'),    value: activeOrders.length,  icon: Zap,           color: 'text-brand bg-brand-muted' },
           { label: t('customer.dashboard.stats.total'),     value: orders?.length ?? 0,  icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
           { label: t('customer.dashboard.stats.completed'), value: completedCount,        icon: ShoppingBag,   color: 'text-success bg-success/10' },
-          { label: t('customer.dashboard.stats.spent'),     value: formatCurrency(orders?.reduce((s, o) => s + o.total_price, 0) ?? 0), icon: MessageCircle, color: 'text-info bg-info/10' },
+          { label: t('customer.dashboard.stats.spent'),     value: currency(orders?.reduce((s, o) => s + o.total_price, 0) ?? 0), icon: MessageCircle, color: 'text-info bg-info/10' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} padding="md">
             <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
@@ -91,7 +93,7 @@ export function CustomerDashboard() {
           <h2 className="text-base font-semibold text-ink mb-3">{t('customer.dashboard.activeTitle')}</h2>
           <div className="space-y-3">
             {activeOrders.map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} currency={currency} />
             ))}
           </div>
         </div>
@@ -122,7 +124,7 @@ export function CustomerDashboard() {
         ) : (
           <div className="space-y-3">
             {orders.slice(0, 5).map((order) => (
-              <OrderCard key={order.id} order={order} />
+              <OrderCard key={order.id} order={order} currency={currency} />
             ))}
           </div>
         )}
@@ -131,7 +133,7 @@ export function CustomerDashboard() {
   )
 }
 
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({ order, currency }: { order: Order; currency: (amount: number) => string }) {
   return (
     <Link to={`/orders/${order.id}`}>
       <Card className="flex items-center justify-between gap-4 hover:border-brand/20 hover:shadow-card-hover transition-all duration-150 cursor-pointer">
@@ -148,7 +150,7 @@ function OrderCard({ order }: { order: Order }) {
         </div>
         <div className="flex items-center gap-4 shrink-0">
           <span className="hidden sm:block text-sm font-semibold text-ink">
-            {formatCurrency(order.total_price)}
+            {currency(order.total_price)}
           </span>
           <OrderStatusBadge status={order.status} />
         </div>

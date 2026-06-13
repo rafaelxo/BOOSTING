@@ -5,8 +5,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { supabase } from '@/lib/supabase'
 import { formatDateTime } from '@/lib/utils'
 import type { AuditLog } from '@/types'
+import { useTranslation } from 'react-i18next'
 
 export function AdminAuditPage() {
+  const { t } = useTranslation()
+
   const { data: logs, isLoading } = useQuery({
     queryKey: ['audit-logs'],
     queryFn: async () => {
@@ -22,18 +25,18 @@ export function AdminAuditPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-ink">Audit Logs</h1>
+      <h1 className="text-2xl font-bold text-ink">{t('admin.audit.title')}</h1>
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !logs?.length ? <EmptyState icon={Eye} title="No audit events yet" /> : (
+          !logs?.length ? <EmptyState icon={Eye} title={t('admin.audit.empty')} /> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Actor</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Entity</TableHead>
-                <TableHead>IP</TableHead>
-                <TableHead>Time</TableHead>
+                <TableHead>{t('admin.audit.table.actor')}</TableHead>
+                <TableHead>{t('admin.audit.table.action')}</TableHead>
+                <TableHead>{t('admin.audit.table.entity')}</TableHead>
+                <TableHead>{t('admin.audit.table.ip')}</TableHead>
+                <TableHead>{t('admin.audit.table.time')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

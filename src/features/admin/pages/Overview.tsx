@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { ShoppingBag, DollarSign, Users, AlertCircle, TrendingUp, Clock } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatCurrency, timeAgo } from '@/lib/utils'
+import { timeAgo } from '@/lib/utils'
 import type { Order } from '@/types'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { useTranslation } from 'react-i18next'
+import { useCurrency } from '@/hooks/useCurrency'
 
 function useAdminStats() {
   return useQuery({
@@ -36,6 +37,7 @@ function useAdminStats() {
 export function AdminOverview() {
   const { data: stats, isLoading } = useAdminStats()
   const { t } = useTranslation()
+  const currency = useCurrency()
 
   const recentOrders = stats?.orders.slice(0, 8) ?? []
 
@@ -67,7 +69,7 @@ export function AdminOverview() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: t('admin.overview.totalRevenue'), value: formatCurrency(stats?.totalRevenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
+            { label: t('admin.overview.totalRevenue'), value: currency(stats?.totalRevenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
             { label: t('admin.overview.activeOrders'), value: stats?.activeOrdersCount ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand-muted', trend: null },
             { label: t('admin.overview.pendingBoosters'), value: stats?.pendingBoostersCount ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
             { label: t('admin.overview.openTickets'), value: `${stats?.openTicketsCount ?? 0}${stats?.urgentTickets ? ` (${stats.urgentTickets} ${t('admin.overview.urgent')})` : ''}`, icon: AlertCircle, color: stats?.urgentTickets ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
@@ -118,7 +120,7 @@ export function AdminOverview() {
                     <p className="text-[10px] text-ink-muted">{timeAgo(order.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-ink">{formatCurrency(order.total_price)}</span>
+                    <span className="text-xs font-semibold text-ink">{currency(order.total_price)}</span>
                     <OrderStatusBadge status={order.status} />
                   </div>
                 </div>

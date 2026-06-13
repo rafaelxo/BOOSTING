@@ -4,9 +4,10 @@ import { Briefcase, Filter, Lock } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatCurrency, formatRank, timeAgo } from '@/lib/utils'
+import { formatRank, timeAgo } from '@/lib/utils'
 import type { Order, QueueType } from '@/types'
 import { useTranslation } from 'react-i18next'
+import { useCurrency } from '@/hooks/useCurrency'
 
 const SERVER_OPTIONS = ['All', 'NA', 'EUW', 'EUNE', 'BR', 'OCE', 'KR']
 
@@ -16,6 +17,7 @@ export function AvailableJobsPage() {
   const [server, setServer] = useState('All')
   const [queue, setQueue] = useState<QueueType | 'all'>('all')
   const { t } = useTranslation()
+  const currency = useCurrency()
 
   const QUEUE_OPTIONS: { label: string; value: QueueType | 'all' }[] = [
     { label: 'All Queues', value: 'all' },
@@ -148,7 +150,7 @@ export function AvailableJobsPage() {
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}</div>
       ) : !filtered.length ? (
-        <EmptyState icon={Briefcase} title="No jobs available" description="Check back soon — orders come in frequently." />
+        <EmptyState icon={Briefcase} title={t('booster.jobs.empty')} description={t('booster.jobs.emptyDesc')} />
       ) : (
         <div className="space-y-3">
           {filtered.map((job) => (
@@ -168,19 +170,19 @@ export function AvailableJobsPage() {
                     {formatRank((job.target_rank as { tier: string }).tier as never, (job.target_rank as { division: string }).division)}
                   </p>
                 )}
-                <p className="text-xs text-ink-muted mt-0.5">Posted {timeAgo(job.created_at)}</p>
+                <p className="text-xs text-ink-muted mt-0.5">{t('booster.jobs.posted', { time: timeAgo(job.created_at) })}</p>
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">
-                  <p className="text-sm font-bold text-success">{formatCurrency(job.total_price * 0.75)}</p>
-                  <p className="text-[10px] text-ink-muted">Your cut (75%)</p>
+                  <p className="text-sm font-bold text-success">{currency(job.total_price * 0.75)}</p>
+                  <p className="text-[10px] text-ink-muted">{t('booster.jobs.yourCut')}</p>
                 </div>
                 <Button
                   size="sm"
                   onClick={() => acceptJob.mutate(job.id)}
                   loading={acceptJob.isPending}
                 >
-                  Accept
+                  {t('booster.jobs.accept')}
                 </Button>
               </div>
             </Card>
