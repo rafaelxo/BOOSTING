@@ -49,7 +49,7 @@ serve(async (req) => {
       mode: 'payment',
       line_items: [{
         price_data: {
-          currency: currency ?? 'usd',
+          currency: currency ?? 'brl',
           product_data: {
             name: `EloBoost Order #${order_id.slice(0, 8).toUpperCase()}`,
             description: 'Professional boosting service — 100% completion guarantee',
@@ -82,7 +82,7 @@ serve(async (req) => {
       stripe_payment_intent_id: (session.payment_intent as string) ?? session.id,
       stripe_checkout_session_id: session.id,
       amount: amount / 100,
-      currency: currency ?? 'usd',
+      currency: currency ?? 'brl',
       status: 'pending',
     })
 

@@ -76,7 +76,7 @@ export function StepPayment() {
           body: {
             order_id: order.id,
             amount: Math.round(totalPrice * 100), // in cents
-            currency: 'usd',
+            currency: 'brl',
             success_url: `${window.location.origin}/orders/${order.id}?payment=success`,
             cancel_url: `${window.location.origin}/orders/new`,
           },
