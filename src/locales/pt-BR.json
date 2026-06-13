@@ -241,7 +241,10 @@
       "submit": "Entrar",
       "noAccount": "Não tem uma conta?",
       "register": "Registrar",
-      "invalidCredentials": "E-mail ou senha incorretos."
+      "invalidCredentials": "E-mail ou senha incorretos.",
+      "discordLogin": "Continuar com Discord",
+      "discordLoading": "Conectando...",
+      "orEmail": "ou continue com e-mail"
     },
     "register": {
       "titleCustomer": "Criar conta",
@@ -264,7 +267,10 @@
       "privacyLink": "Política de Privacidade",
       "successTitle": "Verifique seu e-mail",
       "successDesc": "Enviamos um link de confirmação para o seu e-mail. Clique nele para ativar sua conta.",
-      "backToLogin": "Voltar para o login"
+      "backToLogin": "Voltar para o login",
+      "discordSignUp": "Cadastrar com Discord",
+      "discordLoading": "Conectando...",
+      "orEmail": "ou cadastre-se com e-mail"
     }
   },
   "booster": {

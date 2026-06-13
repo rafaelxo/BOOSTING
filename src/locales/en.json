@@ -241,7 +241,10 @@
       "submit": "Sign in",
       "noAccount": "Don't have an account?",
       "register": "Register",
-      "invalidCredentials": "Incorrect email or password."
+      "invalidCredentials": "Incorrect email or password.",
+      "discordLogin": "Continue with Discord",
+      "discordLoading": "Connecting...",
+      "orEmail": "or continue with email"
     },
     "register": {
       "titleCustomer": "Create account",
@@ -264,7 +267,10 @@
       "privacyLink": "Privacy Policy",
       "successTitle": "Check your email",
       "successDesc": "We sent a confirmation link to your email. Click it to activate your account.",
-      "backToLogin": "Back to sign in"
+      "backToLogin": "Back to sign in",
+      "discordSignUp": "Sign up with Discord",
+      "discordLoading": "Connecting...",
+      "orEmail": "or sign up with email"
     }
   },
   "booster": {

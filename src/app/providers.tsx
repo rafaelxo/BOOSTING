@@ -60,6 +60,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
               return
             }
           }
+
+          // Auto-join Discord server when user authenticates via Discord OAuth
+          if (event === 'SIGNED_IN' && session.provider_token) {
+            const provider = (session.user.app_metadata as Record<string, string>).provider
+            if (provider === 'discord') {
+              joinDiscordServer(session.provider_token)
+            }
+          }
+
           await fetchProfile(session.user.id)
         } else {
           setProfile(null)
@@ -96,6 +105,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setLoading(false)
     setInitialized(true)
+  }
+
+  function joinDiscordServer(providerToken: string) {
+    supabase.functions.invoke('discord-join-server', {
+      body: { discord_access_token: providerToken },
+    }).catch(() => { /* non-fatal — user still logs in */ })
   }
 
   async function refreshProfile(userId: string) {
