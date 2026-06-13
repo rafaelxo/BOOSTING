@@ -30,34 +30,34 @@ export function StepReview() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Review Your Order</h2>
+      <h2 className="text-lg font-bold text-ink mb-1">Revisar Pedido</h2>
       <p className="text-sm text-ink-secondary mb-6">
-        Confirm everything looks correct before payment.
+        Confirme se tudo está correto antes do pagamento.
       </p>
 
       <div className="space-y-5">
         {/* Order details */}
         <div>
-          <p className="section-label mb-2">Order Details</p>
+          <p className="section-label mb-2">Detalhes do Pedido</p>
           <div className="card p-0 px-2">
-            <ReviewRow label="Game" value={gameSlug === 'lol' ? 'League of Legends' : (gameSlug?.toUpperCase() ?? '—')} />
-            <ReviewRow label="Service" value={serviceName} />
-            <ReviewRow label="Server" value={server} />
-            <ReviewRow label="Queue" value={queueType === 'solo_duo' ? 'Solo / Duo' : 'Flex Queue'} />
+            <ReviewRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : (gameSlug?.toUpperCase() ?? '—')} />
+            <ReviewRow label="Serviço" value={serviceName} />
+            <ReviewRow label="Servidor" value={server} />
+            <ReviewRow label="Fila" value={queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex'} />
             {currentRank && (
-              <ReviewRow label="Current Rank" value={formatRank(currentRank.tier, currentRank.division)} />
+              <ReviewRow label="Rank Atual" value={formatRank(currentRank.tier, currentRank.division)} />
             )}
             {targetRank && (
-              <ReviewRow label="Target Rank" value={formatRank(targetRank.tier, targetRank.division)} />
+              <ReviewRow label="Rank Alvo" value={formatRank(targetRank.tier, targetRank.division)} />
             )}
             {winsPurchased && (
-              <ReviewRow label="Wins Purchased" value={`${winsPurchased} wins`} />
+              <ReviewRow label="Vitórias" value={`${winsPurchased} vitórias`} />
             )}
             {sessionsPurchased && (
-              <ReviewRow label="Session Duration" value={`${sessionsPurchased}h`} />
+              <ReviewRow label="Sessões" value={`${sessionsPurchased}h`} />
             )}
             {estimatedHours && (
-              <ReviewRow label="Estimated Delivery" value={`~${estimatedHours} hours`} />
+              <ReviewRow label="Entrega Estimada" value={`~${estimatedHours} horas`} />
             )}
           </div>
         </div>
@@ -65,7 +65,7 @@ export function StepReview() {
         {/* Extras */}
         {selectedExtras.length > 0 && (
           <div>
-            <p className="section-label mb-2">Add-ons</p>
+            <p className="section-label mb-2">Extras</p>
             <div className="card p-0 px-2">
               {selectedExtras.map(({ extra }) => (
                 <ReviewRow
@@ -76,7 +76,7 @@ export function StepReview() {
                       ? `+${currency(extra.price_modifier)}`
                       : extra.price_modifier_pct > 0
                         ? `+${extra.price_modifier_pct}%`
-                        : 'Free'
+                        : 'Grátis'
                   }
                 />
               ))}
@@ -87,7 +87,7 @@ export function StepReview() {
         {/* Notes */}
         {customerNotes && (
           <div>
-            <p className="section-label mb-2">Notes</p>
+            <p className="section-label mb-2">Observações</p>
             <div className="card p-3">
               <p className="text-sm text-ink-secondary">{customerNotes}</p>
             </div>
@@ -96,11 +96,11 @@ export function StepReview() {
 
         {/* Price breakdown */}
         <div>
-          <p className="section-label mb-2">Pricing</p>
+          <p className="section-label mb-2">Preços</p>
           <div className="card p-0 px-2">
-            <ReviewRow label="Base Price" value={currency(basePrice)} />
+            <ReviewRow label="Preço Base" value={currency(basePrice)} />
             {extrasPrice > 0 && (
-              <ReviewRow label="Add-ons" value={`+${currency(extrasPrice)}`} />
+              <ReviewRow label="Extras" value={`+${currency(extrasPrice)}`} />
             )}
             <div className="flex items-center justify-between py-3">
               <span className="text-base font-bold text-ink">Total</span>
@@ -112,9 +112,9 @@ export function StepReview() {
         {/* Guarantees */}
         <div className="flex flex-col sm:flex-row gap-3">
           {[
-            { icon: Shield, text: 'VPN & account protection' },
-            { icon: Star, text: '100% completion guarantee' },
-            { icon: Clock, text: 'Starts within 30 min' },
+            { icon: Shield, text: 'VPN & proteção da conta' },
+            { icon: Star, text: 'Garantia 100% de conclusão' },
+            { icon: Clock, text: 'Inicia em até 30 min' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-2 text-xs text-ink-secondary">
               <Icon className="h-3.5 w-3.5 text-success shrink-0" />
@@ -131,14 +131,14 @@ export function StepReview() {
           disabled={totalPrice <= 0}
           rightIcon={<ChevronRight className="h-5 w-5" />}
         >
-          Proceed to Payment — {currency(totalPrice)}
+          Ir para Pagamento — {currency(totalPrice)}
         </Button>
         {totalPrice <= 0 && (
-          <p className="text-xs text-danger text-center">Configure your order to see the price.</p>
+          <p className="text-xs text-danger text-center">Configure seu pedido para ver o preço.</p>
         )}
 
         <p className="text-xs text-ink-muted text-center">
-          Payment is processed securely by Stripe. Your card data never touches our servers.
+          Pagamento processado pelo Stripe. Seus dados nunca tocam nossos servidores.
         </p>
       </div>
     </div>

@@ -7,8 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 
 const schema = z.object({
-  subject: z.string().min(5, 'Subject must be at least 5 characters').max(200),
-  message: z.string().min(10, 'Please describe your issue in more detail').max(2000),
+  subject: z.string().min(5, 'O assunto deve ter pelo menos 5 caracteres').max(200),
+  message: z.string().min(10, 'Descreva seu problema com mais detalhes').max(2000),
 })
 
 type FormData = z.infer<typeof schema>
@@ -57,24 +57,24 @@ export function CreateTicketModal({ onClose, onCreated, orderId }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-md card p-6 animate-scale-in">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-ink">New Support Ticket</h2>
+          <h2 className="text-base font-semibold text-ink">Novo Ticket de Suporte</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-bg-elevated">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <FormField label="Subject" error={errors.subject?.message} required>
+          <FormField label="Assunto" error={errors.subject?.message} required>
             <Input
-              placeholder="e.g. My order hasn't started after 2 hours"
+              placeholder="ex: Meu pedido não iniciou após 2 horas"
               error={!!errors.subject}
               {...register('subject')}
             />
           </FormField>
 
-          <FormField label="Message" error={errors.message?.message} required>
+          <FormField label="Mensagem" error={errors.message?.message} required>
             <textarea
-              placeholder="Describe your issue in detail..."
+              placeholder="Descreva seu problema em detalhes..."
               className={`input-base min-h-[120px] resize-none ${errors.message ? 'input-error' : ''}`}
               {...register('message')}
             />
@@ -82,10 +82,10 @@ export function CreateTicketModal({ onClose, onCreated, orderId }: Props) {
 
           <div className="flex gap-3 pt-1">
             <Button type="button" variant="secondary" onClick={onClose} className="flex-1">
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" loading={isSubmitting} className="flex-1">
-              Submit Ticket
+              Enviar Ticket
             </Button>
           </div>
         </form>

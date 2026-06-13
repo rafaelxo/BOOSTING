@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,6 +17,7 @@ type FormData = z.infer<typeof schema>
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -38,7 +39,15 @@ export function LoginPage() {
       return
     }
 
-    navigate('/dashboard')
+    const raw = searchParams.get('redirect')
+    let target = '/dashboard'
+    if (raw) {
+      try {
+        const decoded = decodeURIComponent(raw)
+        if (/^\/(?![/\\])/.test(decoded)) target = decoded
+      } catch { /* ignore malformed */ }
+    }
+    navigate(target)
   }
 
   return (

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { PageLoader } from '@/components/ui/Spinner'
 
@@ -55,9 +55,13 @@ import { AdminServicesPage } from '@/features/admin/pages/Services'
 // Route guards
 function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' | 'support' }) {
   const { isAuthenticated, profile, isLoading, isInitialized } = useAuthStore()
+  const location = useLocation()
 
   if (!isInitialized || isLoading) return <PageLoader />
-  if (!isAuthenticated()) return <Navigate to="/login" replace />
+  if (!isAuthenticated()) {
+    const redirect = encodeURIComponent(location.pathname + location.search)
+    return <Navigate to={`/login?redirect=${redirect}`} replace />
+  }
   if (!profile) return <PageLoader />
 
   if (role && profile.role !== role) {

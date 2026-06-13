@@ -69,7 +69,7 @@ export function TicketDetailPage() {
             <TicketStatusBadge status={ticket.status} />
             <TicketPriorityBadge priority={ticket.priority} />
           </div>
-          <p className="text-xs text-ink-muted mt-0.5">Opened {formatDateTime(ticket.created_at)}</p>
+          <p className="text-xs text-ink-muted mt-0.5">Aberto em {formatDateTime(ticket.created_at)}</p>
         </div>
       </div>
 
@@ -82,7 +82,7 @@ export function TicketDetailPage() {
             return (
               <div key={msg.id} className={`flex gap-3 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                 <Avatar
-                  name={isSupport ? 'Support Team' : profile?.username}
+                  name={isSupport ? 'Suporte' : profile?.username}
                   size="sm"
                 />
                 <div className={`max-w-[80%] ${isCustomer ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
@@ -94,7 +94,7 @@ export function TicketDetailPage() {
                         : 'bg-bg-elevated text-ink rounded-tl-sm'
                   }`}>
                     {!isCustomer && (
-                      <p className="text-[10px] font-semibold text-success mb-1">Support Team</p>
+                      <p className="text-[10px] font-semibold text-success mb-1">Equipe de Suporte</p>
                     )}
                     {msg.content}
                   </div>
@@ -118,7 +118,7 @@ export function TicketDetailPage() {
                   sendMessage.mutate(message.trim())
                 }
               }}
-              placeholder="Reply to support..."
+              placeholder="Responder ao suporte..."
               className="input-base flex-1 py-2 text-sm"
             />
             <Button
@@ -133,7 +133,7 @@ export function TicketDetailPage() {
 
         {(ticket.status === 'closed' || ticket.status === 'resolved') && (
           <div className="border-t border-bg-elevated p-3 text-center text-sm text-ink-muted">
-            This ticket is {ticket.status}.
+            Este ticket está {ticket.status === 'closed' ? 'encerrado' : 'resolvido'}.
           </div>
         )}
       </Card>

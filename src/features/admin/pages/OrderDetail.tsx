@@ -51,27 +51,27 @@ export function AdminOrderDetailPage() {
         <Button asChild variant="ghost" size="icon"><Link to="/admin/orders"><ArrowLeft className="h-4 w-4" /></Link></Button>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-ink">Order #{order.id.slice(0, 8).toUpperCase()}</h1>
+            <h1 className="text-xl font-bold text-ink">Pedido #{order.id.slice(0, 8).toUpperCase()}</h1>
             <OrderStatusBadge status={order.status} />
           </div>
-          <p className="text-xs text-ink-muted mt-0.5">Created {formatDateTime(order.created_at)}</p>
+          <p className="text-xs text-ink-muted mt-0.5">Criado em {formatDateTime(order.created_at)}</p>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-4">Order Details</h3>
+            <h3 className="text-sm font-semibold text-ink mb-4">Detalhes do Pedido</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                ['Customer ID', order.customer_id.slice(0, 12) + '...'],
-                ['Service', (order.service_id as string).replace(/_/g, ' ')],
-                ['Server', order.server],
-                ['Queue', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
-                ['Base Price', currency(order.base_price)],
+                ['ID do Cliente', order.customer_id.slice(0, 12) + '...'],
+                ['Serviço', (order.service_id as string).replace(/_/g, ' ')],
+                ['Servidor', order.server],
+                ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
+                ['Preço Base', currency(order.base_price)],
                 ['Extras', currency(order.extras_price)],
                 ['Total', currency(order.total_price)],
-                ['Booster', order.assigned_booster_id ? order.assigned_booster_id.slice(0, 12) + '...' : 'Unassigned'],
+                ['Booster', order.assigned_booster_id ? order.assigned_booster_id.slice(0, 12) + '...' : 'Não atribuído'],
               ].map(([l, v]) => (
                 <div key={l as string}>
                   <p className="text-xs text-ink-muted">{l as string}</p>
@@ -87,7 +87,7 @@ export function AdminOrderDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-ink-secondary" />
-              Override Status
+              Alterar Status
             </h3>
             <div className="space-y-1.5">
               {ADMIN_STATUS_OPTIONS.map((s) => (
@@ -111,13 +111,13 @@ export function AdminOrderDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
               <UserCheck className="h-4 w-4 text-ink-secondary" />
-              Assignment
+              Atribuição
             </h3>
             <p className="text-xs text-ink-secondary mb-3">
-              {order.assigned_booster_id ? `Booster: ${order.assigned_booster_id.slice(0, 12)}...` : 'No booster assigned.'}
+              {order.assigned_booster_id ? `Booster: ${order.assigned_booster_id.slice(0, 12)}...` : 'Nenhum booster atribuído.'}
             </p>
             <Button size="sm" variant="secondary" className="w-full">
-              Reassign Booster
+              Reatribuir Booster
             </Button>
           </Card>
         </div>

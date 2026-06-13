@@ -20,7 +20,7 @@ export function AvailableJobsPage() {
   const currency = useCurrency()
 
   const QUEUE_OPTIONS: { label: string; value: QueueType | 'all' }[] = [
-    { label: 'All Queues', value: 'all' },
+    { label: 'Todas as Filas', value: 'all' },
     { label: t('booster.jobs.soloQueue'), value: 'solo_duo' },
     { label: t('booster.jobs.flexQueue'), value: 'flex' },
   ]

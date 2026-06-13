@@ -26,18 +26,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setProfile, setLoading, setInitialized } = useAuthStore()
 
   useEffect(() => {
-    // Initialize session from storage
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setLoading(false)
-        setInitialized(true)
-      }
-    })
-
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION from localStorage — no extra network call.
+    // Using only this avoids the double-fetch caused by calling getSession() separately.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session)
@@ -46,11 +36,21 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null)
           setLoading(false)
+          setInitialized(true)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Safety net: unblock UI if Supabase never responds
+    const timeout = setTimeout(() => {
+      setLoading(false)
+      setInitialized(true)
+    }, 8000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchProfile(userId: string) {

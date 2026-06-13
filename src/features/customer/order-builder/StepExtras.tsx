@@ -7,12 +7,12 @@ import type { ServiceExtra } from '@/types'
 
 // Static extras (in production these come from DB)
 const EXTRAS: ServiceExtra[] = [
-  { id: 'priority', service_id: null, name: 'Priority Processing', description: 'Assigned to a top-rated booster immediately. Fastest start.', price_modifier: 0, price_modifier_pct: 15, is_active: true, sort_order: 1, icon: 'zap' },
-  { id: 'solo_only', service_id: null, name: 'Solo Queue Only', description: 'Booster only plays in SoloQ. No duo or flex lobbies.', price_modifier: 0, price_modifier_pct: 10, is_active: true, sort_order: 2, icon: 'trophy' },
-  { id: 'mono_champ', service_id: null, name: 'Mono Champion', description: 'Your preferred champion every game. Specify in notes.', price_modifier: 0, price_modifier_pct: 5, is_active: true, sort_order: 3, icon: 'eye' },
-  { id: 'live_stream', service_id: null, name: 'Live Stream', description: 'Watch your booster play via a private stream link.', price_modifier: 4.99, price_modifier_pct: 0, is_active: true, sort_order: 4, icon: 'tv' },
-  { id: 'live_monitoring', service_id: null, name: 'Live Monitoring', description: 'Staff monitors your order and sends updates every few hours.', price_modifier: 2.99, price_modifier_pct: 0, is_active: true, sort_order: 5, icon: 'radio' },
-  { id: 'appear_offline', service_id: null, name: 'Appear Offline', description: 'Your account appears offline throughout the service.', price_modifier: 0, price_modifier_pct: 0, is_active: true, sort_order: 6, icon: 'eye-off' },
+  { id: 'priority', service_id: null, name: 'Priority Processing', description: 'Atribuição imediata ao booster mais bem avaliado. Início mais rápido.', price_modifier: 0, price_modifier_pct: 15, is_active: true, sort_order: 1, icon: 'zap' },
+  { id: 'solo_only', service_id: null, name: 'Solo Queue Only', description: 'O booster joga apenas SoloQ. Sem duo ou flex.', price_modifier: 0, price_modifier_pct: 10, is_active: true, sort_order: 2, icon: 'trophy' },
+  { id: 'mono_champ', service_id: null, name: 'Mono Champion', description: 'Seu campeão favorito em cada partida. Especifique nas observações.', price_modifier: 0, price_modifier_pct: 5, is_active: true, sort_order: 3, icon: 'eye' },
+  { id: 'live_stream', service_id: null, name: 'Live Stream', description: 'Assista seu booster via link de stream privado.', price_modifier: 4.99, price_modifier_pct: 0, is_active: true, sort_order: 4, icon: 'tv' },
+  { id: 'live_monitoring', service_id: null, name: 'Live Monitoring', description: 'Nossa equipe monitora seu pedido e envia atualizações periódicas.', price_modifier: 2.99, price_modifier_pct: 0, is_active: true, sort_order: 5, icon: 'radio' },
+  { id: 'appear_offline', service_id: null, name: 'Appear Offline', description: 'Sua conta fica offline durante todo o serviço.', price_modifier: 0, price_modifier_pct: 0, is_active: true, sort_order: 6, icon: 'eye-off' },
 ]
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -43,14 +43,14 @@ export function StepExtras() {
   function formatExtraPrice(extra: ServiceExtra): string {
     if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
     if (extra.price_modifier_pct > 0) return `+${extra.price_modifier_pct}%`
-    return 'Free'
+    return 'Grátis'
   }
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Premium Add-ons</h2>
+      <h2 className="text-lg font-bold text-ink mb-1">Extras Premium</h2>
       <p className="text-sm text-ink-secondary mb-6">
-        Upgrade your service with optional extras. You can skip this step.
+        Adicione extras opcionais ao seu serviço. Você pode pular esta etapa.
       </p>
 
       <div className="grid sm:grid-cols-2 gap-3">
@@ -92,7 +92,7 @@ export function StepExtras() {
 
       {selectedExtras.length > 0 && (
         <p className="mt-4 text-xs text-ink-secondary text-center">
-          {selectedExtras.length} add-on{selectedExtras.length > 1 ? 's' : ''} selected
+          {selectedExtras.length} extra{selectedExtras.length > 1 ? 's' : ''} selecionado{selectedExtras.length > 1 ? 's' : ''}
         </p>
       )}
     </div>

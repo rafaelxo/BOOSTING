@@ -121,8 +121,19 @@ export function OrderDetailPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
-      {/* Payment success banner */}
-      {paymentJustCompleted && !pollFast && (
+      {/* Polling banner — webhook still being processed */}
+      {pollFast && isPendingPayment && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-info/10 border border-info/25">
+          <Loader2 className="h-5 w-5 text-info shrink-0 mt-0.5 animate-spin" />
+          <div>
+            <p className="text-sm font-semibold text-info">{t('customer.order.paymentProcessing')}</p>
+            <p className="text-xs text-ink-secondary mt-0.5">{t('customer.order.paymentProcessingDesc')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Payment success banner — only show if order actually left awaiting_payment */}
+      {paymentJustCompleted && !pollFast && !isPendingPayment && (
         <div className="flex items-start gap-3 p-4 rounded-2xl bg-success/10 border border-success/25">
           <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
           <div>
@@ -132,13 +143,16 @@ export function OrderDetailPage() {
         </div>
       )}
 
-      {/* Polling banner — webhook still being processed */}
-      {pollFast && isPendingPayment && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-info/10 border border-info/25">
-          <Loader2 className="h-5 w-5 text-info shrink-0 mt-0.5 animate-spin" />
+      {/* Timeout banner — 30s elapsed but order still awaiting_payment (webhook delay) */}
+      {paymentJustCompleted && !pollFast && isPendingPayment && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-warning/10 border border-warning/25">
+          <Clock className="h-5 w-5 text-warning shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-info">{t('customer.order.paymentProcessing')}</p>
-            <p className="text-xs text-ink-secondary mt-0.5">{t('customer.order.paymentProcessingDesc')}</p>
+            <p className="text-sm font-semibold text-warning">Pagamento em processamento</p>
+            <p className="text-xs text-ink-secondary mt-0.5">
+              O pagamento foi recebido mas ainda está sendo confirmado. Aguarde alguns instantes ou{' '}
+              <Link to="/support" className="underline">abra um ticket</Link> se o problema persistir.
+            </p>
           </div>
         </div>
       )}

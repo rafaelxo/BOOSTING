@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next'
 const schema = z.object({
   display_name: z.string().min(2).max(32),
   bio: z.string().max(500),
-  peak_tier: z.string().min(1, 'Select your peak rank'),
+  peak_tier: z.string().min(1, 'Selecione seu rank de pico'),
 })
 
 type FormData = z.infer<typeof schema>

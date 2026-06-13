@@ -5,8 +5,8 @@ import { CheckCircle2 } from 'lucide-react'
 
 const GAMES: { slug: GameSlug; name: string; emoji: string; available: boolean; note?: string }[] = [
   { slug: 'lol', name: 'League of Legends', emoji: '⚔️', available: true },
-  { slug: 'valorant', name: 'Valorant', emoji: '🔫', available: false, note: 'Coming soon' },
-  { slug: 'tft', name: 'Teamfight Tactics', emoji: '♟️', available: false, note: 'Coming soon' },
+  { slug: 'valorant', name: 'Valorant', emoji: '🔫', available: false, note: 'Em breve' },
+  { slug: 'tft', name: 'Teamfight Tactics', emoji: '♟️', available: false, note: 'Em breve' },
 ]
 
 export function StepGame() {
@@ -14,9 +14,9 @@ export function StepGame() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Select Game</h2>
+      <h2 className="text-lg font-bold text-ink mb-1">Selecionar Jogo</h2>
       <p className="text-sm text-ink-secondary mb-6">
-        Choose the game you want services for.
+        Escolha o jogo que você quer contratar.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

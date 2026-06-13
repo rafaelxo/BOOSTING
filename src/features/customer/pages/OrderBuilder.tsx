@@ -1,7 +1,12 @@
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
 import { Stepper, Button, Card } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star } from 'lucide-react'
+import type { ServiceType } from '@/types'
+
+const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches']
 
 // Step components
 import { StepGame } from '../order-builder/StepGame'
@@ -12,12 +17,12 @@ import { StepReview } from '../order-builder/StepReview'
 import { StepPayment } from '../order-builder/StepPayment'
 
 const STEPS: { id: OrderBuilderStep; label: string }[] = [
-  { id: 'game', label: 'Game' },
-  { id: 'service', label: 'Service' },
-  { id: 'configure', label: 'Configure' },
+  { id: 'game', label: 'Jogo' },
+  { id: 'service', label: 'Serviço' },
+  { id: 'configure', label: 'Configurar' },
   { id: 'extras', label: 'Extras' },
-  { id: 'review', label: 'Review' },
-  { id: 'payment', label: 'Payment' },
+  { id: 'review', label: 'Revisão' },
+  { id: 'payment', label: 'Pagamento' },
 ]
 
 const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
@@ -30,8 +35,20 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 }
 
 export function OrderBuilderPage() {
-  const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType } = useOrderBuilderStore()
+  const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType, setGame, setService, setStep, reset } = useOrderBuilderStore()
+  const [searchParams] = useSearchParams()
   const currency = useCurrency()
+
+  useEffect(() => {
+    const service = searchParams.get('service') as ServiceType | null
+    if (service && VALID_SERVICES.includes(service)) {
+      reset()
+      setGame('lol', 'lol')
+      setService(service, service)
+      setStep('configure')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const currentIdx = steps.indexOf(step)
   const completedSteps = steps.slice(0, currentIdx)
@@ -43,8 +60,8 @@ export function OrderBuilderPage() {
     <div className="max-w-6xl mx-auto">
       {/* Stepper */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-ink mb-1">New Order</h1>
-        <p className="text-sm text-ink-secondary mb-6">Configure your boost and extras below.</p>
+        <h1 className="text-2xl font-bold text-ink mb-1">Novo Pedido</h1>
+        <p className="text-sm text-ink-secondary mb-6">Configure seu boost e extras abaixo.</p>
         <Stepper
           steps={STEPS}
           currentStep={step}
@@ -67,14 +84,14 @@ export function OrderBuilderPage() {
                   disabled={!canGoBack}
                   leftIcon={<ChevronLeft className="h-4 w-4" />}
                 >
-                  Back
+                  Voltar
                 </Button>
                 <Button
                   onClick={nextStep}
                   disabled={!isStepComplete(step, { gameSlug, serviceType })}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
-                  Continue
+                  Continuar
                 </Button>
               </div>
             )}
@@ -84,29 +101,29 @@ export function OrderBuilderPage() {
         {/* Summary panel */}
         <aside className="lg:w-72 shrink-0 space-y-4">
           <Card padding="md" className="sticky top-6">
-            <h3 className="text-sm font-semibold text-ink mb-4">Order Summary</h3>
+            <h3 className="text-sm font-semibold text-ink mb-4">Resumo do Pedido</h3>
 
             {gameSlug || serviceType ? (
               <div className="space-y-3 mb-4">
                 {gameSlug && (
-                  <SummaryRow label="Game" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
+                  <SummaryRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
                 )}
                 {serviceType && (
-                  <SummaryRow label="Service" value={serviceType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
+                  <SummaryRow label="Serviço" value={serviceType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
                 )}
                 {estimatedHours && (
-                  <SummaryRow label="Est. delivery" value={`~${estimatedHours}h`} />
+                  <SummaryRow label="Entrega est." value={`~${estimatedHours}h`} />
                 )}
                 {selectedExtras.length > 0 && (
                   <div>
-                    <p className="text-xs text-ink-muted mb-1.5">Add-ons</p>
+                    <p className="text-xs text-ink-muted mb-1.5">Extras</p>
                     <div className="space-y-1">
                       {selectedExtras.map(({ extra }) => (
                         <div key={extra.id} className="flex justify-between text-xs">
                           <span className="text-ink-secondary">{extra.name}</span>
                           <span className="text-ink font-medium">
                             {extra.price_modifier > 0 ? `+${currency(extra.price_modifier)}` :
-                             extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Free'}
+                             extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Grátis'}
                           </span>
                         </div>
                       ))}
@@ -115,18 +132,18 @@ export function OrderBuilderPage() {
                 )}
               </div>
             ) : (
-              <p className="text-xs text-ink-muted mb-4">Configure your order to see pricing.</p>
+              <p className="text-xs text-ink-muted mb-4">Configure seu pedido para ver o preço.</p>
             )}
 
             <div className="border-t border-bg-elevated pt-3 space-y-1.5">
               {extrasPrice > 0 && (
                 <>
                   <div className="flex justify-between text-xs">
-                    <span className="text-ink-secondary">Base price</span>
+                    <span className="text-ink-secondary">Preço base</span>
                     <span className="text-ink">{currency(basePrice)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-ink-secondary">Add-ons</span>
+                    <span className="text-ink-secondary">Extras</span>
                     <span className="text-ink">+{currency(extrasPrice)}</span>
                   </div>
                 </>
@@ -142,9 +159,9 @@ export function OrderBuilderPage() {
           <Card padding="md" variant="brand">
             <div className="space-y-3">
               {[
-                { icon: Shield, text: 'VPN & offline protection' },
-                { icon: Star, text: '100% completion guarantee' },
-                { icon: Clock, text: 'Starts within 30 minutes' },
+                { icon: Shield, text: 'VPN & proteção offline' },
+                { icon: Star, text: 'Garantia 100% de conclusão' },
+                { icon: Clock, text: 'Inicia em até 30 minutos' },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="flex items-center gap-2 text-xs text-ink-secondary">
                   <Icon className="h-3.5 w-3.5 text-brand shrink-0" />

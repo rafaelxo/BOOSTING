@@ -8,10 +8,10 @@ import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
 
 const schema = z.object({
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string().min(8, 'Mínimo de 8 caracteres'),
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
-  message: "Passwords don't match",
+  message: 'As senhas não coincidem',
   path: ['confirmPassword'],
 })
 
@@ -44,18 +44,18 @@ export function ResetPasswordPage() {
 
         <div className="card p-6 space-y-5">
           <div>
-            <h1 className="text-xl font-bold text-ink">Set new password</h1>
-            <p className="text-sm text-ink-secondary mt-1">Choose a strong password.</p>
+            <h1 className="text-xl font-bold text-ink">Definir nova senha</h1>
+            <p className="text-sm text-ink-secondary mt-1">Escolha uma senha forte.</p>
           </div>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <FormField label="New Password" error={errors.password?.message} required>
+            <FormField label="Nova Senha" error={errors.password?.message} required>
               <Input type="password" placeholder="••••••••" leftElement={<Lock className="h-4 w-4" />} error={!!errors.password} {...register('password')} />
             </FormField>
-            <FormField label="Confirm Password" error={errors.confirmPassword?.message} required>
+            <FormField label="Confirmar Senha" error={errors.confirmPassword?.message} required>
               <Input type="password" placeholder="••••••••" leftElement={<Lock className="h-4 w-4" />} error={!!errors.confirmPassword} {...register('confirmPassword')} />
             </FormField>
             {serverError && <p className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2">{serverError}</p>}
-            <Button type="submit" className="w-full" loading={isSubmitting}>Update Password</Button>
+            <Button type="submit" className="w-full" loading={isSubmitting}>Atualizar Senha</Button>
           </form>
         </div>
       </div>

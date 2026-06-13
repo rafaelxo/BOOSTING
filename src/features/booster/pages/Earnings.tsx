@@ -72,7 +72,7 @@ export function BoosterEarningsPage() {
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={chartData}>
             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} tickFormatter={(v) => `$${v}`} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} tickFormatter={(v) => currency(v as number)} />
             <Tooltip
               contentStyle={{ background: '#181C2E', border: '1px solid #1E2338', borderRadius: '0.75rem' }}
               labelStyle={{ color: '#F1F4FF', fontSize: 12 }}

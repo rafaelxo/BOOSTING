@@ -89,7 +89,7 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSel
 
         {selectedTier && (
           <p className="text-xs text-brand font-medium">
-            Selected: {formatRank(selectedTier, selectedDivision)}
+            Selecionado: {formatRank(selectedTier, selectedDivision)}
           </p>
         )}
       </div>
@@ -129,12 +129,12 @@ export function StepConfigure() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Configure Order</h2>
-      <p className="text-sm text-ink-secondary mb-6">Set your rank details and preferences.</p>
+      <h2 className="text-lg font-bold text-ink mb-1">Configurar Pedido</h2>
+      <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
         {/* Server */}
-        <FormField label="Server / Region" required>
+        <FormField label="Servidor / Região" required>
           <div className="flex flex-wrap gap-1.5">
             {SERVERS.map((s) => (
               <button
@@ -156,9 +156,9 @@ export function StepConfigure() {
 
         {/* Queue type (for elo/win boost) */}
         {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
-          <FormField label="Queue Type" required>
+          <FormField label="Tipo de Fila" required>
             <div className="flex gap-3">
-              {([['solo_duo', 'Solo/Duo'], ['flex', 'Flex Queue']] as [QueueType, string][]).map(([value, label]) => (
+              {([['solo_duo', 'Solo/Duo'], ['flex', 'Flex']] as [QueueType, string][]).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -181,13 +181,13 @@ export function StepConfigure() {
         {(serviceType === 'elo_boost' || serviceType === 'placement_matches') && (
           <>
             <RankSelect
-              label="Current Rank"
+              label="Rank Atual"
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
             />
             <RankSelect
-              label="Target Rank"
+              label="Rank Alvo"
               selectedTier={targetRank?.tier ?? null}
               selectedDivision={targetRank?.division ?? null}
               onChange={(tier, division) => setTargetRank({ tier, division })}
@@ -197,7 +197,7 @@ export function StepConfigure() {
 
         {/* Wins for win boost */}
         {serviceType === 'win_boost' && (
-          <FormField label="Number of Wins" required>
+          <FormField label="Número de Vitórias" required>
             <div className="flex flex-wrap gap-2">
               {[3, 5, 10, 15, 20, 30, 50].map((n) => (
                 <button
@@ -211,7 +211,7 @@ export function StepConfigure() {
                       : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
                   )}
                 >
-                  {n} wins
+                  {n} vitórias
                 </button>
               ))}
             </div>
@@ -220,7 +220,7 @@ export function StepConfigure() {
 
         {/* Sessions for coaching */}
         {serviceType === 'coaching' && (
-          <FormField label="Session Duration" required>
+          <FormField label="Duração da Sessão" required>
             <div className="flex gap-3">
               {[['1h', 1], ['2h', 2]].map(([label, val]) => (
                 <button
@@ -242,11 +242,11 @@ export function StepConfigure() {
         )}
 
         {/* Notes */}
-        <FormField label="Notes for Booster" hint="Optional: champion preferences, play schedule, special requests.">
+        <FormField label="Observações para o Booster" hint="Opcional: preferências de campeão, horário, pedidos especiais.">
           <textarea
             value={customerNotes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Only play Jinx ADC, please play during morning hours..."
+            placeholder="ex: Só jogar com Jinx ADC, preferência pela manhã..."
             className="input-base min-h-[80px] resize-none"
             maxLength={500}
           />

@@ -1,12 +1,8 @@
-import { useTranslation } from 'react-i18next'
-
 export function useCurrency() {
-  const { i18n } = useTranslation()
-  const isBRL = i18n.language.startsWith('pt')
   return (amount: number) =>
-    new Intl.NumberFormat(isBRL ? 'pt-BR' : 'en-US', {
+    new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: isBRL ? 'BRL' : 'USD',
+      currency: 'BRL',
       minimumFractionDigits: 2,
     }).format(amount)
 }

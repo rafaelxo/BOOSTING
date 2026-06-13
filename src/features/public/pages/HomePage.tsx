@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Shield, Zap, Star, Clock, Users, ChevronRight,
+  Shield, Zap, Clock, Users, ChevronRight,
   TrendingUp, MessageCircle, Award, CheckCircle2,
   ArrowRight, Lock, Eye, Radio,
 } from 'lucide-react'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui'
 import { cn, RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import type { RankTier } from '@/types'
 import { useAuthStore } from '@/stores/authStore'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ─── Price engine ──────────────────────────────────────────────────────────────
 
@@ -101,6 +102,7 @@ function BoostConfigurator() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const { t } = useTranslation()
+  const currency = useCurrency()
   const [fromTier, setFromTier] = useState<RankTier>('silver')
   const [fromDiv, setFromDiv] = useState<Division>('IV')
   const [toTier, setToTier] = useState<RankTier>('gold')
@@ -196,7 +198,7 @@ function BoostConfigurator() {
         <div className="text-right">
           <p className="text-xs text-ink-muted font-medium">{t('home.configurator.totalPrice')}</p>
           {price > 0
-            ? <p className="text-2xl font-extrabold text-ink">${price.toFixed(2)}</p>
+            ? <p className="text-2xl font-extrabold text-ink">{currency(price)}</p>
             : <p className="text-sm text-ink-muted italic">{t('home.configurator.selectRanks')}</p>
           }
         </div>
@@ -208,7 +210,7 @@ function BoostConfigurator() {
         disabled={price === 0}
         onClick={handleStart}
       >
-        {t('home.configurator.startBoost', { price: price > 0 ? price.toFixed(2) : '0.00' })}
+        {t('home.configurator.startBoost', { price: price > 0 ? currency(price) : currency(0) })}
         <ArrowRight className="h-5 w-5" />
       </Button>
 
@@ -221,26 +223,7 @@ function BoostConfigurator() {
   )
 }
 
-// ─── Estrelas ─────────────────────────────────────────────────────────────────
-
-function StarRating({ n }: { n: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} className={`h-3.5 w-3.5 ${i < n ? 'fill-accent text-accent' : 'text-bg-elevated'}`} />
-      ))}
-    </div>
-  )
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
-
-const REVIEWS = [
-  { name: 'Alex M.', from: 'Silver II', to: 'Platinum IV', rating: 5, text: 'Got plat in 4 days. Booster only played my main roles, communicated the whole time. 100% repeat customer.', avatar: 'AM' },
-  { name: 'TurboKai', from: 'Gold III', to: 'Diamond IV', rating: 5, text: 'Gold to Diamond in 9 days. Used the coaching session after — my mechanics improved massively. Worth every dollar.', avatar: 'TK' },
-  { name: 'Sarah V.', from: 'Iron IV', to: 'Gold IV', rating: 5, text: 'Skeptical at first. Delivery was actually faster than estimated. Booster appeared offline the whole time. Legit.', avatar: 'SV' },
-  { name: 'Marcus B.', from: 'Bronze I', to: 'Silver IV', rating: 5, text: 'Support is actually 24/7. Had a question at 2am and got a response in 5 minutes. Incredible service.', avatar: 'MB' },
-]
 
 export function HomePage() {
   const { t } = useTranslation()
@@ -453,41 +436,6 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ── REVIEWS ── */}
-      <section className="py-28 bg-bg-base">
-        <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }} className="text-center mb-16"
-          >
-            <p className="section-label mb-3">{t('home.reviewsSection.sectionLabel')}</p>
-            <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.reviewsSection.title')}</h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
-            {REVIEWS.map(({ name, from, to, rating, text, avatar }, i) => (
-              <motion.div key={name}
-                initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="card p-5 space-y-4"
-              >
-                <StarRating n={rating} />
-                <p className="text-sm text-ink-secondary leading-relaxed">"{text}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-bg-elevated">
-                  <div className="h-9 w-9 rounded-full bg-brand/20 flex items-center justify-center text-brand text-xs font-black shrink-0">
-                    {avatar}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-ink">{name}</p>
-                    <p className="text-xs text-brand font-semibold truncate">{from} → {to}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── BOOSTER RECRUITMENT ── */}
       <section className="py-28 bg-bg-surface">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
@@ -505,7 +453,7 @@ export function HomePage() {
               </p>
               <div className="grid grid-cols-2 gap-4 mb-8">
                 {[
-                  { stat: '$15–$80', label: t('home.boosterRecruit.perOrder')      },
+                  { stat: 'R$15–R$80', label: t('home.boosterRecruit.perOrder')      },
                   { stat: '72h',     label: t('home.boosterRecruit.avgPayment')     },
                   { stat: '80+',     label: t('home.boosterRecruit.activeBoosters') },
                   { stat: '4.9★',   label: t('home.boosterRecruit.avgRating')      },

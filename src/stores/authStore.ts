@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type { Session, User } from '@supabase/supabase-js'
 import type { Profile, UserRole } from '@/types'
 
@@ -24,37 +23,28 @@ interface AuthState {
   isCustomer: () => boolean
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      session: null,
-      user: null,
-      profile: null,
-      isLoading: true,
-      isInitialized: false,
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  session: null,
+  user: null,
+  profile: null,
+  isLoading: false,
+  isInitialized: false,
 
-      setSession: (session) =>
-        set({ session, user: session?.user ?? null }),
+  setSession: (session) =>
+    set({ session, user: session?.user ?? null }),
 
-      setProfile: (profile) => set({ profile }),
+  setProfile: (profile) => set({ profile }),
 
-      setLoading: (isLoading) => set({ isLoading }),
+  setLoading: (isLoading) => set({ isLoading }),
 
-      setInitialized: (isInitialized) => set({ isInitialized }),
+  setInitialized: (isInitialized) => set({ isInitialized }),
 
-      reset: () =>
-        set({ session: null, user: null, profile: null, isLoading: false }),
+  reset: () =>
+    set({ session: null, user: null, profile: null, isLoading: false }),
 
-      isAuthenticated: () => !!get().session,
-      role: () => get().profile?.role ?? null,
-      isAdmin: () => get().profile?.role === 'admin' || get().profile?.role === 'support',
-      isBooster: () => get().profile?.role === 'booster',
-      isCustomer: () => get().profile?.role === 'customer',
-    }),
-    {
-      name: 'auth-store',
-      // Only persist non-sensitive session metadata
-      partialize: (state) => ({ isInitialized: state.isInitialized }),
-    }
-  )
-)
+  isAuthenticated: () => !!get().session,
+  role: () => get().profile?.role ?? null,
+  isAdmin: () => get().profile?.role === 'admin' || get().profile?.role === 'support',
+  isBooster: () => get().profile?.role === 'booster',
+  isCustomer: () => get().profile?.role === 'customer',
+}))

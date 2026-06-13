@@ -28,19 +28,19 @@ export function AdminReviewsPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-ink">Review Moderation</h1>
+      <h1 className="text-2xl font-bold text-ink">Moderação de Avaliações</h1>
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !reviews?.length ? <EmptyState icon={Star} title="No reviews yet" /> : (
+          !reviews?.length ? <EmptyState icon={Star} title="Nenhuma avaliação ainda" /> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rating</TableHead>
-                <TableHead>Content</TableHead>
-                <TableHead>Public</TableHead>
-                <TableHead>Moderated</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Nota</TableHead>
+                <TableHead>Conteúdo</TableHead>
+                <TableHead>Público</TableHead>
+                <TableHead>Moderado</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -58,12 +58,12 @@ export function AdminReviewsPage() {
                   </TableCell>
                   <TableCell>
                     <span className={`badge text-xs ${r.is_public ? 'text-success bg-success/10' : 'text-ink-muted bg-bg-overlay'}`}>
-                      {r.is_public ? 'Public' : 'Hidden'}
+                      {r.is_public ? 'Público' : 'Oculto'}
                     </span>
                   </TableCell>
                   <TableCell>
                     <span className={`badge text-xs ${r.is_moderated ? 'text-info bg-info/10' : 'text-warning bg-warning/10'}`}>
-                      {r.is_moderated ? 'Yes' : 'Pending'}
+                      {r.is_moderated ? 'Sim' : 'Pendente'}
                     </span>
                   </TableCell>
                   <TableCell>{timeAgo(r.created_at)}</TableCell>
@@ -74,7 +74,7 @@ export function AdminReviewsPage() {
                       leftIcon={r.is_public ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                       onClick={() => toggleVisibility.mutate({ id: r.id, isPublic: !r.is_public })}
                     >
-                      {r.is_public ? 'Hide' : 'Publish'}
+                      {r.is_public ? 'Ocultar' : 'Publicar'}
                     </Button>
                   </TableCell>
                 </TableRow>

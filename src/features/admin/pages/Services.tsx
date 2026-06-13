@@ -18,20 +18,20 @@ export function AdminServicesPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink">Services & Catalog</h1>
-        <Button leftIcon={<Plus className="h-4 w-4" />}>Add Service</Button>
+        <h1 className="text-2xl font-bold text-ink">Serviços & Catálogo</h1>
+        <Button leftIcon={<Plus className="h-4 w-4" />}>Adicionar Serviço</Button>
       </div>
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !services?.length ? <EmptyState icon={Settings} title="No services configured" description="Add services to enable ordering." /> : (
+          !services?.length ? <EmptyState icon={Settings} title="Nenhum serviço configurado" description="Adicione serviços para habilitar pedidos." /> : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Order</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Ordem</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -41,12 +41,12 @@ export function AdminServicesPage() {
                   <TableCell className="text-xs font-mono capitalize">{s.type.replace(/_/g, ' ')}</TableCell>
                   <TableCell>
                     <span className={`badge text-xs ${s.is_active ? 'text-success bg-success/10' : 'text-ink-muted bg-bg-overlay'}`}>
-                      {s.is_active ? 'Active' : 'Inactive'}
+                      {s.is_active ? 'Ativo' : 'Inativo'}
                     </span>
                   </TableCell>
                   <TableCell>{s.sort_order}</TableCell>
                   <TableCell>
-                    <Button size="xs" variant="ghost">Edit</Button>
+                    <Button size="xs" variant="ghost">Editar</Button>
                   </TableCell>
                 </TableRow>
               ))}

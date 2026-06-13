@@ -93,7 +93,7 @@ export function StepPayment() {
         window.location.href = checkoutData.url
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate checkout. Please try again.')
+      setError(err instanceof Error ? err.message : 'Falha ao iniciar o checkout. Tente novamente.')
     } finally {
       setIsProcessing(false)
     }
@@ -101,16 +101,16 @@ export function StepPayment() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Secure Payment</h2>
+      <h2 className="text-lg font-bold text-ink mb-1">Pagamento Seguro</h2>
       <p className="text-sm text-ink-secondary mb-6">
-        You'll be redirected to Stripe's secure checkout to complete your payment.
+        Você será redirecionado ao checkout seguro do Stripe para concluir o pagamento.
       </p>
 
       <div className="space-y-5">
         {/* Order total */}
         <div className="card-brand p-5 flex items-center justify-between rounded-2xl">
           <div>
-            <p className="text-xs text-ink-secondary">Order Total</p>
+            <p className="text-xs text-ink-secondary">Total do Pedido</p>
             <p className="text-2xl font-extrabold text-ink mt-0.5">{currency(totalPrice)}</p>
           </div>
           <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center shadow-brand">
@@ -121,8 +121,8 @@ export function StepPayment() {
         {/* Security notes */}
         <div className="space-y-3">
           {[
-            { icon: Lock, text: 'Your card details are encrypted end-to-end and processed by Stripe.' },
-            { icon: ShieldCheck, text: 'We never store your card number, CVV, or expiry on our servers.' },
+            { icon: Lock, text: 'Seus dados de cartão são criptografados de ponta a ponta e processados pelo Stripe.' },
+            { icon: ShieldCheck, text: 'Nunca armazenamos seu número de cartão, CVV ou validade em nossos servidores.' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-start gap-2.5 text-xs text-ink-secondary">
               <Icon className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
@@ -142,11 +142,11 @@ export function StepPayment() {
           onClick={handleCheckout}
           leftIcon={<Lock className="h-4 w-4" />}
         >
-          Pay {currency(totalPrice)} — Secure Checkout
+          Pagar {currency(totalPrice)} — Checkout Seguro
         </Button>
 
         <p className="text-xs text-ink-muted text-center">
-          Powered by Stripe. PCI-DSS compliant payment processing.
+          Powered by Stripe. Processamento de pagamento em conformidade com PCI-DSS.
         </p>
       </div>
     </div>

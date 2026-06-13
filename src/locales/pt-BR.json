@@ -60,7 +60,7 @@
       "estTime": "Tempo estimado",
       "totalPrice": "Preço total",
       "selectRanks": "Selecione os ranks acima",
-      "startBoost": "Começar Boost — ${{price}}",
+      "startBoost": "Começar Boost — {{price}}",
       "securePayment": "Pagamento seguro",
       "guarantee": "Garantia 100%",
       "support": "Suporte 24/7"

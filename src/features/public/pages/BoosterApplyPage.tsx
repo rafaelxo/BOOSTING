@@ -20,7 +20,7 @@ const ROLES = [
   { id: 'fill',    label: 'Fill'    },
 ]
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
 const GAMES = [
   { id: 'league',   label: 'League of Legends' },
@@ -130,7 +130,7 @@ export function BoosterApplyPage() {
       if (dbErr) throw dbErr
       setStep('success')
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
+      setError(e instanceof Error ? e.message : 'Algo deu errado. Tente novamente.')
     } finally {
       setSubmitting(false)
     }
@@ -148,20 +148,20 @@ export function BoosterApplyPage() {
             <CheckCircle2 className="h-10 w-10 text-success" />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-ink mb-3">Application received!</h1>
+            <h1 className="text-3xl font-black text-ink mb-3">Candidatura recebida!</h1>
             <p className="text-ink-secondary leading-relaxed">
-              We review every application manually. Expect a response via Discord or email
-              within <strong className="text-ink">2–5 business days</strong>. We'll cover next
-              steps if you're accepted.
+              Revisamos cada candidatura manualmente. Esperamos responder via Discord ou e-mail
+              em até <strong className="text-ink">2–5 dias úteis</strong>. Entraremos em contato
+              com os próximos passos se você for aprovado.
             </p>
           </div>
           <div className="card p-5 text-left space-y-2 text-sm text-ink-secondary">
-            <p className="font-semibold text-ink text-base mb-3">What happens next</p>
+            <p className="font-semibold text-ink text-base mb-3">O que acontece a seguir</p>
             {[
-              'Manual review of your OP.GG and application details',
-              'Short onboarding interview (Discord)',
-              'Test match observation with a senior booster',
-              'Account and payout setup',
+              'Revisão manual do seu OP.GG e dados da candidatura',
+              'Entrevista curta de onboarding (Discord)',
+              'Observação de partida teste com um booster sênior',
+              'Configuração de conta e pagamentos',
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-2.5">
                 <span className="h-5 w-5 rounded-full bg-brand/15 text-brand text-xs font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
@@ -170,7 +170,7 @@ export function BoosterApplyPage() {
             ))}
           </div>
           <Button asChild size="lg" className="w-full">
-            <Link to="/">Back to homepage</Link>
+            <Link to="/">Voltar para a página inicial</Link>
           </Button>
         </motion.div>
       </div>
@@ -188,20 +188,20 @@ export function BoosterApplyPage() {
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45 }}
             >
-              <p className="section-label mb-4">Join our team</p>
+              <p className="section-label mb-4">Junte-se à nossa equipe</p>
               <h1 className="text-4xl md:text-5xl font-black text-ink mb-5 leading-tight">
-                Apply as a<br /><span className="text-gradient-brand">Professional Booster</span>
+                Candidate-se como<br /><span className="text-gradient-brand">Booster Profissional</span>
               </h1>
               <p className="text-ink-secondary text-lg leading-relaxed mb-8">
-                Diamond+ players earn $15–$80 per order, set their own hours, and work
-                with the most trusted boosting platform in the region.
+                Jogadores Diamond+ ganham R$15–R$80 por pedido, definem seus próprios horários
+                e trabalham na plataforma de boosting mais confiável da região.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { icon: DollarSign, title: '$15–$80 per order',   sub: 'Paid weekly via PayPal/Wise' },
-                  { icon: Clock,      title: 'Flexible hours',       sub: 'Pick which days you work'   },
-                  { icon: Shield,     title: 'Protected sessions',   sub: 'VPN + encrypted credentials'},
-                  { icon: Zap,        title: 'Fast onboarding',      sub: '2–5 days from application'  },
+                  { icon: DollarSign, title: 'R$15–R$80 por pedido', sub: 'Pago semanalmente via PayPal/Wise' },
+                  { icon: Clock,      title: 'Horários flexíveis',    sub: 'Escolha os dias que trabalha'      },
+                  { icon: Shield,     title: 'Sessões protegidas',    sub: 'VPN + credenciais criptografadas'  },
+                  { icon: Zap,        title: 'Onboarding rápido',     sub: '2–5 dias após a candidatura'       },
                 ].map(({ icon: Icon, title, sub }) => (
                   <div key={title} className="flex gap-3">
                     <div className="h-10 w-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
@@ -218,13 +218,13 @@ export function BoosterApplyPage() {
 
             <div className="hidden lg:flex items-center justify-center">
               <div className="card p-6 w-full max-w-xs space-y-4">
-                <p className="section-label">Requirements</p>
+                <p className="section-label">Requisitos</p>
                 {[
-                  '🏆 Diamond IV or higher (current season)',
-                  '🎮 At least one mastered role',
-                  '⏰ 10+ hours/week availability',
-                  '💬 Basic English communication',
-                  '📊 Verifiable OP.GG profile',
+                  '🏆 Diamond IV ou superior (temporada atual)',
+                  '🎮 Pelo menos uma função dominada',
+                  '⏰ 10+ horas/semana de disponibilidade',
+                  '💬 Comunicação básica em português',
+                  '📊 Perfil OP.GG verificável',
                 ].map(req => (
                   <div key={req} className="flex items-start gap-2 text-sm text-ink-secondary">
                     <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
@@ -243,48 +243,48 @@ export function BoosterApplyPage() {
           {/* Section 1: Account info */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
-              Account Information
+              Informações da Conta
             </h2>
             <div className="space-y-5">
               <div>
-                <FieldLabel required>Summoner Name</FieldLabel>
+                <FieldLabel required>Nome do Invocador</FieldLabel>
                 <input
-                  {...register('summoner_name', { required: 'Required' })}
-                  placeholder="YourSummonerName"
+                  {...register('summoner_name', { required: 'Obrigatório' })}
+                  placeholder="SeuNomeDeInvocador"
                   className="input-base w-full"
                 />
                 {errors.summoner_name && <p className="text-danger text-xs mt-1">{errors.summoner_name.message}</p>}
               </div>
 
               <div>
-                <FieldLabel>OP.GG Profile Link</FieldLabel>
+                <FieldLabel>Link do OP.GG</FieldLabel>
                 <input
                   {...register('opgg_link', {
                     pattern: {
                       value: /^https?:\/\//i,
-                      message: 'Enter a valid URL',
+                      message: 'Digite uma URL válida',
                     },
                   })}
-                  placeholder="https://op.gg/summoners/na/YourName"
+                  placeholder="https://op.gg/summoners/br/SeuNome"
                   className="input-base w-full"
                 />
                 {errors.opgg_link && <p className="text-danger text-xs mt-1">{errors.opgg_link.message}</p>}
               </div>
 
               <div>
-                <FieldLabel required>Region</FieldLabel>
+                <FieldLabel required>Região</FieldLabel>
                 <select {...register('region')} className="input-base w-full">
                   {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
 
               <div>
-                <FieldLabel required>Peak Rank (current season)</FieldLabel>
+                <FieldLabel required>Rank de Pico (temporada atual)</FieldLabel>
                 <div className="flex flex-wrap gap-2">
                   <Controller
                     name="peak_tier"
                     control={control}
-                    rules={{ required: 'Select your peak rank' }}
+                    rules={{ required: 'Selecione seu rank de pico' }}
                     render={({ field }) => (
                       <>
                         {RANK_TIER_ORDER.map(tier => (
@@ -314,15 +314,15 @@ export function BoosterApplyPage() {
           {/* Section 2: Play style */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
-              Play Style & Games
+              Estilo de Jogo & Jogos
             </h2>
             <div className="space-y-5">
               <div>
-                <FieldLabel required>Preferred Roles (select all that apply)</FieldLabel>
+                <FieldLabel required>Funções preferidas (selecione todas que se aplicam)</FieldLabel>
                 <Controller
                   name="roles"
                   control={control}
-                  rules={{ validate: v => v.length > 0 || 'Select at least one role' }}
+                  rules={{ validate: v => v.length > 0 || 'Selecione pelo menos uma função' }}
                   render={({ field }) => (
                     <div className="flex flex-wrap gap-2">
                       {ROLES.map(role => (
@@ -345,11 +345,11 @@ export function BoosterApplyPage() {
               </div>
 
               <div>
-                <FieldLabel required>Games you can boost</FieldLabel>
+                <FieldLabel required>Jogos que você pode boostar</FieldLabel>
                 <Controller
                   name="games"
                   control={control}
-                  rules={{ validate: v => v.length > 0 || 'Select at least one game' }}
+                  rules={{ validate: v => v.length > 0 || 'Selecione pelo menos um jogo' }}
                   render={({ field }) => (
                     <div className="flex flex-wrap gap-2">
                       {GAMES.map(g => (
@@ -372,15 +372,15 @@ export function BoosterApplyPage() {
               </div>
 
               <div>
-                <FieldLabel required>Coaching capability</FieldLabel>
+                <FieldLabel required>Capacidade de coaching</FieldLabel>
                 <Controller
                   name="has_coaching"
                   control={control}
                   render={({ field }) => (
                     <div className="flex gap-3">
                       {[
-                        { v: true, label: 'Yes, I can coach' },
-                        { v: false, label: 'Boosting only' },
+                        { v: true, label: 'Sim, posso fazer coaching' },
+                        { v: false, label: 'Apenas boosting' },
                       ].map(({ v, label }) => (
                         <button
                           key={label}
@@ -406,15 +406,15 @@ export function BoosterApplyPage() {
           {/* Section 3: Availability */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
-              Availability
+              Disponibilidade
             </h2>
             <div className="space-y-5">
               <div>
-                <FieldLabel required>Available days</FieldLabel>
+                <FieldLabel required>Dias disponíveis</FieldLabel>
                 <Controller
                   name="available_days"
                   control={control}
-                  rules={{ validate: v => v.length > 0 || 'Select at least one day' }}
+                  rules={{ validate: v => v.length > 0 || 'Selecione pelo menos um dia' }}
                   render={({ field }) => (
                     <div className="flex flex-wrap gap-2">
                       {DAYS.map(day => (
@@ -437,12 +437,12 @@ export function BoosterApplyPage() {
               </div>
 
               <div>
-                <FieldLabel required>Hours available per week</FieldLabel>
+                <FieldLabel required>Horas disponíveis por semana</FieldLabel>
                 <input
                   {...register('hours_per_week', {
-                    required: 'Required',
-                    min: { value: 1, message: 'At least 1 hour' },
-                    max: { value: 80, message: 'Maximum 80 hours' },
+                    required: 'Obrigatório',
+                    min: { value: 1, message: 'Mínimo 1 hora' },
+                    max: { value: 80, message: 'Máximo 80 horas' },
                   })}
                   type="number"
                   min={1}
@@ -458,15 +458,15 @@ export function BoosterApplyPage() {
           {/* Section 4: About you */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
-              About You
+              Sobre Você
             </h2>
             <div className="space-y-5">
               <div>
-                <FieldLabel required>Years of boosting / competitive experience</FieldLabel>
+                <FieldLabel required>Anos de experiência em boosting / competitivo</FieldLabel>
                 <input
                   {...register('years_experience', {
-                    required: 'Required',
-                    min: { value: 0, message: 'Must be 0 or more' },
+                    required: 'Obrigatório',
+                    min: { value: 0, message: 'Deve ser 0 ou mais' },
                   })}
                   type="number"
                   min={0}
@@ -478,7 +478,7 @@ export function BoosterApplyPage() {
               </div>
 
               <div>
-                <FieldLabel>Discord Tag (optional but recommended)</FieldLabel>
+                <FieldLabel>Discord Tag (opcional, mas recomendado)</FieldLabel>
                 <input
                   {...register('discord_tag')}
                   placeholder="username#0000"
@@ -488,19 +488,19 @@ export function BoosterApplyPage() {
 
               <div>
                 <FieldLabel required>
-                  Why do you want to join our team? What sets you apart?
+                  Por que você quer entrar na nossa equipe? O que te destaca?
                 </FieldLabel>
                 <p className="text-xs text-ink-muted mb-2">
-                  Tell us about your champion pool, ranked history, and what makes you reliable.
-                  Minimum 80 characters.
+                  Conte sobre sua pool de campeões, histórico ranqueado e o que te torna confiável.
+                  Mínimo de 80 caracteres.
                 </p>
                 <textarea
                   {...register('motivation', {
-                    required: 'Required',
-                    minLength: { value: 80, message: 'At least 80 characters' },
+                    required: 'Obrigatório',
+                    minLength: { value: 80, message: 'Mínimo de 80 caracteres' },
                   })}
                   rows={5}
-                  placeholder="I've been playing at Diamond+ for 3 seasons. My main pool is Zed/Fizz/Akali mid. I'm known for…"
+                  placeholder="Jogo no Diamond+ há 3 temporadas. Minha pool principal é Zed/Fizz/Akali mid. Sou conhecido por…"
                   className="input-base w-full resize-none"
                 />
                 <div className="flex justify-between mt-1">
@@ -508,7 +508,7 @@ export function BoosterApplyPage() {
                     ? <p className="text-danger text-xs">{errors.motivation.message}</p>
                     : <span />
                   }
-                  <p className="text-xs text-ink-muted">{watch('motivation')?.length ?? 0} chars</p>
+                  <p className="text-xs text-ink-muted">{watch('motivation')?.length ?? 0} caracteres</p>
                 </div>
               </div>
             </div>
@@ -520,7 +520,7 @@ export function BoosterApplyPage() {
               <Controller
                 name="agreed_terms"
                 control={control}
-                rules={{ validate: v => v || 'You must accept the terms' }}
+                rules={{ validate: v => v || 'Você deve aceitar os termos' }}
                 render={({ field }) => (
                   <input
                     type="checkbox"
@@ -531,11 +531,11 @@ export function BoosterApplyPage() {
                 )}
               />
               <span className="text-sm text-ink-secondary leading-relaxed">
-                I confirm I own the account(s) I'll be using for demonstration, I'm at least 18
-                years old, and I agree to the{' '}
-                <Link to="/terms" className="text-brand hover:underline">Terms of Service</Link>{' '}
-                and{' '}
-                <Link to="/privacy" className="text-brand hover:underline">Privacy Policy</Link>.
+                Confirmo que sou dono da(s) conta(s) que usarei para demonstração, tenho pelo menos
+                18 anos e concordo com os{' '}
+                <Link to="/terms" className="text-brand hover:underline">Termos de Serviço</Link>{' '}
+                e a{' '}
+                <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
               </span>
             </label>
             {errors.agreed_terms && (
@@ -555,13 +555,13 @@ export function BoosterApplyPage() {
             loading={submitting}
             className="w-full"
           >
-            Submit Application <ArrowRight className="h-5 w-5" />
+            Enviar Candidatura <ArrowRight className="h-5 w-5" />
           </Button>
 
           <p className="text-center text-xs text-ink-muted">
-            Already a customer?{' '}
-            <Link to="/login" className="text-brand hover:underline">Sign in first</Link>
-            {' '}to link your application to your account.
+            Já é cliente?{' '}
+            <Link to="/login" className="text-brand hover:underline">Entre primeiro</Link>
+            {' '}para vincular sua candidatura à sua conta.
           </p>
         </form>
       </div>

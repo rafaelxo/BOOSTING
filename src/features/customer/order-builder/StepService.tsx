@@ -4,10 +4,10 @@ import type { ServiceType } from '@/types'
 import { TrendingUp, Zap, Users, Award, CheckCircle2 } from 'lucide-react'
 
 const SERVICES: { type: ServiceType; name: string; desc: string; icon: React.ElementType; badge?: string }[] = [
-  { type: 'elo_boost', name: 'Elo Boost', desc: 'Climb from your current rank to your desired division.', icon: TrendingUp, badge: 'Most Popular' },
-  { type: 'win_boost', name: 'Win Boost', desc: 'Buy a set number of wins for fast LP gains.', icon: Zap, badge: 'Fast' },
-  { type: 'coaching', name: 'Coaching', desc: '1-on-1 sessions with high-ELO coaches.', icon: Users },
-  { type: 'placement_matches', name: 'Placement Matches', desc: 'Start the season at the highest possible rank.', icon: Award },
+  { type: 'elo_boost', name: 'Elo Boost', desc: 'Suba do seu rank atual para a divisão desejada.', icon: TrendingUp, badge: 'Mais Popular' },
+  { type: 'win_boost', name: 'Win Boost', desc: 'Compre um número fixo de vitórias para ganhar LP rapidamente.', icon: Zap, badge: 'Rápido' },
+  { type: 'coaching', name: 'Coaching', desc: 'Sessões individuais com coaches de alto ELO.', icon: Users },
+  { type: 'placement_matches', name: 'Placement Matches', desc: 'Comece a temporada no rank mais alto possível.', icon: Award },
 ]
 
 export function StepService() {
@@ -15,8 +15,8 @@ export function StepService() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-ink mb-1">Select Service</h2>
-      <p className="text-sm text-ink-secondary mb-6">What do you need help with?</p>
+      <h2 className="text-lg font-bold text-ink mb-1">Selecionar Serviço</h2>
+      <p className="text-sm text-ink-secondary mb-6">Com o que você precisa de ajuda?</p>
 
       <div className="grid sm:grid-cols-2 gap-3">
         {SERVICES.map(({ type, name, desc, icon: Icon, badge }) => (

@@ -31,20 +31,20 @@ export function SupportPage() {
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-ink">Support</h1>
-          <p className="text-sm text-ink-secondary mt-1">Need help? Open a ticket and we'll respond fast.</p>
+          <h1 className="text-2xl font-bold text-ink">Suporte</h1>
+          <p className="text-sm text-ink-secondary mt-1">Precisa de ajuda? Abra um ticket e responderemos rapidamente.</p>
         </div>
         <Button onClick={() => setShowCreate(true)} leftIcon={<Plus className="h-4 w-4" />}>
-          New Ticket
+          Novo Ticket
         </Button>
       </div>
 
       {isLoading ? null : !tickets?.length ? (
         <EmptyState
           icon={HeadphonesIcon}
-          title="No support tickets"
-          description="Have an issue or question? Open a ticket and our team will help you."
-          action={{ label: 'Open Ticket', onClick: () => setShowCreate(true) }}
+          title="Sem tickets de suporte"
+          description="Tem algum problema ou pergunta? Abra um ticket e nossa equipe vai te ajudar."
+          action={{ label: 'Abrir Ticket', onClick: () => setShowCreate(true) }}
         />
       ) : (
         <div className="space-y-3">
