@@ -23,6 +23,7 @@ export type OrderStatus =
   | 'assigned'
   | 'in_progress'
   | 'paused'
+  | 'drop_requested'
   | 'awaiting_customer'
   | 'completed'
   | 'disputed'
@@ -174,6 +175,8 @@ export interface Order {
   estimated_hours: number | null
   customer_notes: string | null
   booster_notes: string | null
+  wins_played: number
+  losses_played: number
   assigned_booster_id: string | null
   mp_payment_id: string | null
   payment_status: PaymentStatus | null
@@ -190,6 +193,22 @@ export interface OrderStatusHistory {
   changed_by: string
   reason: string | null
   created_at: string
+}
+
+export interface OrderDropRequest {
+  id: string
+  order_id: string
+  booster_id: string
+  reason: string
+  wins_at_request: number
+  losses_at_request: number
+  penalty_pct: number
+  penalty_amount: number
+  status: 'pending' | 'approved' | 'rejected'
+  admin_id: string | null
+  admin_note: string | null
+  created_at: string
+  resolved_at: string | null
 }
 
 export interface OrderMessage {
