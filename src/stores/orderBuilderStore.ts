@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GameSlug, ServiceType, QueueType, Rank, ServiceExtra } from '@/types'
+import type { GameSlug, ServiceType, QueueType, BoostMode, Rank, ServiceExtra } from '@/types'
 
 export type OrderBuilderStep = 'game' | 'service' | 'configure' | 'extras' | 'review' | 'payment'
 
@@ -20,6 +20,7 @@ interface OrderBuilderState {
   currentRank: Rank | null
   targetRank: Rank | null
   queueType: QueueType
+  boostMode: BoostMode
   server: string
   winsPurchased: number | null
   sessionsPurchased: number | null
@@ -40,6 +41,7 @@ interface OrderBuilderState {
   setCurrentRank: (rank: Rank) => void
   setTargetRank: (rank: Rank | null) => void
   setQueueType: (queue: QueueType) => void
+  setBoostMode: (mode: BoostMode) => void
   setServer: (server: string) => void
   setWinsPurchased: (wins: number) => void
   setSessionsPurchased: (sessions: number) => void
@@ -63,6 +65,7 @@ const initialState = {
   currentRank: null,
   targetRank: null,
   queueType: 'solo_duo' as QueueType,
+  boostMode: 'solo' as BoostMode,
   server: 'NA',
   winsPurchased: null,
   sessionsPurchased: null,
@@ -95,6 +98,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setCurrentRank: (currentRank) => set({ currentRank }),
   setTargetRank: (targetRank) => set({ targetRank }),
   setQueueType: (queueType) => set({ queueType }),
+  setBoostMode: (boostMode) => set({ boostMode }),
   setServer: (server) => set({ server }),
   setWinsPurchased: (winsPurchased) => set({ winsPurchased }),
   setSessionsPurchased: (sessionsPurchased) => set({ sessionsPurchased }),

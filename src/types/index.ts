@@ -2,6 +2,8 @@
 
 export type UserRole = 'customer' | 'booster' | 'admin' | 'support'
 
+export type BoostMode = 'solo' | 'duo'
+
 export type GameSlug = 'lol' | 'valorant' | 'tft'
 
 export type ServiceType =
@@ -105,6 +107,7 @@ export interface BoosterProfile {
   rating: number
   rating_count: number
   is_available: boolean
+  is_top5: boolean
   verified_at: string | null
   created_at: string
 }
@@ -158,6 +161,7 @@ export interface Order {
   game_id: string
   status: OrderStatus
   queue_type: QueueType
+  boost_mode: BoostMode
   server: string
   current_rank: Rank
   target_rank: Rank | null

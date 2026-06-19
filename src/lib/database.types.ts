@@ -92,6 +92,7 @@ export type Database = {
           rating: number
           rating_count: number
           is_available: boolean
+          is_top5: boolean
           verified_at: string | null
           created_at: string
           updated_at: string
@@ -112,6 +113,7 @@ export type Database = {
           rating?: number
           rating_count?: number
           is_available?: boolean
+          is_top5?: boolean
           verified_at?: string | null
           created_at?: string
           updated_at?: string
@@ -130,6 +132,7 @@ export type Database = {
           rating?: number
           rating_count?: number
           is_available?: boolean
+          is_top5?: boolean
           verified_at?: string | null
           updated_at?: string
         }
@@ -244,6 +247,7 @@ export type Database = {
           game_id: string
           status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type: 'solo_duo' | 'flex'
+          boost_mode: 'solo' | 'duo'
           server: string
           current_rank: Json
           target_rank: Json | null
@@ -270,6 +274,7 @@ export type Database = {
           game_id: string
           status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type: 'solo_duo' | 'flex'
+          boost_mode?: 'solo' | 'duo'
           server: string
           current_rank: Json
           target_rank?: Json | null
@@ -292,6 +297,7 @@ export type Database = {
         Update: {
           status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type?: 'solo_duo' | 'flex'
+          boost_mode?: 'solo' | 'duo'
           server?: string
           current_rank?: Json
           target_rank?: Json | null
@@ -695,7 +701,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      accept_boost_order: {
+        Args: { p_order_id: string; p_booster_user_id: string }
+        Returns: Json
+      }
+      can_booster_accept_order: {
+        Args: { p_booster_user_id: string; p_boost_mode: string }
+        Returns: Json
+      }
+      booster_active_slot_counts: {
+        Args: { p_booster_user_id: string }
+        Returns: { solo_count: number; duo_count: number; total_count: number }[]
+      }
+      refresh_top5_boosters: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

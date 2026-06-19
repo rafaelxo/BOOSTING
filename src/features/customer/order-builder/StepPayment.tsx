@@ -41,6 +41,7 @@ export function StepPayment() {
           game_id: store.gameId ?? store.gameSlug ?? '',
           status: 'awaiting_payment',
           queue_type: store.queueType,
+          boost_mode: store.boostMode,
           server: store.server,
           current_rank: store.currentRank as never,
           target_rank: store.targetRank as never,

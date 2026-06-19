@@ -2,7 +2,6 @@ import type { Division, RankTier } from '@/types'
 import { RANK_TIER_ORDER } from '@/lib/utils'
 
 const DIVISIONS_ORDER: Division[] = ['IV', 'III', 'II', 'I']
-const NO_DIV: RankTier[] = ['master', 'grandmaster', 'challenger']
 
 // Sequential step index: Iron IV = 0 … Diamond I = 27, Master = 28, GM = 29, Chall = 30
 export function rankStep(tier: RankTier, div: Division | null): number {

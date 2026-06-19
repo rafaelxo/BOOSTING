@@ -3,7 +3,7 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE } from '@/lib/pricing'
-import type { Division, QueueType, RankTier } from '@/types'
+import type { BoostMode, Division, QueueType, RankTier } from '@/types'
 
 const SERVERS = ['NA', 'EUW', 'EUNE', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'JP', 'KR']
 const DIVISIONS: Division[] = ['I', 'II', 'III', 'IV']
@@ -74,9 +74,9 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSel
 
 export function StepConfigure() {
   const {
-    serviceType, currentRank, targetRank, queueType,
+    serviceType, currentRank, targetRank, queueType, boostMode,
     server, winsPurchased, sessionsPurchased, customerNotes,
-    setCurrentRank, setTargetRank, setQueueType, setServer,
+    setCurrentRank, setTargetRank, setQueueType, setBoostMode, setServer,
     setWinsPurchased, setSessionsPurchased, setNotes,
     setBasePrice, setEstimatedHours,
   } = useOrderBuilderStore()
@@ -133,6 +133,34 @@ export function StepConfigure() {
             ))}
           </div>
         </FormField>
+
+        {/* Boost mode (solo/duo) — only for rankable boost services */}
+        {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
+          <FormField
+            label="Modo de Boost"
+            hint="Solo: o booster acessa sua conta. Duo: você joga junto com o booster."
+            required
+          >
+            <div className="flex gap-3">
+              {([['solo', 'Solo Boost', 'Booster acessa sua conta e joga por você'], ['duo', 'Duo Boost', 'Você joga junto com o booster na duo queue']] as [BoostMode, string, string][]).map(([value, label, desc]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setBoostMode(value)}
+                  className={cn(
+                    'flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all text-left px-4',
+                    boostMode === value
+                      ? 'border-brand bg-brand-muted text-brand'
+                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
+                  )}
+                >
+                  <span className="block font-bold">{label}</span>
+                  <span className="block text-[11px] font-normal mt-0.5 opacity-75">{desc}</span>
+                </button>
+              ))}
+            </div>
+          </FormField>
+        )}
 
         {/* Queue type (for elo/win boost) */}
         {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Briefcase, DollarSign, Star, TrendingUp, Clock, ChevronRight } from 'lucide-react'
+import { Briefcase, DollarSign, Star, TrendingUp, Clock, ChevronRight, Swords, Users } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -46,6 +46,18 @@ export function BoosterDashboard() {
   const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
   const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id ?? '')
+
+  const { data: slotInfo } = useQuery({
+    queryKey: ['booster-slots', profile?.id],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('can_booster_accept_order', {
+        p_booster_user_id: profile!.id,
+        p_boost_mode: 'solo',
+      })
+      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top5: boolean } | null
+    },
+    enabled: !!profile?.id && boosterProfile?.status === 'approved',
+  })
 
   if (profileLoading) return <Skeleton className="h-64 w-full" />
 
@@ -107,6 +119,45 @@ export function BoosterDashboard() {
           </Card>
         ))}
       </div>
+
+      {/* Slot usage */}
+      {slotInfo && (
+        <Card padding="md" className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div>
+              <p className="text-sm font-semibold text-ink flex items-center gap-2">
+                Slots de Pedido
+                {slotInfo.is_top5 && (
+                  <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2 py-0.5 uppercase tracking-wide">
+                    TOP 5
+                  </span>
+                )}
+              </p>
+              <p className="text-xs text-ink-muted mt-0.5">
+                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 2 pedidos (máx 1 duo)'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm">
+              <Swords className="h-4 w-4 text-ink-muted" />
+              <span className="text-ink-secondary">Solo:</span>
+              <span className="font-bold text-ink">{slotInfo.solo_count}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Users className="h-4 w-4 text-ink-muted" />
+              <span className="text-ink-secondary">Duo:</span>
+              <span className="font-bold text-ink">{slotInfo.duo_count}/{slotInfo.max_duo}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-ink-secondary">Total:</span>
+              <span className={`font-bold ${slotInfo.total_count >= slotInfo.max_total ? 'text-danger' : slotInfo.total_count === slotInfo.max_total - 1 ? 'text-warning' : 'text-success'}`}>
+                {slotInfo.total_count}/{slotInfo.max_total}
+              </span>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Active assignments */}
       <div>

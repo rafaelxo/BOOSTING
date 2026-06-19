@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Shield, CheckCircle2, XCircle } from 'lucide-react'
+import { Shield, CheckCircle2, XCircle, Trophy, RefreshCw } from 'lucide-react'
 import { Button, BoosterStatusBadge, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
@@ -48,19 +48,55 @@ export function AdminBoostersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
   })
 
+  const toggleTop5 = useMutation({
+    mutationFn: async ({ id, is_top5 }: { id: string; is_top5: boolean }) => {
+      const { error } = await supabase
+        .from('booster_profiles')
+        .update({ is_top5 })
+        .eq('id', id)
+      if (error) throw error
+      await supabase.from('audit_logs').insert({
+        actor_id: profile!.id, actor_role: profile!.role,
+        action: is_top5 ? 'booster.top5_granted' : 'booster.top5_removed',
+        entity_type: 'booster_profile', entity_id: id,
+      })
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
+  })
+
+  const refreshTop5 = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('refresh_top5_boosters' as never)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
+  })
+
   const filtered = boosters?.filter(b => filter === 'all' || b.status === filter) ?? []
 
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.boosters.title')}</h1>
 
-      <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1 w-fit">
-        {['all', 'pending', 'under_review', 'approved', 'suspended'].map((s) => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>
-            {filterLabels[s] ?? s}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1 w-fit">
+          {['all', 'pending', 'under_review', 'approved', 'suspended'].map((s) => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>
+              {filterLabels[s] ?? s}
+            </button>
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+          loading={refreshTop5.isPending}
+          onClick={() => refreshTop5.mutate()}
+          title="Recalcula o ranking Top5 do mês atual com base em pedidos concluídos"
+        >
+          Atualizar Top 5 do Mês
+        </Button>
       </div>
 
       <div className="card p-0">
@@ -82,9 +118,16 @@ export function AdminBoostersPage() {
               {filtered.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell>
-                    <Link to={`/admin/boosters/${b.id}`} className="text-brand hover:underline font-medium text-sm">
-                      {b.display_name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/admin/boosters/${b.id}`} className="text-brand hover:underline font-medium text-sm">
+                        {b.display_name}
+                      </Link>
+                      {b.is_top5 && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-1.5 py-0.5 uppercase tracking-wide">
+                          <Trophy className="h-2.5 w-2.5" /> TOP5
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{b.games.join(', ')}</TableCell>
                   <TableCell>{b.rating.toFixed(1)} ⭐</TableCell>
@@ -92,7 +135,16 @@ export function AdminBoostersPage() {
                   <TableCell><BoosterStatusBadge status={b.status} /></TableCell>
                   <TableCell>{formatDate(b.created_at)}</TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
+                      <Button
+                        size="xs"
+                        variant={b.is_top5 ? 'danger-ghost' : 'secondary'}
+                        leftIcon={<Trophy className="h-3 w-3" />}
+                        onClick={() => toggleTop5.mutate({ id: b.id, is_top5: !b.is_top5 })}
+                        loading={toggleTop5.isPending}
+                      >
+                        {b.is_top5 ? 'Remover Top5' : 'Top5'}
+                      </Button>
                       {b.status === 'pending' || b.status === 'under_review' ? (
                         <>
                           <Button size="xs" variant="success" leftIcon={<CheckCircle2 className="h-3 w-3" />}

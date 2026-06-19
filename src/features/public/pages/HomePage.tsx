@@ -67,7 +67,7 @@ function RankPicker({
           </button>
         ))}
       </div>
-      {!NO_DIV_TIERS.includes(value) && (
+      {!(['master', 'grandmaster', 'challenger'] as RankTier[]).includes(value) && (
         <div className="flex gap-1.5">
           {DIVISIONS.map(d => (
             <button
