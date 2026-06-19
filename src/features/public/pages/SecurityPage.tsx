@@ -29,7 +29,7 @@ export function SecurityPage() {
       icon: CreditCard,
       title: t('security.pillars.paymentSecurity'),
       items: [
-        t('security.items.stripe'),
+        t('security.items.payment'),
         t('security.items.pci'),
         t('security.items.webhook'),
         t('security.items.idempotent'),

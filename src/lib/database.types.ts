@@ -261,8 +261,8 @@ export type Database = {
           customer_notes: string | null
           booster_notes: string | null
           assigned_booster_id: string | null
-          stripe_payment_intent_id: string | null
-          stripe_payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
+          mp_payment_id: string | null
+          payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
           completed_at: string | null
           created_at: string
           updated_at: string
@@ -288,8 +288,8 @@ export type Database = {
           customer_notes?: string | null
           booster_notes?: string | null
           assigned_booster_id?: string | null
-          stripe_payment_intent_id?: string | null
-          stripe_payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
+          mp_payment_id?: string | null
+          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
           completed_at?: string | null
           created_at?: string
           updated_at?: string
@@ -311,8 +311,8 @@ export type Database = {
           customer_notes?: string | null
           booster_notes?: string | null
           assigned_booster_id?: string | null
-          stripe_payment_intent_id?: string | null
-          stripe_payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
+          mp_payment_id?: string | null
+          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
           completed_at?: string | null
           updated_at?: string
         }
@@ -385,8 +385,7 @@ export type Database = {
           id: string
           order_id: string
           customer_id: string
-          stripe_payment_intent_id: string
-          stripe_checkout_session_id: string | null
+          mp_payment_id: string
           amount: number
           currency: string
           status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
@@ -401,8 +400,7 @@ export type Database = {
           id?: string
           order_id: string
           customer_id: string
-          stripe_payment_intent_id: string
-          stripe_checkout_session_id?: string | null
+          mp_payment_id: string
           amount: number
           currency?: string
           status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
@@ -428,7 +426,7 @@ export type Database = {
           id: string
           payment_id: string
           order_id: string
-          stripe_refund_id: string
+          mp_refund_id: string
           amount: number
           reason: string
           initiated_by: string
@@ -439,7 +437,7 @@ export type Database = {
           id?: string
           payment_id: string
           order_id: string
-          stripe_refund_id: string
+          mp_refund_id: string
           amount: number
           reason: string
           initiated_by: string

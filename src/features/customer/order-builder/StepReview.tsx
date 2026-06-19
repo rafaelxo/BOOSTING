@@ -139,7 +139,7 @@ export function StepReview() {
         )}
 
         <p className="text-xs text-ink-muted text-center">
-          Pagamento processado pelo Stripe. Seus dados nunca tocam nossos servidores.
+          Pagamento processado pelo Mercado Pago. Seus dados nunca tocam nossos servidores.
         </p>
       </div>
     </div>

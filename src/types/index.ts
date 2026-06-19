@@ -175,8 +175,8 @@ export interface Order {
   customer_notes: string | null
   booster_notes: string | null
   assigned_booster_id: string | null
-  stripe_payment_intent_id: string | null
-  stripe_payment_status: PaymentStatus | null
+  mp_payment_id: string | null
+  payment_status: PaymentStatus | null
   completed_at: string | null
   created_at: string
   updated_at: string
@@ -209,8 +209,7 @@ export interface Payment {
   id: string
   order_id: string
   customer_id: string
-  stripe_payment_intent_id: string
-  stripe_checkout_session_id: string | null
+  mp_payment_id: string
   amount: number
   currency: string
   status: PaymentStatus
@@ -226,7 +225,7 @@ export interface Refund {
   id: string
   payment_id: string
   order_id: string
-  stripe_refund_id: string
+  mp_refund_id: string
   amount: number
   reason: string
   initiated_by: string

@@ -42,6 +42,8 @@ begin
 end;
 $$;
 
+drop trigger if exists set_booster_applications_updated_at on booster_applications;
+
 create trigger set_booster_applications_updated_at
   before update on booster_applications
   for each row execute procedure update_booster_applications_updated_at();
@@ -49,10 +51,12 @@ create trigger set_booster_applications_updated_at
 -- RLS: anyone can INSERT (public form); only admins can read/update
 alter table booster_applications enable row level security;
 
+drop policy if exists "Anyone can submit an application" on booster_applications;
 create policy "Anyone can submit an application"
   on booster_applications for insert
   with check (true);
 
+drop policy if exists "Admins can manage applications" on booster_applications;
 create policy "Admins can manage applications"
   on booster_applications for all
   using (
@@ -64,5 +68,5 @@ create policy "Admins can manage applications"
   );
 
 -- Index for admin queries
-create index booster_applications_status_idx on booster_applications(status);
-create index booster_applications_created_at_idx on booster_applications(created_at desc);
+create index if not exists booster_applications_status_idx on booster_applications(status);
+create index if not exists booster_applications_created_at_idx on booster_applications(created_at desc);

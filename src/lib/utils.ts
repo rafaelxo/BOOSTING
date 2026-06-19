@@ -8,15 +8,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Currency formatting
-export function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount)
-}
-
 // Date formatting
 export function formatDate(date: string | Date) {
   return format(new Date(date), 'MMM d, yyyy')
@@ -166,11 +157,3 @@ export function initials(name: string) {
     .toUpperCase()
 }
 
-export function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-// Price calculation helpers
-export function calcTotalPrice(basePrice: number, extrasPriceDelta: number) {
-  return Math.max(0, basePrice + extrasPriceDelta)
-}

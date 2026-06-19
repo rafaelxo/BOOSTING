@@ -41,7 +41,7 @@ export function AdminRefundsPage() {
             <TableBody>
               {refunds.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell><span className="font-mono text-xs">{r.stripe_refund_id.slice(-10)}</span></TableCell>
+                  <TableCell><span className="font-mono text-xs">{r.mp_refund_id.slice(-10)}</span></TableCell>
                   <TableCell><span className="font-mono text-xs text-brand">{r.order_id.slice(0, 8).toUpperCase()}</span></TableCell>
                   <TableCell className="font-semibold text-ink">{currency(r.amount)}</TableCell>
                   <TableCell>{r.reason}</TableCell>

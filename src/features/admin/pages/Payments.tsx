@@ -69,7 +69,7 @@ export function AdminPaymentsPage() {
             <TableBody>
               {payments.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell><span className="font-mono text-xs text-ink-secondary">{p.stripe_payment_intent_id.slice(-12)}</span></TableCell>
+                  <TableCell><span className="font-mono text-xs text-ink-secondary">{p.mp_payment_id.slice(-12)}</span></TableCell>
                   <TableCell><span className="font-mono text-xs text-brand">{p.order_id.slice(0, 8).toUpperCase()}</span></TableCell>
                   <TableCell className="font-semibold text-ink">{currency(p.amount)}</TableCell>
                   <TableCell className="capitalize">{p.payment_method_type ?? '—'}</TableCell>

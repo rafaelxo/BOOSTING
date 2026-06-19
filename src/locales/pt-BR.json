@@ -199,7 +199,7 @@
       "flexQueue": "Flex",
       "paymentSuccess": "Pagamento confirmado!",
       "paymentSuccessDesc": "Seu pedido foi pago e está na fila. Um booster será atribuído em breve.",
-      "paymentProcessing": "Aguardando confirmação do Stripe...",
+      "paymentProcessing": "Aguardando confirmação do pagamento PIX...",
       "paymentProcessingDesc": "Isso pode levar alguns segundos."
     },
     "history": {
@@ -574,7 +574,7 @@
       "jwt": "Sessões JWT seguras com rotação automática",
       "revocation": "Revogação de sessão ao trocar a senha",
       "2fa": "2FA disponível para sua conta",
-      "stripe": "Dados do cartão nunca tocam nossos servidores — Stripe cuida de tudo",
+      "payment": "Pagamentos via PIX processados com segurança pelo Mercado Pago",
       "pci": "Processamento de pagamento compatível com PCI-DSS",
       "webhook": "Validação de assinatura de webhook em cada evento",
       "idempotent": "Operações de pagamento idempotentes evitam cobranças duplas",
@@ -611,7 +611,7 @@
     "q8": "Como os boosters são verificados?",
     "a8": "Todos os boosters se candidatam pela nossa plataforma e passam por verificação em múltiplas etapas: prova de rank, verificação de identidade, revisão de partidas teste e um período de observação. Apenas boosters Diamond IV+ são aprovados.",
     "q9": "Quais métodos de pagamento vocês aceitam?",
-    "a9": "Aceitamos todos os principais cartões de crédito e débito (Visa, Mastercard, Amex), Apple Pay e Google Pay, processados com segurança pelo Stripe.",
+    "a9": "Aceitamos pagamento via PIX, processado com segurança pelo Mercado Pago. O PIX é instantâneo, gratuito para você e disponível 24h por dia.",
     "q10": "Posso conversar com meu booster?",
     "a10": "Com certeza. Cada pedido inclui um chat interno onde você pode enviar mensagens diretamente para o seu booster.",
     "cantFind": "Não encontrou o que procura?",

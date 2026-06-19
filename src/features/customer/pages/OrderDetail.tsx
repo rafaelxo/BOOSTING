@@ -1,8 +1,8 @@
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, ArrowLeft, Clock, MessageCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Send, ArrowLeft, Clock, MessageCircle } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -55,7 +55,6 @@ function useOrderHistory(orderId: string) {
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [searchParams, setSearchParams] = useSearchParams()
   const { profile } = useAuthStore()
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -63,29 +62,9 @@ export function OrderDetailPage() {
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const paymentJustCompleted = searchParams.get('payment') === 'success'
-
-  // Poll every 2 s for 30 s after a Stripe redirect so the webhook status
-  // update shows up quickly. After that, fall back to no auto-refetch.
-  const [pollFast, setPollFast] = useState(paymentJustCompleted)
-  useEffect(() => {
-    if (!paymentJustCompleted) return
-    // Clear the query param from URL so it doesn't persist on refresh
-    setSearchParams({}, { replace: true })
-    const timer = setTimeout(() => setPollFast(false), 30_000)
-    return () => clearTimeout(timer)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const { data: order, isLoading } = useOrder(id!, pollFast ? 2000 : undefined)
+  const { data: order, isLoading } = useOrder(id!)
   const { data: messages } = useOrderMessages(id!)
   const { data: history } = useOrderHistory(id!)
-
-  // Stop fast-polling once the order leaves awaiting_payment
-  useEffect(() => {
-    if (pollFast && order && order.status !== 'awaiting_payment') {
-      setPollFast(false)
-    }
-  }, [order, pollFast])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -117,46 +96,8 @@ export function OrderDetailPage() {
 
   if (!order) return null
 
-  const isPendingPayment = order.status === 'awaiting_payment'
-
   return (
     <div className="max-w-4xl space-y-6">
-      {/* Polling banner — webhook still being processed */}
-      {pollFast && isPendingPayment && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-info/10 border border-info/25">
-          <Loader2 className="h-5 w-5 text-info shrink-0 mt-0.5 animate-spin" />
-          <div>
-            <p className="text-sm font-semibold text-info">{t('customer.order.paymentProcessing')}</p>
-            <p className="text-xs text-ink-secondary mt-0.5">{t('customer.order.paymentProcessingDesc')}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Payment success banner — only show if order actually left awaiting_payment */}
-      {paymentJustCompleted && !pollFast && !isPendingPayment && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-success/10 border border-success/25">
-          <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-success">{t('customer.order.paymentSuccess')}</p>
-            <p className="text-xs text-ink-secondary mt-0.5">{t('customer.order.paymentSuccessDesc')}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Timeout banner — 30s elapsed but order still awaiting_payment (webhook delay) */}
-      {paymentJustCompleted && !pollFast && isPendingPayment && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-warning/10 border border-warning/25">
-          <Clock className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-warning">Pagamento em processamento</p>
-            <p className="text-xs text-ink-secondary mt-0.5">
-              O pagamento foi recebido mas ainda está sendo confirmado. Aguarde alguns instantes ou{' '}
-              <Link to="/support" className="underline">abra um ticket</Link> se o problema persistir.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">

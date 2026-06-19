@@ -1,5 +1,4 @@
 export * from './Avatar'
-export * from './LanguageToggle'
 export * from './ThemeToggle'
 export * from './LogoMark'
 export * from './Badge'
