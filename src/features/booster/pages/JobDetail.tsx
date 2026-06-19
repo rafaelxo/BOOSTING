@@ -1,12 +1,12 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Play, Pause, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank } from '@/lib/utils'
-import type { Order, OrderMessage, OrderStatus } from '@/types'
+import type { Order, OrderMessage, OrderStatus, OrderDropRequest } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -16,6 +16,8 @@ export function JobDetailPage() {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [dropReason, setDropReason] = useState('')
+  const [showDropModal, setShowDropModal] = useState(false)
   const { t } = useTranslation()
   const currency = useCurrency()
 
@@ -32,6 +34,21 @@ export function JobDetailPage() {
       const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
       if (error) throw error
       return data as unknown as Order
+    },
+    enabled: !!id,
+  })
+
+  const { data: pendingDrop } = useQuery({
+    queryKey: ['drop-request', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('order_drop_requests')
+        .select('*')
+        .eq('order_id', id!)
+        .eq('status', 'pending')
+        .maybeSingle()
+      if (error) throw error
+      return data as OrderDropRequest | null
     },
     enabled: !!id,
   })
@@ -67,6 +84,39 @@ export function JobDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })
+    },
+  })
+
+  const logMatchResult = useMutation({
+    mutationFn: async ({ wins, losses }: { wins: number; losses: number }) => {
+      const { data, error } = await supabase.rpc('log_match_result', {
+        p_order_id: id!,
+        p_wins: wins,
+        p_losses: losses,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao registrar resultado')
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const requestDrop = useMutation({
+    mutationFn: async (reason: string) => {
+      const { data, error } = await supabase.rpc('request_order_drop', {
+        p_order_id: id!,
+        p_reason: reason,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; penalty_pct?: number; penalty_amount?: number; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao solicitar drop')
+      return result
+    },
+    onSuccess: () => {
+      setShowDropModal(false)
+      setDropReason('')
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      queryClient.invalidateQueries({ queryKey: ['drop-request', id] })
     },
   })
 
@@ -174,6 +224,45 @@ export function JobDetailPage() {
             <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
           </Card>
 
+          {/* Match result counters */}
+          {(order.status === 'in_progress' || order.status === 'paused') && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3">Resultados da partida</h3>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="text-center">
+                  <p className="text-xs text-ink-muted mb-1">Vitórias</p>
+                  <p className="text-2xl font-bold text-success">{order.wins_played}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-ink-muted mb-1">Derrotas</p>
+                  <p className="text-2xl font-bold text-danger">{order.losses_played}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="success"
+                  className="flex-1"
+                  leftIcon={<Trophy className="h-3.5 w-3.5" />}
+                  loading={logMatchResult.isPending}
+                  onClick={() => logMatchResult.mutate({ wins: order.wins_played + 1, losses: order.losses_played })}
+                >
+                  +1 Win
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="flex-1"
+                  leftIcon={<XCircle className="h-3.5 w-3.5" />}
+                  loading={logMatchResult.isPending}
+                  onClick={() => logMatchResult.mutate({ wins: order.wins_played, losses: order.losses_played + 1 })}
+                >
+                  +1 Loss
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {availableActions.length > 0 && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
@@ -193,8 +282,73 @@ export function JobDetailPage() {
               </div>
             </Card>
           )}
+
+          {/* Drop request */}
+          {order.status === 'in_progress' && !pendingDrop && (
+            <Button
+              variant="danger-ghost"
+              className="w-full"
+              leftIcon={<AlertTriangle className="h-4 w-4" />}
+              onClick={() => setShowDropModal(true)}
+            >
+              Solicitar Drop
+            </Button>
+          )}
+
+          {(order.status === 'drop_requested' || pendingDrop) && (
+            <div className="card p-3 border border-warning/30 bg-warning/5">
+              <div className="flex items-center gap-2 text-warning text-sm font-semibold">
+                <AlertTriangle className="h-4 w-4" />
+                Solicitação de drop pendente
+              </div>
+              <p className="text-xs text-ink-secondary mt-1">Aguardando aprovação do admin.</p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Drop request modal */}
+      {showDropModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card w-full max-w-md p-6 space-y-4">
+            <h2 className="text-lg font-bold text-ink flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Solicitar Drop de Pedido
+            </h2>
+            <p className="text-sm text-ink-secondary">
+              Sua solicitação será enviada ao admin para aprovação. Com {order.wins_played} vitória(s), a penalidade é de{' '}
+              <span className="font-bold text-warning">
+                {order.wins_played === 0 ? '0%' : order.wins_played <= 2 ? '10%' : '20%'}
+              </span>{' '}
+              do valor do pedido.
+            </p>
+            <div>
+              <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+                Motivo <span className="text-danger">*</span>
+              </label>
+              <textarea
+                value={dropReason}
+                onChange={(e) => setDropReason(e.target.value)}
+                placeholder="Descreva o motivo para abandonar o pedido..."
+                className="input-base w-full min-h-[100px] resize-none text-sm"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                loading={requestDrop.isPending}
+                disabled={dropReason.trim().length < 10}
+                onClick={() => requestDrop.mutate(dropReason.trim())}
+              >
+                Enviar Solicitação
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
