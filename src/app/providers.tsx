@@ -69,7 +69,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
-          await fetchProfile(session.user.id)
+          const displayName = (session.user.user_metadata?.name ?? session.user.user_metadata?.full_name) as string | undefined
+          await fetchProfile(session.user.id, displayName)
         } else {
           setProfile(null)
           setCachedProfile(null)
@@ -91,13 +92,24 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function fetchProfile(userId: string) {
+  async function fetchProfile(userId: string, displayName?: string) {
     setLoading(true)
-    const { data } = await supabase
+    let { data } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
+
+    if (!data) {
+      // Profile missing (Discord OAuth trigger may have failed) — create via RPC
+      await supabase.rpc('ensure_profile_exists', { p_display_name: displayName ?? null })
+      const result = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      data = result.data
+    }
 
     if (data) {
       setCachedProfile(data)
