@@ -33,4 +33,8 @@ Thumbs.db
 supabase/.branches
 supabase/.temp
 
-.planning
+# AI tooling — not part of the codebase
+.planning/
+.superpowers/
+docs/
+.claude/
