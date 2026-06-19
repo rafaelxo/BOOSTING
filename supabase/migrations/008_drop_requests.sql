@@ -33,10 +33,7 @@ create table if not exists public.order_drop_requests (
 alter table public.order_drop_requests enable row level security;
 
 drop policy if exists "boosters_insert_own_drop_requests" on public.order_drop_requests;
-create policy "boosters_insert_own_drop_requests"
-  on public.order_drop_requests for insert
-  to authenticated
-  with check (booster_id = auth.uid());
+-- No INSERT policy: all inserts go through the request_order_drop SECURITY DEFINER RPC
 
 drop policy if exists "boosters_select_own_drop_requests" on public.order_drop_requests;
 create policy "boosters_select_own_drop_requests"
@@ -68,6 +65,10 @@ begin
 
   if not found then
     return jsonb_build_object('success', false, 'error', 'order_not_found');
+  end if;
+
+  if p_wins < 0 or p_losses < 0 then
+    return jsonb_build_object('success', false, 'error', 'invalid_values');
   end if;
 
   if auth.uid() is distinct from v_order.assigned_booster_id then
