@@ -83,7 +83,13 @@ begin
   set    wins_played   = p_wins,
          losses_played = p_losses,
          updated_at    = now()
-  where  id = p_order_id;
+  where  id = p_order_id
+    and  p_wins   >= wins_played
+    and  p_losses >= losses_played;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'cannot_decrease_counters');
+  end if;
 
   return jsonb_build_object('success', true);
 end;
@@ -201,11 +207,11 @@ begin
   if p_approve then
     -- Cancel the order
     update public.orders
-    set    status = 'cancelled', updated_at = now()
+    set    status = 'canceled', updated_at = now()
     where  id = v_req.order_id;
 
     insert into public.order_status_history(order_id, from_status, to_status, changed_by, reason)
-    values (v_req.order_id, 'drop_requested', 'cancelled', auth.uid(), 'Drop request approved');
+    values (v_req.order_id, 'drop_requested', 'canceled', auth.uid(), 'Drop request approved');
 
     -- Deduct penalty from booster earnings
     if v_req.penalty_amount > 0 then
