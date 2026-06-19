@@ -120,7 +120,7 @@ function BoostConfigurator() {
       queue, server,
     })
     if (isAuthenticated()) navigate(`/orders/new?${params}`)
-    else navigate(`/register?redirect=/orders/new?${params}`)
+    else navigate(`/login?redirect=/orders/new?${params}`)
   }
 
   return (

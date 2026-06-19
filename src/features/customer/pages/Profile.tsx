@@ -112,23 +112,26 @@ export function CustomerProfilePage() {
 
       {/* Password */}
       <Card padding="md">
-        <h3 className="text-sm font-semibold text-ink mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-ink mb-1 flex items-center gap-2">
           <Lock className="h-4 w-4 text-ink-secondary" />
-          {t('customer.profile.changePassword')}
+          Definir / Alterar Senha
         </h3>
+        <p className="text-xs text-ink-muted mb-4">
+          Opcional. Permite entrar com e-mail e senha além do Discord.
+        </p>
 
         <form onSubmit={passwordForm.handleSubmit(onPasswordSave)} className="space-y-4">
-          <FormField label={t('customer.profile.newPassword')} error={passwordForm.formState.errors.newPassword?.message} required>
-            <Input type="password" placeholder="••••••••" error={!!passwordForm.formState.errors.newPassword} {...passwordForm.register('newPassword')} />
+          <FormField label="Nova senha" error={passwordForm.formState.errors.newPassword?.message} required>
+            <Input type="password" placeholder="Mínimo 8 caracteres" error={!!passwordForm.formState.errors.newPassword} {...passwordForm.register('newPassword')} />
           </FormField>
-          <FormField label={t('customer.profile.confirmPassword')} error={passwordForm.formState.errors.confirmPassword?.message} required>
+          <FormField label="Confirmar senha" error={passwordForm.formState.errors.confirmPassword?.message} required>
             <Input type="password" placeholder="••••••••" error={!!passwordForm.formState.errors.confirmPassword} {...passwordForm.register('confirmPassword')} />
           </FormField>
           <div className="flex items-center gap-3">
             <Button type="submit" variant="secondary" loading={passwordForm.formState.isSubmitting}>
-              {t('customer.profile.updatePassword')}
+              Salvar Senha
             </Button>
-            {passwordSaved && <span className="text-sm text-success">{t('customer.profile.passwordUpdated')}</span>}
+            {passwordSaved && <span className="text-sm text-success">Senha salva com sucesso!</span>}
           </div>
         </form>
       </Card>

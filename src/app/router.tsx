@@ -19,7 +19,6 @@ const BoosterApplyPage = lazy(() => import('@/features/public/pages/BoosterApply
 
 // Auth pages
 const LoginPage          = lazy(() => import('@/features/auth/LoginPage').then(m => ({ default: m.LoginPage })))
-const RegisterPage       = lazy(() => import('@/features/auth/RegisterPage').then(m => ({ default: m.RegisterPage })))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
 const ResetPasswordPage  = lazy(() => import('@/features/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
 
@@ -115,7 +114,7 @@ export const router = createBrowserRouter([
     element: <RequireGuest />,
     children: [
       { path: '/login',           element: <SuspensePage><LoginPage /></SuspensePage> },
-      { path: '/register',        element: <SuspensePage><RegisterPage /></SuspensePage> },
+      { path: '/register',        element: <Navigate to="/login" replace /> },
       { path: '/forgot-password', element: <SuspensePage><ForgotPasswordPage /></SuspensePage> },
       { path: '/reset-password',  element: <SuspensePage><ResetPasswordPage /></SuspensePage> },
     ],

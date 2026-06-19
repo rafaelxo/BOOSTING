@@ -193,7 +193,6 @@ export function PublicLayout() {
               ]},
               { title: t('footer.account'), links: [
                 { href: '/login',     label: t('footer.signIn')   },
-                { href: '/register',  label: t('footer.register') },
                 { href: '/dashboard', label: t('footer.dashboard')},
               ]},
             ].map(({ title, links }) => (

@@ -1,10 +1,7 @@
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Zap, Mail, Lock } from 'lucide-react'
-import { Button, Input, FormField, ThemeToggle } from '@/components/ui'
+import { Zap } from 'lucide-react'
+import { ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
 
@@ -16,63 +13,33 @@ function DiscordIcon({ className }: { className?: string }) {
   )
 }
 
-const schema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-})
-
-type FormData = z.infer<typeof schema>
-
 export function LoginPage() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
-  const [serverError, setServerError] = useState<string | null>(null)
-
-  const [discordLoading, setDiscordLoading] = useState(false)
-
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  })
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   async function handleDiscordLogin() {
-    setDiscordLoading(true)
-    const { error } = await supabase.auth.signInWithOAuth({
+    setLoading(true)
+    setError(null)
+
+    // Preserve ?redirect= so after OAuth we land on the originally requested page
+    const redirect = searchParams.get('redirect')
+    const redirectTo = redirect
+      ? `${window.location.origin}${redirect}`
+      : window.location.origin
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
         scopes: 'identify email guilds.join',
-        redirectTo: window.location.origin,
+        redirectTo,
       },
     })
-    if (error) {
-      setServerError(error.message)
-      setDiscordLoading(false)
+    if (oauthError) {
+      setError(oauthError.message)
+      setLoading(false)
     }
-  }
-
-  async function onSubmit(data: FormData) {
-    setServerError(null)
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
-
-    if (error) {
-      setServerError(error.message === 'Invalid login credentials'
-        ? t('auth.login.invalidCredentials')
-        : error.message)
-      return
-    }
-
-    const raw = searchParams.get('redirect')
-    let target = '/dashboard'
-    if (raw) {
-      try {
-        const decoded = decodeURIComponent(raw)
-        if (/^\/(?![/\\])/.test(decoded)) target = decoded
-      } catch { /* ignore malformed */ }
-    }
-    navigate(target)
   }
 
   return (
@@ -93,70 +60,38 @@ export function LoginPage() {
         <div className="card p-6 space-y-5">
           <div>
             <h1 className="text-xl font-bold text-ink">{t('auth.login.title')}</h1>
-            <p className="text-sm text-ink-secondary mt-1">{t('auth.login.subtitle')}</p>
+            <p className="text-sm text-ink-secondary mt-1">
+              Acesse sua conta com o Discord para continuar.
+            </p>
           </div>
 
-          {/* Discord — primary method */}
           <button
             type="button"
             onClick={handleDiscordLogin}
-            disabled={discordLoading || isSubmitting}
-            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: '#5865F2' }}
           >
             <DiscordIcon className="h-5 w-5" />
-            {discordLoading ? t('auth.login.discordLoading') : t('auth.login.discordLogin')}
+            {loading ? 'Conectando...' : 'Entrar com Discord'}
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-bg-elevated" />
-            <span className="text-xs text-ink-muted">{t('auth.login.orEmail')}</span>
-            <div className="flex-1 h-px bg-bg-elevated" />
-          </div>
+          {error && (
+            <p className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2">{error}</p>
+          )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <FormField label={t('auth.login.email')} error={errors.email?.message} required>
-              <Input
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                leftElement={<Mail className="h-4 w-4" />}
-                error={!!errors.email}
-                {...register('email')}
-              />
-            </FormField>
-
-            <FormField label={t('auth.login.password')} error={errors.password?.message} required>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                leftElement={<Lock className="h-4 w-4" />}
-                error={!!errors.password}
-                {...register('password')}
-              />
-            </FormField>
-
-            <div className="flex justify-end">
-              <Link to="/forgot-password" className="text-xs text-brand hover:underline">
-                {t('auth.login.forgotPassword')}
-              </Link>
-            </div>
-
-            {serverError && (
-              <p className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2">{serverError}</p>
-            )}
-
-            <Button type="submit" className="w-full" loading={isSubmitting}>
-              {t('auth.login.submit')}
-            </Button>
-          </form>
+          <p className="text-xs text-ink-muted text-center">
+            Ao entrar, você concorda com os nossos{' '}
+            <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
+            {' '}e{' '}
+            <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
+          </p>
         </div>
 
-        <p className="text-center text-sm text-ink-secondary mt-4">
-          {t('auth.login.noAccount')}{' '}
-          <Link to="/register" className="text-brand font-medium hover:underline">
-            {t('auth.login.register')}
+        <p className="text-center text-xs text-ink-muted mt-4">
+          Definiu uma senha?{' '}
+          <Link to="/forgot-password" className="text-brand hover:underline">
+            Redefinir senha
           </Link>
         </p>
       </div>
