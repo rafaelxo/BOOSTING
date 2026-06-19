@@ -53,6 +53,7 @@ const AdminTicketsPage    = lazy(() => import('@/features/admin/pages/Tickets').
 const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs').then(m => ({ default: m.AdminAuditPage })))
 const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services').then(m => ({ default: m.AdminServicesPage })))
 const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
+const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const ReviewsPage         = lazy(() => import('@/features/public/pages/ReviewsPage').then(m => ({ default: m.ReviewsPage })))
 
 function SuspensePage({ children }: { children: React.ReactNode }) {
@@ -176,6 +177,7 @@ export const router = createBrowserRouter([
           { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
           { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
           { path: '/admin/reviews',      element: <SuspensePage><AdminReviewsPage /></SuspensePage> },
+          { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
         ],
       },
     ],

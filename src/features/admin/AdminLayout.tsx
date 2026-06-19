@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   HeadphonesIcon, Settings, Shield, Star,
-  LogOut, ChevronDown, Bell, RefreshCw, Eye,
+  LogOut, ChevronDown, Bell, RefreshCw, Eye, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -26,6 +26,7 @@ export function AdminLayout() {
         { href: '/admin/orders',    icon: ShoppingBag,     label: t('admin.nav.orders')     },
         { href: '/admin/boosters',  icon: Shield,          label: t('admin.nav.boosters')   },
         { href: '/admin/customers', icon: Users,           label: t('admin.nav.customers')  },
+        { href: '/admin/drops',     icon: AlertTriangle,   label: 'Drops'                   },
       ],
     },
     {
