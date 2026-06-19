@@ -27,7 +27,7 @@ export function CustomerLayout() {
 
   async function handleSignOut() {
     await signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   return (

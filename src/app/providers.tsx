@@ -22,24 +22,6 @@ const queryClient = new QueryClient({
   },
 })
 
-const PROFILE_CACHE_KEY = 'eb_profile_cache'
-
-function getCachedProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_CACHE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function setCachedProfile(profile: unknown) {
-  try {
-    if (profile) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
-    else localStorage.removeItem(PROFILE_CACHE_KEY)
-  } catch { /* quota exceeded — non-fatal */ }
-}
-
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setProfile, setLoading, setInitialized } = useAuthStore()
 
@@ -48,19 +30,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         setSession(session)
         if (session?.user) {
-          // Hydrate from cache instantly so the UI unblocks without waiting for network
-          if (event === 'INITIAL_SESSION') {
-            const cached = getCachedProfile()
-            if (cached && cached.id === session.user.id) {
-              setProfile(cached)
-              setLoading(false)
-              setInitialized(true)
-              // Revalidate in background — don't await
-              refreshProfile(session.user.id)
-              return
-            }
-          }
-
           // Auto-join Discord server when user authenticates via Discord OAuth
           if (event === 'SIGNED_IN' && session.provider_token) {
             const provider = (session.user.app_metadata as Record<string, string>).provider
@@ -73,7 +42,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           await fetchProfile(session.user.id, displayName)
         } else {
           setProfile(null)
-          setCachedProfile(null)
           setLoading(false)
           setInitialized(true)
         }
@@ -111,10 +79,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       data = result.data
     }
 
-    if (data) {
-      setCachedProfile(data)
-      setProfile(data)
-    }
+    if (data) setProfile(data)
     setLoading(false)
     setInitialized(true)
   }
@@ -123,19 +88,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.functions.invoke('discord-join-server', {
       body: { discord_access_token: providerToken },
     }).catch(() => { /* non-fatal — user still logs in */ })
-  }
-
-  async function refreshProfile(userId: string) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (data) {
-      setCachedProfile(data)
-      setProfile(data)
-    }
   }
 
   return <>{children}</>

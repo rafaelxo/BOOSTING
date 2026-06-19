@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
+    persistSession: false,   // session lives in memory only — re-auth on every tab open
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },

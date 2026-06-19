@@ -23,11 +23,16 @@ export function LoginPage() {
     setLoading(true)
     setError(null)
 
-    // Preserve ?redirect= so after OAuth we land on the originally requested page
-    const redirect = searchParams.get('redirect')
-    const redirectTo = redirect
-      ? `${window.location.origin}${redirect}`
-      : window.location.origin
+    // Validate ?redirect= — must be a same-origin path to prevent open redirect / token leak
+    const raw = searchParams.get('redirect')
+    let path = '/'
+    if (raw) {
+      try {
+        const decoded = decodeURIComponent(raw)
+        if (/^\/(?![/\\])/.test(decoded)) path = decoded
+      } catch { /* ignore malformed */ }
+    }
+    const redirectTo = `${window.location.origin}${path}`
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'discord',

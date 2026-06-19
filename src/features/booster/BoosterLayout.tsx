@@ -41,7 +41,7 @@ export function BoosterLayout() {
 
   async function handleSignOut() {
     await signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   // Redirect to onboarding if profile not created yet

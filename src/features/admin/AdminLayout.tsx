@@ -54,7 +54,7 @@ export function AdminLayout() {
 
   async function handleSignOut() {
     await signOut()
-    navigate('/login')
+    navigate('/')
   }
 
   return (
