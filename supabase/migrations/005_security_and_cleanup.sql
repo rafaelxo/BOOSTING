@@ -92,20 +92,44 @@ $$;
 
 -- ─── 5. Rename Stripe columns → provider-neutral names ───────────────────────
 
--- orders
-alter table public.orders
-  rename column stripe_payment_intent_id to mp_payment_id;
+do $$
+begin
+  -- orders.stripe_payment_intent_id → mp_payment_id
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'orders'
+      and column_name = 'stripe_payment_intent_id'
+  ) then
+    alter table public.orders rename column stripe_payment_intent_id to mp_payment_id;
+  end if;
 
-alter table public.orders
-  rename column stripe_payment_status to payment_status;
+  -- orders.stripe_payment_status → payment_status
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'orders'
+      and column_name = 'stripe_payment_status'
+  ) then
+    alter table public.orders rename column stripe_payment_status to payment_status;
+  end if;
 
--- payments
-alter table public.payments
-  rename column stripe_payment_intent_id to mp_payment_id;
+  -- payments.stripe_payment_intent_id → mp_payment_id
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'payments'
+      and column_name = 'stripe_payment_intent_id'
+  ) then
+    alter table public.payments rename column stripe_payment_intent_id to mp_payment_id;
+  end if;
 
-alter table public.payments
-  drop column if exists stripe_checkout_session_id;
+  -- refunds.stripe_refund_id → mp_refund_id
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'refunds'
+      and column_name = 'stripe_refund_id'
+  ) then
+    alter table public.refunds rename column stripe_refund_id to mp_refund_id;
+  end if;
+end;
+$$;
 
--- refunds
-alter table public.refunds
-  rename column stripe_refund_id to mp_refund_id;
+alter table public.payments drop column if exists stripe_checkout_session_id;
