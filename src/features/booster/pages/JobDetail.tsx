@@ -57,16 +57,13 @@ export function JobDetailPage() {
 
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
-      if (!order) return
-      const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id!)
-      if (error) throw error
-      // Log status history
-      await supabase.from('order_status_history').insert({
-        order_id: id!,
-        from_status: order.status,
-        to_status: newStatus,
-        changed_by: profile!.id,
+      const { data, error } = await supabase.rpc('update_order_status', {
+        p_order_id: id!,
+        p_new_status: newStatus,
       })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar status')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['order', id] })

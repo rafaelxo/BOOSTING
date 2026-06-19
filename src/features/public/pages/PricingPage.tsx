@@ -1,53 +1,51 @@
 import { Link } from 'react-router-dom'
 import { CheckCircle2, ChevronRight, Users } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { Button, Skeleton } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { PLACEMENT_PRICE } from '@/lib/pricing'
+import { PLACEMENT_PRICE, getWinBoostPrice } from '@/lib/pricing'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { RankTier } from '@/types'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import type { RankTier, ServiceExtra } from '@/types'
 
-// ── Elo Boost — preço por divisão dentro de cada tier ───────────────────────
 const ELO_TIERS: { tier: RankTier; perDiv: number }[] = [
-  { tier: 'iron',      perDiv: 8.50  },
-  { tier: 'bronze',    perDiv: 10    },
-  { tier: 'silver',    perDiv: 13.50 },
-  { tier: 'gold',      perDiv: 17    },
-  { tier: 'platinum',  perDiv: 24    },
-  { tier: 'emerald',   perDiv: 47    },
-  { tier: 'diamond',   perDiv: 75    },
+  { tier: 'iron',     perDiv: 8.50 },
+  { tier: 'bronze',   perDiv: 10   },
+  { tier: 'silver',   perDiv: 13.50 },
+  { tier: 'gold',     perDiv: 17   },
+  { tier: 'platinum', perDiv: 24   },
+  { tier: 'emerald',  perDiv: 47   },
+  { tier: 'diamond',  perDiv: 75   },
 ]
 
-// ── Vitória Avulsa — preço por vitória por tier ──────────────────────────────
-type WinRow = { tier: RankTier; label: string }
-const WIN_TIERS: WinRow[] = [
-  { tier: 'iron',         label: 'R$3'      },
-  { tier: 'bronze',       label: 'R$3'      },
-  { tier: 'silver',       label: 'R$4'      },
-  { tier: 'gold',         label: 'R$4'      },
-  { tier: 'platinum',     label: 'R$7'      },
-  { tier: 'emerald',      label: 'R$10'     },
-  { tier: 'diamond',      label: 'R$12–17'  },
-  { tier: 'master',       label: 'R$45'     },
-  { tier: 'grandmaster',  label: 'R$60'     },
-  { tier: 'challenger',   label: 'R$100'    },
-] as { tier: RankTier; label: string }[]
+const WIN_TIERS: RankTier[] = [
+  'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',
+]
 
-// ── MD5 — tiers disponíveis ──────────────────────────────────────────────────
 const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emerald','diamond','master']
 
-// ── Extras ───────────────────────────────────────────────────────────────────
-const EXTRAS_STATIC = [
-  { key: 'duo',       name: 'Duo Boost',          desc: 'Jogue ao lado do booster em duo queue.',         price: '+52%'  },
-  { key: 'priority',  name: 'Priority Processing', desc: 'Atribuição imediata ao booster top-rated.',     price: '+15%'  },
-  { key: 'solo',      name: 'Solo Queue Only',     desc: 'O booster joga apenas SoloQ.',                  price: '+10%'  },
-  { key: 'mono',      name: 'Mono Champion',       desc: 'Seu campeão favorito em toda partida.',         price: '+5%'   },
-  { key: 'stream',    name: 'Live Stream',          desc: 'Assista o boost via link privado.',             price: '+R$4,99' },
-  { key: 'monitor',   name: 'Live Monitoring',     desc: 'Atualizações periódicas da nossa equipe.',      price: '+R$2,99' },
-  { key: 'offline',   name: 'Appear Offline',      desc: 'Sua conta fica offline durante o serviço.',    price: 'Grátis' },
-]
+function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string): string {
+  if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
+  if (extra.price_modifier_pct > 0) return `+${extra.price_modifier_pct}%`
+  return 'Grátis'
+}
 
 export function PricingPage() {
   const currency = useCurrency()
+
+  const { data: extras = [], isLoading: extrasLoading } = useQuery({
+    queryKey: ['service-extras'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_extras')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order')
+      if (error) throw error
+      return data as ServiceExtra[]
+    },
+    staleTime: 1000 * 60 * 10,
+  })
 
   return (
     <div className="py-16">
@@ -106,13 +104,18 @@ export function PricingPage() {
           <h2 className="text-xl font-bold text-ink mb-1">Vitória Avulsa</h2>
           <p className="text-sm text-ink-secondary mb-4">Preço por vitória de acordo com o seu rank atual.</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {WIN_TIERS.map(({ tier, label }) => (
-              <div key={tier} className="card p-4 text-center">
-                <p className={`text-sm font-bold mb-1 ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</p>
-                <p className="text-xl font-extrabold text-ink">{label}</p>
-                <p className="text-[10px] text-ink-muted mt-0.5">por vitória</p>
-              </div>
-            ))}
+            {WIN_TIERS.map((tier) => {
+              const price = getWinBoostPrice(tier, tier === 'diamond' ? 'IV' : null)
+              return (
+                <div key={tier} className="card p-4 text-center">
+                  <p className={`text-sm font-bold mb-1 ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</p>
+                  <p className="text-xl font-extrabold text-ink">
+                    {tier === 'diamond' ? `${currency(12)}–${currency(17)}` : currency(price)}
+                  </p>
+                  <p className="text-[10px] text-ink-muted mt-0.5">por vitória</p>
+                </div>
+              )
+            })}
           </div>
           <div className="mt-3 text-right">
             <Button asChild size="sm">
@@ -184,20 +187,26 @@ export function PricingPage() {
         {/* ── Extras ── */}
         <section>
           <h2 className="text-xl font-bold text-ink mb-4">Extras Opcionais</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {EXTRAS_STATIC.map(({ key, name, desc, price }) => (
-              <div key={key} className="card p-4 flex items-start gap-3">
-                <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-ink">{name}</p>
-                    <span className="text-xs font-bold text-brand">{price}</span>
+          {extrasLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {extras.map((extra) => (
+                <div key={extra.id} className="card p-4 flex items-start gap-3">
+                  <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-semibold text-ink">{extra.name}</p>
+                      <span className="text-xs font-bold text-brand">{formatExtraPrice(extra, currency)}</span>
+                    </div>
+                    <p className="text-xs text-ink-secondary">{extra.description}</p>
                   </div>
-                  <p className="text-xs text-ink-secondary">{desc}</p>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* CTA */}

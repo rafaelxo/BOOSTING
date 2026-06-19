@@ -36,24 +36,17 @@ export function BoosterOnboardingPage() {
   async function onSubmit(data: FormData) {
     if (!profile) return
 
-    const { error } = await supabase.from('booster_profiles').upsert({
-      user_id: profile.id,
-      display_name: data.display_name,
-      bio: data.bio || null,
-      status: 'pending',
-      games: selectedGames,
-      region_preferences: selectedServers,
-      queue_preferences: ['solo_duo', 'flex'],
-      peak_rank: peakTier ? { tier: peakTier, division: null } : null,
-      current_rank: null,
-      total_completed: 0,
-      total_earnings: 0,
-      rating: 0,
-      rating_count: 0,
-      is_available: false,
+    const { data: result, error } = await supabase.rpc('onboard_booster', {
+      p_display_name: data.display_name,
+      p_bio: data.bio || '',
+      p_games: selectedGames,
+      p_regions: selectedServers,
+      p_peak_rank: peakTier ? { tier: peakTier, division: null } : null,
     })
 
-    if (!error) navigate('/booster')
+    if (error) return
+    const res = result as { success: boolean; error?: string }
+    if (res.success) navigate('/booster')
   }
 
   function toggle<T>(arr: T[], val: T): T[] {

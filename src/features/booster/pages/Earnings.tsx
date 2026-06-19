@@ -36,15 +36,18 @@ export function BoosterEarningsPage() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).reduce((s, p) => s + p.net_amount, 0) ?? 0
 
-  // Mock chart data
-  const chartData = [
-    { month: 'Jan', amount: 0 },
-    { month: 'Feb', amount: 0 },
-    { month: 'Mar', amount: 0 },
-    { month: 'Apr', amount: 0 },
-    { month: 'May', amount: 0 },
-    { month: 'Jun', amount: thisMonth },
-  ]
+  const chartData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (5 - i))
+    const label = d.toLocaleDateString('pt-BR', { month: 'short' })
+    const amount = (payouts ?? [])
+      .filter(p => {
+        const pd = new Date(p.created_at)
+        return pd.getMonth() === d.getMonth() && pd.getFullYear() === d.getFullYear()
+      })
+      .reduce((s, p) => s + Number(p.net_amount), 0)
+    return { month: label.charAt(0).toUpperCase() + label.slice(1), amount }
+  })
 
   return (
     <div className="max-w-4xl space-y-6">

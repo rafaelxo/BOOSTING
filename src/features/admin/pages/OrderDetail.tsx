@@ -1,9 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RefreshCw, UserCheck } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
@@ -15,7 +14,6 @@ const ADMIN_STATUS_OPTIONS: OrderStatus[] = [
 
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const currency = useCurrency()
 
@@ -31,15 +29,13 @@ export function AdminOrderDetailPage() {
 
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
-      if (!order) return
-      await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id!)
-      await supabase.from('order_status_history').insert({
-        order_id: id!, from_status: order.status, to_status: newStatus, changed_by: profile!.id, reason: 'Admin override',
+      const { data, error } = await supabase.rpc('admin_override_order_status', {
+        p_order_id: id!,
+        p_new_status: newStatus,
       })
-      await supabase.from('audit_logs').insert({
-        actor_id: profile!.id, actor_role: profile!.role, action: 'order.status_override',
-        entity_type: 'order', entity_id: id!, diff: { from: order.status, to: newStatus },
-      })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar status')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-order', id] }),
   })
@@ -110,16 +106,10 @@ export function AdminOrderDetailPage() {
 
           {/* Booster assignment */}
           <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-ink-secondary" />
-              Atribuição
-            </h3>
-            <p className="text-xs text-ink-secondary mb-3">
-              {order.assigned_booster_id ? `Booster: ${order.assigned_booster_id.slice(0, 12)}...` : 'Nenhum booster atribuído.'}
+            <h3 className="text-sm font-semibold text-ink mb-2">Booster</h3>
+            <p className="text-xs text-ink-secondary">
+              {order.assigned_booster_id ? order.assigned_booster_id.slice(0, 16) + '…' : 'Nenhum booster atribuído.'}
             </p>
-            <Button size="sm" variant="secondary" className="w-full">
-              Reatribuir Booster
-            </Button>
           </Card>
         </div>
       </div>

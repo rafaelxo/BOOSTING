@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { ShoppingBag, DollarSign, Users, AlertCircle } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
@@ -41,15 +42,17 @@ export function AdminOverview() {
 
   const recentOrders = stats?.orders.slice(0, 8) ?? []
 
-  const chartData = [
-    { day: 'Mon', orders: 8 },
-    { day: 'Tue', orders: 14 },
-    { day: 'Wed', orders: 11 },
-    { day: 'Thu', orders: 19 },
-    { day: 'Fri', orders: 24 },
-    { day: 'Sat', orders: 18 },
-    { day: 'Sun', orders: 12 },
-  ]
+  const chartData = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      const label = d.toLocaleDateString('pt-BR', { weekday: 'short' })
+      const count = (stats?.orders ?? []).filter(o =>
+        new Date(o.created_at).toDateString() === d.toDateString()
+      ).length
+      return { day: label.charAt(0).toUpperCase() + label.slice(1, 3), orders: count }
+    })
+  , [stats?.orders])
 
   return (
     <div className="max-w-7xl space-y-6">

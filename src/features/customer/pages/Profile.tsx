@@ -39,17 +39,21 @@ export function CustomerProfilePage() {
 
   async function onProfileSave(data: ProfileData) {
     if (!profile) return
-    const { data: updated, error } = await supabase
-      .from('profiles')
-      .update({ username: data.username, updated_at: new Date().toISOString() })
-      .eq('id', profile.id)
-      .select()
-      .single()
-    if (!error && updated) {
-      setProfile(updated)
-      setProfileSaved(true)
-      setTimeout(() => setProfileSaved(false), 3000)
+    const { data: result, error } = await supabase.rpc('update_my_username', { p_username: data.username })
+    if (error) {
+      profileForm.setError('username', { message: 'Erro ao salvar' })
+      return
     }
+    const res = result as { success: boolean; error?: string }
+    if (!res.success) {
+      profileForm.setError('username', {
+        message: res.error === 'username_taken' ? 'Este nome já está em uso' : 'Erro ao salvar',
+      })
+      return
+    }
+    setProfile({ ...profile, username: data.username })
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 3000)
   }
 
   async function onPasswordSave(data: PasswordData) {

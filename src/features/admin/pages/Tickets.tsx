@@ -4,13 +4,11 @@ import { HeadphonesIcon } from 'lucide-react'
 import { EmptyState, Skeleton, TicketStatusBadge, TicketPriorityBadge } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/authStore'
 import { timeAgo } from '@/lib/utils'
 import type { SupportTicket } from '@/types'
 import { useTranslation } from 'react-i18next'
 
 export function AdminTicketsPage() {
-  const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const { t } = useTranslation()
 
@@ -30,11 +28,10 @@ export function AdminTicketsPage() {
 
   const assignTicket = useMutation({
     mutationFn: async (ticketId: string) => {
-      const { error } = await supabase
-        .from('support_tickets')
-        .update({ assigned_to: profile!.id, status: 'in_progress' })
-        .eq('id', ticketId)
+      const { data, error } = await supabase.rpc('assign_ticket', { p_ticket_id: ticketId })
       if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao atribuir ticket')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-tickets'] }),
   })

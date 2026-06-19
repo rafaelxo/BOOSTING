@@ -20,8 +20,10 @@ export function AdminReviewsPage() {
 
   const toggleVisibility = useMutation({
     mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
-      const { error } = await supabase.from('reviews').update({ is_public: isPublic, is_moderated: true }).eq('id', id)
+      const { data, error } = await supabase.rpc('moderate_review', { p_review_id: id, p_is_public: isPublic })
       if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao moderar avaliação')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-reviews'] }),
   })

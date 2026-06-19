@@ -4,14 +4,12 @@ import { Shield, CheckCircle2, XCircle, Trophy, RefreshCw } from 'lucide-react'
 import { Button, BoosterStatusBadge, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/authStore'
 import { formatDate } from '@/lib/utils'
 import type { BoosterProfile } from '@/types'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 export function AdminBoostersPage() {
-  const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<string>('all')
   const { t } = useTranslation()
@@ -34,32 +32,21 @@ export function AdminBoostersPage() {
   })
 
   const updateBoosterStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected' }) => {
-      const { error } = await supabase
-        .from('booster_profiles')
-        .update({ status, verified_at: status === 'approved' ? new Date().toISOString() : null })
-        .eq('id', id)
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { data, error } = await supabase.rpc('approve_booster', { p_booster_id: id, p_new_status: status })
       if (error) throw error
-      await supabase.from('audit_logs').insert({
-        actor_id: profile!.id, actor_role: profile!.role,
-        action: `booster.${status}`, entity_type: 'booster_profile', entity_id: id,
-      })
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar booster')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
   })
 
   const toggleTop5 = useMutation({
     mutationFn: async ({ id, is_top5 }: { id: string; is_top5: boolean }) => {
-      const { error } = await supabase
-        .from('booster_profiles')
-        .update({ is_top5 })
-        .eq('id', id)
+      const { data, error } = await supabase.rpc('toggle_booster_top5', { p_booster_id: id, p_is_top5: is_top5 })
       if (error) throw error
-      await supabase.from('audit_logs').insert({
-        actor_id: profile!.id, actor_role: profile!.role,
-        action: is_top5 ? 'booster.top5_granted' : 'booster.top5_removed',
-        entity_type: 'booster_profile', entity_id: id,
-      })
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar Top5')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
   })
