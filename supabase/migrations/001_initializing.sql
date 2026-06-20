@@ -742,6 +742,8 @@ create trigger order_completed_refresh_top5
   for each row execute function public.trg_order_completed_refresh_top5();
 
 -- RPC: update_order_status
+-- Boosters may only transition to: in_progress, paused, awaiting_customer.
+-- completed / canceled / refunded / disputed are reserved for admin_override_order_status.
 create or replace function public.update_order_status(
   p_order_id   uuid,
   p_new_status text,
@@ -749,7 +751,8 @@ create or replace function public.update_order_status(
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
-  v_order record;
+  v_order                record;
+  v_booster_allowed_set  constant text[] := array['in_progress', 'paused', 'awaiting_customer'];
 begin
   select id, status, assigned_booster_id into v_order
   from   public.orders where id = p_order_id for update;
@@ -760,6 +763,13 @@ begin
 
   if auth.uid() is distinct from v_order.assigned_booster_id and not public.is_admin() then
     return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  -- Boosters can only move orders through their allowed transitions
+  if auth.uid() = v_order.assigned_booster_id and not public.is_admin() then
+    if not (p_new_status = any(v_booster_allowed_set)) then
+      return jsonb_build_object('success', false, 'error', 'invalid_transition_for_booster');
+    end if;
   end if;
 
   update public.orders set status = p_new_status::public.order_status, updated_at = now()
@@ -1137,7 +1147,10 @@ alter table public.booster_applications  enable row level security;
 
 -- profiles
 create policy "profiles_read_own"   on public.profiles for select using (id = auth.uid() or public.is_admin());
-create policy "profiles_update_own" on public.profiles for update using (id = auth.uid());
+-- WITH CHECK prevents users from escalating their own role via a direct UPDATE
+create policy "profiles_update_own" on public.profiles for update
+  using (id = auth.uid())
+  with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
 
 -- customer_profiles
 create policy "customer_profiles_read_own"   on public.customer_profiles for select using (user_id = auth.uid() or public.is_admin());
