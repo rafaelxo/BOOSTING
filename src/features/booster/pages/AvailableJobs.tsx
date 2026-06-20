@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Briefcase, Filter, Lock, Swords, Users } from 'lucide-react'
+import { Briefcase, Lock, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -9,7 +9,6 @@ import type { Order, QueueType } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 
-const SERVER_OPTIONS = ['All', 'NA', 'EUW', 'EUNE', 'BR', 'OCE', 'KR']
 
 interface SlotInfo {
   solo_count: number
@@ -54,7 +53,6 @@ function SlotIndicator({ slots }: { slots: SlotInfo }) {
 export function AvailableJobsPage() {
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
-  const [server, setServer] = useState('All')
   const [queue, setQueue] = useState<QueueType | 'all'>('all')
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -152,7 +150,6 @@ export function AvailableJobsPage() {
   }
 
   const filtered = jobs?.filter((j) => {
-    if (server !== 'All' && j.server !== server) return false
     if (queue !== 'all' && j.queue_type !== queue) return false
     return true
   }) ?? []
@@ -197,23 +194,7 @@ export function AvailableJobsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex items-center gap-2 bg-bg-surface border border-bg-elevated rounded-xl px-3 py-1">
-          <Filter className="h-3.5 w-3.5 text-ink-muted" />
-          <div className="flex gap-1">
-            {SERVER_OPTIONS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setServer(s)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  server === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="flex gap-3">
         <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1">
           {QUEUE_OPTIONS.map(({ label, value }) => (
             <button

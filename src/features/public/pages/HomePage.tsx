@@ -99,8 +99,6 @@ function BoostConfigurator() {
   const [fromDiv, setFromDiv] = useState<Division>('IV')
   const [toTier, setToTier] = useState<RankTier>('gold')
   const [toDiv, setToDiv] = useState<Division>('IV')
-  const [queue, setQueue] = useState<'solo_duo' | 'flex'>('solo_duo')
-  const [server, setServer] = useState('NA')
 
   function handleFromTier(tier: RankTier) {
     setFromTier(tier)
@@ -117,7 +115,7 @@ function BoostConfigurator() {
       service: 'elo_boost',
       from_tier: fromTier, from_div: fromDiv,
       to_tier: toTier, to_div: toDiv,
-      queue, server,
+      queue: 'solo_duo', server: 'BR',
     })
     if (isAuthenticated()) navigate(`/orders/new?${params}`)
     else navigate(`/login?redirect=/orders/new?${params}`)
@@ -147,40 +145,6 @@ function BoostConfigurator() {
         onTier={setToTier} onDiv={setToDiv}
         excludeBelow={fromTier}
       />
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">
-            {t('home.configurator.queue')}
-          </p>
-          <div className="flex gap-1.5">
-            {(['solo_duo', 'flex'] as const).map(q => (
-              <button key={q} type="button" onClick={() => setQueue(q)}
-                className={cn(
-                  'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
-                  queue === q ? 'border-brand bg-brand/15 text-brand' : 'border-bg-elevated text-ink-muted hover:border-bg-overlay'
-                )}
-              >
-                {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-bold text-ink-secondary uppercase tracking-widest mb-2">
-            {t('home.configurator.server')}
-          </p>
-          <select
-            value={server}
-            onChange={e => setServer(e.target.value)}
-            className="w-full input-base py-1.5 text-xs"
-          >
-            {['NA', 'EUW', 'EUNE', 'BR', 'KR', 'OCE', 'LAN', 'LAS'].map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
 
       <div className="rounded-xl bg-bg-elevated/60 border border-bg-overlay p-4 flex items-center justify-between">
         <div>

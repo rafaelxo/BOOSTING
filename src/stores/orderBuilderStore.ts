@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { GameSlug, ServiceType, QueueType, BoostMode, Rank, ServiceExtra } from '@/types'
 
-export type OrderBuilderStep = 'game' | 'service' | 'configure' | 'extras' | 'review' | 'payment'
+export type OrderBuilderStep = 'service' | 'configure' | 'extras' | 'review' | 'payment'
 
 interface SelectedExtra {
   extra: ServiceExtra
@@ -36,7 +36,6 @@ interface OrderBuilderState {
   setStep: (step: OrderBuilderStep) => void
   nextStep: () => void
   prevStep: () => void
-  setGame: (slug: GameSlug, id: string) => void
   setService: (type: ServiceType, id: string) => void
   setCurrentRank: (rank: Rank) => void
   setTargetRank: (rank: Rank | null) => void
@@ -53,20 +52,20 @@ interface OrderBuilderState {
   reset: () => void
 }
 
-const INITIAL_STEPS: OrderBuilderStep[] = ['game', 'service', 'configure', 'extras', 'review', 'payment']
+const INITIAL_STEPS: OrderBuilderStep[] = ['service', 'configure', 'extras', 'review', 'payment']
 
 const initialState = {
-  step: 'game' as OrderBuilderStep,
+  step: 'service' as OrderBuilderStep,
   steps: INITIAL_STEPS,
-  gameSlug: null,
-  gameId: null,
+  gameSlug: 'lol' as GameSlug,
+  gameId: 'lol',
   serviceType: null,
   serviceId: null,
   currentRank: null,
   targetRank: null,
   queueType: 'solo_duo' as QueueType,
   boostMode: 'solo' as BoostMode,
-  server: 'NA',
+  server: 'BR',
   winsPurchased: null,
   sessionsPurchased: null,
   customerNotes: '',
@@ -93,7 +92,6 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
     if (idx > 0) set({ step: steps[idx - 1] })
   },
 
-  setGame: (gameSlug, gameId) => set({ gameSlug, gameId }),
   setService: (serviceType, serviceId) => set({ serviceType, serviceId }),
   setCurrentRank: (currentRank) => set({ currentRank }),
   setTargetRank: (targetRank) => set({ targetRank }),

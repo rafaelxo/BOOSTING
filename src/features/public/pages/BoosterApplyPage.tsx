@@ -1,15 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useForm, Controller } from 'react-hook-form'
-import { Shield, Clock, DollarSign, Zap, CheckCircle2, ArrowRight } from 'lucide-react'
+import { useForm, Controller, type FieldErrors } from 'react-hook-form'
+import { Shield, Clock, DollarSign, Zap, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { cn, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
 import type { RankTier } from '@/types'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/authStore'
-
-const REGIONS = ['NA', 'EUW', 'EUNE', 'BR', 'KR', 'OCE', 'LAN', 'LAS', 'JP', 'TR', 'RU']
 
 const ROLES = [
   { id: 'top',     label: 'Top'     },
@@ -22,19 +19,11 @@ const ROLES = [
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
 
-const GAMES = [
-  { id: 'league',   label: 'League of Legends' },
-  { id: 'valorant', label: 'Valorant'           },
-  { id: 'tft',      label: 'Teamfight Tactics'  },
-]
-
 type FormData = {
   summoner_name: string
   opgg_link: string
-  region: string
   peak_tier: RankTier | ''
   roles: string[]
-  games: string[]
   hours_per_week: string
   available_days: string[]
   years_experience: string
@@ -75,7 +64,6 @@ function CheckPill({
 }
 
 export function BoosterApplyPage() {
-  const { isAuthenticated, profile } = useAuthStore()
   const [step, setStep] = useState<Step>('form')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,13 +72,12 @@ export function BoosterApplyPage() {
     register, handleSubmit, control, watch,
     formState: { errors },
   } = useForm<FormData>({
+    mode: 'onChange',
     defaultValues: {
       summoner_name: '',
       opgg_link: '',
-      region: 'NA',
       peak_tier: '',
       roles: [],
-      games: ['league'],
       hours_per_week: '',
       available_days: [],
       years_experience: '',
@@ -108,18 +95,17 @@ export function BoosterApplyPage() {
       const payload = {
         summoner_name: data.summoner_name,
         opgg_link: data.opgg_link || null,
-        region: data.region,
+        region: 'BR',
         peak_rank: data.peak_tier,
         roles: data.roles,
-        games: data.games,
-        hours_per_week: parseInt(data.hours_per_week, 10),
+        games: ['lol'],
+        hours_per_week: Number(data.hours_per_week),
         available_days: data.available_days,
-        years_experience: parseFloat(data.years_experience),
+        years_experience: Number(data.years_experience),
         motivation: data.motivation,
         discord_tag: data.discord_tag || null,
         has_coaching: data.has_coaching,
-        // attach user_id if already logged in
-        user_id: isAuthenticated() ? profile?.id : null,
+        user_id: null,
         status: 'pending' as const,
       }
 
@@ -127,13 +113,38 @@ export function BoosterApplyPage() {
         .from('booster_applications')
         .insert(payload)
 
-      if (dbErr) throw dbErr
+      if (dbErr) {
+        setError(`Erro: ${dbErr.message} (code: ${dbErr.code})`)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+
       setStep('success')
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Algo deu errado. Tente novamente.')
+      const msg = (e as { message?: string })?.message
+      setError(msg || 'Algo deu errado. Tente novamente.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function onInvalid(errors: FieldErrors<FormData>) {
+    const labels: Record<string, string> = {
+      summoner_name: 'Nome do Invocador',
+      peak_tier:     'Rank de Pico',
+      roles:         'Funções',
+      available_days:'Dias disponíveis',
+      hours_per_week:'Horas por semana',
+      years_experience: 'Anos de experiência',
+      motivation:    'Motivação (mín. 80 chars)',
+      agreed_terms:  'Aceitar os termos',
+    }
+    const missing = Object.keys(errors)
+      .map(k => labels[k] ?? k)
+      .join(', ')
+    setError(`Preencha os campos obrigatórios: ${missing}`)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   if (step === 'success') {
@@ -179,6 +190,16 @@ export function BoosterApplyPage() {
 
   return (
     <div className="bg-bg-base">
+      {/* Fixed error banner — visible regardless of scroll position */}
+      {error && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] w-full max-w-xl px-4">
+          <div className="bg-danger text-white rounded-xl px-5 py-4 text-sm font-medium shadow-lg flex items-start justify-between gap-3">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)} className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none">×</button>
+          </div>
+        </div>
+      )}
+
       {/* Hero */}
       <div className="relative bg-bg-surface border-b border-bg-elevated overflow-hidden">
         <div className="absolute inset-0 bg-grid opacity-50 pointer-events-none" />
@@ -239,7 +260,7 @@ export function BoosterApplyPage() {
 
       {/* Form */}
       <div className="max-w-2xl mx-auto px-5 sm:px-8 py-16">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-10">
           {/* Section 1: Account info */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
@@ -269,13 +290,6 @@ export function BoosterApplyPage() {
                   className="input-base w-full"
                 />
                 {errors.opgg_link && <p className="text-danger text-xs mt-1">{errors.opgg_link.message}</p>}
-              </div>
-
-              <div>
-                <FieldLabel required>Região</FieldLabel>
-                <select {...register('region')} className="input-base w-full">
-                  {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
               </div>
 
               <div>
@@ -314,7 +328,7 @@ export function BoosterApplyPage() {
           {/* Section 2: Play style */}
           <div>
             <h2 className="text-xl font-bold text-ink mb-6 pb-3 border-b border-bg-elevated">
-              Estilo de Jogo & Jogos
+              Estilo de Jogo
             </h2>
             <div className="space-y-5">
               <div>
@@ -342,33 +356,6 @@ export function BoosterApplyPage() {
                   )}
                 />
                 {errors.roles && <p className="text-danger text-xs mt-1">{errors.roles.message}</p>}
-              </div>
-
-              <div>
-                <FieldLabel required>Jogos que você pode boostar</FieldLabel>
-                <Controller
-                  name="games"
-                  control={control}
-                  rules={{ validate: v => v.length > 0 || 'Selecione pelo menos um jogo' }}
-                  render={({ field }) => (
-                    <div className="flex flex-wrap gap-2">
-                      {GAMES.map(g => (
-                        <CheckPill
-                          key={g.id}
-                          label={g.label}
-                          checked={field.value.includes(g.id)}
-                          onChange={() => {
-                            const next = field.value.includes(g.id)
-                              ? field.value.filter(x => x !== g.id)
-                              : [...field.value, g.id]
-                            field.onChange(next)
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                />
-                {errors.games && <p className="text-danger text-xs mt-1">{errors.games.message}</p>}
               </div>
 
               <div>
@@ -543,19 +530,8 @@ export function BoosterApplyPage() {
             )}
           </div>
 
-          {error && (
-            <div className="bg-danger/10 border border-danger/25 rounded-xl p-4 text-danger text-sm">
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            size="xl"
-            loading={submitting}
-            className="w-full"
-          >
-            Enviar Candidatura <ArrowRight className="h-5 w-5" />
+          <Button type="submit" size="lg" loading={submitting} className="w-full">
+            Enviar Candidatura
           </Button>
 
           <p className="text-center text-xs text-ink-muted">

@@ -38,14 +38,6 @@ export function BoosterProfilePage() {
               <span className="text-sm font-semibold text-ink">{boosterProfile.rating.toFixed(1)}</span>
               <span className="text-xs text-ink-muted">{t('booster.profile.reviews', { count: boosterProfile.rating_count })}</span>
             </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {boosterProfile.games.map(g => (
-                <span key={g} className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand-muted text-brand">{g.toUpperCase()}</span>
-              ))}
-              {boosterProfile.region_preferences.map(r => (
-                <span key={r} className="text-xs font-medium px-2 py-0.5 rounded-full bg-bg-elevated text-ink-secondary">{r}</span>
-              ))}
-            </div>
           </div>
         </div>
 

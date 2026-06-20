@@ -4,8 +4,6 @@ import { FormField } from '@/components/ui/FormField'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE } from '@/lib/pricing'
 import type { BoostMode, Division, QueueType, RankTier } from '@/types'
-
-const SERVERS = ['NA', 'EUW', 'EUNE', 'BR', 'LAN', 'LAS', 'OCE', 'TR', 'RU', 'JP', 'KR']
 const DIVISIONS: Division[] = ['I', 'II', 'III', 'IV']
 const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
@@ -75,8 +73,8 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSel
 export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
-    server, winsPurchased, sessionsPurchased, customerNotes,
-    setCurrentRank, setTargetRank, setQueueType, setBoostMode, setServer,
+    winsPurchased, sessionsPurchased, customerNotes,
+    setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased, setSessionsPurchased, setNotes,
     setBasePrice, setEstimatedHours,
   } = useOrderBuilderStore()
@@ -113,27 +111,6 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
-        {/* Server */}
-        <FormField label="Servidor / Região" required>
-          <div className="flex flex-wrap gap-1.5">
-            {SERVERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setServer(s)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
-                  server === s
-                    ? 'border-brand bg-brand-muted text-brand'
-                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink'
-                )}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </FormField>
-
         {/* Boost mode (solo/duo) — only for rankable boost services */}
         {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
           <FormField
@@ -239,19 +216,19 @@ export function StepConfigure() {
         {serviceType === 'coaching' && (
           <FormField label="Duração da Sessão" required>
             <div className="flex gap-3">
-              {[['1h', 1], ['2h', 2]].map(([label, val]) => (
+              {([['1h', 1], ['2h', 2]] as [string, number][]).map(([label, val]) => (
                 <button
-                  key={label as string}
+                  key={label}
                   type="button"
-                  onClick={() => setSessionsPurchased(val as number)}
+                  onClick={() => setSessionsPurchased(val)}
                   className={cn(
                     'flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all',
-                    sessionsPurchased === (val as number)
+                    sessionsPurchased === val
                       ? 'border-brand bg-brand-muted text-brand'
                       : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
                   )}
                 >
-                  {label as string}
+                  {label}
                 </button>
               ))}
             </div>

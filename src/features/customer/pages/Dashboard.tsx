@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, ShoppingBag, MessageCircle, Zap } from 'lucide-react'
@@ -29,6 +29,7 @@ function useRecentOrders(customerId: string) {
 export function CustomerDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const currency = useCurrency()
   const { data: orders, isLoading } = useRecentOrders(profile?.id ?? '')
 
@@ -119,7 +120,7 @@ export function CustomerDashboard() {
             icon={ShoppingBag}
             title={t('customer.dashboard.empty')}
             description={t('customer.dashboard.emptyDesc')}
-            action={{ label: t('customer.dashboard.startBoost'), onClick: () => {} }}
+            action={{ label: t('customer.dashboard.startBoost'), onClick: () => navigate('/orders/new') }}
           />
         ) : (
           <div className="space-y-3">

@@ -93,12 +93,6 @@ export function LoginPage() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-ink-muted mt-4">
-          Definiu uma senha?{' '}
-          <Link to="/forgot-password" className="text-brand hover:underline">
-            Redefinir senha
-          </Link>
-        </p>
       </div>
     </div>
   )

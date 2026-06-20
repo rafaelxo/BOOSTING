@@ -24,9 +24,10 @@ function useBoosterProfile(userId: string) {
   })
 }
 
-function useAssignedOrders(boosterId: string) {
+function useAssignedOrders(boosterId: string | undefined) {
   return useQuery({
     queryKey: ['booster-assigned-orders', boosterId],
+    enabled: !!boosterId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
@@ -45,7 +46,7 @@ export function BoosterDashboard() {
   const { t } = useTranslation()
   const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
-  const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id ?? '')
+  const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id)
 
   const { data: slotInfo } = useQuery({
     queryKey: ['booster-slots', profile?.id],

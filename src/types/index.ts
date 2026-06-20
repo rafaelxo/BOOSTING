@@ -111,6 +111,15 @@ export interface BoosterProfile {
   is_top5: boolean
   verified_at: string | null
   created_at: string
+  updated_at: string
+  // Personal / PIX info (added in migration 012)
+  full_name: string | null
+  email: string | null
+  cpf: string | null
+  // Profile extras (added in migration 010)
+  opgg_link: string | null
+  hours_per_day_min: number | null
+  hours_per_day_max: number | null
 }
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────

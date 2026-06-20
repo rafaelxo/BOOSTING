@@ -9,7 +9,6 @@ import type { ServiceType } from '@/types'
 const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches']
 
 // Step components
-import { StepGame } from '../order-builder/StepGame'
 import { StepService } from '../order-builder/StepService'
 import { StepConfigure } from '../order-builder/StepConfigure'
 import { StepExtras } from '../order-builder/StepExtras'
@@ -17,7 +16,6 @@ import { StepReview } from '../order-builder/StepReview'
 import { StepPayment } from '../order-builder/StepPayment'
 
 const STEPS: { id: OrderBuilderStep; label: string }[] = [
-  { id: 'game', label: 'Jogo' },
   { id: 'service', label: 'Serviço' },
   { id: 'configure', label: 'Configurar' },
   { id: 'extras', label: 'Extras' },
@@ -26,7 +24,6 @@ const STEPS: { id: OrderBuilderStep; label: string }[] = [
 ]
 
 const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
-  game: StepGame,
   service: StepService,
   configure: StepConfigure,
   extras: StepExtras,
@@ -35,7 +32,7 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 }
 
 export function OrderBuilderPage() {
-  const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType, setGame, setService, setStep, reset } = useOrderBuilderStore()
+  const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType, setService, setStep, reset } = useOrderBuilderStore()
   const [searchParams] = useSearchParams()
   const currency = useCurrency()
 
@@ -43,7 +40,6 @@ export function OrderBuilderPage() {
     const service = searchParams.get('service') as ServiceType | null
     if (service && VALID_SERVICES.includes(service)) {
       reset()
-      setGame('lol', 'lol')
       setService(service, service)
       setStep('configure')
     }
@@ -88,7 +84,7 @@ export function OrderBuilderPage() {
                 </Button>
                 <Button
                   onClick={nextStep}
-                  disabled={!isStepComplete(step, { gameSlug, serviceType })}
+                  disabled={!isStepComplete(step, { serviceType })}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Continuar
@@ -185,8 +181,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function isStepComplete(step: OrderBuilderStep, state: { gameSlug: string | null; serviceType: string | null }) {
-  if (step === 'game') return !!state.gameSlug
+function isStepComplete(step: OrderBuilderStep, state: { serviceType: string | null }) {
   if (step === 'service') return !!state.serviceType
   return true
 }
