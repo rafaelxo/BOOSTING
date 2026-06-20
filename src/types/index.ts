@@ -100,26 +100,21 @@ export interface BoosterProfile {
   bio: string | null
   peak_rank: Rank | null
   current_rank: Rank | null
-  games: GameSlug[]
-  queue_preferences: QueueType[]
-  region_preferences: string[]
   total_completed: number
   total_earnings: number
   rating: number
   rating_count: number
   is_available: boolean
   is_top5: boolean
-  verified_at: string | null
-  created_at: string
-  updated_at: string
-  // Personal / PIX info (added in migration 012)
-  full_name: string | null
-  email: string | null
-  cpf: string | null
-  // Profile extras (added in migration 010)
   opgg_link: string | null
   hours_per_day_min: number | null
   hours_per_day_max: number | null
+  full_name: string | null
+  email: string | null
+  cpf: string | null
+  verified_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
