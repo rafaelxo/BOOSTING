@@ -116,7 +116,7 @@ export function AdminBoostersPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{b.games.join(', ')}</TableCell>
+                  <TableCell>{b.games?.join(', ') || '—'}</TableCell>
                   <TableCell>{b.rating.toFixed(1)} ⭐</TableCell>
                   <TableCell>{b.total_completed}</TableCell>
                   <TableCell><BoosterStatusBadge status={b.status} /></TableCell>

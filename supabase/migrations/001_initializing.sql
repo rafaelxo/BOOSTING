@@ -5,10 +5,6 @@
 -- then rebuilds from scratch using only what is currently in use.
 -- ============================================================
 
--- ─── 0. WIPE ALL USERS ───────────────────────────────────────────────────────
--- Cascades to public.profiles (FK on delete cascade) and all downstream data.
-delete from auth.users;
-
 -- ─── 1. DROP TRIGGERS ────────────────────────────────────────────────────────
 
 drop trigger if exists on_auth_user_created             on auth.users;
@@ -62,6 +58,10 @@ drop table if exists public.booster_applications cascade;
 drop table if exists public.booster_profiles     cascade;
 drop table if exists public.customer_profiles    cascade;
 drop table if exists public.profiles             cascade;
+
+-- ─── 0. WIPE ALL USERS ───────────────────────────────────────────────────────
+-- Runs AFTER tables are dropped so no FK constraints block the cascade.
+delete from auth.users;
 
 -- ─── 4. DROP TYPES ───────────────────────────────────────────────────────────
 
@@ -127,30 +127,32 @@ create table public.customer_profiles (
 create index customer_profiles_user_id_idx on public.customer_profiles(user_id);
 
 -- booster_profiles
--- NOTE: games[], queue_preferences[], region_preferences[], phone removed (unused in current RPC)
 create table public.booster_profiles (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid not null unique references public.profiles(id) on delete cascade,
-  display_name      text not null,
-  status            public.booster_status not null default 'pending',
-  bio               text,
-  peak_rank         jsonb,
-  current_rank      jsonb,
-  total_completed   integer not null default 0,
-  total_earnings    numeric(10,2) not null default 0,
-  rating            numeric(3,2) not null default 0,
-  rating_count      integer not null default 0,
-  is_available      boolean not null default false,
-  is_top5           boolean not null default false,
-  opgg_link         text,
-  hours_per_day_min smallint,
-  hours_per_day_max smallint,
-  full_name         text,
-  email             text,
-  cpf               text,
-  verified_at       timestamptz,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null unique references public.profiles(id) on delete cascade,
+  display_name        text not null,
+  status              public.booster_status not null default 'pending',
+  bio                 text,
+  peak_rank           jsonb,
+  current_rank        jsonb,
+  games               text[] not null default '{}',
+  queue_preferences   text[] not null default '{}',
+  region_preferences  text[] not null default '{}',
+  total_completed     integer not null default 0,
+  total_earnings      numeric(10,2) not null default 0,
+  rating              numeric(3,2) not null default 0,
+  rating_count        integer not null default 0,
+  is_available        boolean not null default false,
+  is_top5             boolean not null default false,
+  opgg_link           text,
+  hours_per_day_min   smallint,
+  hours_per_day_max   smallint,
+  full_name           text,
+  email               text,
+  cpf                 text,
+  verified_at         timestamptz,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
 );
 
 create index booster_profiles_status_idx    on public.booster_profiles(status);
