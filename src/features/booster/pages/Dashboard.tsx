@@ -32,7 +32,7 @@ function useAssignedOrders(boosterId: string | undefined) {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('assigned_booster_id', boosterId)
+        .eq('assigned_booster_id', boosterId!)
         .in('status', ['assigned', 'in_progress', 'paused', 'awaiting_customer'])
         .order('created_at', { ascending: false })
       if (error) throw error

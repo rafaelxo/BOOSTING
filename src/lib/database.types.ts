@@ -239,13 +239,52 @@ export type Database = {
         }
         Relationships: []
       }
+      order_drop_requests: {
+        Row: {
+          id: string
+          order_id: string
+          booster_id: string
+          reason: string
+          wins_at_request: number
+          losses_at_request: number
+          penalty_pct: number
+          penalty_amount: number
+          status: 'pending' | 'approved' | 'rejected'
+          admin_id: string | null
+          admin_note: string | null
+          created_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          booster_id: string
+          reason: string
+          wins_at_request?: number
+          losses_at_request?: number
+          penalty_pct?: number
+          penalty_amount?: number
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_id?: string | null
+          admin_note?: string | null
+          created_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          status?: 'pending' | 'approved' | 'rejected'
+          admin_id?: string | null
+          admin_note?: string | null
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           id: string
           customer_id: string
           service_id: string
           game_id: string
-          status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type: 'solo_duo' | 'flex'
           boost_mode: 'solo' | 'duo'
           server: string
@@ -260,6 +299,8 @@ export type Database = {
           estimated_hours: number | null
           customer_notes: string | null
           booster_notes: string | null
+          wins_played: number
+          losses_played: number
           assigned_booster_id: string | null
           mp_payment_id: string | null
           payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
@@ -272,7 +313,7 @@ export type Database = {
           customer_id: string
           service_id: string
           game_id: string
-          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type: 'solo_duo' | 'flex'
           boost_mode?: 'solo' | 'duo'
           server: string
@@ -287,6 +328,8 @@ export type Database = {
           estimated_hours?: number | null
           customer_notes?: string | null
           booster_notes?: string | null
+          wins_played?: number
+          losses_played?: number
           assigned_booster_id?: string | null
           mp_payment_id?: string | null
           payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
@@ -295,7 +338,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           queue_type?: 'solo_duo' | 'flex'
           boost_mode?: 'solo' | 'duo'
           server?: string
@@ -310,6 +353,8 @@ export type Database = {
           estimated_hours?: number | null
           customer_notes?: string | null
           booster_notes?: string | null
+          wins_played?: number
+          losses_played?: number
           assigned_booster_id?: string | null
           mp_payment_id?: string | null
           payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
@@ -330,8 +375,8 @@ export type Database = {
         Row: {
           id: string
           order_id: string
-          from_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          from_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
+          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           changed_by: string
           reason: string | null
           created_at: string
@@ -339,15 +384,15 @@ export type Database = {
         Insert: {
           id?: string
           order_id: string
-          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
+          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           changed_by: string
           reason?: string | null
           created_at?: string
         }
         Update: {
-          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
+          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
+          to_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
           reason?: string | null
         }
         Relationships: []
@@ -714,6 +759,63 @@ export type Database = {
       refresh_top5_boosters: {
         Args: Record<string, never>
         Returns: undefined
+      }
+      ensure_profile_exists: {
+        Args: { p_display_name: string | null }
+        Returns: Json
+      }
+      approve_booster: {
+        Args: { p_booster_id: string; p_new_status: string }
+        Returns: Json
+      }
+      toggle_booster_top5: {
+        Args: { p_booster_id: string; p_is_top5: boolean }
+        Returns: Json
+      }
+      resolve_drop_request: {
+        Args: { p_request_id: string; p_approve: boolean; p_admin_note: string | null }
+        Returns: Json
+      }
+      admin_override_order_status: {
+        Args: { p_order_id: string; p_new_status: string }
+        Returns: Json
+      }
+      moderate_review: {
+        Args: { p_review_id: string; p_is_public: boolean }
+        Returns: Json
+      }
+      assign_ticket: {
+        Args: { p_ticket_id: string }
+        Returns: Json
+      }
+      update_order_status: {
+        Args: { p_order_id: string; p_new_status: string }
+        Returns: Json
+      }
+      log_match_result: {
+        Args: { p_order_id: string; p_wins: number; p_losses: number }
+        Returns: Json
+      }
+      request_order_drop: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Json
+      }
+      onboard_booster: {
+        Args: {
+          p_display_name: string
+          p_bio: string
+          p_peak_rank: Json | null
+          p_opgg_link: string | null
+          p_hours_per_day_min: number | null
+          p_hours_per_day_max: number | null
+          p_full_name: string
+          p_cpf: string
+        }
+        Returns: Json
+      }
+      update_my_username: {
+        Args: { p_username: string }
+        Returns: Json
       }
     }
     Enums: {

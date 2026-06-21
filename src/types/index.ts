@@ -104,6 +104,7 @@ export interface BoosterProfile {
   total_earnings: number
   rating: number
   rating_count: number
+  games: string[]
   is_available: boolean
   is_top5: boolean
   opgg_link: string | null

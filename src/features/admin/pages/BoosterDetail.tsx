@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar } from '@/components/ui'
@@ -20,7 +20,6 @@ function safeOpggUrl(url: string | null): string | undefined {
 
 export function AdminBoosterDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const currency = useCurrency()
 

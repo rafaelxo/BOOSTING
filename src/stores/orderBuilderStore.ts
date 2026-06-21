@@ -36,6 +36,7 @@ interface OrderBuilderState {
   setStep: (step: OrderBuilderStep) => void
   nextStep: () => void
   prevStep: () => void
+  setGame: (slug: GameSlug, id: string) => void
   setService: (type: ServiceType, id: string) => void
   setCurrentRank: (rank: Rank) => void
   setTargetRank: (rank: Rank | null) => void
@@ -92,6 +93,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
     if (idx > 0) set({ step: steps[idx - 1] })
   },
 
+  setGame: (gameSlug, gameId) => set({ gameSlug, gameId }),
   setService: (serviceType, serviceId) => set({ serviceType, serviceId }),
   setCurrentRank: (currentRank) => set({ currentRank }),
   setTargetRank: (targetRank) => set({ targetRank }),
