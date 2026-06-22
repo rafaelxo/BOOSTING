@@ -109,7 +109,7 @@ export function BoosterDashboard() {
           { label: t('booster.dashboard.stats.active'), value: activeOrders?.length ?? 0, icon: Briefcase, color: 'text-brand bg-brand-muted' },
           { label: t('booster.dashboard.stats.completed'), value: completedCount, icon: TrendingUp, color: 'text-success bg-success/10' },
           { label: t('booster.dashboard.stats.earned'), value: currency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
-          { label: t('booster.dashboard.stats.rating'), value: `${rating.toFixed(1)} ⭐`, icon: Star, color: 'text-warning bg-warning/10' },
+          { label: t('booster.dashboard.stats.rating'), value: rating.toFixed(1), icon: Star, color: 'text-warning bg-warning/10' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} padding="md">
             <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>

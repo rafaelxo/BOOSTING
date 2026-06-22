@@ -205,7 +205,7 @@ export function AdminBoosterDetailPage() {
           {[
             { label: 'Pedidos', value: booster.total_completed },
             { label: 'Ganhos',  value: currency(booster.total_earnings) },
-            { label: 'Rating',  value: `${booster.rating.toFixed(1)} ⭐` },
+            { label: 'Rating',  value: booster.rating.toFixed(1) },
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-lg font-bold text-ink">{value}</p>

@@ -1,48 +1,83 @@
 import { useEffect } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
+import { RankBadge } from '@/components/ui/RankBadge'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE, DUO_BOOST_PCT } from '@/lib/pricing'
 import type { BoostMode, Division, QueueType, RankTier } from '@/types'
-const DIVISIONS: Division[] = ['I', 'II', 'III', 'IV']
+
+const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
+
+function divStep(d: Division): number {
+  return { IV: 0, III: 1, II: 2, I: 3 }[d]
+}
 
 interface RankSelectProps {
   label: string
   selectedTier: RankTier | null
   selectedDivision: Division | null
   onChange: (tier: RankTier, division: Division | null) => void
+  minTier?: RankTier | null
+  minDiv?: Division | null
 }
 
-function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSelectProps) {
+function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, minDiv }: RankSelectProps) {
   const hasDivision = selectedTier && !MASTER_PLUS.includes(selectedTier)
+  const minIdx = minTier ? RANK_TIER_ORDER.indexOf(minTier) : 0
+  const availableTiers = RANK_TIER_ORDER.slice(minIdx)
+
+  const validDivisions = hasDivision
+    ? DIVISIONS.filter(d => {
+        if (!minTier || selectedTier !== minTier) return true
+        return divStep(d) > divStep(minDiv ?? 'IV')
+      })
+    : []
+
+  function handleTier(tier: RankTier) {
+    const div = MASTER_PLUS.includes(tier) ? null : (selectedDivision ?? 'IV')
+    if (minTier && tier === minTier && minDiv) {
+      const first = DIVISIONS.find(d => divStep(d) > divStep(minDiv))
+      onChange(tier, first ?? 'I')
+      return
+    }
+    onChange(tier, div)
+  }
 
   return (
     <FormField label={label} required>
-      <div className="space-y-2">
-        {/* Tier pills */}
-        <div className="flex flex-wrap gap-1.5">
-          {RANK_TIER_ORDER.map((tier) => (
+      <div className="space-y-3">
+        {/* Selected rank preview */}
+        {selectedTier && (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated/50 border border-bg-overlay">
+            <RankBadge tier={selectedTier} division={selectedDivision} size="sm" />
+            <p className="text-sm font-bold text-ink">
+              {formatRank(selectedTier, selectedDivision)}
+            </p>
+          </div>
+        )}
+
+        {/* Tier grid with rank badges */}
+        <div className="grid grid-cols-5 gap-1.5">
+          {availableTiers.map((tier) => (
             <button
               key={tier}
               type="button"
-              onClick={() => onChange(tier, MASTER_PLUS.includes(tier) ? null : (selectedDivision ?? 'I'))}
+              onClick={() => handleTier(tier)}
               className={cn(
-                'px-3 py-1 rounded-lg text-xs font-semibold border transition-all',
-                selectedTier === tier
-                  ? 'border-brand bg-brand-muted text-brand'
-                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink'
+                'rounded-xl ring-2 transition-all focus:outline-none',
+                selectedTier === tier ? 'ring-brand' : 'ring-transparent hover:ring-brand/30'
               )}
             >
-              {RANK_TIER_LABEL[tier]}
+              <RankBadge tier={tier} showDivision={false} size="xs" />
             </button>
           ))}
         </div>
 
-        {/* Division pills (only for non-master+) */}
-        {hasDivision && (
+        {/* Division pills */}
+        {hasDivision && validDivisions.length > 0 && (
           <div className="flex gap-1.5">
-            {DIVISIONS.map((div) => (
+            {validDivisions.map((div) => (
               <button
                 key={div}
                 type="button"
@@ -59,12 +94,6 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSel
             ))}
           </div>
         )}
-
-        {selectedTier && (
-          <p className="text-xs text-brand font-medium">
-            Selecionado: {formatRank(selectedTier, selectedDivision)}
-          </p>
-        )}
       </div>
     </FormField>
   )
@@ -73,13 +102,12 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange }: RankSel
 export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
-    winsPurchased, sessionsPurchased, customerNotes,
+    winsPurchased, sessionsPurchased,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
-    setWinsPurchased, setSessionsPurchased, setNotes,
+    setWinsPurchased, setSessionsPurchased,
     setBasePrice, setEstimatedHours,
   } = useOrderBuilderStore()
 
-  // ── Recalculate price whenever any input changes ──────────────────────────
   useEffect(() => {
     if (serviceType === 'elo_boost') {
       if (!currentRank || !targetRank) return
@@ -87,7 +115,10 @@ export function StepConfigure() {
         currentRank.tier, currentRank.division ?? null,
         targetRank.tier, targetRank.division ?? null,
       )
-      setBasePrice(price)
+      const finalPrice = boostMode === 'duo'
+        ? Math.round(price * (1 + DUO_BOOST_PCT / 100) * 100) / 100
+        : price
+      setBasePrice(finalPrice)
       setEstimatedHours(hours || null)
     } else if (serviceType === 'placement_matches') {
       if (!currentRank) return
@@ -103,7 +134,7 @@ export function StepConfigure() {
       setBasePrice(COACHING_PRICE[sessionsPurchased] ?? 19.99)
       setEstimatedHours(sessionsPurchased)
     }
-  }, [serviceType, currentRank, targetRank, winsPurchased, sessionsPurchased, setBasePrice, setEstimatedHours])
+  }, [serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased, setBasePrice, setEstimatedHours])
 
   return (
     <div>
@@ -111,35 +142,34 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
-        {/* Boost mode (solo/duo) — only for rankable boost services */}
-        {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
-          <FormField
-            label="Modo de Boost"
-            hint="Solo: o booster acessa sua conta. Duo: você joga junto com o booster."
-            required
-          >
-            <div className="flex gap-3">
-              {([['solo', 'Solo Boost', 'Booster acessa sua conta e joga por você'], ['duo', 'Duo Boost', 'Você joga junto com o booster na duo queue']] as [BoostMode, string, string][]).map(([value, label, desc]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setBoostMode(value)}
-                  className={cn(
-                    'flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all text-left px-4',
-                    boostMode === value
-                      ? 'border-brand bg-brand-muted text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
-                  )}
-                >
-                  <span className="block font-bold">{label}</span>
-                  <span className="block text-[11px] font-normal mt-0.5 opacity-75">{desc}</span>
-                </button>
-              ))}
-            </div>
+        {/* Duo Boost checkbox — only for elo boost */}
+        {serviceType === 'elo_boost' && (
+          <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+52% no preço).">
+            <button
+              type="button"
+              onClick={() => setBoostMode(boostMode === 'duo' ? 'solo' : 'duo')}
+              className={cn(
+                'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
+                boostMode === 'duo'
+                  ? 'border-brand bg-brand-muted text-brand'
+                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink'
+              )}
+            >
+              <div>
+                <p className="text-sm font-bold">Duo Boost <span className="text-xs font-normal opacity-70">(+52%)</span></p>
+                <p className="text-[11px] font-normal mt-0.5 opacity-70">Você joga junto com o booster na duo queue</p>
+              </div>
+              <div className={cn(
+                'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
+                boostMode === 'duo' ? 'border-brand bg-brand' : 'border-bg-overlay'
+              )}>
+                {boostMode === 'duo' && <span className="text-white text-[10px] font-black">✓</span>}
+              </div>
+            </button>
           </FormField>
         )}
 
-        {/* Queue type (for elo/win boost) */}
+        {/* Queue type */}
         {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
           <FormField label="Tipo de Fila" required>
             <div className="flex gap-3">
@@ -162,7 +192,7 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Rank selectors */}
+        {/* Ranks — elo boost */}
         {serviceType === 'elo_boost' && (
           <>
             <RankSelect
@@ -176,20 +206,23 @@ export function StepConfigure() {
               selectedTier={targetRank?.tier ?? null}
               selectedDivision={targetRank?.division ?? null}
               onChange={(tier, division) => setTargetRank({ tier, division })}
+              minTier={currentRank?.tier ?? null}
+              minDiv={currentRank?.division ?? null}
             />
           </>
         )}
 
+        {/* Rank — placement / win boost */}
         {(serviceType === 'placement_matches' || serviceType === 'win_boost') && (
           <RankSelect
-            label={serviceType === 'placement_matches' ? 'Rank Desejado' : 'Rank Atual'}
+            label="Rank Atual"
             selectedTier={currentRank?.tier ?? null}
             selectedDivision={currentRank?.division ?? null}
             onChange={(tier, division) => setCurrentRank({ tier, division })}
           />
         )}
 
-        {/* Wins for win boost */}
+        {/* Wins — win boost */}
         {serviceType === 'win_boost' && (
           <FormField label="Número de Vitórias" required>
             <div className="flex flex-wrap gap-2">
@@ -212,7 +245,7 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Sessions for coaching */}
+        {/* Sessions — coaching */}
         {serviceType === 'coaching' && (
           <FormField label="Duração da Sessão" required>
             <div className="flex gap-3">
@@ -234,17 +267,6 @@ export function StepConfigure() {
             </div>
           </FormField>
         )}
-
-        {/* Notes */}
-        <FormField label="Observações para o Booster" hint="Opcional: preferências de campeão, horário, pedidos especiais.">
-          <textarea
-            value={customerNotes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="ex: Só jogar com Jinx ADC, preferência pela manhã..."
-            className="input-base min-h-[80px] resize-none"
-            maxLength={500}
-          />
-        </FormField>
       </div>
     </div>
   )

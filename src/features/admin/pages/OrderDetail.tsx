@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatDateTime } from '@/lib/utils'
+import { formatDateTime, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
 
@@ -62,7 +62,7 @@ export function AdminOrderDetailPage() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 ['ID do Cliente', order.customer_id.slice(0, 12) + '...'],
-                ['Serviço', (order.service_id as string).replace(/_/g, ' ')],
+                ['Serviço', getServiceLabel(order.service_id as string)],
                 ['Servidor', order.server],
                 ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
                 ['Preço Base', currency(order.base_price)],

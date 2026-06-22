@@ -1,5 +1,5 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatRank } from '@/lib/utils'
+import { formatRank, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight } from 'lucide-react'
@@ -18,15 +18,12 @@ export function StepReview() {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
     server, winsPurchased, sessionsPurchased, selectedExtras,
     basePrice, extrasPrice, estimatedHours, customerNotes,
-    nextStep,
+    setNotes, nextStep,
   } = useOrderBuilderStore()
   const currency = useCurrency()
 
   const totalPrice = basePrice + extrasPrice
-
-  const serviceName = serviceType
-    ? serviceType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    : '—'
+  const serviceName = serviceType ? getServiceLabel(serviceType) : '—'
 
   return (
     <div>
@@ -40,11 +37,17 @@ export function StepReview() {
         <div>
           <p className="section-label mb-2">Detalhes do Pedido</p>
           <div className="card p-0 px-2">
-            <ReviewRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : (gameSlug?.toUpperCase() ?? '—')} />
+            {gameSlug && (
+              <ReviewRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
+            )}
             <ReviewRow label="Serviço" value={serviceName} />
-            <ReviewRow label="Servidor" value={server} />
-            <ReviewRow label="Modo" value={boostMode === 'duo' ? 'Duo Boost' : 'Solo Boost'} />
-            <ReviewRow label="Fila" value={queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex'} />
+            {server && <ReviewRow label="Servidor" value={server} />}
+            {serviceType === 'elo_boost' && (
+              <ReviewRow label="Modo" value={boostMode === 'duo' ? 'Duo Boost (+52%)' : 'Solo Boost'} />
+            )}
+            {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
+              <ReviewRow label="Fila" value={queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex'} />
+            )}
             {currentRank && (
               <ReviewRow label="Rank Atual" value={formatRank(currentRank.tier, currentRank.division)} />
             )}
@@ -55,7 +58,7 @@ export function StepReview() {
               <ReviewRow label="Vitórias" value={`${winsPurchased} vitórias`} />
             )}
             {sessionsPurchased && (
-              <ReviewRow label="Sessões" value={`${sessionsPurchased}h`} />
+              <ReviewRow label="Sessão" value={`${sessionsPurchased}h`} />
             )}
             {estimatedHours && (
               <ReviewRow label="Entrega Estimada" value={`~${estimatedHours} horas`} />
@@ -85,16 +88,6 @@ export function StepReview() {
           </div>
         )}
 
-        {/* Notes */}
-        {customerNotes && (
-          <div>
-            <p className="section-label mb-2">Observações</p>
-            <div className="card p-3">
-              <p className="text-sm text-ink-secondary">{customerNotes}</p>
-            </div>
-          </div>
-        )}
-
         {/* Price breakdown */}
         <div>
           <p className="section-label mb-2">Preços</p>
@@ -114,8 +107,8 @@ export function StepReview() {
         <div className="flex flex-col sm:flex-row gap-3">
           {[
             { icon: Shield, text: 'VPN & proteção da conta' },
-            { icon: Star, text: 'Garantia 100% de conclusão' },
-            { icon: Clock, text: 'Inicia em até 30 min' },
+            { icon: Star,   text: 'Garantia 100% de conclusão' },
+            { icon: Clock,  text: 'Inicia em até 30 min' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-2 text-xs text-ink-secondary">
               <Icon className="h-3.5 w-3.5 text-success shrink-0" />
@@ -124,7 +117,22 @@ export function StepReview() {
           ))}
         </div>
 
-        {/* Proceed CTA */}
+        {/* Notes — editable before payment */}
+        <div>
+          <p className="section-label mb-2">Observações para o Booster <span className="font-normal normal-case text-ink-muted">(opcional)</span></p>
+          <textarea
+            value={customerNotes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="ex: Só jogar com Jinx ADC, preferência pela manhã, lane específica..."
+            className="input-base w-full min-h-[80px] resize-none"
+            maxLength={500}
+          />
+          {customerNotes.length > 400 && (
+            <p className="text-[10px] text-ink-muted mt-1 text-right">{customerNotes.length}/500</p>
+          )}
+        </div>
+
+        {/* CTA */}
         <Button
           onClick={nextStep}
           size="lg"

@@ -6,7 +6,7 @@ import { Send, ArrowLeft, Clock, MessageCircle } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDateTime, timeAgo, formatRank } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
 
@@ -124,7 +124,7 @@ export function OrderDetailPage() {
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: t('customer.order.service'),     value: (order.service_id as string).replace(/_/g, ' ') },
+                { label: t('customer.order.service'),     value: getServiceLabel(order.service_id as string) },
                 { label: t('customer.order.server'),      value: order.server },
                 { label: t('customer.order.queue'),       value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') },
                 {

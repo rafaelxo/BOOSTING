@@ -75,16 +75,16 @@ export const RANK_TIER_COLOR: Record<RankTier, string> = {
 }
 
 export const RANK_TIER_LABEL: Record<RankTier, string> = {
-  iron: 'Iron',
+  iron: 'Ferro',
   bronze: 'Bronze',
-  silver: 'Silver',
-  gold: 'Gold',
-  platinum: 'Platinum',
-  emerald: 'Emerald',
-  diamond: 'Diamond',
-  master: 'Master',
-  grandmaster: 'Grandmaster',
-  challenger: 'Challenger',
+  silver: 'Prata',
+  gold: 'Ouro',
+  platinum: 'Platina',
+  emerald: 'Esmeralda',
+  diamond: 'Diamante',
+  master: 'Mestre',
+  grandmaster: 'Grão-mestre',
+  challenger: 'Desafiante',
 }
 
 export function formatRank(tier: RankTier, division?: string | null) {
@@ -141,6 +141,19 @@ export const TICKET_PRIORITY_COLOR: Record<TicketPriority, string> = {
   medium: 'text-warning',
   high: 'text-danger',
   urgent: 'text-danger font-bold',
+}
+
+// ─── Service label ────────────────────────────────────────────────────────────
+
+const SERVICE_LABEL_MAP: Record<string, string> = {
+  elo_boost:         'Solo Boost / Duo Boost',
+  win_boost:         'Vitórias',
+  placement_matches: 'MD5',
+  coaching:          'Coaching',
+}
+
+export function getServiceLabel(serviceId: string): string {
+  return SERVICE_LABEL_MAP[serviceId] ?? serviceId.replace(/_/g, ' ')
 }
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────

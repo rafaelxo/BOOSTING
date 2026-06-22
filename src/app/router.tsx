@@ -104,8 +104,15 @@ export const router = createBrowserRouter([
       { path: '/pricing',  element: <SuspensePage><PricingPage /></SuspensePage> },
       { path: '/security', element: <SuspensePage><SecurityPage /></SuspensePage> },
       { path: '/faq',      element: <SuspensePage><FAQPage /></SuspensePage> },
-      { path: '/apply',    element: <SuspensePage><BoosterApplyPage /></SuspensePage> },
       { path: '/reviews',  element: <SuspensePage><ReviewsPage /></SuspensePage> },
+    ],
+  },
+
+  // Any authenticated user (no role restriction)
+  {
+    element: <RequireAuth />,
+    children: [
+      { path: '/apply', element: <SuspensePage><BoosterApplyPage /></SuspensePage> },
     ],
   },
 
