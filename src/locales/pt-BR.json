@@ -284,7 +284,7 @@
   "booster": {
     "nav": {
       "dashboard": "Painel",
-      "jobs": "Vagas",
+      "jobs": "Pedidos",
       "earnings": "Ganhos",
       "profile": "Meu Perfil",
       "signOut": "Sair",
@@ -294,20 +294,20 @@
     },
     "dashboard": {
       "title": "Painel do Booster",
-      "activeCount": "{{count}} atribuição ativa",
-      "activeCountPlural": "{{count}} atribuições ativas",
-      "noActive": "Sem atribuições ativas no momento.",
-      "browseJobs": "Ver Vagas",
+      "activeCount": "{{count}} pedido ativo",
+      "activeCountPlural": "{{count}} pedidos ativos",
+      "noActive": "Sem pedidos ativos no momento.",
+      "browseJobs": "Ver Pedidos",
       "stats": {
         "active": "Pedidos Ativos",
         "completed": "Concluídos",
         "earned": "Total Ganho",
         "rating": "Avaliação"
       },
-      "activeTitle": "Atribuições Ativas",
+      "activeTitle": "Pedidos Ativos",
       "viewAll": "Ver todos →",
-      "empty": "Sem atribuições ativas",
-      "emptyDesc": "Explore vagas disponíveis para pegar um novo pedido.",
+      "empty": "Sem pedidos ativos",
+      "emptyDesc": "Explore pedidos disponíveis para pegar um novo job.",
       "pending": {
         "title": "Candidatura em Análise",
         "desc": "Sua candidatura está sendo analisada pela nossa equipe. Você será notificado quando aprovado.",
@@ -315,16 +315,16 @@
       }
     },
     "jobs": {
-      "title": "Vagas Disponíveis",
-      "count": "{{count}} vaga disponível",
-      "countPlural": "{{count}} vagas disponíveis",
+      "title": "Pedidos Disponíveis",
+      "count": "{{count}} pedido disponível",
+      "countPlural": "{{count}} pedidos disponíveis",
       "live": "Ao vivo",
       "accept": "Aceitar",
       "yourCut": "Seu corte (75%)",
       "posted": "Publicado {{time}}",
       "soloQueue": "Solo/Duo",
       "flexQueue": "Flex",
-      "empty": "Sem vagas disponíveis",
+      "empty": "Sem pedidos disponíveis",
       "emptyDesc": "Volte em breve — pedidos chegam frequentemente.",
       "locked": {
         "pending": "Candidatura em análise",

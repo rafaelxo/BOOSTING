@@ -24,19 +24,19 @@ export function timeAgo(date: string | Date) {
 // ─── Order status display ─────────────────────────────────────────────────────
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  draft: 'Draft',
-  awaiting_payment: 'Awaiting Payment',
-  paid: 'Payment Confirmed',
-  awaiting_assignment: 'Queued',
-  assigned: 'Booster Assigned',
-  in_progress: 'In Progress',
-  paused: 'Paused',
-  drop_requested: 'Drop Requested',
-  awaiting_customer: 'Awaiting You',
-  completed: 'Completed',
-  disputed: 'Disputed',
-  refunded: 'Refunded',
-  canceled: 'Canceled',
+  draft: 'Rascunho',
+  awaiting_payment: 'Aguardando Pagamento',
+  paid: 'Pagamento Confirmado',
+  awaiting_assignment: 'Esperando Booster',
+  assigned: 'Booster Atribuído',
+  in_progress: 'Em Andamento',
+  paused: 'Pausado',
+  drop_requested: 'Solicitação de Drop',
+  awaiting_customer: 'Aguardando Cliente',
+  completed: 'Concluído',
+  disputed: 'Disputado',
+  refunded: 'Reembolsado',
+  canceled: 'Cancelado',
 }
 
 export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
@@ -96,11 +96,11 @@ export function formatRank(tier: RankTier, division?: string | null) {
 // ─── Booster status ───────────────────────────────────────────────────────────
 
 export const BOOSTER_STATUS_LABEL: Record<BoosterStatus, string> = {
-  pending: 'Pending',
-  under_review: 'Under Review',
-  approved: 'Approved',
-  suspended: 'Suspended',
-  rejected: 'Rejected',
+  pending: 'Pendente',
+  under_review: 'Em Revisão',
+  approved: 'Aprovado',
+  suspended: 'Suspenso',
+  rejected: 'Rejeitado',
 }
 
 export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
@@ -114,11 +114,11 @@ export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
 // ─── Ticket status ────────────────────────────────────────────────────────────
 
 export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
-  open: 'Open',
-  in_progress: 'In Progress',
-  waiting_customer: 'Waiting for You',
-  resolved: 'Resolved',
-  closed: 'Closed',
+  open: 'Aberto',
+  in_progress: 'Em Andamento',
+  waiting_customer: 'Aguardando Cliente',
+  resolved: 'Resolvido',
+  closed: 'Fechado',
 }
 
 export const TICKET_STATUS_COLOR: Record<TicketStatus, string> = {
@@ -130,10 +130,10 @@ export const TICKET_STATUS_COLOR: Record<TicketStatus, string> = {
 }
 
 export const TICKET_PRIORITY_LABEL: Record<TicketPriority, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  urgent: 'Urgent',
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
 }
 
 export const TICKET_PRIORITY_COLOR: Record<TicketPriority, string> = {
