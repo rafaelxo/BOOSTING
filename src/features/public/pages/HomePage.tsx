@@ -167,7 +167,7 @@ export function HomePage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {RANK_TIER_ORDER.map(tier => (
-                    <RankBadge key={tier} tier={tier} size="xs" showDivision={false} />
+                    <RankBadge key={tier} tier={tier} size="xs" showDivision={false} showLabel={false} />
                   ))}
                 </div>
               </div>

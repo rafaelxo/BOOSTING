@@ -26,7 +26,7 @@ export function StepService() {
             className={cn(
               'relative flex items-start gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-150',
               serviceType === type
-                ? 'border-brand bg-brand-muted shadow-brand'
+                ? 'border-brand bg-brand/10 shadow-brand'
                 : 'border-bg-elevated bg-bg-card hover:border-brand/40 hover:bg-bg-elevated cursor-pointer'
             )}
           >

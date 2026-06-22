@@ -10,7 +10,8 @@
     "boostNow": "Boostar Agora",
     "applyBooster": "Seja um Booster",
     "announcement": "Boosting profissional — 98,7% de conclusão · Suporte 24/7",
-    "boostersOnline": "{{count}} boosters online"
+    "boostersOnline": "{{count}} boosters online",
+    "boosters": "Boosters"
   },
   "footer": {
     "tagline": "Serviços de gaming profissionais. Seguro, rápido e garantido.",

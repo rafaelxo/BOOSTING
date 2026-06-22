@@ -51,7 +51,7 @@ export function StepGame() {
                 className={cn(
                   'relative flex flex-col items-center gap-3 p-6 rounded-2xl border-2 text-left transition-all duration-150',
                   gameSlug === slug
-                    ? 'border-brand bg-brand-muted shadow-brand'
+                    ? 'border-brand bg-brand/10 shadow-brand'
                     : is_active
                       ? 'border-bg-elevated bg-bg-card hover:border-brand/40 hover:bg-bg-elevated cursor-pointer'
                       : 'border-bg-elevated bg-bg-card opacity-50 cursor-not-allowed'

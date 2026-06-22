@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { TrendingUp, Zap, Users, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge } from '@/components/ui'
-import { RANK_TIER_ORDER } from '@/lib/utils'
+import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import type { RankTier } from '@/types'
 
 const SERVICES = [
@@ -21,7 +21,7 @@ const SERVICES = [
       'Começa em até 30 minutos',
     ],
     color: 'text-brand',
-    bgColor: 'bg-brand-muted',
+    bgColor: 'bg-brand/10',
     cta: '/orders/new?service=elo_boost',
   },
   {
@@ -81,10 +81,10 @@ const SERVICES = [
 ]
 
 const EXTRAS = [
+  { name: 'Apenas Solo',               desc: 'O booster joga exclusivamente em solo queue, sem duo com outros jogadores.' },
   { name: 'Processamento Prioritário', desc: 'Atribuição imediata ao booster mais bem avaliado. Seu pedido vai direto para frente da fila.' },
   { name: 'Campeão Único',             desc: 'Seu campeão favorito em cada partida. Especifique nas observações do pedido.' },
   { name: 'Transmissão ao Vivo',       desc: 'Assista seu booster jogar em tempo real via link de stream privado.' },
-  { name: 'Lane Específica',           desc: 'Informe a lane que deseja que o booster jogue. Combina perfeitamente com Campeão Único.' },
 ]
 
 export function ServicesPage() {
@@ -119,7 +119,7 @@ export function ServicesPage() {
                   <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-2">Disponível para</p>
                   <div className="flex flex-wrap gap-2">
                     {rankRange.map(tier => (
-                      <RankBadge key={tier} tier={tier} size="xs" showDivision={false} />
+                      <RankBadge key={tier} tier={tier} size="xs" showDivision={false} showLabel={false} />
                     ))}
                   </div>
                 </div>
@@ -168,7 +168,10 @@ export function ServicesPage() {
           <h2 className="text-xl font-bold text-ink mb-6">Disponível em todos os ranks</h2>
           <div className="flex flex-wrap justify-center gap-3">
             {RANK_TIER_ORDER.map(tier => (
-              <RankBadge key={tier} tier={tier} size="md" showDivision={false} />
+              <div key={tier} className="flex flex-col items-center gap-1">
+                <RankBadge tier={tier} size="md" showDivision={false} showLabel={false} />
+                <span className={`text-[10px] font-bold ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</span>
+              </div>
             ))}
           </div>
         </div>

@@ -268,7 +268,7 @@ export function AdminOrderDetailPage() {
                   disabled={order.status === value || updateStatus.isPending}
                   className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                     order.status === value
-                      ? 'bg-brand-muted text-brand cursor-default'
+                      ? 'bg-brand/10 text-brand cursor-default'
                       : 'text-ink-secondary hover:bg-bg-elevated hover:text-ink'
                   }`}
                 >

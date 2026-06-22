@@ -44,7 +44,7 @@ export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
   awaiting_payment: 'text-warning bg-warning/10',
   paid: 'text-info bg-info/10',
   awaiting_assignment: 'text-info bg-info/10',
-  assigned: 'text-brand bg-brand-muted',
+  assigned: 'text-brand bg-brand/10',
   in_progress: 'text-success bg-success/10',
   paused: 'text-warning bg-warning/10',
   drop_requested: 'text-danger bg-danger/10',
@@ -123,7 +123,7 @@ export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
 
 export const TICKET_STATUS_COLOR: Record<TicketStatus, string> = {
   open: 'text-danger bg-danger/10',
-  in_progress: 'text-brand bg-brand-muted',
+  in_progress: 'text-brand bg-brand/10',
   waiting_customer: 'text-accent bg-accent/10',
   resolved: 'text-success bg-success/10',
   closed: 'text-ink-muted bg-bg-overlay',

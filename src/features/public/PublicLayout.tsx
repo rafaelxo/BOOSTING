@@ -81,9 +81,10 @@ export function PublicLayout() {
             </button>
 
             {[
-              { href: '/pricing',  label: t('nav.pricing')  },
-              { href: '/security', label: t('nav.security') },
-              { href: '/faq',      label: t('nav.faq')      },
+              { href: '/pricing',   label: t('nav.pricing')   },
+              { href: '/security',  label: t('nav.security')  },
+              { href: '/faq',       label: t('nav.faq')       },
+              { href: '/boosters',  label: t('nav.boosters')  },
             ].map(({ href, label }) => (
               <Link key={href} to={href}
                 className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -129,10 +130,11 @@ export function PublicLayout() {
               {t('nav.services')}
             </button>
             {[
-              { href: '/pricing',  label: t('nav.pricing')      },
-              { href: '/security', label: t('nav.security')     },
-              { href: '/faq',      label: t('nav.faq')          },
-              { href: '/apply',    label: t('nav.applyBooster') },
+              { href: '/pricing',   label: t('nav.pricing')       },
+              { href: '/security',  label: t('nav.security')      },
+              { href: '/faq',       label: t('nav.faq')           },
+              { href: '/boosters',  label: t('nav.boosters')      },
+              { href: '/apply',     label: t('nav.applyBooster')  },
             ].map(({ href, label }) => (
               <Link key={href} to={href} onClick={() => setMobileOpen(false)}
                 className="block px-3 py-2.5 rounded-xl text-sm text-ink-secondary hover:text-ink hover:bg-bg-elevated"
@@ -180,14 +182,10 @@ export function PublicLayout() {
                 { href: '/orders/new?service=coaching',           label: t('footer.coaching') },
               ]},
               { title: t('footer.company'), links: [
-                { href: '/pricing',  label: t('footer.pricing')  },
-                { href: '/security', label: t('footer.security') },
-                { href: '/faq',      label: t('footer.faq')      },
-                { href: '/apply',    label: t('nav.applyBooster')},
-              ]},
-              { title: t('footer.account'), links: [
-                { href: '/login',     label: t('footer.signIn')   },
-                { href: '/dashboard', label: t('footer.dashboard')},
+                { href: '/pricing',   label: t('footer.pricing')  },
+                { href: '/security',  label: t('footer.security') },
+                { href: '/faq',       label: t('footer.faq')      },
+                { href: '/boosters',  label: t('nav.boosters')    },
               ]},
             ].map(({ title, links }) => (
               <div key={title}>

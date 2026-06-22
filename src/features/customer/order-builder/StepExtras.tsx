@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { CheckCircle2, Zap, Radio, Tv, Users, Crosshair, Star, MapPin } from 'lucide-react'
+import { CheckCircle2, Zap, Radio, Tv, Users, Crosshair, Star, MapPin, User } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import type { ServiceExtra } from '@/types'
@@ -13,6 +13,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   tv:       Tv,
   crosshair:Crosshair,
   'map-pin':MapPin,
+  user:     User,
   star:     Star,
   // legacy icons kept for any existing DB rows
   radio:    Radio,
@@ -22,9 +23,9 @@ const ICON_MAP: Record<string, React.ElementType> = {
 // Extras removed from the product (mandatory or discontinued)
 const HIDDEN_NAMES = [
   'offline', 'appear offline', 'aparecer offline',
-  'solo queue', 'apenas solo', 'solo only',
   'monitoramento', 'live monitoring', 'live monitor',
   'duo boost',
+  'lane específica', 'lane especifica',
 ]
 
 function isHidden(name: string): boolean {
@@ -101,7 +102,7 @@ export function StepExtras() {
                 className={cn(
                   'relative flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-150',
                   selected
-                    ? 'border-brand bg-brand-muted shadow-brand'
+                    ? 'border-brand bg-brand/10 shadow-brand'
                     : 'border-bg-elevated bg-bg-card hover:border-brand/40 hover:bg-bg-elevated'
                 )}
               >

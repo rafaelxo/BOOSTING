@@ -3,7 +3,7 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
 import { RankBadge } from '@/components/ui/RankBadge'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, COACHING_PRICE, DUO_BOOST_PCT } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT } from '@/lib/pricing'
 import type { BoostMode, Division, QueueType, RankTier } from '@/types'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
@@ -20,12 +20,14 @@ interface RankSelectProps {
   onChange: (tier: RankTier, division: Division | null) => void
   minTier?: RankTier | null
   minDiv?: Division | null
+  maxTier?: RankTier | null
 }
 
-function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, minDiv }: RankSelectProps) {
+function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, minDiv, maxTier }: RankSelectProps) {
   const hasDivision = selectedTier && !MASTER_PLUS.includes(selectedTier)
   const minIdx = minTier ? RANK_TIER_ORDER.indexOf(minTier) : 0
-  const availableTiers = RANK_TIER_ORDER.slice(minIdx)
+  const maxIdx = maxTier ? RANK_TIER_ORDER.indexOf(maxTier) + 1 : undefined
+  const availableTiers = RANK_TIER_ORDER.slice(minIdx, maxIdx)
 
   const validDivisions = hasDivision
     ? DIVISIONS.filter(d => {
@@ -50,7 +52,7 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
         {/* Selected rank preview */}
         {selectedTier && (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated/50 border border-bg-overlay">
-            <RankBadge tier={selectedTier} division={selectedDivision} size="sm" />
+            <RankBadge tier={selectedTier} division={selectedDivision} size="sm" showLabel={false} />
             <p className="text-sm font-bold text-ink">
               {formatRank(selectedTier, selectedDivision)}
             </p>
@@ -58,18 +60,24 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
         )}
 
         {/* Tier grid with rank badges */}
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {availableTiers.map((tier) => (
             <button
               key={tier}
               type="button"
               onClick={() => handleTier(tier)}
               className={cn(
-                'rounded-xl ring-2 transition-all focus:outline-none',
-                selectedTier === tier ? 'ring-brand' : 'ring-transparent hover:ring-brand/30'
+                'flex items-center gap-2 px-2 py-1 rounded-xl ring-2 transition-all focus:outline-none',
+                selectedTier === tier ? 'ring-brand bg-brand/10' : 'ring-transparent hover:ring-brand/30 bg-bg-elevated/40'
               )}
             >
-              <RankBadge tier={tier} showDivision={false} size="xs" />
+              <RankBadge tier={tier} showDivision={false} size="xs" showLabel={false} />
+              <span className={cn(
+                'text-xs font-semibold leading-none',
+                selectedTier === tier ? 'text-brand' : 'text-ink-secondary'
+              )}>
+                {RANK_TIER_LABEL[tier]}
+              </span>
             </button>
           ))}
         </div>
@@ -130,9 +138,8 @@ export function StepConfigure() {
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
     } else if (serviceType === 'coaching') {
-      if (!sessionsPurchased) return
-      setBasePrice(COACHING_PRICE[sessionsPurchased] ?? 19.99)
-      setEstimatedHours(sessionsPurchased)
+      setBasePrice(0)
+      setEstimatedHours(sessionsPurchased ?? 1)
     }
   }, [serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased, setBasePrice, setEstimatedHours])
 
@@ -144,19 +151,19 @@ export function StepConfigure() {
       <div className="space-y-6">
         {/* Duo Boost checkbox — only for elo boost */}
         {serviceType === 'elo_boost' && (
-          <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+52% no preço).">
+          <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
             <button
               type="button"
               onClick={() => setBoostMode(boostMode === 'duo' ? 'solo' : 'duo')}
               className={cn(
                 'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
                 boostMode === 'duo'
-                  ? 'border-brand bg-brand-muted text-brand'
+                  ? 'border-brand bg-brand/10 text-brand'
                   : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink'
               )}
             >
               <div>
-                <p className="text-sm font-bold">Duo Boost <span className="text-xs font-normal opacity-70">(+52%)</span></p>
+                <p className="text-sm font-bold">Duo Boost <span className="text-xs font-normal opacity-70">(+50%)</span></p>
                 <p className="text-[11px] font-normal mt-0.5 opacity-70">Você joga junto com o booster na duo queue</p>
               </div>
               <div className={cn(
@@ -181,7 +188,7 @@ export function StepConfigure() {
                   className={cn(
                     'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
                     queueType === value
-                      ? 'border-brand bg-brand-muted text-brand'
+                      ? 'border-brand bg-brand/10 text-brand'
                       : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
                   )}
                 >
@@ -200,6 +207,7 @@ export function StepConfigure() {
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
+              maxTier="grandmaster"
             />
             <RankSelect
               label="Rank Alvo"
@@ -213,9 +221,17 @@ export function StepConfigure() {
         )}
 
         {/* Rank — placement / win boost */}
-        {(serviceType === 'placement_matches' || serviceType === 'win_boost') && (
+        {serviceType === 'win_boost' && (
           <RankSelect
             label="Rank Atual"
+            selectedTier={currentRank?.tier ?? null}
+            selectedDivision={currentRank?.division ?? null}
+            onChange={(tier, division) => setCurrentRank({ tier, division })}
+          />
+        )}
+        {serviceType === 'placement_matches' && (
+          <RankSelect
+            label="Rank Final da Última Temporada"
             selectedTier={currentRank?.tier ?? null}
             selectedDivision={currentRank?.division ?? null}
             onChange={(tier, division) => setCurrentRank({ tier, division })}
@@ -225,47 +241,39 @@ export function StepConfigure() {
         {/* Wins — win boost */}
         {serviceType === 'win_boost' && (
           <FormField label="Número de Vitórias" required>
-            <div className="flex flex-wrap gap-2">
-              {[3, 5, 10, 15, 20, 30, 50].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setWinsPurchased(n)}
-                  className={cn(
-                    'px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all',
-                    winsPurchased === n
-                      ? 'border-brand bg-brand-muted text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
-                  )}
-                >
-                  {n} vitórias
-                </button>
-              ))}
+            <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
+              <button
+                type="button"
+                onClick={() => setWinsPurchased(Math.max(1, (winsPurchased ?? 1) - 1))}
+                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+              >
+                −
+              </button>
+              <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
+                <p className="text-xl font-extrabold text-ink leading-none">{winsPurchased ?? 1}</p>
+                <p className="text-[10px] text-ink-muted mt-0.5">vitórias</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWinsPurchased(Math.min(50, (winsPurchased ?? 1) + 1))}
+                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+              >
+                +
+              </button>
             </div>
+            <p className="text-xs text-ink-muted mt-1.5">Mínimo 1 · Máximo 50</p>
           </FormField>
         )}
 
-        {/* Sessions — coaching */}
+        {/* Coaching — valor a combinar */}
         {serviceType === 'coaching' && (
-          <FormField label="Duração da Sessão" required>
-            <div className="flex gap-3">
-              {([['1h', 1], ['2h', 2]] as [string, number][]).map(([label, val]) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setSessionsPurchased(val)}
-                  className={cn(
-                    'flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all',
-                    sessionsPurchased === val
-                      ? 'border-brand bg-brand-muted text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </FormField>
+          <div className="rounded-xl border border-bg-elevated bg-bg-elevated/40 p-4 space-y-1.5">
+            <p className="text-sm font-semibold text-ink">Coaching por sessão</p>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              O valor é combinado diretamente com o booster após a criação do pedido. Nenhum pagamento antecipado é necessário.
+            </p>
+            <p className="text-sm font-bold text-brand mt-1">Valor a combinar</p>
+          </div>
         )}
       </div>
     </div>

@@ -20,6 +20,14 @@
     --color-ink-muted:    138 155 145;
     --color-ink-inverse:  238 242 238;
 
+    /* Muted tints — light versions */
+    --color-brand-muted:   220 252 231;
+    --color-brand-subtle:  187 247 208;
+    --color-success-muted: 209 250 229;
+    --color-danger-muted:  254 226 226;
+    --color-warning-muted: 254 243 199;
+    --color-accent-muted:  254 249 195;
+
     --logo-url: url('/light.png');
 
     --shadow-card:       0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
@@ -43,6 +51,14 @@
     --color-ink-secondary:159 168 160;
     --color-ink-muted:    106 120 112;
     --color-ink-inverse:   11  13  12;
+
+    /* Muted tints — dark versions */
+    --color-brand-muted:   15  42  26;
+    --color-brand-subtle:  26  61  40;
+    --color-success-muted: 10  46  32;
+    --color-danger-muted:  46  10  10;
+    --color-warning-muted: 46  31   0;
+    --color-accent-muted:  46  36   0;
 
     --logo-url: url('/dark.png');
 
@@ -94,7 +110,7 @@
     @apply bg-bg-elevated border border-bg-overlay rounded-2xl shadow-card-hover;
   }
   .card-brand {
-    @apply bg-brand-muted border border-brand/25 rounded-2xl;
+    @apply bg-brand/10 border border-brand/25 rounded-2xl;
   }
   .card-glass {
     @apply bg-bg-card/60 backdrop-blur-md border border-bg-elevated rounded-2xl;
