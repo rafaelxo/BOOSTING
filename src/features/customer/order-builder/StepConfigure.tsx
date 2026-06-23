@@ -3,7 +3,10 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
 import { RankBadge } from '@/components/ui/RankBadge'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT } from '@/lib/pricing'
+import {
+  calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT,
+  calcMasterPlusPrice, applyLpModifier,
+} from '@/lib/pricing'
 import type { BoostMode, Division, QueueType, RankTier } from '@/types'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
@@ -12,6 +15,8 @@ const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
 function divStep(d: Division): number {
   return { IV: 0, III: 1, II: 2, I: 3 }[d]
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 interface RankSelectProps {
   label: string
@@ -49,7 +54,6 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
   return (
     <FormField label={label} required>
       <div className="space-y-3">
-        {/* Selected rank preview */}
         {selectedTier && (
           <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated/50 border border-bg-overlay">
             <RankBadge tier={selectedTier} division={selectedDivision} size="sm" showLabel={false} />
@@ -59,7 +63,6 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
           </div>
         )}
 
-        {/* Tier grid with rank badges */}
         <div className="flex flex-wrap gap-1.5">
           {availableTiers.map((tier) => (
             <button
@@ -82,7 +85,6 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
           ))}
         </div>
 
-        {/* Division pills */}
         {hasDivision && validDivisions.length > 0 && (
           <div className="flex gap-1.5">
             {validDivisions.map((div) => (
@@ -107,27 +109,149 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
   )
 }
 
+function LpCounter({ label, value, min, max, onChange }: {
+  label: string; value: number; min: number; max: number; onChange: (v: number) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] font-semibold text-ink-secondary">{label}</p>
+      <div className="flex items-center rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="px-3 py-2 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          onChange={e => {
+            const v = parseInt(e.target.value)
+            if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)))
+          }}
+          className="flex-1 text-center py-2 border-x border-bg-elevated bg-transparent text-sm font-extrabold text-ink focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          className="px-3 py-2 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function LpFieldsIronDiamond({ currentLp, avgLpGain, avgLpLoss, onCurrentLp, onAvgGain, onAvgLoss }: {
+  currentLp: number; avgLpGain: number; avgLpLoss: number;
+  onCurrentLp: (v: number) => void; onAvgGain: (v: number) => void; onAvgLoss: (v: number) => void
+}) {
+  return (
+    <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-4 space-y-3">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">PDL</p>
+      <div className="grid grid-cols-3 gap-3">
+        <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={onCurrentLp} />
+        <LpCounter label="Média Ganhos" value={avgLpGain} min={1} max={50} onChange={onAvgGain} />
+        <LpCounter label="Média Perdidos" value={avgLpLoss} min={1} max={40} onChange={onAvgLoss} />
+      </div>
+      <p className="text-[10px] text-ink-muted leading-relaxed">
+        Seu LP na divisão atual e médias influenciam o cálculo de preço.
+      </p>
+    </div>
+  )
+}
+
+function LpFieldsMasterPlus({ currentLp, targetLp, onCurrentLp, onTargetLp }: {
+  currentLp: number; targetLp: number | null;
+  onCurrentLp: (v: number) => void; onTargetLp: (v: number | null) => void
+}) {
+  return (
+    <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-4 space-y-3">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">LP</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-ink-secondary">LP Atual</p>
+          <input
+            type="number"
+            min={0}
+            max={9999}
+            value={currentLp || ''}
+            onChange={e => onCurrentLp(Math.max(0, parseInt(e.target.value) || 0))}
+            placeholder="ex: 200"
+            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-ink-secondary">LP Alvo</p>
+          <input
+            type="number"
+            min={0}
+            max={9999}
+            value={targetLp ?? ''}
+            onChange={e => {
+              const v = parseInt(e.target.value)
+              onTargetLp(isNaN(v) ? null : Math.max(0, v))
+            }}
+            placeholder="ex: 800"
+            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+      </div>
+      <p className="text-[10px] text-ink-muted">O preço é calculado com base na diferença de LP.</p>
+    </div>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased, sessionsPurchased,
+    currentLp, avgLpGain, avgLpLoss, targetLp,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased, setSessionsPurchased,
+    setCurrentLp, setAvgLpGain, setAvgLpLoss, setTargetLp,
     setBasePrice, setEstimatedHours,
   } = useOrderBuilderStore()
 
+  const currentIsMasterPlus = currentRank ? MASTER_PLUS.includes(currentRank.tier) : false
+
   useEffect(() => {
     if (serviceType === 'elo_boost') {
-      if (!currentRank || !targetRank) return
+      if (!currentRank) return
+
+      if (currentIsMasterPlus) {
+        if (targetLp === null || targetLp <= currentLp) {
+          setBasePrice(0)
+          setEstimatedHours(null)
+          return
+        }
+        const price = calcMasterPlusPrice(currentRank.tier, currentLp, targetLp)
+        const finalPrice = boostMode === 'duo'
+          ? Math.round(price * (1 + DUO_BOOST_PCT / 100) * 100) / 100
+          : price
+        setBasePrice(finalPrice)
+        setEstimatedHours(Math.max(1, Math.round((targetLp - currentLp) / 25)))
+        return
+      }
+
+      if (!targetRank) return
       const { price, hours } = calcEloPrice(
         currentRank.tier, currentRank.division ?? null,
         targetRank.tier, targetRank.division ?? null,
       )
+      const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss)
       const finalPrice = boostMode === 'duo'
-        ? Math.round(price * (1 + DUO_BOOST_PCT / 100) * 100) / 100
-        : price
+        ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
+        : withLp
       setBasePrice(finalPrice)
       setEstimatedHours(hours || null)
+
     } else if (serviceType === 'placement_matches') {
       if (!currentRank) return
       setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
@@ -141,7 +265,11 @@ export function StepConfigure() {
       setBasePrice(0)
       setEstimatedHours(sessionsPurchased ?? 1)
     }
-  }, [serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased, setBasePrice, setEstimatedHours])
+  }, [
+    serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased,
+    currentLp, avgLpGain, avgLpLoss, targetLp, currentIsMasterPlus,
+    setBasePrice, setEstimatedHours,
+  ])
 
   return (
     <div>
@@ -149,7 +277,7 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
-        {/* Duo Boost checkbox — only for elo boost */}
+        {/* Duo Boost toggle */}
         {serviceType === 'elo_boost' && (
           <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
             <button
@@ -206,21 +334,54 @@ export function StepConfigure() {
               label="Rank Atual"
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
-              onChange={(tier, division) => setCurrentRank({ tier, division })}
+              onChange={(tier, division) => {
+                setCurrentRank({ tier, division })
+                if (MASTER_PLUS.includes(tier)) {
+                  setCurrentLp(0)
+                  setTargetLp(null)
+                  setTargetRank(null)
+                } else {
+                  setTargetLp(null)
+                  setCurrentLp(0)
+                }
+              }}
               maxTier="grandmaster"
             />
-            <RankSelect
-              label="Rank Alvo"
-              selectedTier={targetRank?.tier ?? null}
-              selectedDivision={targetRank?.division ?? null}
-              onChange={(tier, division) => setTargetRank({ tier, division })}
-              minTier={currentRank?.tier ?? null}
-              minDiv={currentRank?.division ?? null}
-            />
+
+            {/* LP fields — Iron-Diamond */}
+            {currentRank && !currentIsMasterPlus && (
+              <LpFieldsIronDiamond
+                currentLp={currentLp}
+                avgLpGain={avgLpGain}
+                avgLpLoss={avgLpLoss}
+                onCurrentLp={setCurrentLp}
+                onAvgGain={setAvgLpGain}
+                onAvgLoss={setAvgLpLoss}
+              />
+            )}
+
+            {/* Master+: LP Atual + LP Alvo (replaces Rank Alvo) */}
+            {currentRank && currentIsMasterPlus ? (
+              <LpFieldsMasterPlus
+                currentLp={currentLp}
+                targetLp={targetLp}
+                onCurrentLp={setCurrentLp}
+                onTargetLp={setTargetLp}
+              />
+            ) : (
+              <RankSelect
+                label="Rank Alvo"
+                selectedTier={targetRank?.tier ?? null}
+                selectedDivision={targetRank?.division ?? null}
+                onChange={(tier, division) => setTargetRank({ tier, division })}
+                minTier={currentRank?.tier ?? null}
+                minDiv={currentRank?.division ?? null}
+              />
+            )}
           </>
         )}
 
-        {/* Rank — placement / win boost */}
+        {/* Rank — win boost */}
         {serviceType === 'win_boost' && (
           <RankSelect
             label="Rank Atual"
@@ -229,6 +390,8 @@ export function StepConfigure() {
             onChange={(tier, division) => setCurrentRank({ tier, division })}
           />
         )}
+
+        {/* Rank — MD5 */}
         {serviceType === 'placement_matches' && (
           <RankSelect
             label="Rank Final da Última Temporada"
@@ -238,7 +401,7 @@ export function StepConfigure() {
           />
         )}
 
-        {/* Wins — win boost */}
+        {/* Wins counter — win boost */}
         {serviceType === 'win_boost' && (
           <FormField label="Número de Vitórias" required>
             <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
@@ -265,7 +428,7 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Coaching — valor a combinar */}
+        {/* Coaching */}
         {serviceType === 'coaching' && (
           <div className="rounded-xl border border-bg-elevated bg-bg-elevated/40 p-4 space-y-1.5">
             <p className="text-sm font-semibold text-ink">Coaching por sessão</p>

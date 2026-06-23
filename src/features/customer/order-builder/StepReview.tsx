@@ -17,9 +17,11 @@ export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
     server, winsPurchased, sessionsPurchased, selectedExtras,
+    currentLp, avgLpGain, avgLpLoss, targetLp,
     basePrice, extrasPrice, estimatedHours, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
+  const MASTER_PLUS = ['master', 'grandmaster', 'challenger']
   const currency = useCurrency()
 
   const totalPrice = basePrice + extrasPrice
@@ -54,8 +56,23 @@ export function StepReview() {
                 value={formatRank(currentRank.tier, currentRank.division)}
               />
             )}
-            {targetRank && (
+            {targetRank && serviceType === 'elo_boost' && !MASTER_PLUS.includes(currentRank?.tier ?? '') && (
               <ReviewRow label="Rank Alvo" value={formatRank(targetRank.tier, targetRank.division)} />
+            )}
+            {serviceType === 'elo_boost' && currentRank && (
+              MASTER_PLUS.includes(currentRank.tier) ? (
+                <>
+                  <ReviewRow label="LP Atual" value={`${currentLp} LP`} />
+                  {targetLp !== null && (
+                    <ReviewRow label="LP Alvo" value={`${targetLp} LP`} />
+                  )}
+                </>
+              ) : (
+                <ReviewRow
+                  label="PDL"
+                  value={`${currentLp} LP atual · +${avgLpGain} / −${avgLpLoss} médias`}
+                />
+              )
             )}
             {winsPurchased && (
               <ReviewRow label="Vitórias" value={`${winsPurchased} vitórias`} />

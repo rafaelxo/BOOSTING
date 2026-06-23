@@ -82,3 +82,35 @@ export const COACHING_PRICE_NEGOTIABLE = true
 // Ferro–Esmeralda e Diamante IV>III: +52%
 // D III>II: +54% | D II>I: +60%  (implementado como extra fixo +52% na UI)
 export const DUO_BOOST_PCT = 50
+
+// ── Master+ LP-based pricing ──────────────────────────────────────────────────
+// Mestre, Grão-Mestre e Desafiante são medidos em LP (sem divisões)
+const MASTER_LP_RATE: Record<string, number> = {
+  master: 0.45,
+  grandmaster: 0.75,
+  challenger: 1.20,
+}
+
+export function calcMasterPlusPrice(tier: RankTier, currentLp: number, targetLp: number): number {
+  const rate = MASTER_LP_RATE[tier] ?? 0.45
+  return Math.max(0, Math.round((targetLp - currentLp) * rate * 100) / 100)
+}
+
+// ── LP Modifier for Iron–Diamond ──────────────────────────────────────────────
+// LP progress in current division → reduces first-div cost
+// Win-rate estimate (avgGain / total) → efficiency multiplier (±10%)
+export function applyLpModifier(
+  basePrice: number,
+  fTier: RankTier,
+  currentLp: number,
+  avgLpGain: number,
+  avgLpLoss: number,
+): number {
+  if (basePrice <= 0) return 0
+  const divPrice = ELO_DIV_PRICE[fTier] ?? 0
+  const lpDiscount = (currentLp / 100) * divPrice
+  const total = avgLpGain + avgLpLoss
+  const winRate = total > 0 ? avgLpGain / total : 0.5
+  const efficiencyMod = 1 + (0.5 - winRate) * 0.15
+  return Math.max(0, Math.round((basePrice - lpDiscount) * efficiencyMod * 100) / 100)
+}
