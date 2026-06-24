@@ -4,6 +4,7 @@ import { Zap } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
+import { checkRateLimit, limits } from '@/lib/rateLimit'
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -20,6 +21,10 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   async function handleDiscordLogin() {
+    if (!checkRateLimit('discord-login', limits.auth)) {
+      setError('Muitas tentativas de login. Aguarde 1 minuto.')
+      return
+    }
     setLoading(true)
     setError(null)
 

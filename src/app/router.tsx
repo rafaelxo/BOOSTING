@@ -29,7 +29,6 @@ const CustomerDashboard = lazy(() => import('@/features/customer/pages/Dashboard
 const OrderBuilderPage  = lazy(() => import('@/features/customer/pages/OrderBuilder').then(m => ({ default: m.OrderBuilderPage })))
 const OrderDetailPage   = lazy(() => import('@/features/customer/pages/OrderDetail').then(m => ({ default: m.OrderDetailPage })))
 const OrderHistoryPage  = lazy(() => import('@/features/customer/pages/OrderHistory').then(m => ({ default: m.OrderHistoryPage })))
-const CustomerProfilePage = lazy(() => import('@/features/customer/pages/Profile').then(m => ({ default: m.CustomerProfilePage })))
 const SupportPage       = lazy(() => import('@/features/customer/pages/Support').then(m => ({ default: m.SupportPage })))
 const TicketDetailPage  = lazy(() => import('@/features/customer/pages/TicketDetail').then(m => ({ default: m.TicketDetailPage })))
 
@@ -39,6 +38,7 @@ const AvailableJobsPage   = lazy(() => import('@/features/booster/pages/Availabl
 const JobDetailPage       = lazy(() => import('@/features/booster/pages/JobDetail').then(m => ({ default: m.JobDetailPage })))
 const BoosterEarningsPage = lazy(() => import('@/features/booster/pages/Earnings').then(m => ({ default: m.BoosterEarningsPage })))
 const BoosterProfilePage  = lazy(() => import('@/features/booster/pages/Profile').then(m => ({ default: m.BoosterProfilePage })))
+const BoosterServicesPage = lazy(() => import('@/features/booster/pages/Services').then(m => ({ default: m.BoosterServicesPage })))
 const BoosterOnboardingPage = lazy(() => import('@/features/booster/pages/Onboarding').then(m => ({ default: m.BoosterOnboardingPage })))
 
 // Admin pages
@@ -112,7 +112,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Any authenticated user (no role restriction)
+  // Booster signup transition — any authenticated user, no layout
   {
     element: <RequireAuth />,
     children: [
@@ -144,7 +144,6 @@ export const router = createBrowserRouter([
           { path: '/orders',       element: <SuspensePage><OrderHistoryPage /></SuspensePage> },
           { path: '/support',      element: <SuspensePage><SupportPage /></SuspensePage> },
           { path: '/support/:id',  element: <SuspensePage><TicketDetailPage /></SuspensePage> },
-          { path: '/profile',      element: <SuspensePage><CustomerProfilePage /></SuspensePage> },
         ],
       },
     ],
@@ -161,6 +160,7 @@ export const router = createBrowserRouter([
           { path: '/booster/jobs',        element: <SuspensePage><AvailableJobsPage /></SuspensePage> },
           { path: '/booster/jobs/:id',    element: <SuspensePage><JobDetailPage /></SuspensePage> },
           { path: '/booster/earnings',    element: <SuspensePage><BoosterEarningsPage /></SuspensePage> },
+          { path: '/booster/services',    element: <SuspensePage><BoosterServicesPage /></SuspensePage> },
           { path: '/booster/profile',     element: <SuspensePage><BoosterProfilePage /></SuspensePage> },
           { path: '/booster/onboarding',  element: <SuspensePage><BoosterOnboardingPage /></SuspensePage> },
         ],

@@ -1,34 +1,26 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, ShoppingBag, Plus, HeadphonesIcon,
-  User, LogOut, Bell, ChevronDown,
+  LayoutDashboard, ShoppingBag, Plus, HeadphonesIcon, Bell,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-import { signOut } from '@/lib/supabase'
 import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
-import { useState } from 'react'
+import { UserProfilePanel } from '@/components/UserProfilePanel'
 
 export function CustomerLayout() {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   const { profile } = useAuthStore()
   const { t } = useTranslation()
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const NAV_ITEMS = [
     { href: '/dashboard',  icon: LayoutDashboard, label: t('customer.nav.dashboard') },
     { href: '/orders/new', icon: Plus,            label: t('customer.nav.newOrder')   },
     { href: '/orders',     icon: ShoppingBag,     label: t('customer.nav.myOrders')   },
     { href: '/support',    icon: HeadphonesIcon,  label: t('customer.nav.support')    },
-    { href: '/profile',    icon: User,            label: t('customer.nav.profile')    },
   ]
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/')
-  }
 
   return (
     <div className="min-h-screen flex bg-bg-base">
@@ -56,7 +48,7 @@ export function CustomerLayout() {
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
                   active
                     ? 'bg-brand/15 text-brand border border-brand/20'
-                    : 'text-ink-secondary hover:text-ink hover:bg-bg-elevated border border-transparent'
+                    : 'text-ink-secondary hover:text-ink hover:bg-bg-elevated border border-transparent',
                 )}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -66,31 +58,6 @@ export function CustomerLayout() {
           })}
         </nav>
 
-        {/* User profile */}
-        <div className="border-t border-bg-elevated p-4">
-          <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-bg-elevated transition-colors"
-          >
-            <Avatar name={profile?.username} size="sm" />
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-semibold text-ink truncate">{profile?.username}</p>
-              <p className="text-[11px] text-ink-muted">{t('customer.nav.role')}</p>
-            </div>
-            <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />
-          </button>
-          {profileOpen && (
-            <div className="mt-1.5 card p-1 space-y-0.5 animate-scale-in">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors"
-              >
-                <LogOut className="h-4 w-4" />
-                {t('customer.nav.signOut')}
-              </button>
-            </div>
-          )}
-        </div>
       </aside>
 
       {/* ── Main area ──────────────────────────────────────────────── */}
@@ -103,12 +70,19 @@ export function CustomerLayout() {
             <span className="font-bold text-ink text-sm">Elo<span className="text-brand">Peak</span></span>
           </Link>
           <div className="hidden md:block" />
+
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <button className="relative p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
               <Bell className="h-[18px] w-[18px]" />
             </button>
-            <Avatar name={profile?.username} size="sm" />
+            {/* Avatar — opens profile panel */}
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"
+            >
+              <Avatar src={profile?.avatar_url} name={profile?.username} size="sm" />
+            </button>
           </div>
         </header>
 
@@ -120,14 +94,14 @@ export function CustomerLayout() {
         {/* Mobile bottom nav */}
         <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0">
           {NAV_ITEMS.filter(i => i.href !== '/orders/new').map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href) && !pathname.startsWith('/orders/new'))
+            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
               <Link
                 key={href}
                 to={href}
                 className={cn(
                   'flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold transition-colors',
-                  active ? 'text-brand' : 'text-ink-muted'
+                  active ? 'text-brand' : 'text-ink-muted',
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -135,8 +109,18 @@ export function CustomerLayout() {
               </Link>
             )
           })}
+          {/* Profile icon in mobile nav */}
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-semibold text-ink-muted"
+          >
+            <Avatar src={profile?.avatar_url} name={profile?.username} size="xs" />
+            Perfil
+          </button>
         </nav>
       </div>
+
+      <UserProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   )
 }

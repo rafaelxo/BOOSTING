@@ -113,6 +113,10 @@ export interface BoosterProfile {
   full_name: string | null
   email: string | null
   cpf: string | null
+  lanes: string[] | null
+  specialties: string[] | null
+  can_coach: boolean | null
+  available_days: string[] | null
   verified_at: string | null
   rank_stats: {
     gold_minus?:    { kda: number; winrate: number }
@@ -343,6 +347,18 @@ export interface PayoutRecord {
   net_amount: number
   status: 'pending' | 'processing' | 'paid' | 'failed'
   paid_at: string | null
+  created_at: string
+}
+
+// ─── Booster Services ─────────────────────────────────────────────────────────
+
+export interface BoosterService {
+  id: string
+  booster_id: string
+  title: string
+  description: string | null
+  tempo: string | null
+  price: number
   created_at: string
 }
 

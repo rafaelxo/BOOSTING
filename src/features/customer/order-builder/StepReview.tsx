@@ -1,6 +1,7 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { formatRank, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
+import { getWinBoostPrice } from '@/lib/pricing'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight, ChevronLeft } from 'lucide-react'
 
@@ -16,11 +17,21 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
-    server, winsPurchased, sessionsPurchased, selectedExtras,
+    server, winsPurchased, sessionsPurchased, selectedExtras, winPackage,
     currentLp, avgLpGain, avgLpLoss, targetLp,
     basePrice, extrasPrice, estimatedHours, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
+
+  const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
+  const winPackagePrice = winPackage && currentRank
+    ? Math.round(
+        getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
+        * winPackage
+        * (1 - (WIN_PACKAGE_DISCOUNTS[winPackage] ?? 0) / 100)
+        * 100
+      ) / 100
+    : 0
   const MASTER_PLUS = ['master', 'grandmaster', 'challenger']
   const currency = useCurrency()
 
@@ -87,10 +98,16 @@ export function StepReview() {
         </div>
 
         {/* Extras */}
-        {selectedExtras.length > 0 && (
+        {(selectedExtras.length > 0 || winPackage) && (
           <div>
             <p className="section-label mb-2">Extras</p>
             <div className="card p-0 px-2">
+              {winPackage && (
+                <ReviewRow
+                  label={`Pacote ${winPackage} ${winPackage === 1 ? 'vitória' : 'vitórias'} (-${WIN_PACKAGE_DISCOUNTS[winPackage]}%)`}
+                  value={`+${currency(winPackagePrice)}`}
+                />
+              )}
               {selectedExtras.map(({ extra }) => (
                 <ReviewRow
                   key={extra.id}

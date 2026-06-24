@@ -1,21 +1,20 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   HeadphonesIcon, Settings, Shield, Star,
-  LogOut, ChevronDown, Bell, RefreshCw, Eye, AlertTriangle,
+  Bell, RefreshCw, Eye, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-import { signOut } from '@/lib/supabase'
 import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { UserProfilePanel } from '@/components/UserProfilePanel'
 
 export function AdminLayout() {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   const { profile } = useAuthStore()
-  const [profileOpen, setProfileOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
   const { t } = useTranslation()
 
   const NAV_SECTIONS = [
@@ -51,11 +50,6 @@ export function AdminLayout() {
       ],
     },
   ]
-
-  async function handleSignOut() {
-    await signOut()
-    navigate('/')
-  }
 
   return (
     <div className="min-h-screen flex bg-bg-base">
@@ -102,31 +96,6 @@ export function AdminLayout() {
             </div>
           ))}
         </nav>
-
-        {/* User */}
-        <div className="border-t border-bg-elevated p-4">
-          <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-bg-elevated transition-colors"
-          >
-            <Avatar name={profile?.username} size="sm" />
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-semibold text-ink truncate">{profile?.username}</p>
-              <p className="text-[11px] text-ink-muted capitalize">{profile?.role}</p>
-            </div>
-            <ChevronDown className="h-4 w-4 text-ink-muted shrink-0" />
-          </button>
-          {profileOpen && (
-            <div className="mt-1.5 card p-1 animate-scale-in">
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors"
-              >
-                <LogOut className="h-4 w-4" /> {t('admin.nav.signOut')}
-              </button>
-            </div>
-          )}
-        </div>
       </aside>
 
       {/* ── Main area ──────────────────────────────────────────────── */}
@@ -138,7 +107,12 @@ export function AdminLayout() {
             <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
               <Bell className="h-[18px] w-[18px]" />
             </button>
-            <Avatar name={profile?.username} size="sm" />
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"
+            >
+              <Avatar src={profile?.avatar_url} name={profile?.username} size="sm" />
+            </button>
           </div>
         </header>
 
@@ -146,6 +120,8 @@ export function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+      <UserProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   )
 }

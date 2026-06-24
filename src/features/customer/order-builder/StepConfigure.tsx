@@ -1,25 +1,88 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
-import { RankBadge } from '@/components/ui/RankBadge'
-import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, formatRank } from '@/lib/utils'
+import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
 import {
   calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT,
   calcMasterPlusPrice, applyLpModifier,
 } from '@/lib/pricing'
 import type { Division, QueueType, RankTier } from '@/types'
+import { Shield, Star, Gem, Diamond, Crown, Flame, Trophy } from 'lucide-react'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
+
+const TIER_IMAGE: Record<RankTier, string> = {
+  iron:        '/ranks/1_iron.webp',
+  bronze:      '/ranks/2_bronze.webp',
+  silver:      '/ranks/3_silver.webp',
+  gold:        '/ranks/4_gold.webp',
+  platinum:    '/ranks/5_platinum.webp',
+  emerald:     '/ranks/7_emerald.webp',
+  diamond:     '/ranks/6_diamond.webp',
+  master:      '/ranks/7_master.webp',
+  grandmaster: '/ranks/8_grandmaster.webp',
+  challenger:  '/ranks/9_challenger.webp',
+}
+
+const TIER_FALLBACK: Record<RankTier, React.ElementType> = {
+  iron: Shield, bronze: Shield, silver: Star, gold: Star, platinum: Gem,
+  emerald: Gem, diamond: Diamond, master: Crown, grandmaster: Flame, challenger: Trophy,
+}
 
 function divStep(d: Division): number {
   return { IV: 0, III: 1, II: 2, I: 3 }[d]
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── RankCardButton ────────────────────────────────────────────────────────────
 
-interface RankSelectProps {
-  label: string
+function RankCardButton({
+  tier, isSelected, isAvailable, onClick,
+}: {
+  tier: RankTier; isSelected: boolean; isAvailable: boolean; onClick: () => void
+}) {
+  const [imgErr, setImgErr] = useState(false)
+  const FallbackIcon = TIER_FALLBACK[tier]
+  const color = RANK_TIER_COLOR[tier]
+
+  return (
+    <button
+      type="button"
+      disabled={!isAvailable}
+      onClick={onClick}
+      className={cn(
+        'flex flex-col items-center justify-center gap-1 py-2.5 px-1 rounded-xl border-2 transition-all focus:outline-none',
+        isSelected
+          ? 'border-brand bg-brand/10'
+          : isAvailable
+            ? 'border-bg-elevated bg-bg-card hover:border-brand/30 hover:bg-bg-elevated/40'
+            : 'border-transparent bg-transparent opacity-20 cursor-not-allowed',
+      )}
+    >
+      {!imgErr ? (
+        <img
+          src={TIER_IMAGE[tier]}
+          alt={RANK_TIER_LABEL[tier]}
+          onError={() => setImgErr(true)}
+          className="w-8 h-8 object-contain"
+          draggable={false}
+        />
+      ) : (
+        <FallbackIcon className={cn('w-7 h-7', color)} />
+      )}
+      <span className={cn(
+        'text-[8px] font-semibold text-center leading-none',
+        isSelected ? 'text-brand' : 'text-ink-secondary',
+      )}>
+        {RANK_TIER_LABEL[tier]}
+      </span>
+    </button>
+  )
+}
+
+// ── RankPicker ────────────────────────────────────────────────────────────────
+
+interface RankPickerProps {
   selectedTier: RankTier | null
   selectedDivision: Division | null
   onChange: (tier: RankTier, division: Division | null) => void
@@ -28,13 +91,16 @@ interface RankSelectProps {
   maxTier?: RankTier | null
 }
 
-function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, minDiv, maxTier }: RankSelectProps) {
-  const hasDivision = selectedTier && !MASTER_PLUS.includes(selectedTier)
+function RankPicker({
+  selectedTier, selectedDivision, onChange, minTier, minDiv, maxTier,
+}: RankPickerProps) {
   const minIdx = minTier ? RANK_TIER_ORDER.indexOf(minTier) : 0
-  const maxIdx = maxTier ? RANK_TIER_ORDER.indexOf(maxTier) + 1 : undefined
-  const availableTiers = RANK_TIER_ORDER.slice(minIdx, maxIdx)
+  const maxIdx = maxTier ? RANK_TIER_ORDER.indexOf(maxTier) + 1 : RANK_TIER_ORDER.length
+  const availableSet = new Set(RANK_TIER_ORDER.slice(minIdx, maxIdx))
 
-  const validDivisions = hasDivision
+  const isMasterPlus = selectedTier ? MASTER_PLUS.includes(selectedTier) : false
+
+  const validDivisions = !isMasterPlus && selectedTier
     ? DIVISIONS.filter(d => {
         if (!minTier || selectedTier !== minTier) return true
         return divStep(d) > divStep(minDiv ?? 'IV')
@@ -42,6 +108,7 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
     : []
 
   function handleTier(tier: RankTier) {
+    if (!availableSet.has(tier)) return
     const div = MASTER_PLUS.includes(tier) ? null : (selectedDivision ?? 'IV')
     if (minTier && tier === minTier && minDiv) {
       const first = DIVISIONS.find(d => divStep(d) > divStep(minDiv))
@@ -52,74 +119,54 @@ function RankSelect({ label, selectedTier, selectedDivision, onChange, minTier, 
   }
 
   return (
-    <FormField label={label} required>
-      <div className="space-y-3">
-        {selectedTier && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated/50 border border-bg-overlay">
-            <RankBadge tier={selectedTier} division={selectedDivision} size="sm" showLabel={false} />
-            <p className="text-sm font-bold text-ink">
-              {formatRank(selectedTier, selectedDivision)}
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-1.5">
-          {availableTiers.map((tier) => (
+    <div className="space-y-2">
+      <div className="grid grid-cols-5 gap-1">
+        {RANK_TIER_ORDER.map(tier => (
+          <RankCardButton
+            key={tier}
+            tier={tier}
+            isSelected={selectedTier === tier}
+            isAvailable={availableSet.has(tier)}
+            onClick={() => handleTier(tier)}
+          />
+        ))}
+      </div>
+      {!isMasterPlus && selectedTier && validDivisions.length > 0 && (
+        <div className="flex gap-1.5">
+          {validDivisions.map(div => (
             <button
-              key={tier}
+              key={div}
               type="button"
-              onClick={() => handleTier(tier)}
+              onClick={() => onChange(selectedTier, div)}
               className={cn(
-                'flex items-center gap-2 px-2 py-1 rounded-xl ring-2 transition-all focus:outline-none',
-                selectedTier === tier ? 'ring-brand bg-brand/10' : 'ring-transparent hover:ring-brand/30 bg-bg-elevated/40'
+                'flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all',
+                selectedDivision === div
+                  ? 'border-brand bg-brand text-white'
+                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
               )}
             >
-              <RankBadge tier={tier} showDivision={false} size="xs" showLabel={false} />
-              <span className={cn(
-                'text-xs font-semibold leading-none',
-                selectedTier === tier ? 'text-brand' : 'text-ink-secondary'
-              )}>
-                {RANK_TIER_LABEL[tier]}
-              </span>
+              {div}
             </button>
           ))}
         </div>
-
-        {hasDivision && validDivisions.length > 0 && (
-          <div className="flex gap-1.5">
-            {validDivisions.map((div) => (
-              <button
-                key={div}
-                type="button"
-                onClick={() => onChange(selectedTier!, div)}
-                className={cn(
-                  'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all',
-                  selectedDivision === div
-                    ? 'border-brand bg-brand text-white'
-                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
-                )}
-              >
-                {div}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </FormField>
+      )}
+    </div>
   )
 }
+
+// ── LpCounter ─────────────────────────────────────────────────────────────────
 
 function LpCounter({ label, value, min, max, onChange }: {
   label: string; value: number; min: number; max: number; onChange: (v: number) => void
 }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-semibold text-ink-secondary">{label}</p>
-      <div className="flex items-center rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden">
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold text-ink-secondary">{label}</p>
+      <div className="flex items-center rounded-lg border border-bg-elevated bg-bg-card overflow-hidden">
         <button
           type="button"
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="px-3 py-2 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+          className="px-2 py-1.5 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
         >
           −
         </button>
@@ -132,76 +179,16 @@ function LpCounter({ label, value, min, max, onChange }: {
             const v = parseInt(e.target.value)
             if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)))
           }}
-          className="flex-1 text-center py-2 border-x border-bg-elevated bg-transparent text-sm font-extrabold text-ink focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="flex-1 text-center py-1.5 border-x border-bg-elevated bg-transparent text-xs font-extrabold text-ink focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <button
           type="button"
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="px-3 py-2 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+          className="px-2 py-1.5 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
         >
           +
         </button>
       </div>
-    </div>
-  )
-}
-
-function LpFieldsIronDiamond({ currentLp, avgLpGain, avgLpLoss, onCurrentLp, onAvgGain, onAvgLoss }: {
-  currentLp: number; avgLpGain: number; avgLpLoss: number;
-  onCurrentLp: (v: number) => void; onAvgGain: (v: number) => void; onAvgLoss: (v: number) => void
-}) {
-  return (
-    <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-4 space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">PDL</p>
-      <div className="grid grid-cols-3 gap-3">
-        <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={onCurrentLp} />
-        <LpCounter label="Média Ganhos" value={avgLpGain} min={1} max={50} onChange={onAvgGain} />
-        <LpCounter label="Média Perdidos" value={avgLpLoss} min={1} max={40} onChange={onAvgLoss} />
-      </div>
-      <p className="text-[10px] text-ink-muted leading-relaxed">
-        Seu LP na divisão atual e médias influenciam o cálculo de preço.
-      </p>
-    </div>
-  )
-}
-
-function LpFieldsMasterPlus({ currentLp, targetLp, onCurrentLp, onTargetLp }: {
-  currentLp: number; targetLp: number | null;
-  onCurrentLp: (v: number) => void; onTargetLp: (v: number | null) => void
-}) {
-  return (
-    <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-4 space-y-3">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">LP</p>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-ink-secondary">LP Atual</p>
-          <input
-            type="number"
-            min={0}
-            max={9999}
-            value={currentLp || ''}
-            onChange={e => onCurrentLp(Math.max(0, parseInt(e.target.value) || 0))}
-            placeholder="ex: 200"
-            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-ink-secondary">LP Alvo</p>
-          <input
-            type="number"
-            min={0}
-            max={9999}
-            value={targetLp ?? ''}
-            onChange={e => {
-              const v = parseInt(e.target.value)
-              onTargetLp(isNaN(v) ? null : Math.max(0, v))
-            }}
-            placeholder="ex: 800"
-            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        </div>
-      </div>
-      <p className="text-[10px] text-ink-muted">O preço é calculado com base na diferença de LP.</p>
     </div>
   )
 }
@@ -287,7 +274,7 @@ export function StepConfigure() {
                 'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
                 boostMode === 'duo'
                   ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink'
+                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
               )}
             >
               <div>
@@ -296,7 +283,7 @@ export function StepConfigure() {
               </div>
               <div className={cn(
                 'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
-                boostMode === 'duo' ? 'border-brand bg-brand' : 'border-bg-overlay'
+                boostMode === 'duo' ? 'border-brand bg-brand' : 'border-bg-overlay',
               )}>
                 {boostMode === 'duo' && <span className="text-white text-[10px] font-black">✓</span>}
               </div>
@@ -308,97 +295,138 @@ export function StepConfigure() {
         {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
           <FormField label="Tipo de Fila" required>
             <div className="flex gap-3">
-              {([['solo_duo', 'Solo/Duo'], ['flex', 'Flex']] as [QueueType, string][]).map(([value, label]) => (
+              {(['solo_duo', 'flex'] as QueueType[]).map(q => (
                 <button
-                  key={value}
+                  key={q}
                   type="button"
-                  onClick={() => setQueueType(value)}
+                  onClick={() => setQueueType(q)}
                   className={cn(
                     'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
-                    queueType === value
+                    queueType === q
                       ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30'
+                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
                   )}
                 >
-                  {label}
+                  {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
                 </button>
               ))}
             </div>
           </FormField>
         )}
 
-        {/* Ranks — elo boost */}
+        {/* Rank selection — elo boost (split two-column layout) */}
         {serviceType === 'elo_boost' && (
-          <>
-            <RankSelect
-              label="Rank Atual"
-              selectedTier={currentRank?.tier ?? null}
-              selectedDivision={currentRank?.division ?? null}
-              onChange={(tier, division) => {
-                setCurrentRank({ tier, division })
-                if (MASTER_PLUS.includes(tier)) {
-                  setCurrentLp(0)
-                  setTargetLp(null)
-                  setTargetRank(null)
-                } else {
-                  setTargetLp(null)
-                  setCurrentLp(0)
-                }
-              }}
-              maxTier="grandmaster"
-            />
+          <div className="rounded-2xl border border-bg-elevated overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              {/* ── Current rank column ── */}
+              <div className="p-4 space-y-4 border-b border-bg-elevated md:border-b-0 md:border-r">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
 
-            {/* LP fields — Iron-Diamond */}
-            {currentRank && !currentIsMasterPlus && (
-              <LpFieldsIronDiamond
-                currentLp={currentLp}
-                avgLpGain={avgLpGain}
-                avgLpLoss={avgLpLoss}
-                onCurrentLp={setCurrentLp}
-                onAvgGain={setAvgLpGain}
-                onAvgLoss={setAvgLpLoss}
-              />
-            )}
+                <RankPicker
+                  selectedTier={currentRank?.tier ?? null}
+                  selectedDivision={currentRank?.division ?? null}
+                  onChange={(tier, division) => {
+                    setCurrentRank({ tier, division })
+                    if (MASTER_PLUS.includes(tier)) {
+                      setCurrentLp(0); setTargetLp(null); setTargetRank(null)
+                    } else {
+                      setTargetLp(null); setCurrentLp(0)
+                    }
+                  }}
+                />
 
-            {/* Master+: LP Atual + LP Alvo (replaces Rank Alvo) */}
-            {currentRank && currentIsMasterPlus ? (
-              <LpFieldsMasterPlus
-                currentLp={currentLp}
-                targetLp={targetLp}
-                onCurrentLp={setCurrentLp}
-                onTargetLp={setTargetLp}
-              />
-            ) : (
-              <RankSelect
-                label="Rank Alvo"
-                selectedTier={targetRank?.tier ?? null}
-                selectedDivision={targetRank?.division ?? null}
-                onChange={(tier, division) => setTargetRank({ tier, division })}
-                minTier={currentRank?.tier ?? null}
-                minDiv={currentRank?.division ?? null}
-              />
-            )}
-          </>
+                {/* LP fields — current rank */}
+                {currentRank && (
+                  <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {currentIsMasterPlus ? (
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-ink-secondary">LP Atual</p>
+                          <input
+                            type="number"
+                            min={0}
+                            max={9999}
+                            value={currentLp || ''}
+                            onChange={e => setCurrentLp(Math.max(0, parseInt(e.target.value) || 0))}
+                            placeholder="ex: 200"
+                            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                      ) : (
+                        <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
+                      )}
+                      <LpCounter label="Méd. Ganhos" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
+                      <LpCounter label="Méd. Perdidos" value={avgLpLoss} min={1} max={40} onChange={setAvgLpLoss} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Target rank column ── */}
+              <div className="p-4 space-y-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Alvo</p>
+
+                {currentRank ? (
+                  <>
+                    <RankPicker
+                      selectedTier={targetRank?.tier ?? null}
+                      selectedDivision={targetRank?.division ?? null}
+                      onChange={(tier, division) => setTargetRank({ tier, division })}
+                      minTier={currentRank.tier}
+                      minDiv={currentRank.division}
+                    />
+
+                    {/* LP alvo — only shown when current is Master+ */}
+                    {currentIsMasterPlus && (
+                      <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Alvo</p>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-semibold text-ink-secondary">LP Alvo</p>
+                          <input
+                            type="number"
+                            min={0}
+                            max={9999}
+                            value={targetLp ?? ''}
+                            onChange={e => {
+                              const v = parseInt(e.target.value)
+                              setTargetLp(isNaN(v) ? null : Math.max(0, v))
+                            }}
+                            placeholder="ex: 800"
+                            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-ink-muted pt-2">Selecione o rank atual primeiro.</p>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Rank — win boost */}
         {serviceType === 'win_boost' && (
-          <RankSelect
-            label="Rank Atual"
-            selectedTier={currentRank?.tier ?? null}
-            selectedDivision={currentRank?.division ?? null}
-            onChange={(tier, division) => setCurrentRank({ tier, division })}
-          />
+          <FormField label="Rank Atual" required>
+            <RankPicker
+              selectedTier={currentRank?.tier ?? null}
+              selectedDivision={currentRank?.division ?? null}
+              onChange={(tier, division) => setCurrentRank({ tier, division })}
+            />
+          </FormField>
         )}
 
-        {/* Rank — MD5 */}
+        {/* Rank — placement matches */}
         {serviceType === 'placement_matches' && (
-          <RankSelect
-            label="Rank Final da Última Temporada"
-            selectedTier={currentRank?.tier ?? null}
-            selectedDivision={currentRank?.division ?? null}
-            onChange={(tier, division) => setCurrentRank({ tier, division })}
-          />
+          <FormField label="Rank Final da Última Temporada" required>
+            <RankPicker
+              selectedTier={currentRank?.tier ?? null}
+              selectedDivision={currentRank?.division ?? null}
+              onChange={(tier, division) => setCurrentRank({ tier, division })}
+            />
+          </FormField>
         )}
 
         {/* Wins counter — win boost */}

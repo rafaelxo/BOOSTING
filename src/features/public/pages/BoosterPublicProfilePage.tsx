@@ -1,17 +1,30 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap } from 'lucide-react'
+import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap, DollarSign, Package } from 'lucide-react'
 import { Button, Card, RankBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, formatRank } from '@/lib/utils'
-import type { BoosterProfile, RankTier } from '@/types'
+import type { BoosterProfile, BoosterService, RankTier } from '@/types'
+import { useCurrency } from '@/hooks/useCurrency'
+
+// ── Lane labels ───────────────────────────────────────────────────────────────
+
+const LANE_LABEL: Record<string, string> = {
+  top:     'Topo',
+  jungle:  'Selva',
+  mid:     'Meio',
+  bot:     'Atirador',
+  support: 'Suporte',
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 type RankGroup = 'gold_minus' | 'plat_diamond' | 'master_plus'
 
 const RANK_GROUPS: { key: RankGroup; label: string; sublabel: string }[] = [
-  { key: 'gold_minus',   label: 'Gold e Abaixo',     sublabel: 'Ferro · Bronze · Prata · Ouro'            },
-  { key: 'plat_diamond', label: 'Platina – Diamante', sublabel: 'Platina · Esmeralda · Diamante'           },
-  { key: 'master_plus',  label: 'Mestre+',            sublabel: 'Mestre · Grão-mestre · Desafiante'        },
+  { key: 'gold_minus',   label: 'Gold e Abaixo',      sublabel: 'Ferro · Bronze · Prata · Ouro'            },
+  { key: 'plat_diamond', label: 'Platina – Diamante',  sublabel: 'Platina · Esmeralda · Diamante'           },
+  { key: 'master_plus',  label: 'Mestre+',             sublabel: 'Mestre · Grão-mestre · Desafiante'        },
 ]
 
 function StarRating({ rating, count }: { rating: number; count: number }) {
@@ -29,8 +42,11 @@ function StarRating({ rating, count }: { rating: number; count: number }) {
   )
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export function BoosterPublicProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const currency = useCurrency()
 
   const { data: booster, isLoading } = useQuery({
     queryKey: ['public-booster', id],
@@ -45,6 +61,20 @@ export function BoosterPublicProfilePage() {
       return data as BoosterProfile
     },
     enabled: !!id,
+  })
+
+  const { data: services = [] } = useQuery({
+    queryKey: ['public-booster-services', booster?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_services')
+        .select('*')
+        .eq('booster_id', booster!.user_id)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      return data as BoosterService[]
+    },
+    enabled: !!booster?.user_id,
   })
 
   if (isLoading) return (
@@ -64,7 +94,9 @@ export function BoosterPublicProfilePage() {
     </div>
   )
 
-  const hasRankStats = booster.rank_stats && Object.keys(booster.rank_stats).length > 0
+  const hasRankStats  = booster.rank_stats && Object.keys(booster.rank_stats).length > 0
+  const hasLanes      = booster.lanes && booster.lanes.length > 0
+  const hasSpecialties = booster.specialties && booster.specialties.length > 0
 
   return (
     <div className="max-w-3xl mx-auto px-5 sm:px-8 py-16 space-y-6">
@@ -83,8 +115,8 @@ export function BoosterPublicProfilePage() {
             )}
           </div>
 
-          <div className="flex-1 text-center sm:text-left">
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+          <div className="flex-1 text-center sm:text-left space-y-2">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
               <h1 className="text-xl font-extrabold text-ink">{booster.display_name}</h1>
               {booster.is_top5 && (
                 <span className="flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">
@@ -101,13 +133,41 @@ export function BoosterPublicProfilePage() {
             </div>
 
             {booster.rating_count > 0 && (
-              <div className="flex justify-center sm:justify-start mb-3">
+              <div className="flex justify-center sm:justify-start">
                 <StarRating rating={booster.rating} count={booster.rating_count} />
               </div>
             )}
 
             {booster.bio && (
               <p className="text-sm text-ink-secondary leading-relaxed">{booster.bio}</p>
+            )}
+
+            {/* Lanes */}
+            {hasLanes && (
+              <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start pt-1">
+                {booster.lanes!.map(lane => (
+                  <span
+                    key={lane}
+                    className="px-2.5 py-0.5 rounded-full bg-brand/10 border border-brand/20 text-[11px] font-bold text-brand"
+                  >
+                    {LANE_LABEL[lane] ?? lane}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Specialties */}
+            {hasSpecialties && (
+              <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
+                {booster.specialties!.map(s => (
+                  <span
+                    key={s}
+                    className="px-2.5 py-0.5 rounded-full bg-bg-elevated text-[11px] font-medium text-ink-secondary"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
 
@@ -131,27 +191,10 @@ export function BoosterPublicProfilePage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { icon: CheckCircle2, label: 'Concluídos', value: String(booster.total_completed), color: 'text-success' },
-          {
-            icon: Star,
-            label: 'Avaliação',
-            value: booster.rating_count > 0 ? `${booster.rating.toFixed(1)} / 5` : '—',
-            color: 'text-warning',
-          },
-          {
-            icon: Clock,
-            label: 'Visto por último',
-            value: booster.last_active_at ? timeAgo(booster.last_active_at) : '—',
-            color: 'text-ink-secondary',
-          },
-          {
-            icon: TrendingUp,
-            label: 'Rank Máximo',
-            value: booster.peak_rank
-              ? `${booster.peak_rank.tier}${booster.peak_rank.division ? ' ' + booster.peak_rank.division : ''}`
-              : '—',
-            color: 'text-brand',
-          },
+          { icon: CheckCircle2, label: 'Concluídos',    value: String(booster.total_completed),            color: 'text-success'        },
+          { icon: Star,         label: 'Avaliação',     value: booster.rating_count > 0 ? `${booster.rating.toFixed(1)} / 5` : '—', color: 'text-warning' },
+          { icon: Clock,        label: 'Visto por último', value: booster.last_active_at ? timeAgo(booster.last_active_at) : '—', color: 'text-ink-secondary' },
+          { icon: TrendingUp,   label: 'Rank Máximo',  value: booster.peak_rank ? `${booster.peak_rank.tier}${booster.peak_rank.division ? ' ' + booster.peak_rank.division : ''}` : '—', color: 'text-brand' },
         ].map(({ icon: Icon, label, value, color }) => (
           <Card key={label} padding="md" className="flex flex-col gap-1">
             <Icon className={`h-4 w-4 ${color}`} />
@@ -161,7 +204,39 @@ export function BoosterPublicProfilePage() {
         ))}
       </div>
 
-      {/* Rank stats per group */}
+      {/* Custom services */}
+      {services.length > 0 && (
+        <Card padding="md">
+          <div className="flex items-center gap-2 mb-4">
+            <Package className="h-4 w-4 text-brand" />
+            <h2 className="text-sm font-bold text-ink">Serviços Oferecidos</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {services.map(s => (
+              <div key={s.id} className="rounded-xl border border-bg-elevated bg-bg-elevated/30 p-4 flex flex-col gap-2">
+                <p className="text-sm font-bold text-ink">{s.title}</p>
+                {s.description && (
+                  <p className="text-xs text-ink-secondary leading-relaxed flex-1">{s.description}</p>
+                )}
+                <div className="flex items-center gap-3 mt-auto pt-2 border-t border-bg-elevated">
+                  {s.tempo && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-ink-muted" />
+                      <span className="text-[11px] text-ink-secondary">{s.tempo}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1 ml-auto">
+                    <DollarSign className="h-3 w-3 text-brand" />
+                    <span className="text-sm font-bold text-brand">{currency(s.price)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Rank stats */}
       <Card padding="md">
         <div className="flex items-center gap-2 mb-4">
           <Zap className="h-4 w-4 text-brand" />

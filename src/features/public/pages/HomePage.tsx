@@ -122,7 +122,7 @@ export function HomePage() {
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="secondary">
-                  <Link to="/apply">Seja Booster</Link>
+                  <Link to="/apply?booster=1">Seja Booster</Link>
                 </Button>
               </div>
             </motion.div>

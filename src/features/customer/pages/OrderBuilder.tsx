@@ -34,7 +34,7 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 
 export function OrderBuilderPage() {
   const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType, setService, setStep, reset } = useOrderBuilderStore()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
 
   useEffect(() => {
@@ -43,6 +43,7 @@ export function OrderBuilderPage() {
       reset()
       setService(service, service)
       setStep('configure')
+      setSearchParams({}, { replace: true })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

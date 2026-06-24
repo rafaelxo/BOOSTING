@@ -26,6 +26,7 @@ interface OrderBuilderState {
   sessionsPurchased: number | null
   customerNotes: string
   selectedExtras: SelectedExtra[]
+  winPackage: number | null   // 1, 3 or 5 extra wins; null = none
 
   // LP (PDL) fields
   currentLp: number
@@ -53,6 +54,7 @@ interface OrderBuilderState {
   setSessionsPurchased: (sessions: number) => void
   setNotes: (notes: string) => void
   toggleExtra: (extra: ServiceExtra) => void
+  setWinPackage: (wins: number | null) => void
   setCurrentLp: (lp: number) => void
   setAvgLpGain: (lp: number) => void
   setAvgLpLoss: (lp: number) => void
@@ -81,6 +83,7 @@ const initialState = {
   sessionsPurchased: null,
   customerNotes: '',
   selectedExtras: [],
+  winPackage: null,
   currentLp: 0,
   avgLpGain: 20,
   avgLpLoss: 15,
@@ -126,6 +129,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
       }
       return { selectedExtras: [...state.selectedExtras, { extra }] }
     }),
+
+  setWinPackage: (winPackage) => set({ winPackage }),
 
   setCurrentLp: (currentLp) => set({ currentLp }),
   setAvgLpGain: (avgLpGain) => set({ avgLpGain }),
