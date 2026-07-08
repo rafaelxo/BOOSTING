@@ -181,18 +181,85 @@ serve(async (req) => {
     }
   }
 
-  if (mpStatus === 'refunded') {
-    await supabase
-      .from('orders')
-      .update({ status: 'refunded', updated_at: new Date().toISOString() })
-      .eq('id', orderId)
-  }
+  if (mpStatus === 'refunded' || mpStatus === 'charged_back') {
+    const toStatus = mpStatus === 'refunded' ? 'refunded' : 'disputed'
 
-  if (mpStatus === 'charged_back') {
-    await supabase
+    const { data: order } = await supabase
       .from('orders')
-      .update({ status: 'disputed', updated_at: new Date().toISOString() })
+      .select('id, status, customer_id, total_price')
       .eq('id', orderId)
+      .single()
+
+    if (order && order.status !== 'refunded' && order.status !== 'disputed') {
+      // Same atomic idempotency gate as the approved path: only the
+      // delivery that actually flips the status runs the side effects below.
+      const { data: updated } = await supabase
+        .from('orders')
+        .update({ status: toStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId)
+        .eq('status', order.status)
+        .select('id')
+        .maybeSingle()
+
+      if (updated) {
+        const tasks = [
+          supabase.from('order_status_history').insert({
+            order_id: orderId,
+            from_status: order.status,
+            to_status: toStatus,
+            changed_by: order.customer_id,
+            reason: mpStatus === 'refunded'
+              ? 'Pagamento reembolsado via Mercado Pago'
+              : 'Chargeback recebido via Mercado Pago',
+          }),
+          supabase.from('notifications').insert({
+            user_id: order.customer_id,
+            type: 'order_status_changed',
+            title: mpStatus === 'refunded' ? 'Pedido reembolsado' : 'Pagamento contestado',
+            body: mpStatus === 'refunded'
+              ? `Seu pedido #${orderId.slice(0, 8).toUpperCase()} foi reembolsado.`
+              : `Seu pedido #${orderId.slice(0, 8).toUpperCase()} está com o pagamento em disputa — nossa equipe vai analisar.`,
+            data: { order_id: orderId },
+          }),
+          supabase
+            .from('payments')
+            .update({
+              status: toStatus === 'refunded' ? 'refunded' : 'disputed',
+              refunded_amount: toStatus === 'refunded' ? Number(order.total_price) : 0,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('mp_payment_id', mpPaymentId),
+        ]
+
+        if (mpStatus === 'refunded') {
+          const { data: paymentRow } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('mp_payment_id', mpPaymentId)
+            .maybeSingle()
+
+          if (paymentRow) {
+            // MP's refund id (when available) keeps this row unique across
+            // partial/multiple refunds of the same payment; fall back to the
+            // payment id itself for a single full refund.
+            const mpRefundId = String(payment.refunds?.[0]?.id ?? `${mpPaymentId}-refund`)
+            tasks.push(
+              supabase.from('refunds').insert({
+                payment_id: paymentRow.id,
+                order_id: orderId,
+                mp_refund_id: mpRefundId,
+                amount: Number(order.total_price),
+                reason: 'Reembolso processado pelo Mercado Pago (webhook)',
+                initiated_by: order.customer_id,
+                status: 'completed',
+              }),
+            )
+          }
+        }
+
+        await Promise.all(tasks)
+      }
+    }
   }
 
   return new Response('ok', { status: 200 })

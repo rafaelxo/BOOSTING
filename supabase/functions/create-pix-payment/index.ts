@@ -226,8 +226,22 @@ serve(async (req) => {
       return json({ error: 'Falha ao criar pagamento PIX', details: err, order_id: orderId }, 502)
     }
 
-    const mp = await mpResp.json()
+    let mp = await mpResp.json()
     const mpPaymentId = String(mp.id)
+
+    // MP occasionally returns the payment before the PIX QR image has
+    // finished generating (point_of_interaction present but qr_code_base64
+    // still null, or the whole block missing). Poll the payment a few times
+    // server-side before responding, instead of pushing that wait onto the
+    // client — this is the actual root cause of the "QR code sometimes
+    // fails" symptom, not something a client-side retry alone can fix.
+    for (let attempt = 0; attempt < 3 && !mp.point_of_interaction?.transaction_data?.qr_code_base64; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      const poll = await fetch(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
+        headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
+      })
+      if (poll.ok) mp = await poll.json()
+    }
 
     // Persist MP payment ID on the order and create the payment record
     await Promise.all([

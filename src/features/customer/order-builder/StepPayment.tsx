@@ -248,8 +248,9 @@ export function StepPayment() {
               />
             </div>
           ) : (
-            <div className="w-52 h-52 bg-bg-elevated rounded-2xl flex items-center justify-center">
-              <QrCode className="h-16 w-16 text-ink-muted" />
+            <div className="w-52 h-52 bg-bg-elevated rounded-2xl flex flex-col items-center justify-center gap-2 text-center px-4">
+              <QrCode className="h-12 w-12 text-ink-muted animate-pulse" />
+              <p className="text-[11px] text-ink-muted">Gerando imagem do QR code… use o código copia-e-cola abaixo enquanto isso.</p>
             </div>
           )}
           <p className="text-xs text-ink-muted">Válido por 30 minutos</p>

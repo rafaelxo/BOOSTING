@@ -112,7 +112,7 @@ begin
 end;
 $$;
 
-grant execute on function public.set_order_credentials(uuid, text, text, text) to authenticated;
+grant execute on function public.set_order_credentials(uuid, text, text) to authenticated;
 grant execute on function public.get_order_credentials(uuid)                   to authenticated;
 
 -- ─── 2. Atualizar limite de slots (booster normal: max 3 total, max 1 duo) ───
