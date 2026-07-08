@@ -18,8 +18,14 @@ export function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' 
   }
   if (!profile) return <PageLoader />
 
-  if (role && profile.role !== role) {
-    if (profile.role === 'admin' || profile.role === 'support') return <Navigate to="/admin" replace />
+  // `support` has admin-panel access at the DB level (is_admin() treats
+  // them the same) — without this, a support profile hitting a
+  // role="admin" route gets redirected to /admin, which is itself gated by
+  // the same role="admin" check, looping forever.
+  const effectiveRole = profile.role === 'support' ? 'admin' : profile.role
+
+  if (role && effectiveRole !== role) {
+    if (effectiveRole === 'admin') return <Navigate to="/admin" replace />
     if (profile.role === 'booster') return <Navigate to="/booster" replace />
     if (profile.role === 'customer') return <Navigate to="/dashboard" replace />
     return <Navigate to="/login" replace />

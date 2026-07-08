@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
-import { Button, EmptyState, Skeleton } from '@/components/ui'
+import { Button, EmptyState, Skeleton, Modal } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
@@ -158,43 +158,38 @@ export function AdminDropsPage() {
       )}
 
       {/* Resolve modal */}
-      {resolving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="card w-full max-w-md p-6 space-y-4">
-            <h2 className="text-lg font-bold text-ink">
-              {resolving.approve ? 'Aprovar solicitação de drop' : 'Rejeitar solicitação de drop'}
-            </h2>
-            <p className="text-sm text-ink-secondary">
-              {resolving.approve
-                ? 'O pedido será cancelado e a penalidade deduzida dos ganhos do booster.'
-                : 'O pedido voltará ao status em andamento.'}
-            </p>
-            <div>
-              <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
-                Nota para o booster (opcional)
-              </label>
-              <textarea
-                value={adminNote}
-                onChange={(e) => setAdminNote(e.target.value)}
-                placeholder="Justificativa ou observação..."
-                className="input-base w-full min-h-[80px] resize-none text-sm"
-              />
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button variant="ghost" onClick={() => { setResolving(null); setAdminNote('') }}>
-                Cancelar
-              </Button>
-              <Button
-                variant={resolving.approve ? 'success' : 'danger'}
-                loading={resolve.isPending}
-                onClick={() => resolve.mutate({ id: resolving.id, approve: resolving.approve, note: adminNote })}
-              >
-                Confirmar
-              </Button>
-            </div>
-          </div>
+      <Modal
+        open={!!resolving}
+        onOpenChange={(open) => { if (!open) { setResolving(null); setAdminNote('') } }}
+        title={resolving?.approve ? 'Aprovar solicitação de drop' : 'Rejeitar solicitação de drop'}
+        description={resolving?.approve
+          ? 'O pedido será cancelado e a penalidade deduzida dos ganhos do booster.'
+          : 'O pedido voltará ao status em andamento.'}
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Nota para o booster (opcional)
+          </label>
+          <textarea
+            value={adminNote}
+            onChange={(e) => setAdminNote(e.target.value)}
+            placeholder="Justificativa ou observação..."
+            className="input-base w-full min-h-[80px] resize-none text-sm"
+          />
         </div>
-      )}
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setResolving(null); setAdminNote('') }}>
+            Cancelar
+          </Button>
+          <Button
+            variant={resolving?.approve ? 'success' : 'danger'}
+            loading={resolve.isPending}
+            onClick={() => resolving && resolve.mutate({ id: resolving.id, approve: resolving.approve, note: adminNote })}
+          >
+            Confirmar
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

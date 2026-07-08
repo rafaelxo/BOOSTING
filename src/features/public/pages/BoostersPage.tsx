@@ -176,11 +176,18 @@ export function BoostersPage() {
     staleTime: 60_000,
   })
 
+  // O flag is_top5 é a fonte de verdade real (refresh_top5_boosters(), regras
+  // de slot etc.) — o pódio público usa o mesmo critério, em vez de ranquear
+  // por rank_stats.winrate (que hoje ninguém preenche e sempre dá 0).
   const sorted = boosters
-    ? [...boosters].sort((a, b) => overallWinRate(b) - overallWinRate(a))
+    ? [...boosters].sort((a, b) => {
+        if (a.is_top5 !== b.is_top5) return a.is_top5 ? -1 : 1
+        if (b.rating !== a.rating) return b.rating - a.rating
+        return overallWinRate(b) - overallWinRate(a)
+      })
     : []
-  const top5 = sorted.slice(0, 5)
-  const rest  = sorted.slice(5)
+  const top5 = sorted.filter(b => b.is_top5).slice(0, 5)
+  const rest = sorted.filter(b => !b.is_top5)
 
   return (
     <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-16">

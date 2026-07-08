@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, RankBadge } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank } from '@/lib/utils'
@@ -328,47 +328,45 @@ export function JobDetailPage() {
       </div>
 
       {/* Drop request modal */}
-      {showDropModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="card w-full max-w-md p-6 space-y-4">
-            <h2 className="text-lg font-bold text-ink flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              Solicitar Drop de Pedido
-            </h2>
-            <p className="text-sm text-ink-secondary">
-              Sua solicitação será enviada ao admin para aprovação. Com {order.wins_played} vitória(s), a penalidade é de{' '}
-              <span className="font-bold text-warning">
-                {order.wins_played === 0 ? '0%' : order.wins_played <= 2 ? '10%' : '20%'}
-              </span>{' '}
-              do valor do pedido.
-            </p>
-            <div>
-              <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
-                Motivo <span className="text-danger">*</span>
-              </label>
-              <textarea
-                value={dropReason}
-                onChange={(e) => setDropReason(e.target.value)}
-                placeholder="Descreva o motivo para abandonar o pedido..."
-                className="input-base w-full min-h-[100px] resize-none text-sm"
-              />
-            </div>
-            <div className="flex gap-3 justify-end">
-              <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>
-                Cancelar
-              </Button>
-              <Button
-                variant="danger"
-                loading={requestDrop.isPending}
-                disabled={dropReason.trim().length < 10}
-                onClick={() => requestDrop.mutate(dropReason.trim())}
-              >
-                Enviar Solicitação
-              </Button>
-            </div>
-          </div>
+      <Modal
+        open={showDropModal}
+        onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
+        title="Solicitar Drop de Pedido"
+        description={
+          <>
+            Sua solicitação será enviada ao admin para aprovação. Com {order.wins_played} vitória(s), a penalidade é de{' '}
+            <span className="font-bold text-warning">
+              {order.wins_played === 0 ? '0%' : order.wins_played <= 2 ? '10%' : '20%'}
+            </span>{' '}
+            do valor do pedido.
+          </>
+        }
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo <span className="text-danger">*</span>
+          </label>
+          <textarea
+            value={dropReason}
+            onChange={(e) => setDropReason(e.target.value)}
+            placeholder="Descreva o motivo para abandonar o pedido..."
+            className="input-base w-full min-h-[100px] resize-none text-sm"
+          />
         </div>
-      )}
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={requestDrop.isPending}
+            disabled={dropReason.trim().length < 10}
+            onClick={() => requestDrop.mutate(dropReason.trim())}
+          >
+            Enviar Solicitação
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

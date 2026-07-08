@@ -1,11 +1,40 @@
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, Save } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatRank } from '@/lib/utils'
+import { formatDate, formatRank, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { BoosterProfile } from '@/types'
+import type { BoosterProfile, RankTier, Division } from '@/types'
+
+const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
+const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
+
+type RankStatsBracket = 'gold_minus' | 'plat_diamond' | 'master_plus'
+const BRACKET_LABEL: Record<RankStatsBracket, string> = {
+  gold_minus: 'Ouro-',
+  plat_diamond: 'Platina–Diamante',
+  master_plus: 'Mestre+',
+}
+
+interface RankStatsForm {
+  current_tier: RankTier | ''
+  current_division: Division | ''
+  stats: Record<RankStatsBracket, { kda: string; winrate: string }>
+}
+
+function emptyStatsForm(): RankStatsForm {
+  return {
+    current_tier: '',
+    current_division: '',
+    stats: {
+      gold_minus: { kda: '', winrate: '' },
+      plat_diamond: { kda: '', winrate: '' },
+      master_plus: { kda: '', winrate: '' },
+    },
+  }
+}
 
 function safeOpggUrl(url: string | null): string | undefined {
   if (!url) return undefined
@@ -56,6 +85,48 @@ export function AdminBoosterDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-booster', id] })
       queryClient.invalidateQueries({ queryKey: ['admin-boosters'] })
     },
+  })
+
+  // Estatísticas públicas (rank_stats / current_rank) — antes só editável
+  // manualmente via SQL direto no banco; sem isso o pódio público e o perfil
+  // público do booster nunca tinham dado real pra mostrar.
+  const [statsForm, setStatsForm] = useState<RankStatsForm>(emptyStatsForm())
+
+  useEffect(() => {
+    if (!booster) return
+    const s = booster.rank_stats
+    setStatsForm({
+      current_tier: booster.current_rank?.tier ?? '',
+      current_division: booster.current_rank?.division ?? '',
+      stats: {
+        gold_minus: { kda: s?.gold_minus?.kda?.toString() ?? '', winrate: s?.gold_minus?.winrate?.toString() ?? '' },
+        plat_diamond: { kda: s?.plat_diamond?.kda?.toString() ?? '', winrate: s?.plat_diamond?.winrate?.toString() ?? '' },
+        master_plus: { kda: s?.master_plus?.kda?.toString() ?? '', winrate: s?.master_plus?.winrate?.toString() ?? '' },
+      },
+    })
+  }, [booster])
+
+  const saveStats = useMutation({
+    mutationFn: async () => {
+      const rankStats: Record<string, { kda: number; winrate: number }> = {}
+      for (const bracket of Object.keys(statsForm.stats) as RankStatsBracket[]) {
+        const { kda, winrate } = statsForm.stats[bracket]
+        if (kda.trim() || winrate.trim()) {
+          rankStats[bracket] = { kda: parseFloat(kda) || 0, winrate: parseFloat(winrate) || 0 }
+        }
+      }
+
+      const currentRank = statsForm.current_tier
+        ? { tier: statsForm.current_tier, division: MASTER_PLUS.includes(statsForm.current_tier) ? null : (statsForm.current_division || 'IV') }
+        : null
+
+      const { error } = await supabase
+        .from('booster_profiles')
+        .update({ current_rank: currentRank as never, rank_stats: rankStats as never })
+        .eq('id', id!)
+      if (error) throw error
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-booster', id] }),
   })
 
   if (isLoading) return null
@@ -215,13 +286,91 @@ export function AdminBoosterDetailPage() {
         </div>
       </Card>
 
+      {/* Estatísticas públicas — current_rank + rank_stats */}
+      <Card padding="md">
+        <h3 className="text-sm font-semibold text-ink mb-1">Estatísticas Públicas</h3>
+        <p className="text-xs text-ink-muted mb-4">
+          Exibidas no pódio e no perfil público do booster (página /boosters).
+        </p>
+
+        <div className="space-y-1.5 mb-4">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</label>
+          <div className="flex gap-2">
+            <select
+              value={statsForm.current_tier}
+              onChange={(e) => setStatsForm((f) => ({ ...f, current_tier: e.target.value as RankTier | '' }))}
+              className="input-base flex-1 text-sm"
+            >
+              <option value="">— sem rank —</option>
+              {RANK_TIER_ORDER.map((tier) => (
+                <option key={tier} value={tier}>{RANK_TIER_LABEL[tier]}</option>
+              ))}
+            </select>
+            {statsForm.current_tier && !MASTER_PLUS.includes(statsForm.current_tier) && (
+              <select
+                value={statsForm.current_division}
+                onChange={(e) => setStatsForm((f) => ({ ...f, current_division: e.target.value as Division | '' }))}
+                className="input-base w-24 text-sm"
+              >
+                {DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {(Object.keys(BRACKET_LABEL) as RankStatsBracket[]).map((bracket) => (
+            <div key={bracket} className="grid grid-cols-3 gap-2 items-end">
+              <span className="text-xs font-semibold text-ink-secondary">{BRACKET_LABEL[bracket]}</span>
+              <div className="space-y-1">
+                <label className="text-[9px] text-ink-muted">KDA</label>
+                <input
+                  type="number" step="0.01" min="0"
+                  value={statsForm.stats[bracket].kda}
+                  onChange={(e) => setStatsForm((f) => ({
+                    ...f, stats: { ...f.stats, [bracket]: { ...f.stats[bracket], kda: e.target.value } },
+                  }))}
+                  className="input-base w-full text-sm"
+                  placeholder="ex: 3.5"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] text-ink-muted">Winrate %</label>
+                <input
+                  type="number" step="0.1" min="0" max="100"
+                  value={statsForm.stats[bracket].winrate}
+                  onChange={(e) => setStatsForm((f) => ({
+                    ...f, stats: { ...f.stats, [bracket]: { ...f.stats[bracket], winrate: e.target.value } },
+                  }))}
+                  className="input-base w-full text-sm"
+                  placeholder="ex: 62"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3 mt-4">
+          <Button
+            size="sm"
+            leftIcon={<Save className="h-3.5 w-3.5" />}
+            loading={saveStats.isPending}
+            onClick={() => saveStats.mutate()}
+          >
+            Salvar Estatísticas
+          </Button>
+          {saveStats.isSuccess && <span className="text-xs text-success">Salvo!</span>}
+          {saveStats.isError && <span className="text-xs text-danger">{(saveStats.error as Error).message}</span>}
+        </div>
+      </Card>
+
       {/* Active slots */}
       {slotInfo && (
         <Card padding="md">
           <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
             Uso de Slots
             <span className="text-[10px] font-normal text-ink-muted">
-              ({slotInfo.is_top5 ? 'Top5: máx 3 / 2 duo' : 'Normal: máx 2 / 1 duo'})
+              ({slotInfo.is_top5 ? 'Top5: máx 3 / 2 duo' : 'Normal: máx 3 / 1 duo'})
             </span>
           </h3>
           <div className="grid grid-cols-3 gap-4">
