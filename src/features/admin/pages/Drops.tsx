@@ -34,7 +34,7 @@ export function AdminDropsPage() {
       const { data, error } = await supabase.rpc('resolve_drop_request', {
         p_request_id: id,
         p_approve: approve,
-        p_admin_note: note || null,
+        p_admin_note: note || undefined,
       })
       if (error) throw error
       const result = data as { success: boolean; error?: string }

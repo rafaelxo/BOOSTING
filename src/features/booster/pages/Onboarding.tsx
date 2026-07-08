@@ -93,12 +93,11 @@ export function BoosterOnboardingPage() {
       return
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: result, error } = await supabase.rpc('onboard_booster', {
       p_display_name:      profile.username,
       p_bio:               data.bio ?? '',
       p_peak_rank:         { tier: data.peak_tier, division: null },
-      p_opgg_link:         data.opgg_link || null,
+      p_opgg_link:         data.opgg_link || undefined,
       p_hours_per_day_min: data.hours_per_day_min,
       p_hours_per_day_max: data.hours_per_day_max,
       p_full_name:         data.full_name,

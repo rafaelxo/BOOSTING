@@ -7,822 +7,1532 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
-      profiles: {
+      audit_logs: {
         Row: {
-          id: string
-          email: string
-          role: 'customer' | 'booster' | 'admin' | 'support'
-          username: string
-          avatar_url: string | null
+          action: string
+          actor_id: string
+          actor_role: Database["public"]["Enums"]["user_role"]
           created_at: string
-          updated_at: string
+          diff: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: unknown
         }
         Insert: {
-          id: string
-          email: string
-          role?: 'customer' | 'booster' | 'admin' | 'support'
-          username: string
-          avatar_url?: string | null
+          action: string
+          actor_id: string
+          actor_role: Database["public"]["Enums"]["user_role"]
           created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          email?: string
-          role?: 'customer' | 'booster' | 'admin' | 'support'
-          username?: string
-          avatar_url?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      customer_profiles: {
-        Row: {
-          id: string
-          user_id: string
-          display_name: string | null
-          country: string | null
-          preferred_language: string | null
-          total_orders: number
-          total_spent: number
-          created_at: string
-        }
-        Insert: {
+          diff?: Json | null
+          entity_id: string
+          entity_type: string
           id?: string
-          user_id: string
-          display_name?: string | null
-          country?: string | null
-          preferred_language?: string | null
-          total_orders?: number
-          total_spent?: number
-          created_at?: string
+          ip_address?: unknown
         }
         Update: {
-          display_name?: string | null
-          country?: string | null
-          preferred_language?: string | null
-          total_orders?: number
-          total_spent?: number
+          action?: string
+          actor_id?: string
+          actor_role?: Database["public"]["Enums"]["user_role"]
+          created_at?: string
+          diff?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: unknown
         }
         Relationships: [
           {
-            foreignKeyName: 'customer_profiles_user_id_fkey'
-            columns: ['user_id']
-            isOneToOne: true
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          }
+            foreignKeyName: "audit_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booster_applications: {
+        Row: {
+          admin_notes: string | null
+          available_days: string[]
+          cpf: string | null
+          created_at: string
+          discord_tag: string | null
+          email: string | null
+          full_name: string | null
+          games: string[]
+          has_coaching: boolean
+          hours_per_week: number
+          id: string
+          motivation: string
+          opgg_link: string | null
+          peak_rank: string
+          phone: string | null
+          region: string
+          roles: string[]
+          status: string
+          summoner_name: string
+          updated_at: string
+          user_id: string | null
+          years_experience: number
+        }
+        Insert: {
+          admin_notes?: string | null
+          available_days?: string[]
+          cpf?: string | null
+          created_at?: string
+          discord_tag?: string | null
+          email?: string | null
+          full_name?: string | null
+          games?: string[]
+          has_coaching?: boolean
+          hours_per_week: number
+          id?: string
+          motivation: string
+          opgg_link?: string | null
+          peak_rank: string
+          phone?: string | null
+          region: string
+          roles?: string[]
+          status?: string
+          summoner_name: string
+          updated_at?: string
+          user_id?: string | null
+          years_experience: number
+        }
+        Update: {
+          admin_notes?: string | null
+          available_days?: string[]
+          cpf?: string | null
+          created_at?: string
+          discord_tag?: string | null
+          email?: string | null
+          full_name?: string | null
+          games?: string[]
+          has_coaching?: boolean
+          hours_per_week?: number
+          id?: string
+          motivation?: string
+          opgg_link?: string | null
+          peak_rank?: string
+          phone?: string | null
+          region?: string
+          roles?: string[]
+          status?: string
+          summoner_name?: string
+          updated_at?: string
+          user_id?: string | null
+          years_experience?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       booster_profiles: {
         Row: {
-          id: string
-          user_id: string
-          display_name: string
-          status: 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
+          available_days: string[] | null
           bio: string | null
-          peak_rank: Json | null
+          can_coach: boolean | null
+          cpf: string | null
+          created_at: string
           current_rank: Json | null
+          display_name: string
+          email: string | null
+          full_name: string | null
           games: string[]
-          queue_preferences: string[]
-          region_preferences: string[]
-          total_completed: number
-          total_earnings: number
-          rating: number
-          rating_count: number
+          hours_per_day_max: number | null
+          hours_per_day_min: number | null
+          id: string
           is_available: boolean
           is_top5: boolean
-          verified_at: string | null
-          created_at: string
+          lanes: string[] | null
+          last_active_at: string | null
+          opgg_link: string | null
+          peak_rank: Json | null
+          queue_preferences: string[]
+          rank_stats: Json | null
+          rating: number
+          rating_count: number
+          region_preferences: string[]
+          specialties: string[] | null
+          status: Database["public"]["Enums"]["booster_status"]
+          total_completed: number
+          total_earnings: number
           updated_at: string
+          user_id: string
+          verified_at: string | null
         }
         Insert: {
-          id?: string
-          user_id: string
-          display_name: string
-          status?: 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
+          available_days?: string[] | null
           bio?: string | null
-          peak_rank?: Json | null
+          can_coach?: boolean | null
+          cpf?: string | null
+          created_at?: string
           current_rank?: Json | null
+          display_name: string
+          email?: string | null
+          full_name?: string | null
           games?: string[]
-          queue_preferences?: string[]
-          region_preferences?: string[]
-          total_completed?: number
-          total_earnings?: number
-          rating?: number
-          rating_count?: number
+          hours_per_day_max?: number | null
+          hours_per_day_min?: number | null
+          id?: string
           is_available?: boolean
           is_top5?: boolean
-          verified_at?: string | null
-          created_at?: string
+          lanes?: string[] | null
+          last_active_at?: string | null
+          opgg_link?: string | null
+          peak_rank?: Json | null
+          queue_preferences?: string[]
+          rank_stats?: Json | null
+          rating?: number
+          rating_count?: number
+          region_preferences?: string[]
+          specialties?: string[] | null
+          status?: Database["public"]["Enums"]["booster_status"]
+          total_completed?: number
+          total_earnings?: number
           updated_at?: string
+          user_id: string
+          verified_at?: string | null
         }
         Update: {
-          display_name?: string
-          status?: 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
+          available_days?: string[] | null
           bio?: string | null
-          peak_rank?: Json | null
+          can_coach?: boolean | null
+          cpf?: string | null
+          created_at?: string
           current_rank?: Json | null
+          display_name?: string
+          email?: string | null
+          full_name?: string | null
           games?: string[]
-          queue_preferences?: string[]
-          region_preferences?: string[]
-          total_completed?: number
-          total_earnings?: number
-          rating?: number
-          rating_count?: number
+          hours_per_day_max?: number | null
+          hours_per_day_min?: number | null
+          id?: string
           is_available?: boolean
           is_top5?: boolean
-          verified_at?: string | null
+          lanes?: string[] | null
+          last_active_at?: string | null
+          opgg_link?: string | null
+          peak_rank?: Json | null
+          queue_preferences?: string[]
+          rank_stats?: Json | null
+          rating?: number
+          rating_count?: number
+          region_preferences?: string[]
+          specialties?: string[] | null
+          status?: Database["public"]["Enums"]["booster_status"]
+          total_completed?: number
+          total_earnings?: number
           updated_at?: string
+          user_id?: string
+          verified_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'booster_profiles_user_id_fkey'
-            columns: ['user_id']
+            foreignKeyName: "booster_profiles_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: true
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          }
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booster_services: {
+        Row: {
+          booster_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          price: number
+          tempo: string | null
+          title: string
+        }
+        Insert: {
+          booster_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          price?: number
+          tempo?: string | null
+          title: string
+        }
+        Update: {
+          booster_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          price?: number
+          tempo?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_services_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_profiles: {
+        Row: {
+          country: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          preferred_language: string | null
+          total_orders: number
+          total_spent: number
+          user_id: string
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          preferred_language?: string | null
+          total_orders?: number
+          total_spent?: number
+          user_id: string
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          preferred_language?: string | null
+          total_orders?: number
+          total_spent?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       games: {
         Row: {
-          id: string
-          slug: 'lol' | 'valorant' | 'tft'
-          name: string
           icon_url: string | null
+          id: string
           is_active: boolean
+          name: string
+          slug: string
           sort_order: number
         }
         Insert: {
-          id?: string
-          slug: 'lol' | 'valorant' | 'tft'
-          name: string
           icon_url?: string | null
+          id?: string
           is_active?: boolean
+          name: string
+          slug: string
           sort_order?: number
         }
         Update: {
-          slug?: 'lol' | 'valorant' | 'tft'
-          name?: string
           icon_url?: string | null
-          is_active?: boolean
-          sort_order?: number
-        }
-        Relationships: []
-      }
-      services: {
-        Row: {
-          id: string
-          game_id: string
-          type: 'elo_boost' | 'win_boost' | 'coaching' | 'placement_matches' | 'md5'
-          name: string
-          description: string | null
-          short_description: string | null
-          is_active: boolean
-          sort_order: number
-        }
-        Insert: {
           id?: string
-          game_id: string
-          type: 'elo_boost' | 'win_boost' | 'coaching' | 'placement_matches' | 'md5'
-          name: string
-          description?: string | null
-          short_description?: string | null
           is_active?: boolean
-          sort_order?: number
-        }
-        Update: {
-          game_id?: string
-          type?: 'elo_boost' | 'win_boost' | 'coaching' | 'placement_matches' | 'md5'
           name?: string
-          description?: string | null
-          short_description?: string | null
-          is_active?: boolean
+          slug?: string
           sort_order?: number
-        }
-        Relationships: []
-      }
-      service_extras: {
-        Row: {
-          id: string
-          service_id: string | null
-          name: string
-          description: string
-          price_modifier: number
-          price_modifier_pct: number
-          is_active: boolean
-          sort_order: number
-          icon: string | null
-        }
-        Insert: {
-          id?: string
-          service_id?: string | null
-          name: string
-          description: string
-          price_modifier?: number
-          price_modifier_pct?: number
-          is_active?: boolean
-          sort_order?: number
-          icon?: string | null
-        }
-        Update: {
-          service_id?: string | null
-          name?: string
-          description?: string
-          price_modifier?: number
-          price_modifier_pct?: number
-          is_active?: boolean
-          sort_order?: number
-          icon?: string | null
-        }
-        Relationships: []
-      }
-      order_drop_requests: {
-        Row: {
-          id: string
-          order_id: string
-          booster_id: string
-          reason: string
-          wins_at_request: number
-          losses_at_request: number
-          penalty_pct: number
-          penalty_amount: number
-          status: 'pending' | 'approved' | 'rejected'
-          admin_id: string | null
-          admin_note: string | null
-          created_at: string
-          resolved_at: string | null
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          booster_id: string
-          reason: string
-          wins_at_request?: number
-          losses_at_request?: number
-          penalty_pct?: number
-          penalty_amount?: number
-          status?: 'pending' | 'approved' | 'rejected'
-          admin_id?: string | null
-          admin_note?: string | null
-          created_at?: string
-          resolved_at?: string | null
-        }
-        Update: {
-          status?: 'pending' | 'approved' | 'rejected'
-          admin_id?: string | null
-          admin_note?: string | null
-          resolved_at?: string | null
-        }
-        Relationships: []
-      }
-      orders: {
-        Row: {
-          id: string
-          customer_id: string
-          service_id: string
-          game_id: string
-          status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          queue_type: 'solo_duo' | 'flex'
-          boost_mode: 'solo' | 'duo'
-          server: string
-          current_rank: Json
-          target_rank: Json | null
-          wins_purchased: number | null
-          sessions_purchased: number | null
-          extras: Json
-          base_price: number
-          extras_price: number
-          total_price: number
-          estimated_hours: number | null
-          customer_notes: string | null
-          booster_notes: string | null
-          wins_played: number
-          losses_played: number
-          assigned_booster_id: string | null
-          mp_payment_id: string | null
-          payment_status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
-          completed_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          customer_id: string
-          service_id: string
-          game_id: string
-          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          queue_type: 'solo_duo' | 'flex'
-          boost_mode?: 'solo' | 'duo'
-          server: string
-          current_rank: Json
-          target_rank?: Json | null
-          wins_purchased?: number | null
-          sessions_purchased?: number | null
-          extras?: Json
-          base_price: number
-          extras_price?: number
-          total_price: number
-          estimated_hours?: number | null
-          customer_notes?: string | null
-          booster_notes?: string | null
-          wins_played?: number
-          losses_played?: number
-          assigned_booster_id?: string | null
-          mp_payment_id?: string | null
-          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
-          completed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          queue_type?: 'solo_duo' | 'flex'
-          boost_mode?: 'solo' | 'duo'
-          server?: string
-          current_rank?: Json
-          target_rank?: Json | null
-          wins_purchased?: number | null
-          sessions_purchased?: number | null
-          extras?: Json
-          base_price?: number
-          extras_price?: number
-          total_price?: number
-          estimated_hours?: number | null
-          customer_notes?: string | null
-          booster_notes?: string | null
-          wins_played?: number
-          losses_played?: number
-          assigned_booster_id?: string | null
-          mp_payment_id?: string | null
-          payment_status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed' | null
-          completed_at?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'orders_customer_id_fkey'
-            columns: ['customer_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          }
-        ]
-      }
-      order_status_history: {
-        Row: {
-          id: string
-          order_id: string
-          from_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          changed_by: string
-          reason: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          changed_by: string
-          reason?: string | null
-          created_at?: string
-        }
-        Update: {
-          from_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled' | null
-          to_status?: 'draft' | 'awaiting_payment' | 'paid' | 'awaiting_assignment' | 'assigned' | 'in_progress' | 'paused' | 'drop_requested' | 'awaiting_customer' | 'completed' | 'disputed' | 'refunded' | 'canceled'
-          reason?: string | null
-        }
-        Relationships: []
-      }
-      order_messages: {
-        Row: {
-          id: string
-          order_id: string
-          sender_id: string
-          sender_role: 'customer' | 'booster' | 'admin' | 'support'
-          content: string
-          attachment_url: string | null
-          is_read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          sender_id: string
-          sender_role: 'customer' | 'booster' | 'admin' | 'support'
-          content: string
-          attachment_url?: string | null
-          is_read?: boolean
-          created_at?: string
-        }
-        Update: {
-          is_read?: boolean
-          content?: string
-          attachment_url?: string | null
-        }
-        Relationships: []
-      }
-      payments: {
-        Row: {
-          id: string
-          order_id: string
-          customer_id: string
-          mp_payment_id: string
-          amount: number
-          currency: string
-          status: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
-          payment_method_type: string | null
-          webhook_event_id: string | null
-          refunded_amount: number
-          metadata: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          customer_id: string
-          mp_payment_id: string
-          amount: number
-          currency?: string
-          status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
-          payment_method_type?: string | null
-          webhook_event_id?: string | null
-          refunded_amount?: number
-          metadata?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          status?: 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
-          payment_method_type?: string | null
-          webhook_event_id?: string | null
-          refunded_amount?: number
-          metadata?: Json
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      refunds: {
-        Row: {
-          id: string
-          payment_id: string
-          order_id: string
-          mp_refund_id: string
-          amount: number
-          reason: string
-          initiated_by: string
-          status: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          payment_id: string
-          order_id: string
-          mp_refund_id: string
-          amount: number
-          reason: string
-          initiated_by: string
-          status?: string
-          created_at?: string
-        }
-        Update: {
-          status?: string
-        }
-        Relationships: []
-      }
-      support_tickets: {
-        Row: {
-          id: string
-          customer_id: string
-          order_id: string | null
-          assigned_to: string | null
-          status: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
-          priority: 'low' | 'medium' | 'high' | 'urgent'
-          subject: string
-          created_at: string
-          updated_at: string
-          resolved_at: string | null
-        }
-        Insert: {
-          id?: string
-          customer_id: string
-          order_id?: string | null
-          assigned_to?: string | null
-          status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
-          priority?: 'low' | 'medium' | 'high' | 'urgent'
-          subject: string
-          created_at?: string
-          updated_at?: string
-          resolved_at?: string | null
-        }
-        Update: {
-          assigned_to?: string | null
-          status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
-          priority?: 'low' | 'medium' | 'high' | 'urgent'
-          subject?: string
-          updated_at?: string
-          resolved_at?: string | null
-        }
-        Relationships: []
-      }
-      ticket_messages: {
-        Row: {
-          id: string
-          ticket_id: string
-          sender_id: string
-          sender_role: 'customer' | 'booster' | 'admin' | 'support'
-          content: string
-          is_internal: boolean
-          attachment_url: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          ticket_id: string
-          sender_id: string
-          sender_role: 'customer' | 'booster' | 'admin' | 'support'
-          content: string
-          is_internal?: boolean
-          attachment_url?: string | null
-          created_at?: string
-        }
-        Update: {
-          content?: string
-          is_internal?: boolean
-          attachment_url?: string | null
-        }
-        Relationships: []
-      }
-      reviews: {
-        Row: {
-          id: string
-          order_id: string
-          customer_id: string
-          booster_id: string | null
-          rating: number
-          content: string | null
-          is_public: boolean
-          is_moderated: boolean
-          admin_note: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          order_id: string
-          customer_id: string
-          booster_id?: string | null
-          rating: number
-          content?: string | null
-          is_public?: boolean
-          is_moderated?: boolean
-          admin_note?: string | null
-          created_at?: string
-        }
-        Update: {
-          booster_id?: string | null
-          rating?: number
-          content?: string | null
-          is_public?: boolean
-          is_moderated?: boolean
-          admin_note?: string | null
         }
         Relationships: []
       }
       notifications: {
         Row: {
-          id: string
-          user_id: string
-          type: string
-          title: string
           body: string
+          created_at: string
           data: Json
-          is_read: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          type: string
-          title: string
-          body: string
-          data?: Json
-          is_read?: boolean
-          created_at?: string
-        }
-        Update: {
-          is_read?: boolean
-          data?: Json
-        }
-        Relationships: []
-      }
-      audit_logs: {
-        Row: {
           id: string
-          actor_id: string
-          actor_role: 'customer' | 'booster' | 'admin' | 'support'
-          action: string
-          entity_type: string
-          entity_id: string
-          diff: Json | null
-          ip_address: string | null
-          created_at: string
+          is_read: boolean
+          title: string
+          type: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          actor_id: string
-          actor_role: 'customer' | 'booster' | 'admin' | 'support'
-          action: string
-          entity_type: string
-          entity_id: string
-          diff?: Json | null
-          ip_address?: string | null
+          body: string
           created_at?: string
+          data?: Json
+          id?: string
+          is_read?: boolean
+          title: string
+          type: string
+          user_id: string
         }
         Update: {
-          diff?: Json | null
+          body?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          is_read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_drop_requests: {
+        Row: {
+          admin_id: string | null
+          admin_note: string | null
+          booster_id: string
+          created_at: string
+          id: string
+          losses_at_request: number
+          order_id: string
+          penalty_amount: number
+          penalty_pct: number
+          reason: string
+          resolved_at: string | null
+          status: string
+          wins_at_request: number
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_note?: string | null
+          booster_id: string
+          created_at?: string
+          id?: string
+          losses_at_request?: number
+          order_id: string
+          penalty_amount?: number
+          penalty_pct?: number
+          reason: string
+          resolved_at?: string | null
+          status?: string
+          wins_at_request?: number
+        }
+        Update: {
+          admin_id?: string | null
+          admin_note?: string | null
+          booster_id?: string
+          created_at?: string
+          id?: string
+          losses_at_request?: number
+          order_id?: string
+          penalty_amount?: number
+          penalty_pct?: number
+          reason?: string
+          resolved_at?: string | null
+          status?: string
+          wins_at_request?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_drop_requests_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_drop_requests_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_drop_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_messages: {
+        Row: {
+          attachment_url: string | null
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          order_id: string
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_role"]
+        }
+        Insert: {
+          attachment_url?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          order_id: string
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_role"]
+        }
+        Update: {
+          attachment_url?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          order_id?: string
+          sender_id?: string
+          sender_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_status_history: {
+        Row: {
+          changed_by: string
+          created_at: string
+          from_status: Database["public"]["Enums"]["order_status"] | null
+          id: string
+          order_id: string
+          reason: string | null
+          to_status: Database["public"]["Enums"]["order_status"]
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["order_status"] | null
+          id?: string
+          order_id: string
+          reason?: string | null
+          to_status: Database["public"]["Enums"]["order_status"]
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["order_status"] | null
+          id?: string
+          order_id?: string
+          reason?: string | null
+          to_status?: Database["public"]["Enums"]["order_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          assigned_booster_id: string | null
+          base_price: number
+          boost_mode: string
+          booster_notes: string | null
+          completed_at: string | null
+          created_at: string
+          credentials_set: boolean
+          current_rank: Json
+          customer_id: string
+          customer_notes: string | null
+          discord_voice_channel_id: string | null
+          estimated_hours: number | null
+          extras: Json
+          extras_price: number
+          game_credentials: string | null
+          game_id: string
+          id: string
+          losses_played: number
+          mp_payment_id: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          queue_type: Database["public"]["Enums"]["queue_type"]
+          server: string
+          service_id: string
+          sessions_purchased: number | null
+          status: Database["public"]["Enums"]["order_status"]
+          target_rank: Json | null
+          total_price: number
+          updated_at: string
+          wins_played: number
+          wins_purchased: number | null
+        }
+        Insert: {
+          assigned_booster_id?: string | null
+          base_price: number
+          boost_mode?: string
+          booster_notes?: string | null
+          completed_at?: string | null
+          created_at?: string
+          credentials_set?: boolean
+          current_rank: Json
+          customer_id: string
+          customer_notes?: string | null
+          discord_voice_channel_id?: string | null
+          estimated_hours?: number | null
+          extras?: Json
+          extras_price?: number
+          game_credentials?: string | null
+          game_id: string
+          id?: string
+          losses_played?: number
+          mp_payment_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          queue_type?: Database["public"]["Enums"]["queue_type"]
+          server: string
+          service_id: string
+          sessions_purchased?: number | null
+          status?: Database["public"]["Enums"]["order_status"]
+          target_rank?: Json | null
+          total_price: number
+          updated_at?: string
+          wins_played?: number
+          wins_purchased?: number | null
+        }
+        Update: {
+          assigned_booster_id?: string | null
+          base_price?: number
+          boost_mode?: string
+          booster_notes?: string | null
+          completed_at?: string | null
+          created_at?: string
+          credentials_set?: boolean
+          current_rank?: Json
+          customer_id?: string
+          customer_notes?: string | null
+          discord_voice_channel_id?: string | null
+          estimated_hours?: number | null
+          extras?: Json
+          extras_price?: number
+          game_credentials?: string | null
+          game_id?: string
+          id?: string
+          losses_played?: number
+          mp_payment_id?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          queue_type?: Database["public"]["Enums"]["queue_type"]
+          server?: string
+          service_id?: string
+          sessions_purchased?: number | null
+          status?: Database["public"]["Enums"]["order_status"]
+          target_rank?: Json | null
+          total_price?: number
+          updated_at?: string
+          wins_played?: number
+          wins_purchased?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_assigned_booster_id_fkey"
+            columns: ["assigned_booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          customer_id: string
+          id: string
+          metadata: Json
+          mp_payment_id: string
+          order_id: string
+          payment_method_type: string | null
+          refunded_amount: number
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+          webhook_event_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          customer_id: string
+          id?: string
+          metadata?: Json
+          mp_payment_id: string
+          order_id: string
+          payment_method_type?: string | null
+          refunded_amount?: number
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+          webhook_event_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          customer_id?: string
+          id?: string
+          metadata?: Json
+          mp_payment_id?: string
+          order_id?: string
+          payment_method_type?: string | null
+          refunded_amount?: number
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+          webhook_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payout_records: {
         Row: {
-          id: string
           booster_id: string
-          order_id: string
-          gross_amount: number
-          commission_rate: number
           commission_amount: number
-          net_amount: number
-          status: 'pending' | 'processing' | 'paid' | 'failed'
-          paid_at: string | null
+          commission_rate: number
           created_at: string
+          gross_amount: number
+          id: string
+          net_amount: number
+          order_id: string
+          paid_at: string | null
+          status: Database["public"]["Enums"]["payout_status"]
         }
         Insert: {
-          id?: string
           booster_id: string
-          order_id: string
-          gross_amount: number
-          commission_rate?: number
           commission_amount: number
-          net_amount: number
-          status?: 'pending' | 'processing' | 'paid' | 'failed'
-          paid_at?: string | null
+          commission_rate?: number
           created_at?: string
+          gross_amount: number
+          id?: string
+          net_amount: number
+          order_id: string
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["payout_status"]
         }
         Update: {
-          status?: 'pending' | 'processing' | 'paid' | 'failed'
+          booster_id?: string
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          order_id?: string
           paid_at?: string | null
+          status?: Database["public"]["Enums"]["payout_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_records_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          discord_id: string | null
+          email: string
+          id: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          discord_id?: string | null
+          email: string
+          id: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          discord_id?: string | null
+          email?: string
+          id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          username?: string
         }
         Relationships: []
       }
-      booster_applications: {
+      refunds: {
         Row: {
-          id: string
+          amount: number
           created_at: string
-          updated_at: string
-          user_id: string | null
-          summoner_name: string
-          opgg_link: string | null
-          region: string
-          peak_rank: string
-          roles: string[]
-          games: string[]
-          has_coaching: boolean
-          available_days: string[]
-          hours_per_week: number
-          years_experience: number
-          discord_tag: string | null
-          motivation: string
-          status: 'pending' | 'under_review' | 'accepted' | 'rejected'
-          admin_notes: string | null
+          id: string
+          initiated_by: string
+          mp_refund_id: string
+          order_id: string
+          payment_id: string
+          reason: string
+          status: string
         }
         Insert: {
-          id?: string
+          amount: number
           created_at?: string
-          updated_at?: string
-          user_id?: string | null
-          summoner_name: string
-          opgg_link?: string | null
-          region: string
-          peak_rank: string
-          roles?: string[]
-          games?: string[]
-          has_coaching?: boolean
-          available_days?: string[]
-          hours_per_week: number
-          years_experience: number
-          discord_tag?: string | null
-          motivation: string
-          status?: 'pending' | 'under_review' | 'accepted' | 'rejected'
-          admin_notes?: string | null
+          id?: string
+          initiated_by: string
+          mp_refund_id: string
+          order_id: string
+          payment_id: string
+          reason: string
+          status?: string
         }
         Update: {
-          user_id?: string | null
-          summoner_name?: string
-          opgg_link?: string | null
-          region?: string
-          peak_rank?: string
-          roles?: string[]
-          games?: string[]
-          has_coaching?: boolean
-          available_days?: string[]
-          hours_per_week?: number
-          years_experience?: number
-          discord_tag?: string | null
-          motivation?: string
-          status?: 'pending' | 'under_review' | 'accepted' | 'rejected'
-          admin_notes?: string | null
+          amount?: number
+          created_at?: string
+          id?: string
+          initiated_by?: string
+          mp_refund_id?: string
+          order_id?: string
+          payment_id?: string
+          reason?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_initiated_by_fkey"
+            columns: ["initiated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          admin_note: string | null
+          booster_id: string | null
+          content: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          is_moderated: boolean
+          is_public: boolean
+          order_id: string
+          rating: number
+        }
+        Insert: {
+          admin_note?: string | null
+          booster_id?: string | null
+          content?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_moderated?: boolean
+          is_public?: boolean
+          order_id: string
+          rating: number
+        }
+        Update: {
+          admin_note?: string | null
+          booster_id?: string | null
+          content?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_moderated?: boolean
+          is_public?: boolean
+          order_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_extras: {
+        Row: {
+          description: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          price_modifier: number
+          price_modifier_pct: number
+          service_id: string | null
+          sort_order: number
+        }
+        Insert: {
+          description: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price_modifier?: number
+          price_modifier_pct?: number
+          service_id?: string | null
+          sort_order?: number
+        }
+        Update: {
+          description?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_modifier?: number
+          price_modifier_pct?: number
+          service_id?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_extras_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          description: string | null
+          game_id: string
+          id: string
+          is_active: boolean
+          name: string
+          short_description: string | null
+          sort_order: number
+          type: Database["public"]["Enums"]["service_type"]
+        }
+        Insert: {
+          description?: string | null
+          game_id: string
+          id?: string
+          is_active?: boolean
+          name: string
+          short_description?: string | null
+          sort_order?: number
+          type: Database["public"]["Enums"]["service_type"]
+        }
+        Update: {
+          description?: string | null
+          game_id?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          short_description?: string | null
+          sort_order?: number
+          type?: Database["public"]["Enums"]["service_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          order_id: string | null
+          priority: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject: string
           updated_at?: string
         }
-        Relationships: []
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          order_id?: string | null
+          priority?: Database["public"]["Enums"]["ticket_priority"]
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_messages: {
+        Row: {
+          attachment_url: string | null
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_role"]
+          ticket_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_role"]
+          ticket_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          sender_id?: string
+          sender_role?: Database["public"]["Enums"]["user_role"]
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
-      [_ in never]: never
+      public_booster_profiles: {
+        Row: {
+          bio: string | null
+          current_rank: Json | null
+          display_name: string | null
+          games: string[] | null
+          id: string | null
+          is_available: boolean | null
+          is_top5: boolean | null
+          last_active_at: string | null
+          peak_rank: Json | null
+          rank_stats: Json | null
+          rating: number | null
+          rating_count: number | null
+          total_completed: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          bio?: string | null
+          current_rank?: Json | null
+          display_name?: string | null
+          games?: string[] | null
+          id?: string | null
+          is_available?: boolean | null
+          is_top5?: boolean | null
+          last_active_at?: string | null
+          peak_rank?: Json | null
+          rank_stats?: Json | null
+          rating?: number | null
+          rating_count?: number | null
+          total_completed?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          bio?: string | null
+          current_rank?: Json | null
+          display_name?: string | null
+          games?: string[] | null
+          id?: string | null
+          is_available?: boolean | null
+          is_top5?: boolean | null
+          last_active_at?: string | null
+          peak_rank?: Json | null
+          rank_stats?: Json | null
+          rating?: number | null
+          rating_count?: number | null
+          total_completed?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_boost_order: {
-        Args: { p_order_id: string; p_booster_user_id: string }
+        Args: { p_booster_user_id: string; p_order_id: string }
         Returns: Json
       }
-      can_booster_accept_order: {
-        Args: { p_booster_user_id: string; p_boost_mode: string }
-        Returns: Json
-      }
-      booster_active_slot_counts: {
-        Args: { p_booster_user_id: string }
-        Returns: { solo_count: number; duo_count: number; total_count: number }[]
-      }
-      refresh_top5_boosters: {
-        Args: Record<string, never>
-        Returns: undefined
-      }
-      ensure_profile_exists: {
-        Args: { p_display_name: string | null }
+      admin_override_order_status: {
+        Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
       }
       approve_booster: {
         Args: { p_booster_id: string; p_new_status: string }
         Returns: Json
       }
-      toggle_booster_top5: {
-        Args: { p_booster_id: string; p_is_top5: boolean }
+      assign_ticket: { Args: { p_ticket_id: string }; Returns: Json }
+      booster_active_slot_counts: {
+        Args: { p_booster_user_id: string }
+        Returns: {
+          duo_count: number
+          solo_count: number
+          total_count: number
+        }[]
+      }
+      can_booster_accept_order: {
+        Args: { p_boost_mode: string; p_booster_user_id: string }
         Returns: Json
       }
-      resolve_drop_request: {
-        Args: { p_request_id: string; p_approve: boolean; p_admin_note: string | null }
-        Returns: Json
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
       }
-      admin_override_order_status: {
-        Args: { p_order_id: string; p_new_status: string }
+      ensure_profile_exists: {
+        Args: { p_display_name?: string }
+        Returns: undefined
+      }
+      get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
+      is_admin: { Args: never; Returns: boolean }
+      log_match_result: {
+        Args: { p_losses: number; p_order_id: string; p_wins: number }
         Returns: Json
       }
       moderate_review: {
-        Args: { p_review_id: string; p_is_public: boolean }
+        Args: { p_is_public: boolean; p_review_id: string }
         Returns: Json
       }
-      assign_ticket: {
-        Args: { p_ticket_id: string }
-        Returns: Json
-      }
-      update_order_status: {
-        Args: { p_order_id: string; p_new_status: string }
-        Returns: Json
-      }
-      log_match_result: {
-        Args: { p_order_id: string; p_wins: number; p_losses: number }
-        Returns: Json
-      }
+      onboard_booster:
+        | {
+            Args: {
+              p_bio: string
+              p_display_name: string
+              p_hours_per_day_max?: number
+              p_hours_per_day_min?: number
+              p_opgg_link?: string
+              p_peak_rank: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_bio: string
+              p_cpf?: string
+              p_display_name: string
+              p_full_name?: string
+              p_hours_per_day_max?: number
+              p_hours_per_day_min?: number
+              p_opgg_link?: string
+              p_peak_rank: Json
+            }
+            Returns: Json
+          }
+      refresh_top5_boosters: { Args: never; Returns: undefined }
+      request_booster_role: { Args: never; Returns: Json }
       request_order_drop: {
         Args: { p_order_id: string; p_reason: string }
         Returns: Json
       }
-      onboard_booster: {
+      resolve_drop_request: {
         Args: {
-          p_display_name: string
-          p_bio: string
-          p_peak_rank: Json | null
-          p_opgg_link: string | null
-          p_hours_per_day_min: number | null
-          p_hours_per_day_max: number | null
-          p_full_name: string
-          p_cpf: string
+          p_admin_note?: string
+          p_approve: boolean
+          p_request_id: string
         }
         Returns: Json
       }
-      update_my_username: {
-        Args: { p_username: string }
+      set_order_credentials:
+        | {
+            Args: { p_login: string; p_order_id: string; p_password: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_encrypt_key?: string
+              p_login: string
+              p_order_id: string
+              p_password: string
+            }
+            Returns: Json
+          }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      toggle_booster_top5: {
+        Args: { p_booster_id: string; p_is_top5: boolean }
+        Returns: Json
+      }
+      update_my_username: { Args: { p_username: string }; Returns: Json }
+      update_order_status: {
+        Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
       }
     }
     Enums: {
-      [_ in never]: never
+      booster_status:
+        | "pending"
+        | "under_review"
+        | "approved"
+        | "suspended"
+        | "rejected"
+      game_slug: "lol" | "valorant" | "tft"
+      order_status:
+        | "draft"
+        | "awaiting_payment"
+        | "paid"
+        | "awaiting_assignment"
+        | "assigned"
+        | "in_progress"
+        | "paused"
+        | "drop_requested"
+        | "awaiting_customer"
+        | "completed"
+        | "disputed"
+        | "refunded"
+        | "canceled"
+      payment_status:
+        | "pending"
+        | "paid"
+        | "failed"
+        | "refunded"
+        | "partially_refunded"
+        | "disputed"
+      payout_status: "pending" | "processing" | "paid" | "failed"
+      queue_type: "solo_duo" | "flex"
+      service_type:
+        | "elo_boost"
+        | "win_boost"
+        | "coaching"
+        | "placement_matches"
+        | "md5"
+      ticket_priority: "low" | "medium" | "high" | "urgent"
+      ticket_status:
+        | "open"
+        | "in_progress"
+        | "waiting_customer"
+        | "resolved"
+        | "closed"
+      user_role: "customer" | "booster" | "admin" | "support"
     }
     CompositeTypes: {
       [_ in never]: never
     }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      booster_status: [
+        "pending",
+        "under_review",
+        "approved",
+        "suspended",
+        "rejected",
+      ],
+      game_slug: ["lol", "valorant", "tft"],
+      order_status: [
+        "draft",
+        "awaiting_payment",
+        "paid",
+        "awaiting_assignment",
+        "assigned",
+        "in_progress",
+        "paused",
+        "drop_requested",
+        "awaiting_customer",
+        "completed",
+        "disputed",
+        "refunded",
+        "canceled",
+      ],
+      payment_status: [
+        "pending",
+        "paid",
+        "failed",
+        "refunded",
+        "partially_refunded",
+        "disputed",
+      ],
+      payout_status: ["pending", "processing", "paid", "failed"],
+      queue_type: ["solo_duo", "flex"],
+      service_type: [
+        "elo_boost",
+        "win_boost",
+        "coaching",
+        "placement_matches",
+        "md5",
+      ],
+      ticket_priority: ["low", "medium", "high", "urgent"],
+      ticket_status: [
+        "open",
+        "in_progress",
+        "waiting_customer",
+        "resolved",
+        "closed",
+      ],
+      user_role: ["customer", "booster", "admin", "support"],
+    },
+  },
+} as const

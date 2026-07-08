@@ -84,18 +84,6 @@ serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-  // Idempotency: skip events we already processed
-  const { data: existing } = await supabase
-    .from('payments')
-    .select('id')
-    .eq('webhook_event_id', `mp-${dataId}`)
-    .maybeSingle()
-
-  if (existing) {
-    console.log('Duplicate MP webhook event — skipping:', dataId)
-    return new Response('ok', { status: 200 })
-  }
-
   // Always re-fetch the payment from MP API — never trust webhook body data directly
   const mpResp = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {
     headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
@@ -151,29 +139,45 @@ serve(async (req) => {
         return new Response('amount mismatch', { status: 400 })
       }
 
-      await Promise.all([
-        supabase.from('orders').update({
+      // Idempotency gate: MP redelivers notifications for every status the
+      // payment passes through (pending → approved), all with the *same*
+      // payment id. Rather than dedupe by "have we seen this payment id
+      // before" (which would also swallow the approved event after an
+      // earlier pending one), gate on the order actually transitioning out
+      // of awaiting_payment via a conditional update. If another (possibly
+      // concurrent) delivery already flipped it, rowCount is 0 here and we
+      // skip the side effects below — safe against redelivery and races.
+      const { data: updated } = await supabase
+        .from('orders')
+        .update({
           status: 'awaiting_assignment',
           payment_status: 'paid',
           updated_at: new Date().toISOString(),
-        }).eq('id', orderId),
+        })
+        .eq('id', orderId)
+        .eq('status', 'awaiting_payment')
+        .select('id')
+        .maybeSingle()
 
-        supabase.from('order_status_history').insert({
-          order_id: orderId,
-          from_status: 'awaiting_payment',
-          to_status: 'awaiting_assignment',
-          changed_by: order.customer_id,
-          reason: 'Pagamento PIX confirmado via Mercado Pago',
-        }),
+      if (updated) {
+        await Promise.all([
+          supabase.from('order_status_history').insert({
+            order_id: orderId,
+            from_status: 'awaiting_payment',
+            to_status: 'awaiting_assignment',
+            changed_by: order.customer_id,
+            reason: 'Pagamento PIX confirmado via Mercado Pago',
+          }),
 
-        supabase.from('notifications').insert({
-          user_id: order.customer_id,
-          type: 'payment_confirmed',
-          title: 'PIX confirmado!',
-          body: `Seu pedido #${orderId.slice(0, 8).toUpperCase()} foi pago e está na fila de boosters.`,
-          data: { order_id: orderId },
-        }),
-      ])
+          supabase.from('notifications').insert({
+            user_id: order.customer_id,
+            type: 'payment_confirmed',
+            title: 'PIX confirmado!',
+            body: `Seu pedido #${orderId.slice(0, 8).toUpperCase()} foi pago e está na fila de boosters.`,
+            data: { order_id: orderId },
+          }),
+        ])
+      }
     }
   }
 

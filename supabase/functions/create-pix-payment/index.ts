@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { computeOrderPrice, type OrderPriceInput, type RankValue } from '../../../shared/pricing.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -18,6 +19,44 @@ function json(data: unknown, status = 200) {
   })
 }
 
+// Intenção do pedido enviada pelo cliente — nunca contém preço. O total é
+// sempre recomputado aqui a partir de shared/pricing.ts (mesma lógica usada
+// pelo order-builder só para exibir estimativa).
+interface OrderIntent {
+  service_type: OrderPriceInput['serviceType']
+  service_id: string
+  game_id: string
+  queue_type: string
+  boost_mode: 'solo' | 'duo'
+  server: string
+  current_rank: RankValue | null
+  target_rank: RankValue | null
+  current_lp: number
+  avg_lp_gain: number
+  avg_lp_loss: number
+  target_lp: number | null
+  wins_purchased: number | null
+  sessions_purchased: number | null
+  extra_ids: string[]
+  win_package: 1 | 3 | 5 | null
+  customer_notes: string | null
+}
+
+function isValidIntent(v: unknown): v is OrderIntent {
+  if (!v || typeof v !== 'object') return false
+  const i = v as Record<string, unknown>
+  return (
+    typeof i.service_type === 'string' &&
+    typeof i.service_id === 'string' &&
+    typeof i.game_id === 'string' &&
+    typeof i.queue_type === 'string' &&
+    (i.boost_mode === 'solo' || i.boost_mode === 'duo') &&
+    typeof i.server === 'string' &&
+    i.current_rank !== undefined &&
+    Array.isArray(i.extra_ids)
+  )
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
 
@@ -32,26 +71,103 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await userClient.auth.getUser()
     if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
 
-    const { order_id } = await req.json()
-    if (!order_id) return json({ error: 'Missing order_id' }, 400)
+    const body = await req.json()
+    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Verify order ownership and status
-    const { data: order, error: orderErr } = await userClient
-      .from('orders')
-      .select('id, customer_id, total_price, status, mp_payment_id')
-      .eq('id', order_id)
-      .single()
+    let orderId: string
+    let order: { id: string; customer_id: string; total_price: number; mp_payment_id: string | null }
 
-    if (orderErr || !order) return json({ error: 'Order not found' }, 404)
-    if (order.customer_id !== user.id) return json({ error: 'Forbidden' }, 403)
-    if (order.status !== 'awaiting_payment') return json({ error: 'Order is not awaiting payment' }, 400)
+    if (body.order_id) {
+      // ── Retry path: reuse an order already created by this function ──────────
+      orderId = body.order_id
 
-    // Amount is always derived from the DB — never from the client request
-    if (!order.total_price || Number(order.total_price) <= 0) {
-      return json({ error: 'Invalid order amount' }, 400)
+      const { data: existingOrder, error: orderErr } = await userClient
+        .from('orders')
+        .select('id, customer_id, total_price, status, mp_payment_id')
+        .eq('id', orderId)
+        .single()
+
+      if (orderErr || !existingOrder) return json({ error: 'Order not found' }, 404)
+      if (existingOrder.customer_id !== user.id) return json({ error: 'Forbidden' }, 403)
+      if (existingOrder.status !== 'awaiting_payment') return json({ error: 'Order is not awaiting payment' }, 400)
+
+      order = existingOrder
+    } else if (isValidIntent(body.intent)) {
+      // ── New order: server computes the authoritative price ──────────────────
+      const intent = body.intent as OrderIntent
+      const extraIds = [...new Set(intent.extra_ids)].filter((id) => typeof id === 'string')
+
+      let extras: { id: string; name: string; price_modifier: number; price_modifier_pct: number }[] = []
+      if (extraIds.length > 0) {
+        const { data: extraRows, error: extraErr } = await serviceClient
+          .from('service_extras')
+          .select('id, name, price_modifier, price_modifier_pct')
+          .in('id', extraIds)
+          .eq('is_active', true)
+        if (extraErr) return json({ error: 'Failed to load extras' }, 500)
+        extras = extraRows ?? []
+      }
+
+      const priceInput: OrderPriceInput = {
+        serviceType: intent.service_type,
+        boostMode: intent.boost_mode,
+        currentRank: intent.current_rank,
+        targetRank: intent.target_rank,
+        currentLp: intent.current_lp ?? 0,
+        avgLpGain: intent.avg_lp_gain ?? 20,
+        avgLpLoss: intent.avg_lp_loss ?? 15,
+        targetLp: intent.target_lp ?? null,
+        winsPurchased: intent.wins_purchased ?? null,
+        sessionsPurchased: intent.sessions_purchased ?? null,
+        extras: extras.map((e) => ({ id: e.id, priceModifier: Number(e.price_modifier), priceModifierPct: Number(e.price_modifier_pct) })),
+        winPackage: intent.win_package ?? null,
+      }
+
+      const priced = computeOrderPrice(priceInput)
+      if (priced.totalPrice <= 0) return json({ error: 'Invalid order amount' }, 400)
+
+      const extrasJson = extras.map((e) => {
+        const b = priced.extrasBreakdown.find((x) => x.id === e.id)
+        return { extra_id: e.id, name: e.name, price: b?.price ?? 0 }
+      })
+
+      const { data: inserted, error: insertErr } = await serviceClient
+        .from('orders')
+        .insert({
+          customer_id: user.id,
+          service_id: intent.service_id,
+          game_id: intent.game_id,
+          status: 'awaiting_payment',
+          queue_type: intent.queue_type,
+          boost_mode: intent.boost_mode,
+          server: intent.server,
+          current_rank: intent.current_rank as never,
+          target_rank: intent.target_rank as never,
+          wins_purchased: intent.wins_purchased,
+          sessions_purchased: intent.sessions_purchased,
+          extras: extrasJson as never,
+          win_package: intent.win_package,
+          base_price: priced.basePrice,
+          extras_price: priced.extrasPrice,
+          total_price: priced.totalPrice,
+          estimated_hours: priced.estimatedHours,
+          customer_notes: intent.customer_notes || null,
+        })
+        .select('id, customer_id, total_price, mp_payment_id')
+        .single()
+
+      if (insertErr || !inserted) return json({ error: insertErr?.message ?? 'Erro ao criar pedido' }, 500)
+      orderId = inserted.id
+      order = inserted
+    } else {
+      return json({ error: 'Missing order_id or intent' }, 400)
     }
 
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    // Amount is always derived from the DB row we just read/created — never
+    // recomputed from anything the client sends at this point.
+    if (!order.total_price || Number(order.total_price) <= 0) {
+      return json({ error: 'Invalid order amount', order_id: orderId }, 400)
+    }
 
     // If there is already a pending MP payment for this order, try to reuse it
     if (order.mp_payment_id) {
@@ -64,6 +180,8 @@ serve(async (req) => {
         // pending or in_process: return the existing QR code
         if (mp.status === 'pending' || mp.status === 'in_process') {
           return json({
+            order_id: orderId,
+            total_price: order.total_price,
             payment_id: mp.id,
             qr_code: mp.point_of_interaction?.transaction_data?.qr_code,
             qr_code_base64: mp.point_of_interaction?.transaction_data?.qr_code_base64,
@@ -76,7 +194,7 @@ serve(async (req) => {
 
     // Create new PIX payment via Mercado Pago API
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
-    // Amount sourced exclusively from DB — client cannot influence this value
+    // Amount sourced exclusively from the order row — client cannot influence this value
     const amountBrl = Number(order.total_price)
 
     const mpResp = await fetch('https://api.mercadopago.com/v1/payments', {
@@ -84,16 +202,17 @@ serve(async (req) => {
       headers: {
         Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
-        // Idempotency key prevents duplicate charges if the client retries
-        'X-Idempotency-Key': `${order_id}-${Math.floor(Date.now() / (30 * 60 * 1000))}`,
+        // Idempotency key is scoped to the order itself — each order only
+        // ever creates one MP payment through this path.
+        'X-Idempotency-Key': orderId,
       },
       body: JSON.stringify({
         transaction_amount: amountBrl,
-        description: `EloBoost — Pedido #${order_id.slice(0, 8).toUpperCase()}`,
+        description: `EloBoost — Pedido #${orderId.slice(0, 8).toUpperCase()}`,
         payment_method_id: 'pix',
         payer: { email: user.email },
         date_of_expiration: expiresAt,
-        external_reference: order_id,
+        external_reference: orderId,
         notification_url: `${SUPABASE_URL}/functions/v1/mercadopago-webhook`,
       }),
     })
@@ -101,7 +220,10 @@ serve(async (req) => {
     if (!mpResp.ok) {
       const err = await mpResp.json()
       console.error('Mercado Pago error:', err)
-      return json({ error: 'Falha ao criar pagamento PIX', details: err }, 502)
+      // Include order_id even on failure: the order row already exists at
+      // this point, so a client retry must reuse it (order_id path) instead
+      // of resending an intent and creating a second order.
+      return json({ error: 'Falha ao criar pagamento PIX', details: err, order_id: orderId }, 502)
     }
 
     const mp = await mpResp.json()
@@ -112,11 +234,11 @@ serve(async (req) => {
       serviceClient
         .from('orders')
         .update({ mp_payment_id: mpPaymentId, updated_at: new Date().toISOString() })
-        .eq('id', order_id),
+        .eq('id', orderId),
 
       serviceClient.from('payments').upsert(
         {
-          order_id,
+          order_id: orderId,
           customer_id: user.id,
           mp_payment_id: mpPaymentId,
           amount: amountBrl,
@@ -129,6 +251,8 @@ serve(async (req) => {
     ])
 
     return json({
+      order_id: orderId,
+      total_price: order.total_price,
       payment_id: mp.id,
       qr_code: mp.point_of_interaction?.transaction_data?.qr_code,
       qr_code_base64: mp.point_of_interaction?.transaction_data?.qr_code_base64,

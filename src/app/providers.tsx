@@ -87,7 +87,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!data) {
       // Profile missing (Discord OAuth trigger may have failed) — create via RPC
-      await supabase.rpc('ensure_profile_exists', { p_display_name: displayName ?? null })
+      await supabase.rpc('ensure_profile_exists', { p_display_name: displayName ?? undefined })
       const result = await supabase
         .from('profiles')
         .select('*')

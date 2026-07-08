@@ -45,3 +45,10 @@ enable_signup = false
 
 [edge_runtime]
 enabled = true
+
+# Mercado Pago calls this webhook directly (x-signature/x-request-id, not a
+# Supabase JWT) — the function verifies MP's HMAC signature itself. Without
+# verify_jwt = false the platform gateway rejects every MP notification with
+# 401 before it ever reaches our code, so payments would never auto-confirm.
+[functions.mercadopago-webhook]
+verify_jwt = false

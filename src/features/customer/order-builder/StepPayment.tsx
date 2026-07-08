@@ -11,7 +11,7 @@ import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw } from 'lucid
 type PixState =
   | { phase: 'idle' }
   | { phase: 'generating' }
-  | { phase: 'waiting'; qr_code: string; qr_base64: string | null; expires_at: string; payment_id: string; order_id: string }
+  | { phase: 'waiting'; qr_code: string; qr_base64: string | null; expires_at: string; payment_id: string; order_id: string; total_price: number }
   | { phase: 'confirmed' }
   | { phase: 'expired'; order_id: string }
   | { phase: 'error'; message: string; order_id?: string }
@@ -41,15 +41,11 @@ export function StepPayment() {
   const [copied, setCopied] = useState(false)
   const pollRef = useRef<number | null>(null)
 
-  const freshExtrasPrice = Math.round(
-    store.selectedExtras.reduce((sum, { extra }) => {
-      if (extra.price_modifier > 0) return sum + extra.price_modifier
-      if (extra.price_modifier_pct > 0) return sum + (store.basePrice * extra.price_modifier_pct) / 100
-      return sum
-    }, 0) * 100,
-  ) / 100
-
-  const totalPrice = store.basePrice + freshExtrasPrice
+  // Estimativa exibida antes de gerar o PIX (mesma conta que StepReview já
+  // mostrou ao cliente). O valor cobrado de fato é sempre o que a Edge
+  // Function retorna, recomputado no servidor a partir de shared/pricing.ts.
+  const estimatedTotal = store.basePrice + store.extrasPrice
+  const totalPrice = pix.phase === 'waiting' ? pix.total_price : estimatedTotal
   const expiresAt = pix.phase === 'waiting' ? pix.expires_at : null
   const { remaining, label: countdownLabel } = useCountdown(expiresAt)
 
@@ -92,14 +88,24 @@ export function StepPayment() {
 
   useEffect(() => () => stopPolling(), [])
 
-  async function fetchPix(orderId: string) {
+  // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
+  // O preço nunca é enviado pelo cliente — a function recomputa tudo a
+  // partir da intenção (rank, extras selecionados, pacote de vitórias etc).
+  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown> }) {
     const { data: pixData, error: pixError } = await supabase.functions.invoke('create-pix-payment', {
-      body: { order_id: orderId },
+      body: payload,
     })
 
     if (pixError || !pixData?.qr_code) {
-      throw new Error(pixData?.error ?? pixError?.message ?? 'Erro ao gerar PIX')
+      setPix({
+        phase: 'error',
+        message: pixData?.error ?? pixError?.message ?? 'Erro ao gerar PIX',
+        order_id: pixData?.order_id,
+      })
+      return
     }
+
+    const orderId: string = pixData.order_id
 
     setPix({
       phase: 'waiting',
@@ -108,6 +114,7 @@ export function StepPayment() {
       expires_at: pixData.expires_at,
       payment_id: String(pixData.payment_id),
       order_id: orderId,
+      total_price: Number(pixData.total_price),
     })
 
     // If MP didn't return base64 yet, retry once after 3s to get it
@@ -130,7 +137,8 @@ export function StepPayment() {
   async function generatePix() {
     if (!profile) return
 
-    // If there's already an order (expired or error retry), reuse it
+    // If there's already an order (expired or error retry), reuse it —
+    // never resend an intent once an order row exists for this attempt.
     const existingOrderId =
       pix.phase === 'expired' ? pix.order_id :
       pix.phase === 'error' ? pix.order_id :
@@ -139,56 +147,34 @@ export function StepPayment() {
     setPix({ phase: 'generating' })
 
     try {
-      let orderId = existingOrderId
-
-      if (!orderId) {
-        // Create the order record only on first call
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            customer_id: profile.id,
-            service_id: store.serviceId ?? store.serviceType ?? '',
-            game_id: store.gameId ?? store.gameSlug ?? '',
-            status: 'awaiting_payment',
-            queue_type: store.queueType,
-            boost_mode: store.boostMode,
-            server: store.server,
-            current_rank: store.currentRank as never,
-            target_rank: store.targetRank as never,
-            wins_purchased: store.winsPurchased,
-            sessions_purchased: store.sessionsPurchased,
-            extras: store.selectedExtras.map(({ extra }) => ({
-              extra_id: extra.id,
-              name: extra.name,
-              price: extra.price_modifier > 0
-                ? extra.price_modifier
-                : Math.round(store.basePrice * extra.price_modifier_pct) / 100,
-            })) as never,
-            base_price: store.basePrice,
-            extras_price: freshExtrasPrice,
-            total_price: totalPrice,
-            estimated_hours: store.estimatedHours,
-            customer_notes: store.customerNotes || null,
-            booster_notes: null,
-            assigned_booster_id: null,
-            mp_payment_id: null,
-            payment_status: null,
-            completed_at: null,
-          })
-          .select()
-          .single()
-
-        if (orderError || !order) throw new Error(orderError?.message ?? 'Erro ao criar pedido')
-        orderId = order.id
+      if (existingOrderId) {
+        await invokePix({ order_id: existingOrderId })
+        return
       }
 
-      await fetchPix(orderId)
+      await invokePix({
+        intent: {
+          service_type: store.serviceType,
+          service_id: store.serviceId ?? store.serviceType ?? '',
+          game_id: store.gameId ?? store.gameSlug ?? '',
+          queue_type: store.queueType,
+          boost_mode: store.boostMode,
+          server: store.server,
+          current_rank: store.currentRank,
+          target_rank: store.targetRank,
+          current_lp: store.currentLp,
+          avg_lp_gain: store.avgLpGain,
+          avg_lp_loss: store.avgLpLoss,
+          target_lp: store.targetLp,
+          wins_purchased: store.winsPurchased,
+          sessions_purchased: store.sessionsPurchased,
+          extra_ids: store.selectedExtras.map(({ extra }) => extra.id),
+          win_package: store.winPackage,
+          customer_notes: store.customerNotes || null,
+        },
+      })
     } catch (err) {
-      const existingId =
-        pix.phase === 'expired' ? pix.order_id :
-        pix.phase === 'error' ? pix.order_id :
-        undefined
-      setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido', order_id: existingId })
+      setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }
   }
 
