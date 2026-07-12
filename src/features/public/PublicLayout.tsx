@@ -129,7 +129,7 @@ export function PublicLayout() {
               { href: '/security',  label: t('nav.security')      },
               { href: '/faq',       label: t('nav.faq')           },
               { href: '/boosters',  label: t('nav.boosters')      },
-              { href: '/apply',     label: t('nav.applyBooster')  },
+              { href: '/apply?booster=1', label: t('nav.applyBooster')  },
             ].map(({ href, label }) => (
               <Link key={href} to={href} onClick={() => setMobileOpen(false)}
                 className="block px-3 py-2.5 rounded-xl text-sm text-ink-secondary hover:text-ink hover:bg-bg-elevated"

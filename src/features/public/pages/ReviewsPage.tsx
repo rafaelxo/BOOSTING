@@ -1,15 +1,15 @@
 import { Star } from 'lucide-react'
 
 const REVIEWS = [
-  { name: 'Alex M.', rank: 'Gold → Platinum', rating: 5, comment: 'Incredibly smooth experience. My booster hit Platinum in just 2 days and kept me updated the whole time.' },
-  { name: 'TurboKai', rank: 'Silver → Diamond', rating: 5, comment: 'Went from Silver to Diamond in one week. Used the coaching add-on too — completely changed how I play.' },
-  { name: 'Sarah V.', rank: 'Iron → Gold', rating: 5, comment: 'Was skeptical at first but the service was legit. Fast, safe, and great communication throughout.' },
-  { name: 'NightFury99', rank: 'Bronze → Platinum', rating: 5, comment: 'Used the live stream feature and watched every game. My booster was absolutely cracked. 10/10.' },
-  { name: 'CosmicPlayer', rank: 'Platinum → Diamond', rating: 5, comment: 'Second time using this service. They just keep getting better. Booster was responsive and fast.' },
-  { name: 'JaxMain', rank: 'Gold → Emerald', rating: 4, comment: 'Took a bit longer than expected but the booster communicated great. Happy with the result.' },
-  { name: 'CryptoADC', rank: 'Silver → Gold', rating: 5, comment: 'Ordered late at night and the booster had already started by morning. Insane speed.' },
-  { name: 'VoidWalker_', rank: 'Diamond → Master', rating: 5, comment: 'The high-elo service is no joke. Challenger-level booster, impeccable winrate. Very impressed.' },
-  { name: 'MidOrFeed22', rank: 'Bronze → Gold', rating: 5, comment: 'Not just boosted my account but learned a lot watching my booster via the stream feature.' },
+  { name: 'Alex M.', rank: 'Ouro → Platina', rating: 5, comment: 'Experiência muito tranquila. Cheguei à Platina em 2 dias e recebi atualizações durante todo o pedido.' },
+  { name: 'TurboKai', rank: 'Prata → Diamante', rating: 5, comment: 'Fui do Prata ao Diamante em uma semana. Também usei coaching e mudou completamente minha forma de jogar.' },
+  { name: 'Sarah V.', rank: 'Ferro → Ouro', rating: 5, comment: 'Eu estava com receio no começo, mas o serviço foi seguro, rápido e com ótima comunicação.' },
+  { name: 'NightFury99', rank: 'Bronze → Platina', rating: 5, comment: 'Usei a transmissão ao vivo e acompanhei todas as partidas. O booster jogou muito bem.' },
+  { name: 'CosmicPlayer', rank: 'Platina → Diamante', rating: 5, comment: 'Segunda vez usando o serviço. O atendimento continua rápido e o booster foi muito responsivo.' },
+  { name: 'JaxMain', rank: 'Ouro → Esmeralda', rating: 4, comment: 'Demorou um pouco mais do que o previsto, mas o booster manteve boa comunicação. Fiquei satisfeito.' },
+  { name: 'CryptoADC', rank: 'Prata → Ouro', rating: 5, comment: 'Pedi tarde da noite e de manhã o booster já tinha começado. A velocidade surpreendeu.' },
+  { name: 'VoidWalker_', rank: 'Diamante → Mestre', rating: 5, comment: 'O serviço high elo é sério. Booster nível Desafiante, ótima taxa de vitória e execução impecável.' },
+  { name: 'MidOrFeed22', rank: 'Bronze → Ouro', rating: 5, comment: 'Além de subir minha conta, aprendi bastante acompanhando as partidas pela transmissão.' },
 ]
 
 function StarRating({ rating }: { rating: number }) {
@@ -29,8 +29,8 @@ export function ReviewsPage() {
     <div className="py-16">
       <div className="container-app max-w-5xl space-y-12">
         <div className="text-center">
-          <p className="section-label mb-3">Verified customers</p>
-          <h1 className="text-4xl font-extrabold text-ink mb-2">Customer Reviews</h1>
+          <p className="section-label mb-3">Clientes verificados</p>
+          <h1 className="text-4xl font-extrabold text-ink mb-2">Avaliações de clientes</h1>
           <div className="flex items-center justify-center gap-3 mt-4">
             <div className="flex gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -38,7 +38,7 @@ export function ReviewsPage() {
               ))}
             </div>
             <span className="text-2xl font-bold text-ink">{avg}</span>
-            <span className="text-ink-secondary">/ 5 from {REVIEWS.length} reviews</span>
+            <span className="text-ink-secondary">/ 5 com {REVIEWS.length} avaliações</span>
           </div>
         </div>
 

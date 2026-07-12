@@ -16,7 +16,7 @@ export function HomePage() {
 
   const STATS = [
     { value: '48.200+', label: t('home.stats.ordersCompleted') },
-    { value: '4,94★',   label: t('home.stats.avgRating')       },
+    { value: '4,94/5',  label: t('home.stats.avgRating')       },
     { value: '88%',     label: t('home.stats.winRate')          },
     { value: '340+',    label: t('home.stats.activeBoosters')   },
   ]
@@ -64,7 +64,7 @@ export function HomePage() {
   ]
 
   const INCLUDED = [
-    'Boosters Grão-mestre ou acima',
+    'Boosters Grão-mestre ou Desafiante',
     'VPN ativado em cada partida',
     'Conta offline durante todo o serviço',
     'Chat em PT-BR com o booster',

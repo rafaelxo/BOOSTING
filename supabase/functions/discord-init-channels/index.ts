@@ -1,4 +1,6 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { constantTimeEqual } from '../_shared/crypto.ts'
+import { jsonResponse } from '../_shared/responses.ts'
 
 const DISCORD_API = 'https://discord.com/api/v10'
 const BOT_TOKEN     = Deno.env.get('DISCORD_BOT_TOKEN')  ?? ''
@@ -18,7 +20,10 @@ async function send(channelId: string, payload: object) {
     headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    console.error(`Discord init message failed ${res.status}:`, await res.text())
+    throw new Error(`Discord ${res.status}`)
+  }
 }
 
 // ─── Mensagens de cada canal ──────────────────────────────────────────────────
@@ -26,14 +31,14 @@ async function send(channelId: string, payload: object) {
 async function initSobreNos(channelId: string) {
   await send(channelId, {
     embeds: [{
-      title: '🏔️ Sobre a EloPeak',
+      title: 'Sobre a EloPeak',
       description:
         'Somos uma plataforma especializada em serviços para **League of Legends**, conectando jogadores a boosters aprovados de forma prática, transparente e segura.\n\n' +
         '*Nosso objetivo é oferecer uma experiência profissional, rápida e segura para todos os clientes.*',
       color: 0x22C55E,
       fields: [
         {
-          name: '🎮 Nossos Serviços',
+          name: 'Nossos Serviços',
           value:
             '• **Elo Boost** — um profissional joga na sua conta para alcançar o elo desejado.\n' +
             '• **Duo Boost** — jogue ao lado de um booster experiente durante a subida.\n' +
@@ -43,10 +48,10 @@ async function initSobreNos(channelId: string) {
           inline: false,
         },
         {
-          name: '🔒 Segurança e Tecnologia',
+          name: 'Segurança e Tecnologia',
           value:
-            '• Acesso protegido — o booster não recebe sua senha diretamente.\n' +
-            '• Código temporário de autenticação para cada pedido.\n' +
+            '• Credenciais protegidas por criptografia e acesso restrito ao pedido.\n' +
+            '• O booster designado acessa apenas as informações necessárias para executar o serviço.\n' +
             '• Acompanhamento em tempo real e suporte 24 horas.',
           inline: false,
         },
@@ -59,14 +64,14 @@ async function initSobreNos(channelId: string) {
 async function initRegras(channelId: string) {
   await send(channelId, {
     embeds: [{
-      title: '📋 Regras da Comunidade',
+      title: 'Regras da Comunidade',
       description:
         'Ao participar deste servidor, você concorda em respeitar todas as diretrizes abaixo.\n' +
         'O não cumprimento poderá resultar em advertência, silenciamento temporário ou **remoção permanente** da comunidade.',
       color: 0xE74C3C,
       fields: [
         {
-          name: '🤝 Respeito e Convivência',
+          name: 'Respeito e Convivência',
           value:
             '• Mantenha um comportamento respeitoso com todos os membros.\n' +
             '• Comentários ofensivos, preconceituosos, discriminatórios ou qualquer forma de assédio não serão tolerados.\n' +
@@ -74,7 +79,7 @@ async function initRegras(channelId: string) {
           inline: false,
         },
         {
-          name: '💬 Mensagens e Divulgação',
+          name: 'Mensagens e Divulgação',
           value:
             '• É proibido enviar mensagens repetidas, flood ou qualquer forma de spam.\n' +
             '• Não promova plataformas, serviços ou comunidades concorrentes.\n' +
@@ -82,7 +87,7 @@ async function initRegras(channelId: string) {
           inline: false,
         },
         {
-          name: '🔐 Segurança',
+          name: 'Segurança',
           value:
             '• Nunca publique informações sensíveis, como senhas, logins ou dados pessoais.\n' +
             '• O compartilhamento de credenciais relacionadas aos pedidos deve ocorrer apenas pelos sistemas oficiais da plataforma.\n' +
@@ -90,7 +95,7 @@ async function initRegras(channelId: string) {
           inline: false,
         },
         {
-          name: '🎟️ Pedidos e Atendimento',
+          name: 'Pedidos e Atendimento',
           value:
             '• Dúvidas, problemas ou solicitações relacionadas a pedidos devem ser tratadas através do sistema de tickets.\n' +
             '• Negociações diretas entre membros não são recomendadas nem possuem suporte da plataforma.\n' +
@@ -98,14 +103,14 @@ async function initRegras(channelId: string) {
           inline: false,
         },
         {
-          name: '🚫 Conteúdo Proibido',
+          name: 'Conteúdo Proibido',
           value:
             '• É proibido compartilhar conteúdo ilegal, impróprio ou que infrinja os Termos de Serviço do Discord.\n' +
             '• Acusações falsas, difamação ou tentativas de prejudicar membros, clientes ou a empresa poderão resultar em banimento permanente.',
           inline: false,
         },
         {
-          name: '⚖️ Disposições Gerais',
+          name: 'Disposições Gerais',
           value:
             '• A equipe de moderação reserva-se o direito de agir em situações não previstas nestas regras para preservar a organização e a segurança da comunidade.\n' +
             '• O desconhecimento das regras não isenta nenhum usuário de suas responsabilidades.',
@@ -120,14 +125,14 @@ async function initRegras(channelId: string) {
 async function initAnuncios(channelId: string) {
   await send(channelId, {
     embeds: [{
-      title: '📣 Canal de Anúncios',
+      title: 'Canal de Anúncios',
       description:
         'Bem-vindo ao canal oficial de anúncios da **EloPeak**.\n\n' +
         'Este espaço é reservado exclusivamente para comunicações da equipe e da plataforma. Aqui você encontrará todas as informações importantes relacionadas aos nossos serviços e à comunidade.',
       color: 0x3498DB,
       fields: [
         {
-          name: '📌 O que será publicado aqui?',
+          name: 'O que será publicado aqui?',
           value:
             '• Atualizações da plataforma e novos recursos\n' +
             '• Promoções, cupons e ofertas especiais\n' +
@@ -139,7 +144,7 @@ async function initAnuncios(channelId: string) {
           inline: false,
         },
         {
-          name: '⚠️ Importante',
+          name: 'Importante',
           value:
             '• Este canal possui apenas foco informativo.\n' +
             '• Recomendamos manter as notificações ativadas para acompanhar todas as novidades em primeira mão.\n' +
@@ -155,30 +160,30 @@ async function initAnuncios(channelId: string) {
 async function initComoComprar(channelId: string) {
   await send(channelId, {
     embeds: [{
-      title: '🛒 Como Comprar na EloPeak',
+      title: 'Como Comprar na EloPeak',
       description: 'Comprar é simples, seguro e transparente. Siga o passo a passo:',
       color: 0x9B59B6,
       fields: [
         {
-          name: '📝 Passo a Passo',
+          name: 'Passo a Passo',
           value:
-            '**1️⃣ Crie sua conta** — Acesse nossa plataforma e cadastre-se gratuitamente com Discord.\n' +
-            '**2️⃣ Escolha o serviço** — Selecione entre Elo Boost, Duo Boost, MD5, Pacotes de Vitórias ou Coach.\n' +
-            '**3️⃣ Configure seu pedido** — Informe seu rank atual, rank desejado, servidor e os adicionais que desejar.\n' +
-            '**4️⃣ Realize o pagamento** — Pague com segurança via Pix ou cartão de crédito.\n' +
-            '**5️⃣ Acompanhe em tempo real** — Um booster aprovado será atribuído ao seu pedido. Acompanhe tudo pelo painel.\n' +
-            '**6️⃣ Receba o resultado** — Após a conclusão, avalie o serviço e aproveite!',
+            '**1. Crie sua conta** — Acesse nossa plataforma e cadastre-se gratuitamente com Discord.\n' +
+            '**2. Escolha o serviço** — Selecione entre Solo/Duo Boost, MD5, Pacotes de Vitórias ou Coach.\n' +
+            '**3. Configure seu pedido** — Informe seu rank atual, rank desejado, média de pontos e os adicionais que desejar.\n' +
+            '**4. Realize o pagamento** — Pague com segurança via Pix.\n' +
+            '**5. Acompanhe em tempo real** — Um booster aprovado será atribuído ao seu pedido. Acompanhe tudo pelo painel.\n' +
+            '**6. Receba o resultado** — Após a conclusão, avalie o serviço e aproveite!',
           inline: false,
         },
         {
-          name: '🔒 Sua segurança em primeiro lugar',
+          name: 'Sua segurança em primeiro lugar',
           value:
-            'Você **nunca** precisa compartilhar sua senha.\n' +
-            'O acesso do booster é feito por **código temporário** gerado pela plataforma para cada pedido.',
+            'Quando um serviço exigir acesso à conta, envie as credenciais somente pela plataforma oficial.\n' +
+            'As credenciais são criptografadas e liberadas apenas para o booster designado durante a execução do pedido.',
           inline: false,
         },
         {
-          name: '❓ Ainda tem dúvidas?',
+          name: 'Ainda tem dúvidas?',
           value: 'Abra um ticket no canal de suporte ou entre em contato com nossa equipe. Estamos disponíveis 24 horas.',
           inline: false,
         },
@@ -191,7 +196,7 @@ async function initComoComprar(channelId: string) {
 async function initReviews(channelId: string) {
   await send(channelId, {
     embeds: [{
-      title: '⭐ Canal de Reviews',
+      title: 'Canal de Reviews',
       description:
         'Este canal é dedicado às avaliações dos **compradores** que utilizaram nossos serviços.\n\n' +
         'Se você comprou um serviço na **EloPeak**, compartilhe aqui como foi sua experiência. ' +
@@ -199,7 +204,7 @@ async function initReviews(channelId: string) {
       color: 0xF1C40F,
       fields: [
         {
-          name: '💬 O que você pode compartilhar',
+          name: 'O que você pode compartilhar',
           value:
             '• Como foi a experiência com o booster\n' +
             '• Qualidade e velocidade do serviço\n' +
@@ -207,14 +212,14 @@ async function initReviews(channelId: string) {
           inline: false,
         },
         {
-          name: '📌 Regra do canal',
+          name: 'Regra do canal',
           value:
             'Este canal é **exclusivo para compradores**. Apenas quem realizou um pedido pode deixar review aqui.\n' +
             'Avaliações falsas ou de membros que não utilizaram os serviços serão removidas.',
           inline: false,
         },
       ],
-      footer: { text: 'Obrigado por confiar na EloPeak! 🏆' },
+      footer: { text: 'Obrigado por confiar na EloPeak!' },
     }],
   })
 }
@@ -232,7 +237,16 @@ const INITS: { key: keyof typeof CHANNELS; fn: (id: string) => Promise<void> }[]
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
 
-  if (req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!WEBHOOK_SECRET) {
+    return new Response('Server misconfigured', { status: 500 })
+  }
+
+  if (!BOT_TOKEN) {
+    return new Response('Server misconfigured', { status: 500 })
+  }
+
+  const receivedSecret = req.headers.get('x-webhook-secret') ?? ''
+  if (!constantTimeEqual(receivedSecret, WEBHOOK_SECRET)) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -252,7 +266,5 @@ serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify(results, null, 2), {
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return jsonResponse(req, results)
 })

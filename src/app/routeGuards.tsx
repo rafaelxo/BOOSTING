@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { PageLoader } from '@/components/ui/Spinner'
+import { hasAcceptedLegal } from '@/lib/legal'
 
 export function SuspensePage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>
@@ -17,6 +18,11 @@ export function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' 
     return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
   if (!profile) return <PageLoader />
+
+  if (!hasAcceptedLegal(profile) && location.pathname !== '/legal/acceptance') {
+    const redirect = encodeURIComponent(location.pathname + location.search)
+    return <Navigate to={`/legal/acceptance?redirect=${redirect}`} replace />
+  }
 
   // `support` has admin-panel access at the DB level (is_admin() treats
   // them the same) — without this, a support profile hitting a

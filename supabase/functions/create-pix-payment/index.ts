@@ -1,78 +1,85 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://esm.sh/zod@3.23.8'
 import { computeOrderPrice, type OrderPriceInput, type RankValue } from '../../../shared/pricing.ts'
+import { handleCors } from '../_shared/cors.ts'
+import { errorResponse, jsonResponse } from '../_shared/responses.ts'
+import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
+import { getAuthUser } from '../_shared/authUser.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const rankSchema = z.object({
+  tier: z.enum(['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger']),
+  division: z.enum(['IV', 'III', 'II', 'I']).nullable().optional(),
+})
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  })
-}
+const orderIntentSchema = z.object({
+  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching']),
+  service_id: z.string().min(1, 'service_id é obrigatório'),
+  game_id: z.string().min(1, 'game_id é obrigatório'),
+  queue_type: z.enum(['solo_duo', 'flex']),
+  boost_mode: z.enum(['solo', 'duo']),
+  server: z.string().min(1, 'server é obrigatório'),
+  current_rank: rankSchema.nullable(),
+  target_rank: rankSchema.nullable(),
+  current_lp: z.number().int().min(0).max(9999).default(0),
+  avg_lp_gain: z.number().int().min(1).max(50).default(20),
+  avg_lp_loss: z.number().int().min(1).max(50).default(15),
+  target_lp: z.number().int().min(0).max(9999).nullable(),
+  wins_purchased: z.number().int().min(1).max(50).nullable(),
+  sessions_purchased: z.number().int().min(1).max(20).nullable(),
+  extra_ids: z.array(z.string().min(1)).default([]),
+  win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable(),
+  customer_notes: z.string().max(500).nullable(),
+})
+
+const bodySchema = z.object({
+  order_id: z.string().uuid().optional(),
+  intent: orderIntentSchema.optional(),
+}).refine((body) => body.order_id || body.intent, {
+  message: 'Informe order_id ou intent',
+})
 
 // Intenção do pedido enviada pelo cliente — nunca contém preço. O total é
 // sempre recomputado aqui a partir de shared/pricing.ts (mesma lógica usada
 // pelo order-builder só para exibir estimativa).
-interface OrderIntent {
-  service_type: OrderPriceInput['serviceType']
-  service_id: string
-  game_id: string
-  queue_type: string
-  boost_mode: 'solo' | 'duo'
-  server: string
-  current_rank: RankValue | null
-  target_rank: RankValue | null
-  current_lp: number
-  avg_lp_gain: number
-  avg_lp_loss: number
-  target_lp: number | null
-  wins_purchased: number | null
-  sessions_purchased: number | null
-  extra_ids: string[]
-  win_package: 1 | 3 | 5 | null
-  customer_notes: string | null
-}
-
-function isValidIntent(v: unknown): v is OrderIntent {
-  if (!v || typeof v !== 'object') return false
-  const i = v as Record<string, unknown>
-  return (
-    typeof i.service_type === 'string' &&
-    typeof i.service_id === 'string' &&
-    typeof i.game_id === 'string' &&
-    typeof i.queue_type === 'string' &&
-    (i.boost_mode === 'solo' || i.boost_mode === 'duo') &&
-    typeof i.server === 'string' &&
-    i.current_rank !== undefined &&
-    Array.isArray(i.extra_ids)
-  )
-}
+type OrderIntent = z.infer<typeof orderIntentSchema>
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+  const cors = handleCors(req)
+  if (cors) return cors
 
   try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return json({ error: 'Missing authorization header' }, 401)
+    if (!MP_ACCESS_TOKEN || !SUPABASE_URL) {
+      return errorResponse(req, 'Server misconfigured', 500)
+    }
 
-    // Authenticate caller
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: { user }, error: authErr } = await userClient.auth.getUser()
-    if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
+    const auth = await getAuthUser(req.headers.get('Authorization'))
+    if (!auth) return errorResponse(req, 'Unauthorized', 401)
 
-    const body = await req.json()
-    const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    let rawBody: unknown
+    try {
+      rawBody = await req.json()
+    } catch {
+      return errorResponse(req, 'JSON inválido', 400)
+    }
+
+    const parsedBody = bodySchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return jsonResponse(req, {
+        error: 'Body inválido',
+        issues: parsedBody.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          message: issue.message,
+        })),
+      }, 400)
+    }
+
+    const body = parsedBody.data
+    const userClient = auth.client
+    const { user } = auth
+    const serviceClient = supabaseAdmin()
 
     let orderId: string
     let order: { id: string; customer_id: string; total_price: number; mp_payment_id: string | null }
@@ -87,14 +94,14 @@ serve(async (req) => {
         .eq('id', orderId)
         .single()
 
-      if (orderErr || !existingOrder) return json({ error: 'Order not found' }, 404)
-      if (existingOrder.customer_id !== user.id) return json({ error: 'Forbidden' }, 403)
-      if (existingOrder.status !== 'awaiting_payment') return json({ error: 'Order is not awaiting payment' }, 400)
+      if (orderErr || !existingOrder) return errorResponse(req, 'Order not found', 404)
+      if (existingOrder.customer_id !== user.id) return errorResponse(req, 'Forbidden', 403)
+      if (existingOrder.status !== 'awaiting_payment') return errorResponse(req, 'Order is not awaiting payment', 400)
 
       order = existingOrder
-    } else if (isValidIntent(body.intent)) {
+    } else if (body.intent) {
       // ── New order: server computes the authoritative price ──────────────────
-      const intent = body.intent as OrderIntent
+      const intent: OrderIntent = body.intent
       const extraIds = [...new Set(intent.extra_ids)].filter((id) => typeof id === 'string')
 
       let extras: { id: string; name: string; price_modifier: number; price_modifier_pct: number }[] = []
@@ -104,15 +111,15 @@ serve(async (req) => {
           .select('id, name, price_modifier, price_modifier_pct')
           .in('id', extraIds)
           .eq('is_active', true)
-        if (extraErr) return json({ error: 'Failed to load extras' }, 500)
+        if (extraErr) return errorResponse(req, 'Failed to load extras', 500)
         extras = extraRows ?? []
       }
 
       const priceInput: OrderPriceInput = {
         serviceType: intent.service_type,
         boostMode: intent.boost_mode,
-        currentRank: intent.current_rank,
-        targetRank: intent.target_rank,
+        currentRank: intent.current_rank as RankValue | null,
+        targetRank: intent.target_rank as RankValue | null,
         currentLp: intent.current_lp ?? 0,
         avgLpGain: intent.avg_lp_gain ?? 20,
         avgLpLoss: intent.avg_lp_loss ?? 15,
@@ -124,7 +131,7 @@ serve(async (req) => {
       }
 
       const priced = computeOrderPrice(priceInput)
-      if (priced.totalPrice <= 0) return json({ error: 'Invalid order amount' }, 400)
+      if (priced.totalPrice <= 0) return errorResponse(req, 'Invalid order amount', 400)
 
       const extrasJson = extras.map((e) => {
         const b = priced.extrasBreakdown.find((x) => x.id === e.id)
@@ -156,17 +163,17 @@ serve(async (req) => {
         .select('id, customer_id, total_price, mp_payment_id')
         .single()
 
-      if (insertErr || !inserted) return json({ error: insertErr?.message ?? 'Erro ao criar pedido' }, 500)
+      if (insertErr || !inserted) return errorResponse(req, insertErr?.message ?? 'Erro ao criar pedido', 500)
       orderId = inserted.id
       order = inserted
     } else {
-      return json({ error: 'Missing order_id or intent' }, 400)
+      return errorResponse(req, 'Missing order_id or intent', 400)
     }
 
     // Amount is always derived from the DB row we just read/created — never
     // recomputed from anything the client sends at this point.
     if (!order.total_price || Number(order.total_price) <= 0) {
-      return json({ error: 'Invalid order amount', order_id: orderId }, 400)
+      return jsonResponse(req, { error: 'Invalid order amount', order_id: orderId }, 400)
     }
 
     // If there is already a pending MP payment for this order, try to reuse it
@@ -179,7 +186,7 @@ serve(async (req) => {
         const mp = await existing.json()
         // pending or in_process: return the existing QR code
         if (mp.status === 'pending' || mp.status === 'in_process') {
-          return json({
+          return jsonResponse(req, {
             order_id: orderId,
             total_price: order.total_price,
             payment_id: mp.id,
@@ -223,7 +230,7 @@ serve(async (req) => {
       // Include order_id even on failure: the order row already exists at
       // this point, so a client retry must reuse it (order_id path) instead
       // of resending an intent and creating a second order.
-      return json({ error: 'Falha ao criar pagamento PIX', details: err, order_id: orderId }, 502)
+      return jsonResponse(req, { error: 'Falha ao criar pagamento PIX', order_id: orderId }, 502)
     }
 
     let mp = await mpResp.json()
@@ -264,7 +271,7 @@ serve(async (req) => {
       ),
     ])
 
-    return json({
+    return jsonResponse(req, {
       order_id: orderId,
       total_price: order.total_price,
       payment_id: mp.id,
@@ -275,6 +282,6 @@ serve(async (req) => {
     })
   } catch (err) {
     console.error('create-pix-payment error:', err)
-    return json({ error: (err as Error).message }, 500)
+    return errorResponse(req, (err as Error).message, 500)
   }
 })

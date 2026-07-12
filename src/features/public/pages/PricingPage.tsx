@@ -200,7 +200,7 @@ export function PricingPage() {
             <div className="flex-1">
               <h2 className="text-lg font-bold text-ink mb-1">Coaching</h2>
               <p className="text-sm text-ink-secondary mb-3">
-                Sessões individuais com um booster Grão-mestre ou acima. O valor é combinado diretamente com o booster — não há cobrança antecipada.
+                Sessões individuais com um booster Grão-mestre ou Desafiante. O valor é combinado diretamente com o booster — não há cobrança antecipada.
               </p>
               <div className="flex flex-wrap gap-3 text-sm mb-3">
                 {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (

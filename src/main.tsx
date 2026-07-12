@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
+import { AlertTriangle } from 'lucide-react'
 import { Providers } from './app/providers'
 import { router } from './app/router'
 import './styles/globals.css'
@@ -16,7 +17,9 @@ class ErrorBoundary extends React.Component<
       return (
         <div className="min-h-screen flex items-center justify-center bg-bg-base px-6">
           <div className="max-w-md text-center space-y-4">
-            <p className="text-3xl">⚠️</p>
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-danger/10 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-danger" />
+            </div>
             <h1 className="text-xl font-bold text-ink">Algo deu errado</h1>
             <pre className="text-xs text-danger bg-danger/10 rounded-xl p-4 text-left overflow-auto max-h-48">
               {(this.state.error as Error).message}

@@ -1,11 +1,18 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://esm.sh/zod@3.23.8'
 import { createHmac } from 'node:crypto'
+import { constantTimeEqual } from '../_shared/crypto.ts'
+import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const MP_WEBHOOK_SECRET = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET') ?? ''
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+const webhookBodySchema = z.object({
+  type: z.string().optional(),
+  data: z.object({
+    id: z.union([z.string(), z.number()]).optional(),
+  }).passthrough().optional(),
+}).passthrough()
 
 // Verify Mercado Pago webhook signature (v2 format)
 // Docs: https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks
@@ -27,7 +34,7 @@ function verifySignature(
   const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`
   const expected = createHmac('sha256', MP_WEBHOOK_SECRET).update(manifest).digest('hex')
 
-  return expected === v1
+  return constantTimeEqual(expected, v1)
 }
 
 // Map MP statuses to our internal payment_status enum
@@ -48,19 +55,30 @@ serve(async (req) => {
     return new Response('method not allowed', { status: 405 })
   }
 
-  let body: Record<string, unknown>
+  if (!MP_ACCESS_TOKEN) {
+    console.error('MERCADOPAGO_ACCESS_TOKEN is not set')
+    return new Response('server misconfigured', { status: 500 })
+  }
+
+  let rawBody: unknown
   try {
-    body = await req.json()
+    rawBody = await req.json()
   } catch {
     return new Response('invalid json', { status: 400 })
   }
+
+  const parsedBody = webhookBodySchema.safeParse(rawBody)
+  if (!parsedBody.success) {
+    return new Response('invalid payload', { status: 400 })
+  }
+  const body = parsedBody.data
 
   // We only handle payment notifications
   if (body.type !== 'payment' || !body.data) {
     return new Response('ok', { status: 200 })
   }
 
-  const dataId = String((body.data as Record<string, unknown>).id ?? '')
+  const dataId = String(body.data.id ?? '')
   if (!dataId) return new Response('ok', { status: 200 })
 
   // Verify webhook authenticity — fail closed in all environments.
@@ -82,7 +100,7 @@ serve(async (req) => {
     }
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const supabase = supabaseAdmin()
 
   // Always re-fetch the payment from MP API — never trust webhook body data directly
   const mpResp = await fetch(`https://api.mercadopago.com/v1/payments/${dataId}`, {

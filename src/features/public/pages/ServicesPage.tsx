@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { TrendingUp, Zap, Users, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import type { RankTier } from '@/types'
 
 const SERVICES = [
   {
@@ -12,7 +11,7 @@ const SERVICES = [
     tagline: 'Suba divisão por divisão até o rank desejado.',
     description:
       'Nossos boosters jogam na sua conta (Solo Boost) ou ao seu lado em duo queue (Duo Boost) e sobem do seu rank atual até o rank desejado. Você escolhe o tipo de fila, preferências de campeão e extras.',
-    rankRange: ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'] as RankTier[],
+    rankRange: RANK_TIER_ORDER,
     highlights: [
       'Solo boost ou duo boost — você escolhe',
       'Qualquer rank — do Ferro ao Desafiante',
@@ -31,7 +30,7 @@ const SERVICES = [
     tagline: 'Compre um número fixo de vitórias rapidamente.',
     description:
       'Perfeito para ganhar LP rápido, completar missões ou subir antes de uma virada de temporada. Escolha quantas vitórias precisa e nossos boosters cuidam do resto.',
-    rankRange: ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'] as RankTier[],
+    rankRange: RANK_TIER_ORDER,
     highlights: [
       'Escolha de 3 a 50 vitórias',
       'Solo queue ou flex',
@@ -49,7 +48,7 @@ const SERVICES = [
     tagline: 'Aprenda com os melhores e melhore de verdade.',
     description:
       'Sessões 1-a-1 ao vivo com coaches de alto ELO. Revisão de VOD, coaching em jogo, fundamentos de campeão, estratégia macro e gestão mental — tudo coberto.',
-    rankRange: ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'] as RankTier[],
+    rankRange: RANK_TIER_ORDER,
     highlights: [
       'Opções de sessão de 1h ou 2h',
       'Revisão de VOD inclusa',
@@ -67,7 +66,7 @@ const SERVICES = [
     tagline: 'Comece a temporada no rank que você merece.',
     description:
       'Nossos profissionais jogam suas 5 partidas de posicionamento para garantir que você comece a temporada no rank mais alto possível. Inclui otimização de MMR.',
-    rankRange: ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond'] as RankTier[],
+    rankRange: RANK_TIER_ORDER,
     highlights: [
       '5 partidas de placement completas',
       'Pré-boost de MMR disponível',

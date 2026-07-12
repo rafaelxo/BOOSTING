@@ -4,6 +4,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_VERSION, hasAcceptedLegal } from '@/lib/legal'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,7 +97,33 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       data = result.data
     }
 
-    if (data) setProfile(data)
+    if (data) {
+      const hasPendingLegalAcceptance = localStorage.getItem(LEGAL_ACCEPTANCE_STORAGE_KEY) === LEGAL_VERSION
+
+      if (hasPendingLegalAcceptance && !hasAcceptedLegal(data)) {
+        const acceptedAt = new Date().toISOString()
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            terms_accepted_at: acceptedAt,
+            privacy_accepted_at: acceptedAt,
+            legal_version: LEGAL_VERSION,
+          })
+          .eq('id', userId)
+
+        if (!error) {
+          data = {
+            ...data,
+            terms_accepted_at: acceptedAt,
+            privacy_accepted_at: acceptedAt,
+            legal_version: LEGAL_VERSION,
+          }
+          localStorage.removeItem(LEGAL_ACCEPTANCE_STORAGE_KEY)
+        }
+      }
+
+      setProfile(data)
+    }
     setLoading(false)
     setInitialized(true)
   }

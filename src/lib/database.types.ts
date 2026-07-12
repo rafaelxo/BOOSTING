@@ -799,7 +799,10 @@ export type Database = {
           discord_id: string | null
           email: string
           id: string
+          legal_version: string | null
+          privacy_accepted_at: string | null
           role: Database["public"]["Enums"]["user_role"]
+          terms_accepted_at: string | null
           updated_at: string
           username: string
         }
@@ -809,7 +812,10 @@ export type Database = {
           discord_id?: string | null
           email: string
           id: string
+          legal_version?: string | null
+          privacy_accepted_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          terms_accepted_at?: string | null
           updated_at?: string
           username: string
         }
@@ -819,7 +825,10 @@ export type Database = {
           discord_id?: string | null
           email?: string
           id?: string
+          legal_version?: string | null
+          privacy_accepted_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          terms_accepted_at?: string | null
           updated_at?: string
           username?: string
         }

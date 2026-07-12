@@ -135,7 +135,7 @@ export function BoosterDashboard() {
                 )}
               </p>
               <p className="text-xs text-ink-muted mt-0.5">
-                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 2 pedidos (máx 1 duo)'}
+                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'}
               </p>
             </div>
           </div>

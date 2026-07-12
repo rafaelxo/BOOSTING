@@ -17,11 +17,14 @@ const FAQPage          = lazy(() => import('@/features/public/pages/FAQPage').th
 const BoosterApplyPage = lazy(() => import('@/features/public/pages/BoosterApplyPage').then(m => ({ default: m.BoosterApplyPage })))
 const BoostersPage               = lazy(() => import('@/features/public/pages/BoostersPage').then(m => ({ default: m.BoostersPage })))
 const BoosterPublicProfilePage   = lazy(() => import('@/features/public/pages/BoosterPublicProfilePage').then(m => ({ default: m.BoosterPublicProfilePage })))
+const TermsPage                   = lazy(() => import('@/features/public/pages/LegalPages').then(m => ({ default: m.TermsPage })))
+const PrivacyPage                 = lazy(() => import('@/features/public/pages/LegalPages').then(m => ({ default: m.PrivacyPage })))
 
 // Auth pages
 const LoginPage          = lazy(() => import('@/features/auth/LoginPage').then(m => ({ default: m.LoginPage })))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
 const ResetPasswordPage  = lazy(() => import('@/features/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
+const LegalAcceptancePage = lazy(() => import('@/features/auth/LegalAcceptancePage').then(m => ({ default: m.LegalAcceptancePage })))
 
 // Customer pages
 const CustomerDashboard = lazy(() => import('@/features/customer/pages/Dashboard').then(m => ({ default: m.CustomerDashboard })))
@@ -67,6 +70,8 @@ export const router = createBrowserRouter([
       { path: '/security', element: <SuspensePage><SecurityPage /></SuspensePage> },
       { path: '/faq',      element: <SuspensePage><FAQPage /></SuspensePage> },
       { path: '/reviews',  element: <SuspensePage><ReviewsPage /></SuspensePage> },
+      { path: '/terms',    element: <SuspensePage><TermsPage /></SuspensePage> },
+      { path: '/privacy',  element: <SuspensePage><PrivacyPage /></SuspensePage> },
       { path: '/boosters',     element: <SuspensePage><BoostersPage /></SuspensePage> },
       { path: '/boosters/:id', element: <SuspensePage><BoosterPublicProfilePage /></SuspensePage> },
     ],
@@ -77,6 +82,7 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       { path: '/apply', element: <SuspensePage><BoosterApplyPage /></SuspensePage> },
+      { path: '/legal/acceptance', element: <SuspensePage><LegalAcceptancePage /></SuspensePage> },
     ],
   },
 
@@ -85,7 +91,7 @@ export const router = createBrowserRouter([
     element: <RequireGuest />,
     children: [
       { path: '/login',           element: <SuspensePage><LoginPage /></SuspensePage> },
-      { path: '/register',        element: <Navigate to="/login" replace /> },
+      { path: '/register',        element: <Navigate to="/login?mode=register" replace /> },
       { path: '/forgot-password', element: <SuspensePage><ForgotPasswordPage /></SuspensePage> },
       { path: '/reset-password',  element: <SuspensePage><ResetPasswordPage /></SuspensePage> },
     ],

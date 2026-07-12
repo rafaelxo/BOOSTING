@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Plus, ShoppingBag, MessageCircle, Zap } from 'lucide-react'
+import { Plus, ShoppingBag, MessageCircle, Zap, Sparkles } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -58,7 +58,8 @@ export function CustomerDashboard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">
-            {greeting}, {profile?.username} 👋
+            {greeting}, {profile?.username}
+            <Sparkles className="ml-2 inline h-5 w-5 text-accent align-[-2px]" />
           </h1>
           <p className="text-ink-secondary mt-1">{activeMsg}</p>
         </div>

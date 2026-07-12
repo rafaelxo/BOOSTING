@@ -1,4 +1,4 @@
-import { Shield, Lock, Eye, Cpu, Server, CreditCard } from 'lucide-react'
+import { Shield, Lock, Eye, Cpu, Server, CreditCard, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 export function SecurityPage() {
@@ -87,7 +87,7 @@ export function SecurityPage() {
               <ul className="space-y-2">
                 {items.map((item) => (
                   <li key={item} className="text-xs text-ink-secondary flex items-start gap-2">
-                    <span className="text-success mt-px">✓</span>
+                    <Check className="h-3.5 w-3.5 text-success mt-px shrink-0" />
                     {item}
                   </li>
                 ))}

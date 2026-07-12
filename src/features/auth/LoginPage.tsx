@@ -5,6 +5,7 @@ import { ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useState } from 'react'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
+import { LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_VERSION } from '@/lib/legal'
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -19,8 +20,17 @@ export function LoginPage() {
   const { t } = useTranslation()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  const isRegisterMode = searchParams.get('mode') === 'register'
+  const canSubmit = !loading && (!isRegisterMode || (termsAccepted && privacyAccepted))
 
   async function handleDiscordLogin() {
+    if (isRegisterMode && (!termsAccepted || !privacyAccepted)) {
+      setError('Para criar sua conta, aceite os Termos de Uso e a Política de Privacidade.')
+      return
+    }
+
     if (!checkRateLimit('discord-login', limits.auth)) {
       setError('Muitas tentativas de login. Aguarde 1 minuto.')
       return
@@ -39,6 +49,12 @@ export function LoginPage() {
     }
     const redirectTo = `${window.location.origin}${path}`
 
+    if (isRegisterMode) {
+      localStorage.setItem(LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_VERSION)
+    } else {
+      localStorage.removeItem(LEGAL_ACCEPTANCE_STORAGE_KEY)
+    }
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
@@ -47,6 +63,7 @@ export function LoginPage() {
       },
     })
     if (oauthError) {
+      localStorage.removeItem(LEGAL_ACCEPTANCE_STORAGE_KEY)
       setError(oauthError.message)
       setLoading(false)
     }
@@ -69,21 +86,69 @@ export function LoginPage() {
 
         <div className="card p-6 space-y-5">
           <div>
-            <h1 className="text-xl font-bold text-ink">{t('auth.login.title')}</h1>
+            <h1 className="text-xl font-bold text-ink">
+              {isRegisterMode ? 'Criar conta' : t('auth.login.title')}
+            </h1>
             <p className="text-sm text-ink-secondary mt-1">
-              Acesse sua conta com o Discord para continuar.
+              {isRegisterMode
+                ? 'Leia e aceite os documentos abaixo antes de vincular sua conta com o Discord.'
+                : 'Acesse sua conta com o Discord para continuar.'}
             </p>
           </div>
+
+          {isRegisterMode && (
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-brand"
+                />
+                <span>
+                  Li e concordo com os{' '}
+                  <Link
+                    to="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand hover:underline"
+                  >
+                    Termos de Uso
+                  </Link>.
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary">
+                <input
+                  type="checkbox"
+                  checked={privacyAccepted}
+                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-brand"
+                />
+                <span>
+                  Li e concordo com a{' '}
+                  <Link
+                    to="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand hover:underline"
+                  >
+                    Política de Privacidade
+                  </Link>.
+                </span>
+              </label>
+            </div>
+          )}
 
           <button
             type="button"
             onClick={handleDiscordLogin}
-            disabled={loading}
+            disabled={!canSubmit}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: '#5865F2' }}
           >
             <DiscordIcon className="h-5 w-5" />
-            {loading ? 'Conectando...' : 'Entrar com Discord'}
+            {loading ? 'Conectando...' : isRegisterMode ? 'Vincular com Discord' : 'Entrar com Discord'}
           </button>
 
           {error && (
@@ -91,11 +156,31 @@ export function LoginPage() {
           )}
 
           <p className="text-xs text-ink-muted text-center">
-            Ao entrar, você concorda com os nossos{' '}
-            <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
-            {' '}e{' '}
-            <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
+            {isRegisterMode ? 'Já tem conta?' : 'Ainda não tem conta?'}{' '}
+            <Link
+              to={isRegisterMode ? '/login' : '/register'}
+              className="text-brand hover:underline"
+            >
+              {isRegisterMode ? 'Entrar' : 'Criar conta'}
+            </Link>
           </p>
+
+          {!isRegisterMode && (
+            <p className="text-xs text-ink-muted text-center">
+              Consulte os nossos{' '}
+              <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
+              {' '}e a{' '}
+              <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
+            </p>
+          )}
+          {isRegisterMode && (
+            <p className="text-xs text-ink-muted text-center">
+              Os documentos podem ser consultados a qualquer momento em{' '}
+              <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
+              {' '}e{' '}
+              <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
+            </p>
+          )}
         </div>
 
       </div>

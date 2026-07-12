@@ -77,6 +77,10 @@ export interface Profile {
   role: UserRole
   username: string
   avatar_url: string | null
+  discord_id: string | null
+  terms_accepted_at: string | null
+  privacy_accepted_at: string | null
+  legal_version: string | null
   created_at: string
   updated_at: string
 }

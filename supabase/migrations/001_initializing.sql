@@ -1,5 +1,13 @@
 -- ============================================================
 -- EloBoost — Complete Reset & Rebuild
+--
+-- WARNING: DESTRUCTIVE BASELINE MIGRATION.
+-- This migration intentionally drops public tables/functions/types and deletes
+-- all auth.users before rebuilding the schema. It exists as the original reset
+-- baseline for this project and must not be replayed against any environment
+-- that contains production/staging data. New schema changes should be added as
+-- forward-only migrations instead of editing this reset flow.
+--
 -- Run in Supabase SQL Editor (with service_role / postgres context)
 -- This file: drops all users, drops all tables/functions/types,
 -- then rebuilds from scratch using only what is currently in use.
@@ -1344,7 +1352,7 @@ from lol, (values
 -- Service extras (final PT-BR version from migration 007)
 insert into public.service_extras (name, description, price_modifier, price_modifier_pct, sort_order, icon, is_active)
 values
-  ('Duo Boost',           'Jogue ao lado do seu booster em duo queue. +52% sobre o valor base.',         0,    52, 1, 'users',   true),
+  ('Duo Boost',           'Jogue ao lado do seu booster em duo queue. +50% sobre o valor base.',         0,    50, 1, 'users',   true),
   ('Priority Processing', 'Atribuição imediata ao booster mais bem avaliado. Início mais rápido.',       0,    15, 2, 'zap',     true),
   ('Solo Queue Only',     'O booster joga apenas SoloQ. Sem duo ou flex.',                               0,    10, 3, 'trophy',  true),
   ('Mono Champion',       'Seu campeão favorito em cada partida. Especifique nas observações.',          0,     5, 4, 'eye',     true),

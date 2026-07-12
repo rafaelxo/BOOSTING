@@ -7,7 +7,7 @@ import {
   calcMasterPlusPrice, applyLpModifier,
 } from '@/lib/pricing'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Shield, Star, Gem, Diamond, Crown, Flame, Trophy } from 'lucide-react'
+import { Shield, Star, Gem, Diamond, Crown, Flame, Trophy, Check } from 'lucide-react'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
@@ -285,7 +285,7 @@ export function StepConfigure() {
                 'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
                 boostMode === 'duo' ? 'border-brand bg-brand' : 'border-bg-overlay',
               )}>
-                {boostMode === 'duo' && <span className="text-white text-[10px] font-black">✓</span>}
+                {boostMode === 'duo' && <Check className="h-3 w-3 text-white" />}
               </div>
             </button>
           </FormField>

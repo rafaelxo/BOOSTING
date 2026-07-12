@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { z } from 'https://esm.sh/zod@3.23.8'
+import { constantTimeEqual } from '../_shared/crypto.ts'
+import { jsonResponse } from '../_shared/responses.ts'
+import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 
 const DISCORD_API     = 'https://discord.com/api/v10'
 const BOT_TOKEN       = Deno.env.get('DISCORD_BOT_TOKEN')       ?? ''
@@ -14,12 +17,19 @@ const DENY_EVERYONE  = String(1024) // deny VIEW_CHANNEL for @everyone
 
 const TERMINAL = ['completed', 'canceled', 'refunded', 'disputed', 'drop_requested']
 
-function supabaseAdmin() {
-  return createClient(
-    Deno.env.get('SUPABASE_URL')              ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  )
-}
+const orderRecordSchema = z.object({
+  id: z.string().uuid(),
+  status: z.string().min(1),
+  discord_voice_channel_id: z.string().nullable().optional(),
+}).passthrough()
+
+const dbWebhookSchema = z.union([
+  orderRecordSchema,
+  z.object({
+    record: orderRecordSchema,
+    old_record: z.object({ status: z.string().optional() }).passthrough().optional(),
+  }).passthrough(),
+])
 
 async function fetchOrderProfiles(orderId: string) {
   const db = supabaseAdmin()
@@ -69,7 +79,10 @@ async function createVoiceChannel(orderId: string, customerDiscordId: string | n
     body: JSON.stringify(body),
   })
 
-  if (!res.ok) throw new Error(`Discord create channel ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    console.error(`Discord create channel failed ${res.status}:`, await res.text())
+    throw new Error(`Discord create channel ${res.status}`)
+  }
   const channel = await res.json() as { id: string }
   return channel.id
 }
@@ -81,7 +94,8 @@ async function deleteVoiceChannel(channelId: string) {
   })
   // 404 = already deleted, that's fine
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Discord delete channel ${res.status}: ${await res.text()}`)
+    console.error(`Discord delete channel failed ${res.status}:`, await res.text())
+    throw new Error(`Discord delete channel ${res.status}`)
   }
 }
 
@@ -95,15 +109,35 @@ async function saveChannelId(orderId: string, channelId: string | null) {
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 })
 
-  if (req.headers.get('x-webhook-secret') !== WEBHOOK_SECRET) {
+  if (!WEBHOOK_SECRET) {
+    return new Response('Server misconfigured', { status: 500 })
+  }
+
+  if (!BOT_TOKEN || !GUILD_ID) {
+    return new Response('Server misconfigured', { status: 500 })
+  }
+
+  const receivedSecret = req.headers.get('x-webhook-secret') ?? ''
+  if (!constantTimeEqual(receivedSecret, WEBHOOK_SECRET)) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const payload = await req.json()
+  let rawPayload: unknown
+  try {
+    rawPayload = await req.json()
+  } catch {
+    return jsonResponse(req, { error: 'invalid json' }, 400)
+  }
+
+  const parsedPayload = dbWebhookSchema.safeParse(rawPayload)
+  if (!parsedPayload.success) {
+    return jsonResponse(req, { error: 'invalid webhook payload' }, 400)
+  }
 
   // Supabase Database Webhooks wrap the row in { type, table, record, old_record }
-  const record    = payload.record    ?? payload
-  const oldRecord = payload.old_record ?? {}
+  const payload = parsedPayload.data
+  const record = 'record' in payload ? payload.record : payload
+  const oldRecord = 'record' in payload ? payload.old_record ?? {} : {}
 
   const orderId:           string        = record.id
   const newStatus:         string        = record.status
@@ -116,10 +150,7 @@ serve(async (req) => {
       const { order, customer, booster } = await fetchOrderProfiles(orderId)
 
       if (!customer?.discord_id && !booster?.discord_id) {
-        return new Response(
-          JSON.stringify({ ok: false, reason: 'no discord_ids found for customer or booster' }),
-          { headers: { 'Content-Type': 'application/json' } }
-        )
+        return jsonResponse(req, { ok: false, reason: 'no discord_ids found for customer or booster' })
       }
 
       const channelId = await createVoiceChannel(
@@ -129,9 +160,7 @@ serve(async (req) => {
       )
       await saveChannelId(orderId, channelId)
 
-      return new Response(JSON.stringify({ ok: true, action: 'created', channelId }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return jsonResponse(req, { ok: true, action: 'created', channelId })
     }
 
     // ── Delete channel when order is terminated ──────────────────────────────
@@ -139,18 +168,12 @@ serve(async (req) => {
       await deleteVoiceChannel(existingChannelId)
       await saveChannelId(orderId, null)
 
-      return new Response(JSON.stringify({ ok: true, action: 'deleted' }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return jsonResponse(req, { ok: true, action: 'deleted' })
     }
 
-    return new Response(JSON.stringify({ ok: true, action: 'skipped' }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return jsonResponse(req, { ok: true, action: 'skipped' })
   } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    console.error('discord-order-channel error:', err)
+    return jsonResponse(req, { error: 'discord_channel_error' }, 500)
   }
 })
