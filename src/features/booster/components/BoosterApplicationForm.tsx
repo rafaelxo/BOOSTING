@@ -44,11 +44,17 @@ type FormData = z.infer<typeof schema>
 interface BoosterApplicationFormProps {
   submitLabel?: string
   onEnsureBoosterRole?: () => Promise<boolean>
+  /** Prefills the form — used to let approved boosters edit their existing application data. */
+  initialData?: Partial<FormData>
+  /** Called after a successful save instead of the default onboarding redirect. */
+  onSuccess?: () => void
 }
 
 export function BoosterApplicationForm({
   submitLabel = 'Completar Cadastro',
   onEnsureBoosterRole,
+  initialData,
+  onSuccess,
 }: BoosterApplicationFormProps) {
   const { profile } = useAuthStore()
   const navigate = useNavigate()
@@ -59,15 +65,16 @@ export function BoosterApplicationForm({
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      full_name:         '',
-      cpf:               '',
-      opgg_link:         '',
-      bio:               '',
-      can_coach:         false,
-      available_days:    [],
-      hours_per_day_min: 2,
-      hours_per_day_max: 8,
+    values: {
+      full_name:         initialData?.full_name ?? '',
+      cpf:               initialData?.cpf ?? '',
+      opgg_link:         initialData?.opgg_link ?? '',
+      bio:               initialData?.bio ?? '',
+      peak_tier:         initialData?.peak_tier as FormData['peak_tier'],
+      can_coach:         initialData?.can_coach ?? false,
+      available_days:    initialData?.available_days ?? [],
+      hours_per_day_min: initialData?.hours_per_day_min ?? 2,
+      hours_per_day_max: initialData?.hours_per_day_max ?? 8,
     },
   })
 
@@ -139,7 +146,8 @@ export function BoosterApplicationForm({
       return
     }
 
-    navigate('/booster')
+    if (onSuccess) onSuccess()
+    else navigate('/booster')
   }
 
   return (

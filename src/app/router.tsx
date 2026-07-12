@@ -33,12 +33,15 @@ const OrderDetailPage   = lazy(() => import('@/features/customer/pages/OrderDeta
 const OrderHistoryPage  = lazy(() => import('@/features/customer/pages/OrderHistory').then(m => ({ default: m.OrderHistoryPage })))
 const SupportPage       = lazy(() => import('@/features/customer/pages/Support').then(m => ({ default: m.SupportPage })))
 const TicketDetailPage  = lazy(() => import('@/features/customer/pages/TicketDetail').then(m => ({ default: m.TicketDetailPage })))
+const CustomerProfilePage = lazy(() => import('@/features/customer/pages/Profile').then(m => ({ default: m.CustomerProfilePage })))
 
 // Booster pages
 const BoosterDashboard    = lazy(() => import('@/features/booster/pages/Dashboard').then(m => ({ default: m.BoosterDashboard })))
 const AvailableJobsPage   = lazy(() => import('@/features/booster/pages/AvailableJobs').then(m => ({ default: m.AvailableJobsPage })))
 const JobDetailPage       = lazy(() => import('@/features/booster/pages/JobDetail').then(m => ({ default: m.JobDetailPage })))
 const BoosterEarningsPage = lazy(() => import('@/features/booster/pages/Earnings').then(m => ({ default: m.BoosterEarningsPage })))
+const CompletedOrdersPage = lazy(() => import('@/features/booster/pages/CompletedOrders').then(m => ({ default: m.CompletedOrdersPage })))
+const BoosterAccountsPage = lazy(() => import('@/features/booster/pages/Accounts').then(m => ({ default: m.BoosterAccountsPage })))
 const BoosterProfilePage  = lazy(() => import('@/features/booster/pages/Profile').then(m => ({ default: m.BoosterProfilePage })))
 const BoosterServicesPage = lazy(() => import('@/features/booster/pages/Services').then(m => ({ default: m.BoosterServicesPage })))
 const BoosterOnboardingPage = lazy(() => import('@/features/booster/pages/Onboarding').then(m => ({ default: m.BoosterOnboardingPage })))
@@ -57,6 +60,8 @@ const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs'
 const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services').then(m => ({ default: m.AdminServicesPage })))
 const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
+const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
+const AdminProfilePage    = lazy(() => import('@/features/admin/pages/Profile').then(m => ({ default: m.AdminProfilePage })))
 const ReviewsPage         = lazy(() => import('@/features/public/pages/ReviewsPage').then(m => ({ default: m.ReviewsPage })))
 
 export const router = createBrowserRouter([
@@ -93,9 +98,16 @@ export const router = createBrowserRouter([
       { path: '/login',           element: <SuspensePage><LoginPage /></SuspensePage> },
       { path: '/register',        element: <Navigate to="/login?mode=register" replace /> },
       { path: '/forgot-password', element: <SuspensePage><ForgotPasswordPage /></SuspensePage> },
-      { path: '/reset-password',  element: <SuspensePage><ResetPasswordPage /></SuspensePage> },
     ],
   },
+
+  // Password recovery — NOT behind RequireGuest. Clicking the email link
+  // (ForgotPasswordPage.tsx → resetPasswordForEmail redirectTo) makes
+  // Supabase establish a real session via the recovery token before this
+  // route renders, so isAuthenticated() is already true here. Under
+  // RequireGuest that session would trigger an immediate redirect to the
+  // user's dashboard and the reset form would never be reachable.
+  { path: '/reset-password', element: <SuspensePage><ResetPasswordPage /></SuspensePage> },
 
   // Customer routes
   {
@@ -110,6 +122,7 @@ export const router = createBrowserRouter([
           { path: '/orders',       element: <SuspensePage><OrderHistoryPage /></SuspensePage> },
           { path: '/support',      element: <SuspensePage><SupportPage /></SuspensePage> },
           { path: '/support/:id',  element: <SuspensePage><TicketDetailPage /></SuspensePage> },
+          { path: '/profile',      element: <SuspensePage><CustomerProfilePage /></SuspensePage> },
         ],
       },
     ],
@@ -125,6 +138,8 @@ export const router = createBrowserRouter([
           { path: '/booster',             element: <SuspensePage><BoosterDashboard /></SuspensePage> },
           { path: '/booster/jobs',        element: <SuspensePage><AvailableJobsPage /></SuspensePage> },
           { path: '/booster/jobs/:id',    element: <SuspensePage><JobDetailPage /></SuspensePage> },
+          { path: '/booster/completed',   element: <SuspensePage><CompletedOrdersPage /></SuspensePage> },
+          { path: '/booster/accounts',    element: <SuspensePage><BoosterAccountsPage /></SuspensePage> },
           { path: '/booster/earnings',    element: <SuspensePage><BoosterEarningsPage /></SuspensePage> },
           { path: '/booster/services',    element: <SuspensePage><BoosterServicesPage /></SuspensePage> },
           { path: '/booster/profile',     element: <SuspensePage><BoosterProfilePage /></SuspensePage> },
@@ -154,6 +169,8 @@ export const router = createBrowserRouter([
           { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
           { path: '/admin/reviews',      element: <SuspensePage><AdminReviewsPage /></SuspensePage> },
           { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
+          { path: '/admin/duo-accounts', element: <SuspensePage><AdminDuoAccountsPage /></SuspensePage> },
+          { path: '/admin/profile',      element: <SuspensePage><AdminProfilePage /></SuspensePage> },
         ],
       },
     ],

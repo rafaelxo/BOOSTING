@@ -4,7 +4,7 @@ import { Briefcase, Lock, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, formatRank } from '@/lib/utils'
+import { timeAgo, formatRank, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
 import type { Division, Order, QueueType, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -227,7 +227,6 @@ export function AvailableJobsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs font-mono text-ink-muted">#{job.id.slice(0, 8).toUpperCase()}</span>
-                    <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">{job.server}</span>
                     <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">
                       {job.queue_type === 'solo_duo' ? t('booster.jobs.soloQueue') : t('booster.jobs.flexQueue')}
                     </span>
@@ -269,7 +268,7 @@ export function AvailableJobsPage() {
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-right">
-                    <p className="text-sm font-bold text-success">{currency(job.total_price * 0.75)}</p>
+                    <p className="text-sm font-bold text-success">{currency(job.total_price * BOOSTER_EARNINGS_SHARE)}</p>
                     <p className="text-[10px] text-ink-muted">{t('booster.jobs.yourCut')}</p>
                   </div>
                   <div className="flex flex-col gap-1">

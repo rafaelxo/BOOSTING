@@ -1,41 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { X, LogOut, ExternalLink } from 'lucide-react'
+import { X, LogOut, ExternalLink, ArrowRight } from 'lucide-react'
 import { Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase, signOut } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
-
-// ── DDragon ───────────────────────────────────────────────────────────────────
-
-async function fetchVersion(): Promise<string> {
-  const res = await fetch('https://ddragon.leagueoflegends.com/api/versions.json')
-  const list: string[] = await res.json()
-  return list[0]
-}
-
-async function fetchIconIds(version: string): Promise<number[]> {
-  const res = await fetch(
-    `https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/profileicon.json`,
-  )
-  const json = await res.json()
-  return Object.keys(json.data as Record<string, unknown>)
-    .map(Number)
-    .sort((a, b) => a - b)
-}
-
-function iconUrl(version: string, id: number) {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${id}.png`
-}
+import { AvatarIconPicker } from '@/components/profile/AvatarIconPicker'
+import type { UserRole } from '@/types'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
-const ROLE_BADGE: Record<string, { label: string; className: string }> = {
+const ROLE_BADGE: Record<UserRole, { label: string; className: string }> = {
   customer: { label: 'Cliente',  className: 'text-brand bg-brand/10'      },
   booster:  { label: 'Booster',  className: 'text-success bg-success/10'  },
   admin:    { label: 'Admin',    className: 'text-danger bg-danger/10'     },
-  support:  { label: 'Suporte',  className: 'text-warning bg-warning/10'  },
+}
+
+const FULL_PROFILE_PATH: Record<UserRole, string> = {
+  customer: '/profile',
+  booster: '/booster/profile',
+  admin: '/admin/profile',
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -58,10 +43,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   const [usernameError, setUsernameError]   = useState<string | null>(null)
   const [usernameSaved, setUsernameSaved]   = useState(false)
 
-  // ── Riot icon ──
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [iconSaving, setIconSaving] = useState(false)
-
   // ── Booster: display_name ──
   const [displayName, setDisplayName]           = useState('')
   const [displayNameSaving, setDisplayNameSaving] = useState(false)
@@ -81,28 +62,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
 
   // Sync username
   useEffect(() => { setUsername(profile?.username ?? '') }, [profile?.username])
-
-  // Parse current icon
-  useEffect(() => {
-    if (profile?.avatar_url) {
-      const m = profile.avatar_url.match(/profileicon\/(\d+)\.png/)
-      if (m) setSelectedId(parseInt(m[1]))
-    }
-  }, [profile?.avatar_url])
-
-  // DDragon
-  const { data: version } = useQuery({
-    queryKey: ['ddragon-version'],
-    queryFn: fetchVersion,
-    staleTime: 1000 * 60 * 60,
-  })
-
-  const { data: iconIds = [] } = useQuery({
-    queryKey: ['ddragon-icons', version],
-    queryFn: () => fetchIconIds(version!),
-    enabled: !!version && open,
-    staleTime: 1000 * 60 * 60,
-  })
 
   // Booster profile data
   const { data: boosterData } = useQuery({
@@ -149,11 +108,11 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     if (!profile || !username.trim()) return
     setUsernameSaving(true)
     setUsernameError(null)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: result, error } = await supabase.rpc('update_my_username', { p_username: username.trim() }) as any
+    const { data: result, error } = await supabase.rpc('update_my_username', { p_username: username.trim() })
     setUsernameSaving(false)
-    if (error || !result?.success) {
-      setUsernameError(result?.error === 'username_taken' ? 'Nome já em uso' : 'Erro ao salvar')
+    const res = result as { success: boolean; error?: string } | null
+    if (error || !res?.success) {
+      setUsernameError(res?.error === 'username_taken' ? 'Nome já em uso' : 'Erro ao salvar')
       return
     }
     setProfile({ ...profile, username: username.trim() })
@@ -161,14 +120,10 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     setTimeout(() => setUsernameSaved(false), 3000)
   }
 
-  async function handleSelectIcon(id: number) {
-    if (!profile || !version) return
-    setSelectedId(id)
-    setIconSaving(true)
-    const url = iconUrl(version, id)
+  async function handleSelectIcon(url: string) {
+    if (!profile) return
     await supabase.from('profiles').update({ avatar_url: url }).eq('id', profile.id)
     setProfile({ ...profile, avatar_url: url })
-    setIconSaving(false)
   }
 
   async function handleSaveDisplayName() {
@@ -221,7 +176,8 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
 
   if (!open) return null
 
-  const roleBadge = ROLE_BADGE[profile?.role ?? 'customer']
+  const role = profile?.role ?? 'customer'
+  const roleBadge = ROLE_BADGE[role]
 
   return (
     <>
@@ -254,6 +210,16 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
             </div>
           </div>
 
+          {/* Link to full profile page (avatar, email, senha, dados completos) */}
+          <button
+            type="button"
+            onClick={() => { onClose(); navigate(FULL_PROFILE_PATH[role]) }}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-bg-elevated hover:border-brand/40 hover:bg-bg-elevated transition-colors text-sm font-semibold text-ink"
+          >
+            Editar perfil completo
+            <ArrowRight className="h-4 w-4 text-ink-muted" />
+          </button>
+
           {/* Username */}
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de usuário</p>
@@ -279,127 +245,91 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
           </div>
 
           {/* Riot icon picker */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Ícone de Perfil</p>
-              {iconSaving && <span className="text-[10px] text-ink-muted">Salvando...</span>}
-            </div>
-            <p className="text-[11px] text-ink-secondary">Ícones oficiais do League of Legends.</p>
-            {version && iconIds.length > 0 ? (
-              <div className="grid grid-cols-6 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
-                {iconIds.slice(0, 240).map(id => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleSelectIcon(id)}
-                    className={cn(
-                      'aspect-square rounded-lg overflow-hidden border-2 transition-all hover:scale-110 focus:outline-none',
-                      selectedId === id ? 'border-brand shadow-sm' : 'border-transparent',
-                    )}
-                  >
-                    <img
-                      src={iconUrl(version, id)}
-                      alt={`Ícone ${id}`}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      draggable={false}
-                    />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-6 gap-1.5">
-                {Array.from({ length: 18 }).map((_, i) => (
-                  <div key={i} className="aspect-square rounded-lg bg-bg-elevated animate-pulse" />
-                ))}
-              </div>
-            )}
-          </div>
+          <AvatarIconPicker currentUrl={profile?.avatar_url} onSelect={handleSelectIcon} maxIcons={90} />
 
           {/* Booster-only fields */}
           {isBooster && (
-            <>
-              <div className="border-t border-bg-elevated pt-4 space-y-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Conta Booster</p>
+            <div className="border-t border-bg-elevated pt-4 space-y-5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Conta Booster</p>
 
-                {/* Display name */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de exibição</p>
-                  <div className="flex gap-2">
-                    <input
-                      value={displayName}
-                      onChange={e => { setDisplayName(e.target.value); setDisplayNameError(null) }}
-                      placeholder="Nome público"
-                      maxLength={32}
-                      className="input-base flex-1 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveDisplayName}
-                      disabled={displayNameSaving || !displayName.trim() || displayName.trim() === boosterData?.display_name}
-                      className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
-                    >
-                      {displayNameSaving ? '...' : 'Salvar'}
-                    </button>
-                  </div>
-                  {displayNameError && <p className="text-xs text-danger">{displayNameError}</p>}
-                  {displayNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
+              {/* Display name */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de exibição</p>
+                <div className="flex gap-2">
+                  <input
+                    value={displayName}
+                    onChange={e => { setDisplayName(e.target.value); setDisplayNameError(null) }}
+                    placeholder="Nome público"
+                    maxLength={32}
+                    className="input-base flex-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveDisplayName}
+                    disabled={displayNameSaving || !displayName.trim() || displayName.trim() === boosterData?.display_name}
+                    className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
+                  >
+                    {displayNameSaving ? '...' : 'Salvar'}
+                  </button>
                 </div>
-
-                {/* Full name */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome completo (PIX)</p>
-                  <div className="flex gap-2">
-                    <input
-                      value={fullName}
-                      onChange={e => setFullName(e.target.value)}
-                      placeholder="Como no CPF"
-                      maxLength={120}
-                      className="input-base flex-1 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveFullName}
-                      disabled={fullNameSaving || fullName.trim() === (boosterData?.full_name ?? '')}
-                      className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
-                    >
-                      {fullNameSaving ? '...' : 'Salvar'}
-                    </button>
-                  </div>
-                  {fullNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
-                </div>
-
-                {/* CPF */}
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">CPF</p>
-                  <div className="flex gap-2">
-                    <input
-                      value={cpf}
-                      onChange={e => handleCpfChange(e.target.value)}
-                      placeholder="000.000.000-00"
-                      className="input-base flex-1 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveCpf}
-                      disabled={cpfSaving || cpf.replace(/\D/g, '').length !== 11}
-                      className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
-                    >
-                      {cpfSaving ? '...' : 'Salvar'}
-                    </button>
-                  </div>
-                  {cpfError && <p className="text-xs text-danger">{cpfError}</p>}
-                  {cpfSaved && <p className="text-xs text-success">CPF salvo!</p>}
-                </div>
+                {displayNameError && <p className="text-xs text-danger">{displayNameError}</p>}
+                {displayNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
               </div>
-            </>
+
+              {/* Full name */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome completo (PIX)</p>
+                <div className="flex gap-2">
+                  <input
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder="Como no CPF"
+                    maxLength={120}
+                    className="input-base flex-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveFullName}
+                    disabled={fullNameSaving || fullName.trim() === (boosterData?.full_name ?? '')}
+                    className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
+                  >
+                    {fullNameSaving ? '...' : 'Salvar'}
+                  </button>
+                </div>
+                {fullNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
+              </div>
+
+              {/* CPF */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">CPF</p>
+                <div className="flex gap-2">
+                  <input
+                    value={cpf}
+                    onChange={e => handleCpfChange(e.target.value)}
+                    placeholder="000.000.000-00"
+                    className="input-base flex-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveCpf}
+                    disabled={cpfSaving || cpf.replace(/\D/g, '').length !== 11}
+                    className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
+                  >
+                    {cpfSaving ? '...' : 'Salvar'}
+                  </button>
+                </div>
+                {cpfError && <p className="text-xs text-danger">{cpfError}</p>}
+                {cpfSaved && <p className="text-xs text-success">CPF salvo!</p>}
+              </div>
+            </div>
           )}
 
           {/* Discord note */}
           <div className="rounded-xl border border-bg-elevated bg-bg-elevated/30 p-3 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Conta Discord</p>
             <p className="text-[11px] text-ink-secondary leading-relaxed">
-              Email e senha são gerenciados pelo Discord. Para alterar, abra um ticket no nosso servidor.
+              Seu email é gerenciado pelo Discord. Você também pode definir uma senha
+              para entrar por email — acesse &quot;Editar perfil completo&quot; acima.
             </p>
             <a
               href="https://discord.gg/elopeak"

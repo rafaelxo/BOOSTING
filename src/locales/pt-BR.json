@@ -167,7 +167,6 @@
       "created": "Criado {{date}}",
       "details": "Detalhes do Pedido",
       "service": "Serviço",
-      "server": "Servidor",
       "queue": "Fila",
       "currentRank": "Rank Atual",
       "targetRank": "Rank Alvo",
@@ -263,6 +262,8 @@
     "nav": {
       "dashboard": "Painel",
       "jobs": "Pedidos",
+      "completed": "Concluídos",
+      "accounts": "Contas",
       "earnings": "Ganhos",
       "profile": "Meu Perfil",
       "signOut": "Sair",
@@ -317,7 +318,6 @@
     },
     "job": {
       "details": "Detalhes do Trabalho",
-      "server": "Servidor",
       "queue": "Fila",
       "from": "De",
       "to": "Para",
@@ -381,6 +381,7 @@
       "reviews": "Avaliações",
       "services": "Serviços",
       "audit": "Auditoria",
+      "profile": "Meu Perfil",
       "signOut": "Sair",
       "role": "Admin",
       "panel": "Painel Admin"
@@ -410,7 +411,6 @@
       "table": {
         "id": "ID Pedido",
         "service": "Serviço",
-        "server": "Servidor",
         "amount": "Valor",
         "status": "Status",
         "created": "Criado"

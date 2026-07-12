@@ -17,7 +17,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
-    server, winsPurchased, sessionsPurchased, selectedExtras, winPackage,
+    winsPurchased, sessionsPurchased, selectedExtras, winPackage,
     currentLp, avgLpGain, avgLpLoss, targetLp,
     basePrice, extrasPrice, estimatedHours, customerNotes,
     setNotes, nextStep, prevStep,
@@ -54,7 +54,6 @@ export function StepReview() {
               <ReviewRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
             )}
             <ReviewRow label="Serviço" value={serviceName} />
-            {server && <ReviewRow label="Servidor" value={server} />}
             {serviceType === 'elo_boost' && (
               <ReviewRow label="Modo" value={boostMode === 'duo' ? 'Duo Boost (+50%)' : 'Solo Boost'} />
             )}

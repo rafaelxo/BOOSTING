@@ -61,6 +61,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
           setInitialized(true)
           initialized = true
+          // Drop every cached query (orders, notifications, admin lists,
+          // etc.) on sign-out. Most keys already include the user id, so
+          // this isn't an active cross-account leak today, but it removes
+          // the category of risk entirely for shared/library devices and
+          // for any future query key that forgets to scope by user.
+          queryClient.clear()
         }
       }
     )

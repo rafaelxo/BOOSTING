@@ -138,7 +138,6 @@ export function AdminOrderDetailPage() {
               {[
                 ['Cliente', order.customer_id.slice(0, 12) + '...'],
                 ['Serviço', getServiceLabel(order.service_id as string)],
-                ['Servidor', order.server],
                 ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
                 ['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'],
                 ['Base', currency(order.base_price)],

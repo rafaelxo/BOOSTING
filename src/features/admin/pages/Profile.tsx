@@ -1,12 +1,11 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useTranslation } from 'react-i18next'
+import { useState } from 'react'
 import { User, Mail } from 'lucide-react'
 import { Button, Card, FormField, Input, Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
-import { useState } from 'react'
 import { AvatarIconPicker } from '@/components/profile/AvatarIconPicker'
 import { PasswordCard } from '@/components/profile/PasswordCard'
 
@@ -16,9 +15,8 @@ const profileSchema = z.object({
 
 type ProfileData = z.infer<typeof profileSchema>
 
-export function CustomerProfilePage() {
+export function AdminProfilePage() {
   const { profile, setProfile } = useAuthStore()
-  const { t } = useTranslation()
   const [profileSaved, setProfileSaved] = useState(false)
 
   const profileForm = useForm<ProfileData>({
@@ -53,23 +51,22 @@ export function CustomerProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold text-ink">{t('customer.profile.title')}</h1>
+      <h1 className="text-2xl font-bold text-ink">Meu Perfil</h1>
 
-      {/* Avatar & identity */}
       <Card padding="md">
         <div className="flex items-center gap-4 mb-6">
           <Avatar src={profile?.avatar_url} name={profile?.username} size="xl" />
           <div>
             <p className="font-semibold text-ink">{profile?.username}</p>
             <p className="text-sm text-ink-secondary">{profile?.email}</p>
-            <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand">
-              {t('customer.profile.role')}
+            <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-danger/10 text-danger uppercase tracking-wide">
+              Admin
             </span>
           </div>
         </div>
 
         <form onSubmit={profileForm.handleSubmit(onProfileSave)} className="space-y-4">
-          <FormField label={t('customer.profile.username')} error={profileForm.formState.errors.username?.message} required>
+          <FormField label="Nome de usuário" error={profileForm.formState.errors.username?.message} required>
             <Input
               leftElement={<User className="h-4 w-4" />}
               error={!!profileForm.formState.errors.username}
@@ -77,31 +74,22 @@ export function CustomerProfilePage() {
             />
           </FormField>
 
-          <FormField label={t('customer.profile.email')}>
-            <Input
-              type="email"
-              value={profile?.email}
-              leftElement={<Mail className="h-4 w-4" />}
-              disabled
-            />
-            <p className="text-xs text-ink-muted mt-1">{t('customer.profile.emailHint')}</p>
+          <FormField label="Email">
+            <Input type="email" value={profile?.email} leftElement={<Mail className="h-4 w-4" />} disabled />
+            <p className="text-xs text-ink-muted mt-1">Gerenciado pela sua conta Discord.</p>
           </FormField>
 
           <div className="flex items-center gap-3">
-            <Button type="submit" loading={profileForm.formState.isSubmitting}>
-              {t('customer.profile.saveProfile')}
-            </Button>
-            {profileSaved && <span className="text-sm text-success">{t('customer.profile.saved')}</span>}
+            <Button type="submit" loading={profileForm.formState.isSubmitting}>Salvar</Button>
+            {profileSaved && <span className="text-sm text-success">Salvo!</span>}
           </div>
         </form>
       </Card>
 
-      {/* Avatar icon picker */}
       <Card padding="md">
         <AvatarIconPicker currentUrl={profile?.avatar_url} onSelect={handleSelectIcon} />
       </Card>
 
-      {/* Password */}
       <PasswordCard />
     </div>
   )

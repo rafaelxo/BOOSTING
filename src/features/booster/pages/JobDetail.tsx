@@ -5,7 +5,7 @@ import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTrian
 import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank } from '@/lib/utils'
+import { formatRank, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
 import type { Division, Order, OrderMessage, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -161,7 +161,6 @@ export function JobDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div><p className="text-xs text-ink-muted">{t('booster.job.server')}</p><p className="text-sm font-semibold text-ink">{order.server}</p></div>
               <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
               {order.current_rank && (
                 <div>
@@ -240,7 +239,7 @@ export function JobDetailPage() {
         <div className="space-y-4">
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.earnings')}</h3>
-            <p className="text-2xl font-bold text-success">{currency(order.total_price * 0.75)}</p>
+            <p className="text-2xl font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</p>
             <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
           </Card>
 

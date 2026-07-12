@@ -73,7 +73,6 @@ export function AdminOrdersPage() {
               <TableRow>
                 <TableHead>{t('admin.orders.table.id')}</TableHead>
                 <TableHead>{t('admin.orders.table.service')}</TableHead>
-                <TableHead>{t('admin.orders.table.server')}</TableHead>
                 <TableHead>{t('admin.orders.table.amount')}</TableHead>
                 <TableHead>{t('admin.orders.table.status')}</TableHead>
                 <TableHead>{t('admin.orders.table.created')}</TableHead>
@@ -88,7 +87,6 @@ export function AdminOrdersPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-ink">{getServiceLabel(order.service_id as string)}</TableCell>
-                  <TableCell>{order.server}</TableCell>
                   <TableCell className="font-semibold text-ink">{currency(order.total_price)}</TableCell>
                   <TableCell><OrderStatusBadge status={order.status} /></TableCell>
                   <TableCell>{timeAgo(order.created_at)}</TableCell>

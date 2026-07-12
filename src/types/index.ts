@@ -1,6 +1,6 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'customer' | 'booster' | 'admin' | 'support'
+export type UserRole = 'customer' | 'booster' | 'admin'
 
 export type BoostMode = 'solo' | 'duo'
 
@@ -352,6 +352,21 @@ export interface PayoutRecord {
   status: 'pending' | 'processing' | 'paid' | 'failed'
   paid_at: string | null
   created_at: string
+}
+
+// ─── Duo accounts ───────────────────────────────────────────────────────────────
+
+export interface DuoAccount {
+  id: string
+  game_id: string
+  label: string
+  current_rank: { tier: RankTier; division: Division } | null
+  notes: string | null
+  encrypted_credentials: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
 }
 
 // ─── Booster Services ─────────────────────────────────────────────────────────

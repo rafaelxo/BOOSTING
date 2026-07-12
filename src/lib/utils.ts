@@ -157,6 +157,10 @@ export function getServiceLabel(serviceId: string): string {
   return SERVICE_LABEL_MAP[serviceId] ?? serviceId.replace(/_/g, ' ')
 }
 
+// Share of order.total_price the booster receives before an authoritative
+// payout_records row exists (mirrors the platform commission split).
+export const BOOSTER_EARNINGS_SHARE = 0.75
+
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 
 export function truncate(str: string, length = 50) {

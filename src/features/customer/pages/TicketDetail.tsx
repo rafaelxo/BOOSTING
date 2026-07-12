@@ -80,7 +80,7 @@ export function TicketDetailPage() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px] max-h-[500px]">
           {messages?.map((msg) => {
             const isCustomer = msg.sender_id === profile?.id
-            const isSupport = msg.sender_role === 'admin' || msg.sender_role === 'support'
+            const isSupport = msg.sender_role === 'admin'
             return (
               <div key={msg.id} className={`flex gap-3 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                 <Avatar

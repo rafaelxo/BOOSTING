@@ -330,6 +330,53 @@ export type Database = {
           },
         ]
       }
+      duo_accounts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          current_rank: Json | null
+          encrypted_credentials: string | null
+          game_id: string
+          id: string
+          is_active: boolean
+          label: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          current_rank?: Json | null
+          encrypted_credentials?: string | null
+          game_id?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          current_rank?: Json | null
+          encrypted_credentials?: string | null
+          game_id?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       games: {
         Row: {
           icon_url: string | null
@@ -1246,6 +1293,10 @@ export type Database = {
         Args: { p_display_name?: string }
         Returns: undefined
       }
+      get_duo_account_credentials: {
+        Args: { p_account_id: string }
+        Returns: Json
+      }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       log_match_result: {
@@ -1293,6 +1344,10 @@ export type Database = {
           p_approve: boolean
           p_request_id: string
         }
+        Returns: Json
+      }
+      set_duo_account_credentials: {
+        Args: { p_account_id: string; p_login: string; p_password: string }
         Returns: Json
       }
       set_order_credentials:
@@ -1365,7 +1420,7 @@ export type Database = {
         | "waiting_customer"
         | "resolved"
         | "closed"
-      user_role: "customer" | "booster" | "admin" | "support"
+      user_role: "customer" | "booster" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1541,7 +1596,7 @@ export const Constants = {
         "resolved",
         "closed",
       ],
-      user_role: ["customer", "booster", "admin", "support"],
+      user_role: ["customer", "booster", "admin"],
     },
   },
 } as const

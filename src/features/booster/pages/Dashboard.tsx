@@ -4,7 +4,7 @@ import { Briefcase, DollarSign, Star, TrendingUp, Clock, ChevronRight, Swords, U
 import { Button, Card, OrderStatusBadge, Skeleton, EmptyState, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, formatRank } from '@/lib/utils'
+import { timeAgo, formatRank, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
 import type { Division, Order, BoosterProfile, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -186,7 +186,6 @@ export function BoosterDashboard() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p className="text-sm font-semibold text-ink">#{order.id.slice(0, 8).toUpperCase()}</p>
-                      <span className="text-xs text-ink-muted">{order.server}</span>
                     </div>
                     {order.current_rank && order.target_rank && (
                       <div className="flex items-center gap-2 mt-1">
@@ -214,7 +213,7 @@ export function BoosterDashboard() {
                     <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(order.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-success">{currency(order.total_price * 0.75)}</span>
+                    <span className="text-sm font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</span>
                     <OrderStatusBadge status={order.status} />
                     <ChevronRight className="h-4 w-4 text-ink-muted" />
                   </div>

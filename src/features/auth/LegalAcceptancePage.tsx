@@ -25,7 +25,7 @@ export function LegalAcceptancePage() {
         if (/^\/(?![/\\])/.test(decoded) && decoded !== '/legal/acceptance') return decoded
       } catch { /* ignore malformed redirect */ }
     }
-    if (profile?.role === 'admin' || profile?.role === 'support') return '/admin'
+    if (profile?.role === 'admin') return '/admin'
     if (profile?.role === 'booster') return '/booster'
     return '/dashboard'
   }

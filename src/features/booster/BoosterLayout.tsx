@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, DollarSign,
-  User, Bell, Wrench, Clock,
+  User, Wrench, Clock, CheckCircle2, Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { UserProfilePanel } from '@/components/UserProfilePanel'
+import { NotificationBell } from '@/components/NotificationBell'
 
 export function BoosterLayout() {
   const { pathname } = useLocation()
@@ -21,6 +22,8 @@ export function BoosterLayout() {
   const NAV_ITEMS = [
     { href: '/booster',           icon: LayoutDashboard, label: t('booster.nav.dashboard')  },
     { href: '/booster/jobs',      icon: Briefcase,       label: t('booster.nav.jobs')        },
+    { href: '/booster/completed', icon: CheckCircle2,    label: t('booster.nav.completed')   },
+    { href: '/booster/accounts',  icon: Landmark,        label: t('booster.nav.accounts')    },
     { href: '/booster/earnings',  icon: DollarSign,      label: t('booster.nav.earnings')    },
     { href: '/booster/services',  icon: Wrench,          label: 'Meus Serviços'              },
     { href: '/booster/profile',   icon: User,            label: t('booster.nav.profile')     },
@@ -166,9 +169,7 @@ export function BoosterLayout() {
           <div className="hidden md:block" />
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationBell />
             <button
               onClick={() => setPanelOpen(true)}
               className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"

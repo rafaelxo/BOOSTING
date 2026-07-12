@@ -220,7 +220,6 @@ export function OrderDetailPage() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: t('customer.order.service'),     value: getServiceLabel(order.service_id as string) },
-                { label: t('customer.order.server'),      value: order.server },
                 { label: t('customer.order.queue'),       value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') },
                 {
                   label: t('customer.order.currentRank'),

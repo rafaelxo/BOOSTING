@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   isAuthenticated: () => !!get().session,
   role: () => get().profile?.role ?? null,
-  isAdmin: () => get().profile?.role === 'admin' || get().profile?.role === 'support',
+  isAdmin: () => get().profile?.role === 'admin',
   isBooster: () => get().profile?.role === 'booster',
   isCustomer: () => get().profile?.role === 'customer',
 }))

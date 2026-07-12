@@ -31,7 +31,7 @@ export function PublicLayout() {
   const { t } = useTranslation()
 
   const dashboardLink =
-    profile?.role === 'admin' || profile?.role === 'support' ? '/admin'
+    profile?.role === 'admin' ? '/admin'
     : profile?.role === 'booster' ? '/booster'
     : '/dashboard'
 

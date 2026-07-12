@@ -3,13 +3,14 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   HeadphonesIcon, Settings, Shield, Star,
-  Bell, RefreshCw, Eye, AlertTriangle,
+  RefreshCw, Eye, AlertTriangle, Landmark, User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
 import { UserProfilePanel } from '@/components/UserProfilePanel'
+import { NotificationBell } from '@/components/NotificationBell'
 
 export function AdminLayout() {
   const { pathname } = useLocation()
@@ -26,6 +27,7 @@ export function AdminLayout() {
         { href: '/admin/boosters',  icon: Shield,          label: t('admin.nav.boosters')   },
         { href: '/admin/customers', icon: Users,           label: t('admin.nav.customers')  },
         { href: '/admin/drops',     icon: AlertTriangle,   label: 'Drops'                   },
+        { href: '/admin/duo-accounts', icon: Landmark,     label: 'Contas Duo'              },
       ],
     },
     {
@@ -47,6 +49,12 @@ export function AdminLayout() {
       items: [
         { href: '/admin/services', icon: Settings, label: t('admin.nav.services')  },
         { href: '/admin/audit',    icon: Eye,      label: t('admin.nav.audit') },
+      ],
+    },
+    {
+      label: 'Conta',
+      items: [
+        { href: '/admin/profile', icon: User, label: t('admin.nav.profile') },
       ],
     },
   ]
@@ -104,9 +112,7 @@ export function AdminLayout() {
           <p className="text-sm text-ink-muted font-medium">{t('admin.nav.panel')}</p>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <button className="p-2.5 rounded-xl text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationBell />
             <button
               onClick={() => setPanelOpen(true)}
               className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"
