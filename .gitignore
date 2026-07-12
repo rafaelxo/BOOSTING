@@ -7,12 +7,15 @@ node_modules/
 dist/
 build/
 
-# Environment — NEVER commit secrets
+# Environment - NEVER commit secrets
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
+!.env.*.example
 
 # Editor
 .vscode/
@@ -29,11 +32,20 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 
+# Logs and coverage
+*.log
+coverage/
+
 # Supabase
 supabase/.branches
 supabase/.temp
+supabase/.env
+supabase/.env.*
 
-# AI tooling — not part of the codebase
+# Deploy tooling
+.vercel/
+
+# AI tooling - not part of the codebase
 .planning/
 .superpowers/
 docs/
