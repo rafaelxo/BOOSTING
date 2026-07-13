@@ -104,7 +104,7 @@ export function AvailableJobsPage() {
     queryKey: ['available-jobs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('orders')
+        .from('available_boost_orders')
         .select('*')
         .eq('status', 'awaiting_assignment')
         .order('created_at', { ascending: true })

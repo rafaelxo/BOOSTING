@@ -28,6 +28,25 @@ export const RANK_TIER_ORDER: RankTier[] = [
 
 const DIVISIONS_ORDER: Division[] = ['IV', 'III', 'II', 'I']
 
+export function moneyToCents(value: number): number {
+  if (!Number.isFinite(value) || value < 0 || value > 10_000_000) {
+    throw new RangeError('Invalid monetary value')
+  }
+  return Math.round(value * 100)
+}
+
+export function centsToMoney(cents: number): number {
+  if (!Number.isSafeInteger(cents) || cents < 0) throw new RangeError('Invalid cent value')
+  return cents / 100
+}
+
+function percentageOfCents(cents: number, percentage: number): number {
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+    throw new RangeError('Invalid percentage')
+  }
+  return Math.round(cents * percentage / 100)
+}
+
 export function isMasterPlus(tier: RankTier): boolean {
   return tier === 'master' || tier === 'grandmaster' || tier === 'challenger'
 }
@@ -74,11 +93,11 @@ export function calcEloPrice(
   const to   = rankStep(tTier, tDiv)
   if (to <= from) return { price: 0, hours: 0 }
 
-  let price = 0
-  for (let s = from + 1; s <= to; s++) price += divPriceForStep(s)
+  let priceCents = 0
+  for (let s = from + 1; s <= to; s++) priceCents += moneyToCents(divPriceForStep(s))
 
   const hours = Math.max(1, Math.round((to - from) * 1.5))
-  return { price: Math.round(price * 100) / 100, hours }
+  return { price: centsToMoney(priceCents), hours }
 }
 
 // ── Vitória Avulsa (Win Boost) ────────────────────────────────────────────────
@@ -128,12 +147,17 @@ export function applyLpModifier(
   avgLpLoss: number,
 ): number {
   if (basePrice <= 0) return 0
-  const divPrice = ELO_DIV_PRICE[fTier] ?? 0
-  const lpDiscount = (currentLp / 100) * divPrice
+  if (![currentLp, avgLpGain, avgLpLoss].every(Number.isFinite)
+      || currentLp < 0 || currentLp > 100 || avgLpGain <= 0 || avgLpLoss <= 0) {
+    throw new RangeError('Invalid LP values')
+  }
+  const baseCents = moneyToCents(basePrice)
+  const divPriceCents = moneyToCents(ELO_DIV_PRICE[fTier] ?? 0)
+  const lpDiscountCents = Math.round(currentLp * divPriceCents / 100)
   const total = avgLpGain + avgLpLoss
   const winRate = total > 0 ? avgLpGain / total : 0.5
   const efficiencyMod = 1 + (0.5 - winRate) * 0.15
-  return Math.max(0, Math.round((basePrice - lpDiscount) * efficiencyMod * 100) / 100)
+  return centsToMoney(Math.max(0, Math.round((baseCents - lpDiscountCents) * efficiencyMod)))
 }
 
 // ── Preço autoritativo do pedido ──────────────────────────────────────────────
@@ -184,6 +208,13 @@ export interface OrderPriceResult {
 }
 
 export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
+  if (input.extras.length > 20) throw new RangeError('Too many extras')
+  for (const extra of input.extras) {
+    moneyToCents(extra.priceModifier)
+    if (!Number.isFinite(extra.priceModifierPct) || extra.priceModifierPct < 0 || extra.priceModifierPct > 100) {
+      throw new RangeError('Invalid extra percentage')
+    }
+  }
   let basePrice = 0
   let estimatedHours: number | null = null
 
@@ -197,7 +228,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
         // vier 'duo' aqui; a rejeição explícita acontece antes disso, na
         // validação de fluxo (getBoostFlow retorna null para essa combinação).
         if (boostMode === 'duo' || input.masterPlusPrice == null) break
-        basePrice = input.masterPlusPrice
+        basePrice = centsToMoney(moneyToCents(input.masterPlusPrice))
         estimatedHours = null
       } else {
         if (!targetRank) break
@@ -207,8 +238,8 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
         )
         const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss)
         basePrice = boostMode === 'duo'
-          ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
-          : withLp
+          ? centsToMoney(moneyToCents(withLp) + percentageOfCents(moneyToCents(withLp), DUO_BOOST_PCT))
+          : centsToMoney(moneyToCents(withLp))
         estimatedHours = hours || null
       }
       break
@@ -222,7 +253,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     case 'win_boost': {
       if (!input.winsPurchased || !input.currentRank) break
       const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
-      basePrice = Math.round(input.winsPurchased * pricePerWin * 100) / 100
+      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
     }
@@ -233,26 +264,29 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     }
   }
 
+  const basePriceCents = moneyToCents(basePrice)
   const extrasBreakdown = input.extras.map((e) => ({
     id: e.id,
-    price: e.priceModifier > 0
-      ? e.priceModifier
+    price: centsToMoney(e.priceModifier > 0
+      ? moneyToCents(e.priceModifier)
       : e.priceModifierPct > 0
-        ? Math.round(basePrice * e.priceModifierPct) / 100
-        : 0,
+        ? percentageOfCents(basePriceCents, e.priceModifierPct)
+        : 0),
   }))
 
-  const extrasRaw = extrasBreakdown.reduce((sum, e) => sum + e.price, 0)
+  const extrasRawCents = extrasBreakdown.reduce((sum, e) => sum + moneyToCents(e.price), 0)
 
   let winPackagePrice = 0
   if (input.winPackage && input.currentRank) {
     const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
     const discountPct = WIN_PACKAGE_DISCOUNTS[input.winPackage] ?? 0
-    winPackagePrice = Math.round(pricePerWin * input.winPackage * (1 - discountPct / 100) * 100) / 100
+    const undiscountedCents = moneyToCents(pricePerWin) * input.winPackage
+    winPackagePrice = centsToMoney(undiscountedCents - percentageOfCents(undiscountedCents, discountPct))
   }
 
-  const extrasPrice = Math.round((extrasRaw + winPackagePrice) * 100) / 100
-  const totalPrice = Math.round((basePrice + extrasPrice) * 100) / 100
+  const extrasPriceCents = extrasRawCents + moneyToCents(winPackagePrice)
+  const extrasPrice = centsToMoney(extrasPriceCents)
+  const totalPrice = centsToMoney(basePriceCents + extrasPriceCents)
 
   return { basePrice, extrasPrice, totalPrice, estimatedHours, winPackagePrice, extrasBreakdown }
 }

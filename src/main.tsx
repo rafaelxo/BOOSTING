@@ -21,9 +21,11 @@ class ErrorBoundary extends React.Component<
               <AlertTriangle className="h-6 w-6 text-danger" />
             </div>
             <h1 className="text-xl font-bold text-ink">Algo deu errado</h1>
-            <pre className="text-xs text-danger bg-danger/10 rounded-xl p-4 text-left overflow-auto max-h-48">
-              {(this.state.error as Error).message}
-            </pre>
+            {import.meta.env.DEV && (
+              <pre className="text-xs text-danger bg-danger/10 rounded-xl p-4 text-left overflow-auto max-h-48">
+                {(this.state.error as Error).message}
+              </pre>
+            )}
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 rounded-xl bg-brand text-white text-sm font-semibold"

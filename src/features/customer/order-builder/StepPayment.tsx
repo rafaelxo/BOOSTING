@@ -42,6 +42,7 @@ export function StepPayment() {
   const [pix, setPix] = useState<PixState>({ phase: 'idle' })
   const [copied, setCopied] = useState(false)
   const pollRef = useRef<number | null>(null)
+  const idempotencyKeyRef = useRef(crypto.randomUUID())
 
   const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
@@ -67,6 +68,7 @@ export function StepPayment() {
   useEffect(() => {
     if (pix.phase === 'waiting' && remaining === 0) {
       const orderId = pix.order_id
+      idempotencyKeyRef.current = crypto.randomUUID()
       setPix({ phase: 'expired', order_id: orderId })
       stopPolling()
     }
@@ -105,7 +107,7 @@ export function StepPayment() {
   // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
   // partir da intenção (rank, extras selecionados, pacote de vitórias etc).
-  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown> }) {
+  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown>; idempotency_key: string }) {
     const { data: pixData, error: pixError } = await supabase.functions.invoke('create-pix-payment', {
       body: payload,
     })
@@ -151,10 +153,9 @@ export function StepPayment() {
   async function generatePix() {
     if (!profile) return
 
-    // If there's already an order (expired or error retry), reuse it —
-    // never resend an intent once an order row exists for this attempt.
+    // Retry an errored attempt by order id. An expired PIX starts a fresh
+    // order because Mercado Pago idempotency is scoped to the previous order.
     const existingOrderId =
-      pix.phase === 'expired' ? pix.order_id :
       pix.phase === 'error' ? pix.order_id :
       null
 
@@ -211,7 +212,7 @@ export function StepPayment() {
               win_package: store.winPackage,
             }
 
-      await invokePix({ intent })
+      await invokePix({ intent, idempotency_key: idempotencyKeyRef.current })
     } catch (err) {
       setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }

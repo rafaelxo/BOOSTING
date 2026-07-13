@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { constantTimeEqual } from '../_shared/crypto.ts'
-import { jsonResponse } from '../_shared/responses.ts'
+import { jsonResponse, rateLimitResponse } from '../_shared/responses.ts'
+import { fetchWithTimeout } from '../_shared/http.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 
 const DISCORD_API = 'https://discord.com/api/v10'
 const BOT_TOKEN     = Deno.env.get('DISCORD_BOT_TOKEN')  ?? ''
@@ -15,7 +17,7 @@ const CHANNELS = {
 }
 
 async function send(channelId: string, payload: object) {
-  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+  const res = await fetchWithTimeout(`${DISCORD_API}/channels/${channelId}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -250,6 +252,9 @@ serve(async (req) => {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  const rateLimit = await consumeUserRateLimit('discord-init-channels', 'manual-webhook', 1, 300)
+  if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
+
   const results: Record<string, string> = {}
 
   for (const { key, fn } of INITS) {
@@ -261,8 +266,8 @@ serve(async (req) => {
     try {
       await fn(channelId)
       results[key] = 'ok'
-    } catch (err) {
-      results[key] = (err as Error).message
+    } catch {
+      results[key] = 'failed'
     }
   }
 

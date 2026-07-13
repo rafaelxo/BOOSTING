@@ -3,6 +3,9 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 import { constantTimeEqual } from '../_shared/crypto.ts'
 import { jsonResponse } from '../_shared/responses.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
+import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
+import { rateLimitResponse } from '../_shared/responses.ts'
 
 const DISCORD_API     = 'https://discord.com/api/v10'
 const BOT_TOKEN       = Deno.env.get('DISCORD_BOT_TOKEN')       ?? ''
@@ -73,7 +76,7 @@ async function createVoiceChannel(orderId: string, customerDiscordId: string | n
   }
   if (CATEGORY_ID) body.parent_id = CATEGORY_ID
 
-  const res = await fetch(`${DISCORD_API}/guilds/${GUILD_ID}/channels`, {
+  const res = await fetchWithTimeout(`${DISCORD_API}/guilds/${GUILD_ID}/channels`, {
     method: 'POST',
     headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -88,7 +91,7 @@ async function createVoiceChannel(orderId: string, customerDiscordId: string | n
 }
 
 async function deleteVoiceChannel(channelId: string) {
-  const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
+  const res = await fetchWithTimeout(`${DISCORD_API}/channels/${channelId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bot ${BOT_TOKEN}` },
   })
@@ -122,11 +125,15 @@ serve(async (req) => {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  const rateLimit = await consumeUserRateLimit('discord-order-channel', 'database-webhook', 120, 60)
+  if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
+
   let rawPayload: unknown
   try {
-    rawPayload = await req.json()
-  } catch {
-    return jsonResponse(req, { error: 'invalid json' }, 400)
+    rawPayload = await readJsonBody(req, 32 * 1024)
+  } catch (err) {
+    if (err instanceof HttpError) return jsonResponse(req, { error: err.message }, err.status)
+    return jsonResponse(req, { error: 'invalid request' }, 400)
   }
 
   const parsedPayload = dbWebhookSchema.safeParse(rawPayload)

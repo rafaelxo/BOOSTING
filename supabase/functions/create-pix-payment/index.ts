@@ -12,9 +12,11 @@ import {
   NO_DIVISION_TIERS,
 } from '../../../shared/boostDomain.ts'
 import { handleCors } from '../_shared/cors.ts'
-import { errorResponse, jsonResponse } from '../_shared/responses.ts'
+import { errorResponse, jsonResponse, rateLimitResponse } from '../_shared/responses.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
+import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -31,7 +33,7 @@ const DIVISIONS = ['IV', 'III', 'II', 'I'] as const
 
 const standardRankSchema = z.object({
   tier: z.enum(STANDARD_TIERS),
-  division: z.enum(DIVISIONS).nullable().optional(),
+  division: z.enum(DIVISIONS),
 }).strict()
 
 // Rank alvo do fluxo padrão pode ir além de Diamond — até Master, Grão-Mestre
@@ -46,6 +48,8 @@ const standardTargetRankSchema = z.object({
 }).strict().superRefine((val, ctx) => {
   if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
+  } else if (!NO_DIVISION_TIERS.includes(val.tier) && !val.division) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Divisão é obrigatória para este rank', path: ['division'] })
   }
 })
 
@@ -75,11 +79,11 @@ const routingSchema = z.object({
 // Solo Boost / Duo Boost padrão — Iron a Diamond.
 const standardEloIntentSchema = z.object({
   service_type: z.literal('elo_boost'),
-  service_id: z.string().min(1, 'service_id é obrigatório'),
-  game_id: z.string().min(1, 'game_id é obrigatório'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
   queue_type: z.enum(['solo_duo', 'flex']),
   boost_mode: z.enum(['solo', 'duo']),
-  server: z.string().min(1, 'server é obrigatório'),
+  server: z.string().trim().min(2).max(16),
   current_rank: standardRankSchema,
   target_rank: standardTargetRankSchema,
   current_lp: z.number().int().min(0).max(100).default(0),
@@ -96,11 +100,11 @@ const standardEloIntentSchema = z.object({
 // preço por vitória não se aplica ao Master+).
 const masterPlusIntentSchema = z.object({
   service_type: z.literal('elo_boost'),
-  service_id: z.string().min(1, 'service_id é obrigatório'),
-  game_id: z.string().min(1, 'game_id é obrigatório'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
   queue_type: z.enum(['solo_duo', 'flex']),
   boost_mode: z.literal('solo'),
-  server: z.string().min(1, 'server é obrigatório'),
+  server: z.string().trim().min(2).max(16),
   current_rank: masterPlusCurrentRankSchema,
   target_rank: masterPlusTargetRankSchema,
   current_pdl: z.number().int().min(0),
@@ -114,11 +118,11 @@ const masterPlusIntentSchema = z.object({
 // (Solo/Duo/Master+); mantido como antes, só sem o campo target_lp morto.
 const otherServiceIntentSchema = z.object({
   service_type: z.enum(['win_boost', 'placement_matches', 'coaching']),
-  service_id: z.string().min(1, 'service_id é obrigatório'),
-  game_id: z.string().min(1, 'game_id é obrigatório'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
   queue_type: z.enum(['solo_duo', 'flex']),
   boost_mode: z.enum(['solo', 'duo']),
-  server: z.string().min(1, 'server é obrigatório'),
+  server: z.string().trim().min(2).max(16),
   current_rank: genericRankSchema.nullable(),
   target_rank: genericRankSchema.nullable(),
   current_lp: z.number().int().min(0).max(9999).default(0),
@@ -129,13 +133,14 @@ const otherServiceIntentSchema = z.object({
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),
   customer_notes: z.string().max(500).nullable().default(null),
-})
+}).strict()
 
 const bodySchema = z.object({
   order_id: z.string().uuid().optional(),
   intent: z.record(z.unknown()).optional(),
-}).refine((body) => body.order_id || body.intent, {
-  message: 'Informe order_id ou intent',
+  idempotency_key: z.string().uuid().optional(),
+}).strict().refine((body) => Boolean(body.order_id) !== Boolean(body.intent), {
+  message: 'Informe exatamente um entre order_id e intent',
 })
 
 // Forma normalizada usada pelo resto do handler, independente de qual dos 3
@@ -172,6 +177,7 @@ serve(async (req) => {
   if (cors) return cors
 
   try {
+    if (req.method !== 'POST') return errorResponse(req, 'Method not allowed', 405)
     if (!MP_ACCESS_TOKEN || !SUPABASE_URL) {
       return errorResponse(req, 'Server misconfigured', 500)
     }
@@ -179,12 +185,10 @@ serve(async (req) => {
     const auth = await getAuthUser(req.headers.get('Authorization'))
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
 
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      return badRequest(req, 'JSON inválido')
-    }
+    const rateLimit = await consumeUserRateLimit('create-pix-payment', auth.user.id, 6, 60)
+    if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
+
+    const rawBody = await readJsonBody(req)
 
     const parsedBody = bodySchema.safeParse(rawBody)
     if (!parsedBody.success) {
@@ -198,13 +202,25 @@ serve(async (req) => {
     const userClient = auth.client
     const { user } = auth
     const serviceClient = supabaseAdmin()
+    let requestedOrderId = body.order_id
+
+    if (!requestedOrderId && body.idempotency_key) {
+      const { data: previous, error: previousError } = await serviceClient
+        .from('orders')
+        .select('id')
+        .eq('customer_id', user.id)
+        .eq('idempotency_key', body.idempotency_key)
+        .maybeSingle()
+      if (previousError) return errorResponse(req, 'Failed to check idempotency key', 500)
+      requestedOrderId = previous?.id
+    }
 
     let orderId: string
     let order: { id: string; customer_id: string; total_price: number; mp_payment_id: string | null }
 
-    if (body.order_id) {
+    if (requestedOrderId) {
       // ── Retry path: reuse an order already created by this function ──────────
-      orderId = body.order_id
+      orderId = requestedOrderId
 
       const { data: existingOrder, error: orderErr } = await userClient
         .from('orders')
@@ -357,6 +373,16 @@ serve(async (req) => {
         }
       }
 
+      const [{ data: service, error: serviceError }, { data: game, error: gameError }] = await Promise.all([
+        serviceClient.from('services').select('id, game_id, type, is_active').eq('id', normalized.serviceId).maybeSingle(),
+        serviceClient.from('games').select('id, is_active').eq('id', normalized.gameId).maybeSingle(),
+      ])
+      if (serviceError || gameError) return errorResponse(req, 'Failed to validate catalog', 500)
+      if (!service || !game || !service.is_active || !game.is_active
+          || service.game_id !== game.id || service.type !== normalized.serviceType) {
+        return badRequest(req, 'Serviço ou jogo inválido/inativo')
+      }
+
       // ── Addons: validados contra a whitelist do fluxo E contra o catálogo
       // vivo em service_extras (ativo, do fluxo certo). Nunca aceita
       // percentual/label vindo do cliente — só o código.
@@ -440,13 +466,32 @@ serve(async (req) => {
           avg_pdl_gain: normalized.avgPdlGain,
           avg_pdl_loss: normalized.avgPdlLoss,
           pricing_version: 'v2',
+          idempotency_key: body.idempotency_key ?? null,
         })
         .select('id, customer_id, total_price, mp_payment_id')
         .single()
 
-      if (insertErr || !inserted) return errorResponse(req, insertErr?.message ?? 'Erro ao criar pedido', 500)
-      orderId = inserted.id
-      order = inserted
+      if (insertErr || !inserted) {
+        if (insertErr?.code === '23505' && body.idempotency_key) {
+          const { data: raced } = await serviceClient
+            .from('orders')
+            .select('id, customer_id, total_price, mp_payment_id')
+            .eq('customer_id', user.id)
+            .eq('idempotency_key', body.idempotency_key)
+            .maybeSingle()
+          if (raced) {
+            orderId = raced.id
+            order = raced
+          } else {
+            return errorResponse(req, 'Order creation conflict', 409)
+          }
+        } else {
+          return errorResponse(req, 'Failed to create order', 500)
+        }
+      } else {
+        orderId = inserted.id
+        order = inserted
+      }
     } else {
       return badRequest(req, 'Missing order_id or intent')
     }
@@ -459,7 +504,7 @@ serve(async (req) => {
 
     // If there is already a pending MP payment for this order, try to reuse it
     if (order.mp_payment_id) {
-      const existing = await fetch(
+      const existing = await fetchWithTimeout(
         `https://api.mercadopago.com/v1/payments/${order.mp_payment_id}`,
         { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } },
       )
@@ -485,7 +530,7 @@ serve(async (req) => {
     // Amount sourced exclusively from the order row — client cannot influence this value
     const amountBrl = Number(order.total_price)
 
-    const mpResp = await fetch('https://api.mercadopago.com/v1/payments', {
+    const mpResp = await fetchWithTimeout('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
@@ -506,8 +551,7 @@ serve(async (req) => {
     })
 
     if (!mpResp.ok) {
-      const err = await mpResp.json()
-      console.error('Mercado Pago error:', err)
+      console.error(`Mercado Pago create payment failed with status ${mpResp.status}`)
       // Include order_id even on failure: the order row already exists at
       // this point, so a client retry must reuse it (order_id path) instead
       // of resending an intent and creating a second order.
@@ -525,32 +569,22 @@ serve(async (req) => {
     // fails" symptom, not something a client-side retry alone can fix.
     for (let attempt = 0; attempt < 3 && !mp.point_of_interaction?.transaction_data?.qr_code_base64; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 1200))
-      const poll = await fetch(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
+      const poll = await fetchWithTimeout(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
       if (poll.ok) mp = await poll.json()
     }
 
-    // Persist MP payment ID on the order and create the payment record
-    await Promise.all([
-      serviceClient
-        .from('orders')
-        .update({ mp_payment_id: mpPaymentId, updated_at: new Date().toISOString() })
-        .eq('id', orderId),
-
-      serviceClient.from('payments').upsert(
-        {
-          order_id: orderId,
-          customer_id: user.id,
-          mp_payment_id: mpPaymentId,
-          amount: amountBrl,
-          currency: 'brl',
-          status: 'pending',
-          metadata: { provider: 'mercadopago', mp_payment_id: mpPaymentId },
-        },
-        { onConflict: 'order_id' },
-      ),
-    ])
+    const { data: recorded, error: recordError } = await serviceClient.rpc('record_pix_payment', {
+      p_order_id: orderId,
+      p_customer_id: user.id,
+      p_mp_payment_id: mpPaymentId,
+      p_amount: amountBrl,
+    })
+    if (recordError || !(recorded as { success?: boolean } | null)?.success) {
+      console.error('Failed to persist PIX payment for order', orderId)
+      return jsonResponse(req, { error: 'Falha ao registrar pagamento PIX', order_id: orderId }, 500)
+    }
 
     return jsonResponse(req, {
       order_id: orderId,
@@ -562,7 +596,8 @@ serve(async (req) => {
       reused: false,
     })
   } catch (err) {
-    console.error('create-pix-payment error:', err)
-    return errorResponse(req, (err as Error).message, 500)
+    console.error('create-pix-payment error', err instanceof Error ? err.name : 'unknown')
+    if (err instanceof HttpError) return errorResponse(req, err.message, err.status)
+    return errorResponse(req, 'Internal server error', 500)
   }
 })

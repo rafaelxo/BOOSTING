@@ -120,3 +120,53 @@ describe('Fluxo padrão (Iron–Diamond) — Duo aplica +50% sobre o preço com 
     expect(priced.basePrice).toBe(0)
   })
 })
+
+describe('Integridade monetária e entradas hostis', () => {
+  it('arredonda percentuais uma única vez na menor unidade monetária', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'master', division: null },
+      targetRank: { tier: 'challenger', division: null },
+      masterPlusPrice: 10.01,
+      extras: [{ id: 'fractional', priceModifier: 0, priceModifierPct: 15 }],
+    }))
+    expect(priced.extrasPrice).toBe(1.5)
+    expect(priced.totalPrice).toBe(11.51)
+  })
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -0.01])(
+    'recusa modificador monetário inválido: %s',
+    (priceModifier) => {
+      expect(() => computeOrderPrice(baseInput({
+        currentRank: { tier: 'master', division: null },
+        masterPlusPrice: 100,
+        extras: [{ id: 'invalid', priceModifier, priceModifierPct: 0 }],
+      }))).toThrow(RangeError)
+    },
+  )
+
+  it('recusa percentual acima de 100%', () => {
+    expect(() => computeOrderPrice(baseInput({
+      currentRank: { tier: 'master', division: null },
+      masterPlusPrice: 100,
+      extras: [{ id: 'invalid', priceModifier: 0, priceModifierPct: 100.01 }],
+    }))).toThrow(RangeError)
+  })
+
+  it.each([1, 3, 50])('calcula quantidade válida de vitórias: %i', (winsPurchased) => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased,
+    }))
+    expect(priced.basePrice).toBe(winsPurchased * 3.9)
+    expect(priced.totalPrice).toBe(priced.basePrice)
+  })
+
+  it('recusa quantidade negativa', () => {
+    expect(() => computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: -1,
+    }))).toThrow(RangeError)
+  })
+})

@@ -31,6 +31,14 @@ export function JobDetailPage() {
   const { data: order } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
+      const { data: available, error: availableError } = await supabase
+        .from('available_boost_orders')
+        .select('*')
+        .eq('id', id!)
+        .maybeSingle()
+      if (availableError) throw availableError
+      if (available) return available as unknown as Order
+
       const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
       if (error) throw error
       return data as unknown as Order

@@ -1,22 +1,25 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { handleCors } from '../_shared/cors.ts'
-import { errorResponse, jsonResponse } from '../_shared/responses.ts'
+import { errorResponse, jsonResponse, rateLimitResponse } from '../_shared/responses.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
+import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
 
 const DISCORD_API = 'https://discord.com/api/v10'
 const GUILD_ID = Deno.env.get('DISCORD_GUILD_ID') ?? ''
 const BOT_TOKEN = Deno.env.get('DISCORD_BOT_TOKEN') ?? ''
 
 const bodySchema = z.object({
-  discord_access_token: z.string().min(1, 'discord_access_token é obrigatório'),
-})
+  discord_access_token: z.string().min(1).max(4096),
+}).strict()
 
 serve(async (req) => {
   const cors = handleCors(req)
   if (cors) return cors
 
   try {
+    if (req.method !== 'POST') return errorResponse(req, 'Method not allowed', 405)
     if (!GUILD_ID || !BOT_TOKEN) {
       return errorResponse(req, 'Server misconfigured', 500)
     }
@@ -24,12 +27,10 @@ serve(async (req) => {
     const auth = await getAuthUser(req.headers.get('Authorization'))
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
 
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      return errorResponse(req, 'JSON inválido', 400)
-    }
+    const rateLimit = await consumeUserRateLimit('discord-join-server', auth.user.id, 3, 300)
+    if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
+
+    const rawBody = await readJsonBody(req, 8 * 1024)
 
     const parsedBody = bodySchema.safeParse(rawBody)
     if (!parsedBody.success) {
@@ -45,14 +46,22 @@ serve(async (req) => {
     const { discord_access_token } = parsedBody.data
 
     // Resolve Discord user ID from the access token
-    const meRes = await fetch(`${DISCORD_API}/users/@me`, {
+    const meRes = await fetchWithTimeout(`${DISCORD_API}/users/@me`, {
       headers: { Authorization: `Bearer ${discord_access_token}` },
     })
-    if (!meRes.ok) throw new Error('Failed to fetch Discord user')
+    if (!meRes.ok) return errorResponse(req, 'Invalid Discord token', 400)
     const { id: discordUserId } = await meRes.json() as { id: string }
 
+    const discordIdentity = auth.user.identities?.find((identity) => identity.provider === 'discord')
+    const expectedDiscordId = discordIdentity?.identity_id
+      ?? auth.user.user_metadata?.provider_id
+      ?? auth.user.user_metadata?.sub
+    if (!expectedDiscordId || String(expectedDiscordId) !== discordUserId) {
+      return errorResponse(req, 'Discord identity mismatch', 403)
+    }
+
     // Add user to the guild (bot must already be in the server)
-    const joinRes = await fetch(`${DISCORD_API}/guilds/${GUILD_ID}/members/${discordUserId}`, {
+    const joinRes = await fetchWithTimeout(`${DISCORD_API}/guilds/${GUILD_ID}/members/${discordUserId}`, {
       method: 'PUT',
       headers: {
         Authorization: `Bot ${BOT_TOKEN}`,
@@ -63,13 +72,14 @@ serve(async (req) => {
 
     // 201 = joined, 204 = already a member — both are success
     if (!joinRes.ok && joinRes.status !== 201 && joinRes.status !== 204) {
-      const body = await joinRes.text()
-      console.error(`Discord join failed ${joinRes.status}:`, body)
-      throw new Error('Não foi possível vincular o usuário ao servidor Discord')
+      console.error(`Discord join failed with status ${joinRes.status}`)
+      return errorResponse(req, 'Unable to join Discord server', 502)
     }
 
     return jsonResponse(req, { joined: true })
   } catch (err) {
-    return errorResponse(req, (err as Error).message, 400)
+    if (err instanceof HttpError) return errorResponse(req, err.message, err.status)
+    console.error('discord-join-server error')
+    return errorResponse(req, 'Internal server error', 500)
   }
 })

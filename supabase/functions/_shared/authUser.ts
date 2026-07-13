@@ -1,4 +1,4 @@
-import { createClient, type User } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.108.1'
 
 export async function getAuthUser(authHeader: string | null): Promise<{ user: User; client: ReturnType<typeof createClient> } | null> {
   if (!authHeader) return null

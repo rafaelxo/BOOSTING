@@ -689,6 +689,7 @@ export type Database = {
           game_credentials: string | null
           game_id: string
           id: string
+          idempotency_key: string | null
           losses_played: number
           mp_payment_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
@@ -726,6 +727,7 @@ export type Database = {
           game_credentials?: string | null
           game_id: string
           id?: string
+          idempotency_key?: string | null
           losses_played?: number
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
@@ -763,6 +765,7 @@ export type Database = {
           game_credentials?: string | null
           game_id?: string
           id?: string
+          idempotency_key?: string | null
           losses_played?: number
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
@@ -1276,6 +1279,49 @@ export type Database = {
       }
     }
     Views: {
+      admin_duo_accounts: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          current_rank: Json | null
+          game_id: string | null
+          id: string | null
+          is_active: boolean | null
+          label: string | null
+          notes: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      available_boost_orders: {
+        Row: {
+          avg_pdl_gain: number | null
+          avg_pdl_loss: number | null
+          boost_mode: string | null
+          created_at: string | null
+          current_pdl: number | null
+          current_rank: Json | null
+          estimated_hours: number | null
+          extras: Json | null
+          game_id: string | null
+          id: string | null
+          losses_played: number | null
+          pdl_bracket: string | null
+          pricing_version: string | null
+          queue_type: Database["public"]["Enums"]["queue_type"] | null
+          server: string | null
+          service_id: string | null
+          sessions_purchased: number | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          target_rank: Json | null
+          total_price: number | null
+          updated_at: string | null
+          win_package: number | null
+          wins_played: number | null
+          wins_purchased: number | null
+        }
+        Relationships: []
+      }
       public_booster_profiles: {
         Row: {
           bio: string | null
