@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { BOOST_ADDON_CODES, sortAddonsBySortOrder } from '@/lib/boostDomain'
 import type { BoostFlow, ServiceExtra } from '@/types'
 
 // Referência estável pra quando a query está desabilitada (flow null) —
@@ -20,14 +21,22 @@ export function useBoostAddons(flow: BoostFlow | null) {
   return useQuery({
     queryKey: ['boost-addons', flow],
     queryFn: async () => {
+      const addonCodes = [...BOOST_ADDON_CODES[flow!]]
       const { data, error } = await supabase
         .from('service_extras')
         .select('*')
         .eq('flow', flow as string)
         .eq('is_active', true)
+        .in('code', addonCodes)
         .order('sort_order')
       if (error) throw error
-      return data as ServiceExtra[]
+      return sortAddonsBySortOrder(
+        (data as ServiceExtra[]).filter((extra) =>
+          extra.flow === flow &&
+          typeof extra.code === 'string' &&
+          BOOST_ADDON_CODES[flow!].includes(extra.code)
+        )
+      )
     },
     enabled: !!flow,
     staleTime: 1000 * 60 * 10,

@@ -375,16 +375,6 @@ export function OrderDetailPage() {
             )}
           </Card>
 
-          {/* Support */}
-          <Card padding="md" variant="brand">
-            <p className="text-sm font-semibold text-ink mb-1">{t('customer.order.needHelp')}</p>
-            <p className="text-xs text-ink-secondary mb-3">{t('customer.order.ticketDesc')}</p>
-            <Button asChild variant="secondary" size="sm" className="w-full">
-              <a href="https://discord.gg/elopeak" target="_blank" rel="noopener noreferrer">
-                {t('customer.order.openTicket')}
-              </a>
-            </Button>
-          </Card>
         </div>
       </div>
     </div>

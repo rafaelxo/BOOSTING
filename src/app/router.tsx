@@ -48,7 +48,6 @@ const AdminBoosterDetailPage = lazy(() => import('@/features/admin/pages/Booster
 const AdminCustomersPage  = lazy(() => import('@/features/admin/pages/Customers').then(m => ({ default: m.AdminCustomersPage })))
 const AdminPaymentsPage   = lazy(() => import('@/features/admin/pages/Payments').then(m => ({ default: m.AdminPaymentsPage })))
 const AdminRefundsPage    = lazy(() => import('@/features/admin/pages/Refunds').then(m => ({ default: m.AdminRefundsPage })))
-const AdminTicketsPage    = lazy(() => import('@/features/admin/pages/Tickets').then(m => ({ default: m.AdminTicketsPage })))
 const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs').then(m => ({ default: m.AdminAuditPage })))
 const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services').then(m => ({ default: m.AdminServicesPage })))
 const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
@@ -152,7 +151,6 @@ export const router = createBrowserRouter([
           { path: '/admin/customers',    element: <SuspensePage><AdminCustomersPage /></SuspensePage> },
           { path: '/admin/payments',     element: <SuspensePage><AdminPaymentsPage /></SuspensePage> },
           { path: '/admin/refunds',      element: <SuspensePage><AdminRefundsPage /></SuspensePage> },
-          { path: '/admin/tickets',      element: <SuspensePage><AdminTicketsPage /></SuspensePage> },
           { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
           { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
           { path: '/admin/boost-config', element: <SuspensePage><AdminBoostConfigPage /></SuspensePage> },

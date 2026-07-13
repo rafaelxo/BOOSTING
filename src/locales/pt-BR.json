@@ -175,9 +175,6 @@
       "messagePlaceholder": "Mensagem para seu booster...",
       "timeline": "Histórico de Status",
       "noHistory": "Sem histórico ainda.",
-      "needHelp": "Precisa de ajuda?",
-      "ticketDesc": "Fale com nosso suporte pelo Discord.",
-      "openTicket": "Abrir Discord",
       "soloQueue": "Solo/Duo",
       "flexQueue": "Flex",
       "paymentSuccess": "Pagamento confirmado!",
@@ -345,7 +342,6 @@
     "nav": {
       "operations": "Operações",
       "finance": "Finanças",
-      "support": "Suporte",
       "system": "Sistema",
       "overview": "Visão Geral",
       "orders": "Pedidos",
@@ -353,7 +349,6 @@
       "customers": "Clientes",
       "payments": "Pagamentos",
       "refunds": "Reembolsos",
-      "tickets": "Tickets",
       "reviews": "Avaliações",
       "services": "Serviços",
       "audit": "Auditoria",
@@ -367,8 +362,6 @@
       "totalRevenue": "Receita Total",
       "activeOrders": "Pedidos Ativos",
       "pendingBoosters": "Boosters Pendentes",
-      "openTickets": "Tickets Abertos",
-      "urgent": "urgente",
       "ordersWeek": "Pedidos Esta Semana",
       "recentOrders": "Pedidos Recentes",
       "viewAll": "Ver todos"
@@ -451,20 +444,6 @@
         "date": "Data"
       },
       "empty": "Nenhum reembolso emitido"
-    },
-    "tickets": {
-      "title": "Tickets de Suporte",
-      "table": {
-        "subject": "Assunto",
-        "priority": "Prioridade",
-        "status": "Status",
-        "assigned": "Atribuído",
-        "created": "Criado",
-        "actions": "Ações"
-      },
-      "unassigned": "Não atribuído",
-      "assignToMe": "Atribuir a mim",
-      "empty": "Nenhum ticket"
     },
     "audit": {
       "title": "Logs de Auditoria",

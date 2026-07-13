@@ -39,9 +39,9 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 export function OrderBuilderPage() {
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
-    selectedExtraIds, currentRank, boostMode, gameSlug, gameId, serviceType,
+    selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType,
     setGame, setService, setStep, reset, preferredBoosterName, setPreferredBooster,
-    selectedCoachPackage, setSelectedCoachPackage, setBasePrice,
+    selectedCoachPackage, setSelectedCoachPackage, setBasePrice, winsPurchased,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
@@ -184,7 +184,13 @@ export function OrderBuilderPage() {
                 </Button>
                 <Button
                   onClick={nextStep}
-                  disabled={!isStepComplete(step, { serviceType, selectedCoachPackageId: selectedCoachPackage?.id ?? null })}
+                  disabled={!isStepComplete(step, {
+                    serviceType,
+                    selectedCoachPackageId: selectedCoachPackage?.id ?? null,
+                    currentRank,
+                    targetRank,
+                    winsPurchased,
+                  })}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Continuar
@@ -281,8 +287,22 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function isStepComplete(step: OrderBuilderStep, state: { serviceType: string | null; selectedCoachPackageId: string | null }) {
+function isStepComplete(
+  step: OrderBuilderStep,
+  state: {
+    serviceType: ServiceType | null
+    selectedCoachPackageId: string | null
+    currentRank: unknown | null
+    targetRank: unknown | null
+    winsPurchased: number | null
+  }
+) {
   if (step === 'service') return !!state.serviceType
-  if (step === 'configure' && state.serviceType === 'coaching') return !!state.selectedCoachPackageId
+  if (step === 'configure') {
+    if (state.serviceType === 'elo_boost') return !!state.currentRank && !!state.targetRank
+    if (state.serviceType === 'win_boost') return !!state.currentRank && !!state.winsPurchased
+    if (state.serviceType === 'placement_matches') return !!state.currentRank
+    if (state.serviceType === 'coaching') return !!state.selectedCoachPackageId
+  }
   return true
 }

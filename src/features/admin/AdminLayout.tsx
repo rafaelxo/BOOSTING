@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
-  HeadphonesIcon, Settings, Shield, Star,
+  Settings, Shield, Star,
   RefreshCw, Eye, AlertTriangle, Landmark, Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,7 @@ export function AdminLayout() {
         { href: '/admin/customers', icon: Users,           label: t('admin.nav.customers')  },
         { href: '/admin/drops',     icon: AlertTriangle,   label: 'Drops'                   },
         { href: '/admin/duo-accounts', icon: Landmark,     label: 'Contas Duo'              },
+        { href: '/admin/reviews',   icon: Star,            label: t('admin.nav.reviews')    },
       ],
     },
     {
@@ -30,13 +31,6 @@ export function AdminLayout() {
       items: [
         { href: '/admin/payments', icon: DollarSign, label: t('admin.nav.payments') },
         { href: '/admin/refunds',  icon: RefreshCw,  label: t('admin.nav.refunds')  },
-      ],
-    },
-    {
-      label: t('admin.nav.support'),
-      items: [
-        { href: '/admin/tickets', icon: HeadphonesIcon, label: t('admin.nav.tickets') },
-        { href: '/admin/reviews', icon: Star,           label: t('admin.nav.reviews') },
       ],
     },
     {

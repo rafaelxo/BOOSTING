@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { ShoppingBag, DollarSign, Users, AlertCircle } from 'lucide-react'
+import { ShoppingBag, DollarSign, Users } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
@@ -14,14 +14,12 @@ interface AdminDashboardStats {
   total_revenue: number
   active_orders_count: number
   pending_boosters_count: number
-  open_tickets_count: number
-  urgent_tickets_count: number
   recent_orders: Pick<Order, 'id' | 'status' | 'total_price' | 'created_at'>[]
   daily_orders: { day: string; count: number }[]
 }
 
 // Server-side aggregate (admin_dashboard_stats RPC) instead of downloading
-// the entire orders/payments/booster_profiles/support_tickets tables to the
+// the entire orders/payments/booster_profiles tables to the
 // client just to compute counts and sums, repeated every 30s.
 function useAdminStats() {
   return useQuery({
@@ -61,16 +59,15 @@ export function AdminOverview() {
 
       {/* KPI cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {[
             { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
             { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10', trend: null },
             { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
-            { label: t('admin.overview.openTickets'), value: `${stats?.open_tickets_count ?? 0}${stats?.urgent_tickets_count ? ` (${stats.urgent_tickets_count} ${t('admin.overview.urgent')})` : ''}`, icon: AlertCircle, color: stats?.urgent_tickets_count ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
           ].map(({ label, value, icon: Icon, color, trend }) => (
             <Card key={label} padding="md">
               <div className="flex items-start justify-between mb-3">

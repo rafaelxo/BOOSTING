@@ -11,7 +11,12 @@ const SERVICES: { type: ServiceType; name: string; desc: string; icon: React.Ele
 ]
 
 export function StepService() {
-  const { serviceType, setService } = useOrderBuilderStore()
+  const { serviceType, setService, reset } = useOrderBuilderStore()
+
+  const handleSelectService = (type: ServiceType) => {
+    if (serviceType && serviceType !== type) reset()
+    setService(type, type)
+  }
 
   return (
     <div>
@@ -22,7 +27,7 @@ export function StepService() {
         {SERVICES.map(({ type, name, desc, icon: Icon, badge }) => (
           <button
             key={type}
-            onClick={() => setService(type, type)}
+            onClick={() => handleSelectService(type)}
             className={cn(
               'relative flex items-start gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-150',
               serviceType === type
