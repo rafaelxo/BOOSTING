@@ -243,7 +243,7 @@ export function StepPayment() {
           <CheckCircle2 className="h-8 w-8 text-success" />
         </div>
         <h2 className="text-xl font-bold text-ink mb-2">Pagamento Confirmado!</h2>
-        <p className="text-sm text-ink-secondary">Seu pedido entrou na fila. Redirecionando…</p>
+        <p className="text-sm text-ink-secondary">Pagamento aprovado. Redirecionando para os próximos passos…</p>
       </div>
     )
   }

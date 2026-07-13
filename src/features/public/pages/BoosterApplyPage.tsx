@@ -1,4 +1,5 @@
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Zap } from 'lucide-react'
 import { PageLoader, ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
@@ -9,7 +10,9 @@ import { PendingScreen, RejectedScreen, BoosterStatusErrorScreen } from '@/featu
 
 export function BoosterApplyPage() {
   const [searchParams] = useSearchParams()
-  const { profile, setProfile } = useAuthStore()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { profile } = useAuthStore()
   const isBoosterIntent = searchParams.get('booster') === '1'
   const isAlreadyBooster = profile?.role === 'booster'
   const { state } = useBoosterStatus()
@@ -19,17 +22,24 @@ export function BoosterApplyPage() {
   if (profile.role !== 'customer' && !isAlreadyBooster) return <Navigate to="/" replace />
   if (isAlreadyBooster && state === 'approved') return <Navigate to="/booster" replace />
 
-  async function ensureBoosterRole() {
+  async function startBoosterApplication() {
     if (!profile) return false
     if (profile.role === 'booster') return true
 
+    // Compatibility RPC: it no longer promotes the user to booster. It only
+    // verifies the user can start an application; the role is changed by admin
+    // approval in the database.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase.rpc('request_booster_role') as any
     const result = data as { success?: boolean } | null
     if (error || !result?.success) return false
 
-    setProfile({ ...profile, role: 'booster' })
     return true
+  }
+
+  async function handleApplicationSaved() {
+    await queryClient.invalidateQueries({ queryKey: ['booster-profile-access-status', profile?.id] })
+    navigate('/apply?booster=1', { replace: true })
   }
 
   const header = (
@@ -80,7 +90,8 @@ export function BoosterApplyPage() {
 
         <BoosterApplicationForm
           submitLabel="Enviar Candidatura"
-          onEnsureBoosterRole={ensureBoosterRole}
+          onEnsureBoosterRole={startBoosterApplication}
+          onSuccess={handleApplicationSaved}
         />
       </div>
     </div>

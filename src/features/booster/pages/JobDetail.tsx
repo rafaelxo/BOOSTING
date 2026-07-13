@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -9,6 +9,15 @@ import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils
 import type { Division, Order, OrderMessage, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
+
+function orderRequiresAccountAccess(order: Order): boolean {
+  return (
+    (order.service_id === 'elo_boost' && order.boost_mode === 'solo') ||
+    order.service_id === 'win_boost' ||
+    order.service_id === 'placement_matches' ||
+    order.service_id === 'md5'
+  )
+}
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +27,8 @@ export function JobDetailPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [dropReason, setDropReason] = useState('')
   const [showDropModal, setShowDropModal] = useState(false)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [tokenCopied, setTokenCopied] = useState(false)
   const { t } = useTranslation()
   const currency = useCurrency()
 
@@ -128,6 +139,28 @@ export function JobDetailPage() {
       if (result.passed) queryClient.invalidateQueries({ queryKey: ['order', id] })
     },
   })
+
+  const revealAccessToken = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('get_order_credentials', {
+        p_order_id: id!,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; access_token?: string; error?: string } | null
+      if (!result?.success || !result.access_token) {
+        throw new Error(result?.error ?? 'Token de acesso indisponível')
+      }
+      return result.access_token
+    },
+    onSuccess: (token) => setAccessToken(token),
+  })
+
+  async function copyAccessToken() {
+    if (!accessToken) return
+    await navigator.clipboard.writeText(accessToken)
+    setTokenCopied(true)
+    setTimeout(() => setTokenCopied(false), 1500)
+  }
 
   const requestDrop = useMutation({
     mutationFn: async (reason: string) => {
@@ -291,6 +324,58 @@ export function JobDetailPage() {
             <p className="text-2xl font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</p>
             <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
           </Card>
+
+          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-brand" />
+                Token de acesso
+              </h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Use este token apenas no aplicativo autorizado para inicializar o client. Login e senha não são exibidos.
+              </p>
+
+              {!order.credentials_set ? (
+                <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                  O cliente ainda não gerou o token de acesso.
+                </div>
+              ) : accessToken ? (
+                <div className="space-y-2">
+                  <textarea
+                    readOnly
+                    value={accessToken}
+                    className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none"
+                    spellCheck={false}
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    variant={tokenCopied ? 'success' : 'secondary'}
+                    leftIcon={<Copy className="h-3.5 w-3.5" />}
+                    onClick={() => void copyAccessToken()}
+                  >
+                    {tokenCopied ? 'Copiado' : 'Copiar token'}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  className="w-full"
+                  leftIcon={<KeyRound className="h-3.5 w-3.5" />}
+                  loading={revealAccessToken.isPending}
+                  onClick={() => revealAccessToken.mutate()}
+                >
+                  Mostrar token
+                </Button>
+              )}
+
+              {revealAccessToken.isError && (
+                <p className="text-xs text-danger mt-2">
+                  {revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'}
+                </p>
+              )}
+            </Card>
+          )}
 
           {/* Match result counters */}
           {(order.status === 'in_progress' || order.status === 'paused') && (

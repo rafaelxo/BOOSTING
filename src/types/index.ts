@@ -224,6 +224,7 @@ export interface Order {
   assigned_booster_id: string | null
   mp_payment_id: string | null
   payment_status: PaymentStatus | null
+  credentials_set: boolean
   completed_at: string | null
   created_at: string
   updated_at: string

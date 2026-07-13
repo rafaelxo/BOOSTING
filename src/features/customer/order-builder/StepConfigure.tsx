@@ -11,7 +11,7 @@ import {
   isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket, tierHasDivisions,
 } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Shield, Star, Gem, Diamond, Crown, Flame, Check } from 'lucide-react'
+import { Shield, Star, Gem, Diamond, Crown, Flame, Check, Search, AlertCircle } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
@@ -219,6 +219,64 @@ export function StepConfigure() {
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
   const pdlBracket = currentIsMasterPlus ? getPdlBracket(currentPdl) : null
+  const [riotLookupLoading, setRiotLookupLoading] = useState(false)
+  const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
+  const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
+
+  async function lookupRiotRank() {
+    const trimmed = riotId.trim()
+    setRiotLookupMessage(null)
+    setRiotLookupError(null)
+
+    if (!trimmed || !trimmed.includes('#')) {
+      setRiotLookupError('Informe no formato Nome#TAG.')
+      return
+    }
+
+    setRiotLookupLoading(true)
+    const { data, error } = await supabase.functions.invoke('riot-account-rank', {
+      body: { riot_id: trimmed },
+    })
+    setRiotLookupLoading(false)
+
+    if (error) {
+      setRiotLookupError(error.message || 'Não foi possível consultar a Riot agora.')
+      return
+    }
+
+    const result = data as {
+      found?: boolean
+      ranked?: boolean
+      tier?: RankTier
+      division?: Division | null
+      league_points?: number
+      avg_lp_gain?: number | null
+      avg_lp_loss?: number | null
+      message?: string
+    } | null
+
+    if (!result?.found) {
+      setRiotLookupError('Conta Riot não encontrada.')
+      return
+    }
+    if (!result.ranked || !result.tier) {
+      setRiotLookupError('Conta encontrada, mas sem rank Solo/Duo atual.')
+      return
+    }
+
+    setCurrentRank({ tier: result.tier, division: result.division ?? null })
+    if (isMasterPlusCurrentTier(result.tier)) {
+      setCurrentPdl(Math.max(0, Math.min(9999, result.league_points ?? 0)))
+      if (typeof result.avg_lp_gain === 'number') setAvgPdlGain(Math.max(1, Math.min(200, result.avg_lp_gain)))
+      if (typeof result.avg_lp_loss === 'number') setAvgPdlLoss(Math.max(1, Math.min(200, result.avg_lp_loss)))
+    } else {
+      setCurrentLp(Math.max(0, Math.min(99, result.league_points ?? 0)))
+      if (typeof result.avg_lp_gain === 'number') setAvgLpGain(Math.max(1, Math.min(50, result.avg_lp_gain)))
+      if (typeof result.avg_lp_loss === 'number') setAvgLpLoss(Math.max(1, Math.min(40, result.avg_lp_loss)))
+    }
+
+    setRiotLookupMessage(result.message ?? 'Rank atual preenchido automaticamente. Você ainda pode alterar os dados.')
+  }
 
   // Grão-Mestre só tem um destino válido (Challenger) — a interface pode
   // preenchê-lo automaticamente, mas o backend valida a combinação de novo.
@@ -303,6 +361,55 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
+        {/* Riot ID first: used to prefill current rank/LP from Riot. The user
+            may still edit everything afterwards; backend validation remains
+            authoritative when creating/completing orders. */}
+        {serviceType === 'elo_boost' && (
+          <FormField label="Riot ID" required hint="Informe antes de configurar. Ex: NomeDoInvocador#BR1. Vamos tentar preencher seu elo atual automaticamente.">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={riotId}
+                onChange={e => {
+                  setRiotId(e.target.value)
+                  setRiotLookupMessage(null)
+                  setRiotLookupError(null)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void lookupRiotRank()
+                  }
+                }}
+                placeholder="NomeDoInvocador#TAG"
+                className="input-base flex-1"
+                maxLength={32}
+              />
+              <button
+                type="button"
+                onClick={() => void lookupRiotRank()}
+                disabled={riotLookupLoading}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all',
+                  'bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed',
+                )}
+              >
+                <Search className="h-4 w-4" />
+                {riotLookupLoading ? 'Consultando...' : 'Verificar elo'}
+              </button>
+            </div>
+            {riotLookupMessage && (
+              <p className="mt-2 text-xs text-success">{riotLookupMessage}</p>
+            )}
+            {riotLookupError && (
+              <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-warning">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {riotLookupError}
+              </p>
+            )}
+          </FormField>
+        )}
+
         {/* Duo Boost toggle — não existe no fluxo Master+ */}
         {serviceType === 'elo_boost' && !currentIsMasterPlus && (
           <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
@@ -447,21 +554,6 @@ export function StepConfigure() {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Riot ID — necessário pra verificar automaticamente se a conta
-            chegou no rank alvo antes de concluir o pedido. */}
-        {serviceType === 'elo_boost' && (
-          <FormField label="Riot ID" required hint="Nome de invocador e tag, ex: Faker#BR1. Usamos isso pra confirmar que a conta atingiu o rank alvo.">
-            <input
-              type="text"
-              value={riotId}
-              onChange={e => setRiotId(e.target.value)}
-              placeholder="NomeDoInvocador#TAG"
-              className="input-base"
-              maxLength={22}
-            />
-          </FormField>
         )}
 
         {/* Rank — win boost */}

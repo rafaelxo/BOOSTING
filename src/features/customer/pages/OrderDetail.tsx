@@ -2,13 +2,22 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react'
+import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, ShieldCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
+
+function orderRequiresAccountAccess(order: Order): boolean {
+  return (
+    (order.service_id === 'elo_boost' && order.boost_mode === 'solo') ||
+    order.service_id === 'win_boost' ||
+    order.service_id === 'placement_matches' ||
+    order.service_id === 'md5'
+  )
+}
 
 function useOrder(id: string, refetchInterval?: number) {
   return useQuery({
@@ -54,9 +63,9 @@ function useOrderHistory(orderId: string) {
 }
 
 function CredentialsSection({ order }: { order: Order }) {
+  const queryClient = useQueryClient()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const saveCredentials = useMutation({
@@ -68,25 +77,28 @@ function CredentialsSection({ order }: { order: Order }) {
         p_password: password,
       })
       if (error) throw error
-      const result = data as { success: boolean; error?: string }
+      const result = data as { success: boolean; error?: string; access_token?: string }
       if (!result.success) throw new Error(result.error ?? 'Erro ao salvar')
     },
     onSuccess: () => {
       setSaved(true)
       setLogin('')
       setPassword('')
+      queryClient.invalidateQueries({ queryKey: ['order', order.id] })
       setTimeout(() => setSaved(false), 3000)
     },
   })
 
-  const canSet = ['awaiting_assignment', 'assigned', 'in_progress', 'paused'].includes(order.status)
+  if (!orderRequiresAccountAccess(order)) return null
+
+  const canSet = ['awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status)
   if (!canSet && !(order as Order & { credentials_set?: boolean }).credentials_set) return null
 
   return (
     <Card padding="md">
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold text-ink">Credenciais da Conta</h3>
+        <h3 className="text-sm font-semibold text-ink">Acesso da Conta</h3>
         {(order as Order & { credentials_set?: boolean }).credentials_set && (
           <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-lg">
             <ShieldCheck className="h-3 w-3" /> Salvas
@@ -94,7 +106,7 @@ function CredentialsSection({ order }: { order: Order }) {
         )}
       </div>
       <p className="text-xs text-ink-muted mb-4">
-        Visível somente para você. Seus dados são criptografados antes de serem armazenados.
+        Envie as credenciais uma única vez para gerar um token criptografado de acesso. O booster verá apenas o token; login e senha não são exibidos.
       </p>
       {canSet && (
         <div className="space-y-3">
@@ -106,38 +118,34 @@ function CredentialsSection({ order }: { order: Order }) {
               onChange={(e) => setLogin(e.target.value)}
               placeholder="Ex: SeuUsuario#BR1"
               className="input-base w-full text-sm"
-              autoComplete="off"
+              autoComplete="username"
+              maxLength={160}
             />
           </div>
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Senha da conta</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="input-base w-full text-sm pr-10"
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="input-base w-full text-sm"
+              autoComplete="new-password"
+              maxLength={256}
+            />
+            <p className="text-[10px] text-ink-muted mt-1">
+              O valor enviado é transformado em payload criptografado no banco. Não compartilhe a senha no chat.
+            </p>
           </div>
           <Button
             size="sm"
             className="w-full"
             loading={saveCredentials.isPending}
-            disabled={!login.trim() || !password}
+            disabled={!login.trim() || password.length < 4}
             onClick={() => saveCredentials.mutate()}
             variant={saved ? 'success' : 'primary'}
           >
-            {saved ? 'Credenciais salvas!' : (order as Order & { credentials_set?: boolean }).credentials_set ? 'Atualizar Credenciais' : 'Salvar Credenciais'}
+            {saved ? 'Pedido concluído!' : (order as Order & { credentials_set?: boolean }).credentials_set ? 'Gerar novo token' : 'Concluir pedido e gerar token'}
           </Button>
           {saveCredentials.isError && (
             <p className="text-xs text-danger">{saveCredentials.error instanceof Error ? saveCredentials.error.message : 'Erro'}</p>
