@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw } from 'lucide-react'
 
@@ -50,7 +50,8 @@ export function StepPayment() {
   // Mesma queryKey usada em StepExtras/StepReview — já em cache. Precisamos
   // do catálogo aqui só para traduzir os ids selecionados em códigos
   // estáveis (addon_codes) — o payload nunca envia o id interno do banco.
-  const { data: addonCatalog = [] } = useBoostAddons(flow)
+  const { data: addonData } = useBoostAddons(flow)
+  const addonCatalog = addonData ?? EMPTY_ADDONS
   const addonCodes = addonCatalog
     .filter(e => store.selectedExtraIds.has(e.id))
     .map(e => e.code)
@@ -107,7 +108,7 @@ export function StepPayment() {
   // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
   // partir da intenção (rank, extras selecionados, pacote de vitórias etc).
-  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown>; idempotency_key: string }) {
+  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown>; idempotency_key: string; preferred_booster_id?: string }) {
     const { data: pixData, error: pixError } = await supabase.functions.invoke('create-pix-payment', {
       body: payload,
     })
@@ -180,7 +181,9 @@ export function StepPayment() {
 
       // O contrato é diferente por fluxo — Master+ não tem PDL alvo, LP,
       // pacote de vitórias nem Duo; o fluxo padrão não tem PDL atual/médias
-      // de PDL. Nunca mandamos os dois conjuntos de campos juntos.
+      // de PDL; fluxos fora de elo_boost não têm rank alvo, então não levam
+      // riot_id (o schema deles é .strict() e rejeitaria o campo). Nunca
+      // mandamos os dois conjuntos de campos juntos.
       const intent = flow === 'master_plus'
         ? {
             ...base,
@@ -189,6 +192,7 @@ export function StepPayment() {
             avg_pdl_gain: store.avgPdlGain,
             avg_pdl_loss: store.avgPdlLoss,
             addon_codes: addonCodes,
+            riot_id: store.riotId,
           }
         : flow
           ? {
@@ -199,6 +203,7 @@ export function StepPayment() {
               avg_lp_loss: store.avgLpLoss,
               addon_codes: addonCodes,
               win_package: store.winPackage,
+              riot_id: store.riotId,
             }
           : {
               ...base,
@@ -210,9 +215,14 @@ export function StepPayment() {
               sessions_purchased: store.sessionsPurchased,
               addon_codes: [] as string[],
               win_package: store.winPackage,
+              booster_service_id: store.selectedCoachPackage?.id ?? null,
             }
 
-      await invokePix({ intent, idempotency_key: idempotencyKeyRef.current })
+      await invokePix({
+        intent,
+        idempotency_key: idempotencyKeyRef.current,
+        preferred_booster_id: store.preferredBoosterId ?? undefined,
+      })
     } catch (err) {
       setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }

@@ -122,9 +122,6 @@ export const PLACEMENT_PRICE: Record<string, number> = {
   master: 59.90, grandmaster: 59.90, challenger: 59.90,
 }
 
-// ── Coaching — valor a combinar por sessão ────────────────────────────────────
-export const COACHING_PRICE_NEGOTIABLE = true
-
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
 // Duo Boost só existe para o fluxo padrão (Iron–Diamond) — Master+ não aceita
 // Duo (ver shared/boostDomain.ts::getBoostFlow). Este percentual nunca é
@@ -196,6 +193,10 @@ export interface OrderPriceInput {
   sessionsPurchased: number | null
   extras: OrderExtraInput[]
   winPackage: 1 | 3 | 5 | null
+  // Preço do pacote de coach escolhido (booster_services.price),
+  // já validado server-side contra o booster_service_id do intent — nunca
+  // inventado. Ignorado para qualquer serviceType que não seja 'coaching'.
+  coachPackagePrice: number | null
 }
 
 export interface OrderPriceResult {
@@ -258,7 +259,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       break
     }
     case 'coaching': {
-      basePrice = 0
+      basePrice = input.coachPackagePrice ?? 0
       estimatedHours = input.sessionsPurchased ?? 1
       break
     }

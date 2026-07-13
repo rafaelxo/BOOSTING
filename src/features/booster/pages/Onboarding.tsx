@@ -8,7 +8,7 @@ export function BoosterOnboardingPage() {
   const { profile } = useAuthStore()
 
   const { data: boosterProfile, isLoading } = useQuery({
-    queryKey: ['booster-profile-status', profile?.id],
+    queryKey: ['booster-profile-onboarding-status', profile?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('booster_profiles')

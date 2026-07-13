@@ -1,13 +1,13 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useEffect, useState } from 'react'
-import { ArrowLeft, RefreshCw, MessageCircle, Send, Clock } from 'lucide-react'
+import { ArrowLeft, RefreshCw, MessageCircle, Send, Clock, ShieldCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Avatar } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Order, OrderStatus, OrderMessage, OrderStatusHistory } from '@/types'
+import type { Order, OrderStatus, OrderMessage, OrderStatusHistory, OrderRankVerification } from '@/types'
 
 const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'awaiting_assignment', label: 'Esperando Booster' },
@@ -67,6 +67,22 @@ export function AdminOrderDetailPage() {
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as OrderStatusHistory[]
+    },
+    enabled: !!id,
+  })
+
+  const { data: rankVerifications } = useQuery({
+    queryKey: ['admin-order-rank-verifications', id],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('order_rank_verifications')
+        .select('*')
+        .eq('order_id', id!)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (error) throw error
+      return data as OrderRankVerification[]
     },
     enabled: !!id,
   })
@@ -151,6 +167,13 @@ export function AdminOrderDetailPage() {
                 ['Extras', currency(order.extras_price)],
                 ['Total', currency(order.total_price)],
                 ['Booster', order.assigned_booster_id ? order.assigned_booster_id.slice(0, 12) + '...' : 'Não atribuído'],
+                ...(order.preferred_booster_id ? [
+                  ['Pedido direto', order.preferred_booster_id.slice(0, 12) + '...' + (
+                    order.exclusive_until && new Date(order.exclusive_until) > new Date()
+                      ? ` (exclusivo até ${new Date(order.exclusive_until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`
+                      : ' (exclusividade expirada)'
+                  )],
+                ] : []),
                 ['Pag.', order.payment_status ?? '—'],
               ].map(([l, v]) => (
                 <div key={l as string}>
@@ -330,6 +353,32 @@ export function AdminOrderDetailPage() {
               </div>
             )}
           </Card>
+
+          {/* Verificações de rank — histórico do que a Riot API já
+              confirmou (ou não), pra decidir com contexto antes de usar a
+              sobreposição manual de status abaixo. */}
+          {!!rankVerifications?.length && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-ink-secondary" />
+                Verificações de Rank
+              </h3>
+              <div className="space-y-3">
+                {rankVerifications.map((v) => (
+                  <div key={v.id} className="flex gap-2">
+                    <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${v.passed ? 'bg-success' : 'bg-warning'}`} />
+                    <div>
+                      <p className="text-xs font-semibold text-ink">
+                        {v.riot_id_checked} — {v.passed ? 'Aprovado' : 'Não bateu'}
+                        {v.fetched_tier && ` (${formatRank(v.fetched_tier, v.fetched_division)} / alvo ${formatRank(v.target_tier, v.target_division)})`}
+                      </p>
+                      <p className="text-[10px] text-ink-muted">{timeAgo(v.created_at)}{v.error_reason ? ` · ${v.error_reason}` : ''}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Booster */}
           <Card padding="md">

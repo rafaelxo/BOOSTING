@@ -24,7 +24,7 @@ export function useBoosterStatus() {
   const { profile } = useAuthStore()
 
   const { data, error, isLoading, isFetching } = useQuery({
-    queryKey: ['booster-profile', profile?.id],
+    queryKey: ['booster-profile-access-status', profile?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_profiles')

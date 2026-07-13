@@ -32,6 +32,7 @@ export function OrderHistoryPage() {
         .select('*')
         .eq('customer_id', profile!.id)
         .order('created_at', { ascending: false })
+        .limit(100)
       if (error) throw error
       return data as unknown as Order[]
     },

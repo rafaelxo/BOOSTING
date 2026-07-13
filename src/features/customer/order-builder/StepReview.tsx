@@ -1,7 +1,7 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { formatRank, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import { Button } from '@/components/ui'
@@ -28,7 +28,8 @@ export function StepReview() {
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
   const flow = serviceType === 'elo_boost' && currentRank ? getBoostFlow(currentRank.tier, boostMode) : null
   // Mesma queryKey usada em StepExtras — já em cache, não refaz a chamada.
-  const { data: addonCatalog = [] } = useBoostAddons(flow)
+  const { data: addonData } = useBoostAddons(flow)
+  const addonCatalog = addonData ?? EMPTY_ADDONS
   const selectedAddons = addonCatalog.filter(e => selectedExtraIds.has(e.id))
 
   const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }

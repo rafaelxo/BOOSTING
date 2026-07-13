@@ -4,18 +4,9 @@ import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap, DollarSi
 import { Button, Card, RankBadge, Avatar, Skeleton, StarRating, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, formatRank, formatDate } from '@/lib/utils'
+import { LANE_LABEL, SPECIALTY_LABEL } from '@/lib/lolTaxonomy'
 import type { BoosterProfile, BoosterService, Review, RankTier } from '@/types'
 import { useCurrency } from '@/hooks/useCurrency'
-
-// ── Lane labels ───────────────────────────────────────────────────────────────
-
-const LANE_LABEL: Record<string, string> = {
-  top:     'Topo',
-  jungle:  'Selva',
-  mid:     'Meio',
-  bot:     'Atirador',
-  support: 'Suporte',
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -72,6 +63,7 @@ export function BoosterPublicProfilePage() {
         .eq('booster_id', booster!.user_id)
         .eq('is_public', true)
         .order('created_at', { ascending: false })
+        .limit(50)
       if (error) throw error
       return data as Pick<Review, 'id' | 'rating' | 'content' | 'created_at'>[]
     },
@@ -205,12 +197,12 @@ export function BoosterPublicProfilePage() {
         ))}
       </div>
 
-      {/* Custom services */}
+      {/* Pacotes de coach */}
       {services.length > 0 && (
         <Card padding="md">
           <div className="flex items-center gap-2 mb-4">
             <Package className="h-4 w-4 text-brand" />
-            <h2 className="text-sm font-bold text-ink">Serviços Oferecidos</h2>
+            <h2 className="text-sm font-bold text-ink">Pacotes de Coach</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {services.map(s => (
@@ -218,6 +210,20 @@ export function BoosterPublicProfilePage() {
                 <p className="text-sm font-bold text-ink">{s.title}</p>
                 {s.description && (
                   <p className="text-xs text-ink-secondary leading-relaxed flex-1">{s.description}</p>
+                )}
+                {(s.lanes?.length || s.specialties?.length) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {s.lanes?.map(l => (
+                      <span key={l} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+                        {LANE_LABEL[l] ?? l}
+                      </span>
+                    ))}
+                    {s.specialties?.map(sp => (
+                      <span key={sp} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-bg-elevated text-ink-secondary">
+                        {SPECIALTY_LABEL[sp] ?? sp}
+                      </span>
+                    ))}
+                  </div>
                 )}
                 <div className="flex items-center gap-3 mt-auto pt-2 border-t border-bg-elevated">
                   {s.tempo && (
@@ -231,6 +237,9 @@ export function BoosterPublicProfilePage() {
                     <span className="text-sm font-bold text-brand">{currency(s.price)}</span>
                   </div>
                 </div>
+                <Button asChild size="sm" className="w-full mt-1">
+                  <Link to={`/orders/new?service=coaching&booster=${booster.user_id}&coach_package=${s.id}`}>Contratar</Link>
+                </Button>
               </div>
             ))}
           </div>
@@ -303,7 +312,7 @@ export function BoosterPublicProfilePage() {
           <p className="text-xs text-ink-secondary mt-0.5">Faça um pedido e o booster poderá aceitar.</p>
         </div>
         <Button asChild size="sm" className="shrink-0">
-          <Link to="/orders/new">Fazer Pedido</Link>
+          <Link to={`/orders/new?booster=${booster.user_id}`}>Fazer Pedido</Link>
         </Button>
       </Card>
     </div>

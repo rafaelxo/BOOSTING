@@ -10,7 +10,7 @@ import { BoosterServiceForm } from './BoosterServiceForm'
 import { BoosterServiceCard } from './BoosterServiceCard'
 import { EMPTY_SERVICE_FORM, serviceToForm, type ServiceFormData } from '@/features/booster/utils/boosterServiceForm'
 
-const MAX_SERVICES = 5
+const MAX_SERVICES = 3
 
 export function BoosterServicesList({ userId }: { userId: string }) {
   const qc = useQueryClient()
@@ -21,6 +21,7 @@ export function BoosterServicesList({ userId }: { userId: string }) {
   const [savingEdit, setSavingEdit]       = useState(false)
   const [deletingId, setDeletingId]       = useState<string | null>(null)
   const [togglingId, setTogglingId]       = useState<string | null>(null)
+  const [error, setError]                 = useState<string | null>(null)
 
   const { data: services = [], isLoading } = useQuery({
     queryKey: ['booster-services', userId],
@@ -29,6 +30,7 @@ export function BoosterServicesList({ userId }: { userId: string }) {
         .from('booster_services')
         .select('*')
         .eq('booster_id', userId)
+        .eq('service_type', 'coaching')
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as BoosterService[]
@@ -43,37 +45,39 @@ export function BoosterServicesList({ userId }: { userId: string }) {
   async function handleCreate(form: ServiceFormData) {
     if (!checkRateLimit(`svc-create-${userId}`, limits.rpcMutation)) return
     setSavingNew(true)
+    setError(null)
     const { error } = await supabase.from('booster_services').insert({
       booster_id: userId,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      service_type: form.service_type,
-      unit: form.unit,
+      service_type: 'coaching',
+      unit: 'fixed',
       tempo: form.tempo.trim() || null,
       price: parseFloat(form.price),
-      requirements: form.requirements.trim() || null,
-      availability_note: form.availability_note.trim() || null,
-      rules: form.rules.trim() || null,
+      lanes: form.lanes as never,
+      specialties: form.specialties as never,
     })
     setSavingNew(false)
-    if (!error) { setAdding(false); invalidate() }
+    if (error) { setError('Erro ao salvar pacote. Tente novamente.'); return }
+    setAdding(false)
+    invalidate()
   }
 
   async function handleUpdate(id: string, form: ServiceFormData) {
     setSavingEdit(true)
+    setError(null)
     const { error } = await supabase.from('booster_services').update({
       title: form.title.trim(),
       description: form.description.trim() || null,
-      service_type: form.service_type,
-      unit: form.unit,
       tempo: form.tempo.trim() || null,
       price: parseFloat(form.price),
-      requirements: form.requirements.trim() || null,
-      availability_note: form.availability_note.trim() || null,
-      rules: form.rules.trim() || null,
+      lanes: form.lanes as never,
+      specialties: form.specialties as never,
     }).eq('id', id)
     setSavingEdit(false)
-    if (!error) { setEditingId(null); invalidate() }
+    if (error) { setError('Erro ao salvar pacote. Tente novamente.'); return }
+    setEditingId(null)
+    invalidate()
   }
 
   async function handleDelete(id: string) {
@@ -96,8 +100,8 @@ export function BoosterServicesList({ userId }: { userId: string }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-ink">Serviços Oferecidos</h2>
-          <p className="text-xs text-ink-secondary mt-0.5">Crie pacotes personalizados para seus clientes.</p>
+          <h2 className="text-sm font-bold text-ink">Pacotes de Coach</h2>
+          <p className="text-xs text-ink-secondary mt-0.5">Crie até {MAX_SERVICES} pacotes de coaching para seus clientes.</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className={cn(
@@ -119,6 +123,8 @@ export function BoosterServicesList({ userId }: { userId: string }) {
           )}
         </div>
       </div>
+
+      {error && <p className="text-xs text-danger">{error}</p>}
 
       {adding && (
         <BoosterServiceForm
@@ -145,15 +151,15 @@ export function BoosterServicesList({ userId }: { userId: string }) {
             <Package className="h-5 w-5 text-ink-muted" />
           </div>
           <div>
-            <p className="font-semibold text-ink text-sm">Você ainda não cadastrou nenhum serviço.</p>
-            <p className="text-xs text-ink-muted mt-1">Adicione até {MAX_SERVICES} serviços para oferecer aos clientes.</p>
+            <p className="font-semibold text-ink text-sm">Você ainda não cadastrou nenhum pacote de coach.</p>
+            <p className="text-xs text-ink-muted mt-1">Adicione até {MAX_SERVICES} pacotes para oferecer aos clientes.</p>
           </div>
           <button
             onClick={() => setAdding(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-white text-sm font-bold hover:bg-brand/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Criar primeiro serviço
+            Criar primeiro pacote
           </button>
         </div>
       ) : (

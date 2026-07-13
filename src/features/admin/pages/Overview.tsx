@@ -10,26 +10,26 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 
+interface AdminDashboardStats {
+  total_revenue: number
+  active_orders_count: number
+  pending_boosters_count: number
+  open_tickets_count: number
+  urgent_tickets_count: number
+  recent_orders: Pick<Order, 'id' | 'status' | 'total_price' | 'created_at'>[]
+  daily_orders: { day: string; count: number }[]
+}
+
+// Server-side aggregate (admin_dashboard_stats RPC) instead of downloading
+// the entire orders/payments/booster_profiles/support_tickets tables to the
+// client just to compute counts and sums, repeated every 30s.
 function useAdminStats() {
   return useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const [ordersRes, paymentsRes, boostersRes, ticketsRes] = await Promise.all([
-        supabase.from('orders').select('id, status, total_price, created_at').order('created_at', { ascending: false }),
-        supabase.from('payments').select('amount, status'),
-        supabase.from('booster_profiles').select('id, status'),
-        supabase.from('support_tickets').select('id, status, priority'),
-      ])
-
-      const orders = (ordersRes.data ?? []) as Order[]
-      return {
-        orders,
-        totalRevenue: (paymentsRes.data ?? []).filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0),
-        activeOrdersCount: orders.filter(o => ['assigned', 'in_progress', 'paused'].includes(o.status)).length,
-        pendingBoostersCount: (boostersRes.data ?? []).filter(b => b.status === 'pending' || b.status === 'under_review').length,
-        openTicketsCount: (ticketsRes.data ?? []).filter(t => t.status === 'open').length,
-        urgentTickets: (ticketsRes.data ?? []).filter(t => t.priority === 'urgent').length,
-      }
+      const { data, error } = await supabase.rpc('admin_dashboard_stats' as never)
+      if (error) throw error
+      return data as unknown as AdminDashboardStats
     },
     refetchInterval: 30000,
   })
@@ -40,19 +40,14 @@ export function AdminOverview() {
   const { t } = useTranslation()
   const currency = useCurrency()
 
-  const recentOrders = stats?.orders.slice(0, 8) ?? []
+  const recentOrders = stats?.recent_orders ?? []
 
   const chartData = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (6 - i))
-      const label = d.toLocaleDateString('pt-BR', { weekday: 'short' })
-      const count = (stats?.orders ?? []).filter(o =>
-        new Date(o.created_at).toDateString() === d.toDateString()
-      ).length
+    (stats?.daily_orders ?? []).map(({ day, count }) => {
+      const label = new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'short' })
       return { day: label.charAt(0).toUpperCase() + label.slice(1, 3), orders: count }
     })
-  , [stats?.orders])
+  , [stats?.daily_orders])
 
   return (
     <div className="max-w-7xl space-y-6">
@@ -72,10 +67,10 @@ export function AdminOverview() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: t('admin.overview.totalRevenue'), value: currency(stats?.totalRevenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
-            { label: t('admin.overview.activeOrders'), value: stats?.activeOrdersCount ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10', trend: null },
-            { label: t('admin.overview.pendingBoosters'), value: stats?.pendingBoostersCount ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
-            { label: t('admin.overview.openTickets'), value: `${stats?.openTicketsCount ?? 0}${stats?.urgentTickets ? ` (${stats.urgentTickets} ${t('admin.overview.urgent')})` : ''}`, icon: AlertCircle, color: stats?.urgentTickets ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
+            { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
+            { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10', trend: null },
+            { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
+            { label: t('admin.overview.openTickets'), value: `${stats?.open_tickets_count ?? 0}${stats?.urgent_tickets_count ? ` (${stats.urgent_tickets_count} ${t('admin.overview.urgent')})` : ''}`, icon: AlertCircle, color: stats?.urgent_tickets_count ? 'text-danger bg-danger/10' : 'text-info bg-info/10', trend: null },
           ].map(({ label, value, icon: Icon, color, trend }) => (
             <Card key={label} padding="md">
               <div className="flex items-start justify-between mb-3">

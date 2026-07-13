@@ -171,11 +171,6 @@ export const BOOSTER_EARNINGS_SHARE = 0.75
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 
-export function truncate(str: string, length = 50) {
-  if (str.length <= length) return str
-  return str.slice(0, length).trimEnd() + '…'
-}
-
 export function initials(name: string) {
   return name
     .split(' ')

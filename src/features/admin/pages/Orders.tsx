@@ -88,7 +88,16 @@ export function AdminOrdersPage() {
                   </TableCell>
                   <TableCell className="text-ink">{getServiceLabel(order.service_id as string)}</TableCell>
                   <TableCell className="font-semibold text-ink">{currency(order.total_price)}</TableCell>
-                  <TableCell><OrderStatusBadge status={order.status} /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <OrderStatusBadge status={order.status} />
+                      {order.preferred_booster_id && order.exclusive_until && new Date(order.exclusive_until) > new Date() && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-accent/15 text-accent border border-accent/30 uppercase tracking-wide">
+                          Exclusivo
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{timeAgo(order.created_at)}</TableCell>
                 </TableRow>
               ))}

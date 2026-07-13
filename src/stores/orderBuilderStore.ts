@@ -27,6 +27,21 @@ interface OrderBuilderState {
   selectedExtraIds: Set<string>
   winPackage: number | null   // 1, 3 or 5 extra wins; null = none
 
+  // Pedido direto: booster escolhido no perfil público (via ?booster= na URL
+  // de entrada). Só exibição/roteamento — a validação real acontece no
+  // servidor ao criar o pedido.
+  preferredBoosterId: string | null
+  preferredBoosterName: string | null
+
+  // Riot ID (nome#tag) — usado depois pra verificar automaticamente se o
+  // rank alvo foi atingido antes de concluir o pedido.
+  riotId: string
+
+  // Pacote de coach escolhido (booster_services) — preço vem sempre daqui,
+  // nunca editável pelo cliente. Selecionar um pacote também vincula o
+  // pedido ao booster dono dele via setPreferredBooster.
+  selectedCoachPackage: { id: string; title: string; price: number; tempo: string | null } | null
+
   // LP (PDL) — fluxo padrão (Solo/Duo, Iron–Diamond)
   currentLp: number
   avgLpGain: number
@@ -59,6 +74,9 @@ interface OrderBuilderState {
   setNotes: (notes: string) => void
   toggleExtra: (extraId: string) => void
   setWinPackage: (wins: number | null) => void
+  setPreferredBooster: (id: string, name: string) => void
+  setRiotId: (riotId: string) => void
+  setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null } | null) => void
   setCurrentLp: (lp: number) => void
   setAvgLpGain: (lp: number) => void
   setAvgLpLoss: (lp: number) => void
@@ -90,6 +108,10 @@ const initialState = {
   customerNotes: '',
   selectedExtraIds: new Set<string>(),
   winPackage: null,
+  preferredBoosterId: null,
+  preferredBoosterName: null,
+  riotId: '',
+  selectedCoachPackage: null,
   currentLp: 0,
   avgLpGain: 20,
   avgLpLoss: 15,
@@ -185,6 +207,9 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
     }),
 
   setWinPackage: (winPackage) => set({ winPackage }),
+  setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
+  setRiotId: (riotId) => set({ riotId }),
+  setSelectedCoachPackage: (selectedCoachPackage) => set({ selectedCoachPackage }),
 
   setCurrentLp: (currentLp) => set({ currentLp }),
   setAvgLpGain: (avgLpGain) => set({ avgLpGain }),

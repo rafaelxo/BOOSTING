@@ -170,6 +170,7 @@ export function BoostersPage() {
       const { data, error } = await (supabase as any)
         .from('public_booster_profiles')
         .select('*')
+        .limit(100)
       if (error) throw error
       return data as BoosterProfile[]
     },

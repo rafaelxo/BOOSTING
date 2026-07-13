@@ -15,7 +15,7 @@ import { CompletedOrderCard } from '@/features/booster/components/CompletedOrder
 
 function useBoosterProfile(userId: string) {
   return useQuery({
-    queryKey: ['booster-profile', userId],
+    queryKey: ['booster-profile-full', userId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_profiles')
@@ -29,15 +29,18 @@ function useBoosterProfile(userId: string) {
   })
 }
 
-function useAssignedOrders(boosterId: string | undefined) {
+// orders.assigned_booster_id FKs to profiles.id (the auth uid), which is
+// booster_profiles.user_id — NOT booster_profiles.id. Must filter by the
+// auth uid, never by the booster_profiles row's own primary key.
+function useAssignedOrders(boosterUserId: string | undefined) {
   return useQuery({
-    queryKey: ['booster-assigned-orders', boosterId],
-    enabled: !!boosterId,
+    queryKey: ['booster-assigned-orders', boosterUserId],
+    enabled: !!boosterUserId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('assigned_booster_id', boosterId!)
+        .eq('assigned_booster_id', boosterUserId!)
         .in('status', ['assigned', 'in_progress', 'paused', 'awaiting_customer'])
         .order('created_at', { ascending: false })
       if (error) throw error
@@ -46,12 +49,34 @@ function useAssignedOrders(boosterId: string | undefined) {
   })
 }
 
+interface PayoutSummary {
+  total_earned: number
+  total_withdrawn: number
+  available: number
+  processing: number
+}
+
+function usePayoutSummary(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['booster-payout-summary', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('booster_payout_summary' as never, { p_booster_user_id: userId! } as never)
+      if (error) throw error
+      return data as unknown as PayoutSummary
+    },
+    enabled: !!userId,
+  })
+}
+
 export function BoosterDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
   const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
-  const { data: activeOrders } = useAssignedOrders(boosterProfile?.id)
+  const { data: activeOrders } = useAssignedOrders(profile?.id)
+  const { data: payoutSummary, isLoading: loadingPayoutSummary } = usePayoutSummary(
+    boosterProfile?.status === 'approved' ? profile?.id : undefined,
+  )
 
   const { data: slotInfo } = useQuery({
     queryKey: ['booster-slots', profile?.id],
@@ -60,11 +85,14 @@ export function BoosterDashboard() {
         p_booster_user_id: profile!.id,
         p_boost_mode: 'solo',
       })
-      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top5: boolean } | null
+      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top5: boolean; exclusive_slot_used: boolean; max_exclusive: number } | null
     },
     enabled: !!profile?.id && boosterProfile?.status === 'approved',
   })
 
+  // Capped list for display only — the balance totals below come from
+  // booster_payout_summary(), a server-side aggregate over ALL payout rows,
+  // so the "Total Ganho" etc. boxes stay correct regardless of this limit.
   const { data: payouts, isLoading: loadingPayouts } = useQuery({
     queryKey: ['booster-payouts', profile?.id],
     queryFn: async () => {
@@ -73,6 +101,7 @@ export function BoosterDashboard() {
         .select('*')
         .eq('booster_id', profile!.id)
         .order('created_at', { ascending: false })
+        .limit(50)
       if (error) throw error
       return data as PayoutRecord[]
     },
@@ -117,14 +146,12 @@ export function BoosterDashboard() {
     )
   }
 
-  // Total Ganho: soma líquida de todos os payouts, independente do status.
-  const totalEarned = payouts?.reduce((s, p) => s + Number(p.net_amount), 0) ?? 0
-  // Total Sacado: já pago/transferido ao booster.
-  const totalWithdrawn = payouts?.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.net_amount), 0) ?? 0
-  // Valor Disponível: liberado, ainda não solicitado/processado.
-  const available = payouts?.filter(p => p.status === 'pending').reduce((s, p) => s + Number(p.net_amount), 0) ?? 0
-  // Pagamento Pendente: em processamento no gateway/financeiro.
-  const processing = payouts?.filter(p => p.status === 'processing').reduce((s, p) => s + Number(p.net_amount), 0) ?? 0
+  // Ganho/Sacado/Disponível/Pendente — agregados no servidor sobre TODOS os
+  // payouts (booster_payout_summary), não só os 50 mais recentes da lista.
+  const totalEarned = payoutSummary?.total_earned ?? 0
+  const totalWithdrawn = payoutSummary?.total_withdrawn ?? 0
+  const available = payoutSummary?.available ?? 0
+  const processing = payoutSummary?.processing ?? 0
 
   const BALANCE_BOXES = [
     { label: 'Total Ganho', value: totalEarned, icon: Wallet, color: 'text-success bg-success/10' },
@@ -161,7 +188,7 @@ export function BoosterDashboard() {
               <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
                 <Icon className="h-4 w-4" />
               </div>
-              <p className="text-xl font-bold text-ink">{loadingPayouts ? <Skeleton className="h-6 w-20" /> : currency(value)}</p>
+              <p className="text-xl font-bold text-ink">{loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}</p>
               <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
             </Card>
           ))}
@@ -182,7 +209,7 @@ export function BoosterDashboard() {
                 )}
               </p>
               <p className="text-xs text-ink-muted mt-0.5">
-                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'}
+                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'} + 1 exclusivo
               </p>
             </div>
           </div>
@@ -201,6 +228,12 @@ export function BoosterDashboard() {
               <span className="text-ink-secondary">Total:</span>
               <span className={`font-bold ${slotInfo.total_count >= slotInfo.max_total ? 'text-danger' : slotInfo.total_count === slotInfo.max_total - 1 ? 'text-warning' : 'text-success'}`}>
                 {slotInfo.total_count}/{slotInfo.max_total}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-ink-secondary">Exclusivo:</span>
+              <span className={`font-bold ${slotInfo.exclusive_slot_used ? 'text-danger' : 'text-success'}`}>
+                {slotInfo.exclusive_slot_used ? 1 : 0}/1
               </span>
             </div>
           </div>

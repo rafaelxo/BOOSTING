@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { CheckCircle2, Zap, Tv, Crosshair, User, Trophy, Shield, Lightbulb, Mic } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { getWinBoostPrice } from '@/lib/pricing'
@@ -53,7 +53,8 @@ export function StepExtras() {
   // a query já vem filtrada por `flow`, nunca é a lista inteira escondida
   // por tipo de modalidade. A ordem vem de `sort_order` (Acesso Prioritário
   // sempre por último — ver a seed em supabase/migrations).
-  const { data: extras = [], isLoading } = useBoostAddons(flow)
+  const { data, isLoading } = useBoostAddons(flow)
+  const extras = data ?? EMPTY_ADDONS
 
   useEffect(() => {
     const selected = extras.filter(e => selectedExtraIds.has(e.id))

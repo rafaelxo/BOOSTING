@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 
 export function AdminBoostersPage() {
   const queryClient = useQueryClient()
-  const [filter, setFilter] = useState<string>('all')
+  const [filter, setFilter] = useState<BoosterProfile['status'] | 'all'>('all')
   const { t } = useTranslation()
 
   const filterLabels: Record<string, string> = {
@@ -23,9 +23,11 @@ export function AdminBoostersPage() {
   }
 
   const { data: boosters, isLoading } = useQuery({
-    queryKey: ['admin-boosters'],
+    queryKey: ['admin-boosters', filter],
     queryFn: async () => {
-      const { data, error } = await supabase.from('booster_profiles').select('*').order('created_at', { ascending: false })
+      let q = supabase.from('booster_profiles').select('*').order('created_at', { ascending: false }).limit(100)
+      if (filter !== 'all') q = q.eq('status', filter)
+      const { data, error } = await q
       if (error) throw error
       return data as unknown as BoosterProfile[]
     },
@@ -59,7 +61,7 @@ export function AdminBoostersPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
   })
 
-  const filtered = boosters?.filter(b => filter === 'all' || b.status === filter) ?? []
+  const filtered = boosters ?? []
 
   return (
     <div className="space-y-5">
@@ -67,7 +69,7 @@ export function AdminBoostersPage() {
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1 w-fit">
-          {['all', 'pending', 'under_review', 'approved', 'suspended'].map((s) => (
+          {(['all', 'pending', 'under_review', 'approved', 'suspended'] as const).map((s) => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>
               {filterLabels[s] ?? s}

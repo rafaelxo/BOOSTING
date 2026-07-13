@@ -4,6 +4,7 @@ import { createHmac } from 'node:crypto'
 import { constantTimeEqual } from '../_shared/crypto.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const MP_WEBHOOK_SECRET = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET') ?? ''
@@ -80,6 +81,15 @@ serve(async (req) => {
   }
 
   try {
+    // Public, unauthenticated endpoint — throttle by IP before doing any
+    // JSON parsing or signature work, so volumetric flooding is cheap to
+    // reject. Limit is generous relative to normal MP notification volume.
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || req.headers.get('cf-connecting-ip')
+      || 'unknown'
+    const rateLimit = await consumeUserRateLimit('mercadopago-webhook', clientIp, 120, 60)
+    if (!rateLimit.allowed) return new Response('too many requests', { status: 429 })
+
     const rawBody = await readJsonBody(req, 16 * 1024)
 
     const parsedBody = webhookBodySchema.safeParse(rawBody)

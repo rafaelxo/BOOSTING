@@ -76,6 +76,10 @@ const routingSchema = z.object({
   boost_mode: z.enum(['solo', 'duo']).optional(),
 }).passthrough()
 
+// Riot ID: gameName#tagLine. gameName é 3-16 chars (regras da Riot),
+// tagLine é 2-5 alfanuméricos.
+const riotIdSchema = z.string().regex(/^.{3,16}#[A-Za-z0-9]{2,5}$/, 'Riot ID inválido (formato: nome#tag)')
+
 // Solo Boost / Duo Boost padrão — Iron a Diamond.
 const standardEloIntentSchema = z.object({
   service_type: z.literal('elo_boost'),
@@ -92,6 +96,7 @@ const standardEloIntentSchema = z.object({
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),
   customer_notes: z.string().max(500).nullable().default(null),
+  riot_id: riotIdSchema,
 }).strict()
 
 // Boost Master+ — rank atual Master ou Grão-Mestre. Sem PDL alvo: o preço
@@ -112,6 +117,7 @@ const masterPlusIntentSchema = z.object({
   avg_pdl_loss: z.number().positive(),
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
+  riot_id: riotIdSchema,
 }).strict()
 
 // Win Boost / Placement Matches / Coaching — fora do escopo desta reforma
@@ -133,12 +139,19 @@ const otherServiceIntentSchema = z.object({
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),
   customer_notes: z.string().max(500).nullable().default(null),
+  // Obrigatório quando service_type === 'coaching' (validado abaixo, não no
+  // schema — o mesmo schema também cobre win_boost/placement_matches, que
+  // não usam pacote de coach nenhum).
+  booster_service_id: z.string().uuid().nullable().default(null),
 }).strict()
 
 const bodySchema = z.object({
   order_id: z.string().uuid().optional(),
   intent: z.record(z.unknown()).optional(),
   idempotency_key: z.string().uuid().optional(),
+  // Booster escolhido pelo cliente no perfil público (opcional, só usado ao
+  // criar um pedido novo — ignorado no caminho de retry via order_id).
+  preferred_booster_id: z.string().uuid().optional(),
 }).strict().refine((body) => Boolean(body.order_id) !== Boolean(body.intent), {
   message: 'Informe exatamente um entre order_id e intent',
 })
@@ -166,6 +179,8 @@ interface NormalizedIntent {
   currentPdl: number | null
   avgPdlGain: number | null
   avgPdlLoss: number | null
+  riotId: string | null
+  boosterServiceId: string | null
 }
 
 function badRequest(req: Request, message: string) {
@@ -237,6 +252,25 @@ serve(async (req) => {
       // ── New order: server decides the flow, validates it and computes the
       // authoritative price. Nothing about rank/mode/addon compatibility is
       // trusted from the client beyond "which combination are you asking for".
+
+      // Booster diretamente vinculado (veio do perfil público) — nunca confia
+      // no client além do id; precisa ser um booster aprovado e não pode ser
+      // o próprio cliente.
+      let preferredBoosterId: string | null = null
+      if (body.preferred_booster_id) {
+        if (body.preferred_booster_id === user.id) {
+          return badRequest(req, 'Você não pode vincular um pedido a si mesmo')
+        }
+        const { data: boosterRow, error: boosterErr } = await serviceClient
+          .from('booster_profiles')
+          .select('user_id')
+          .eq('user_id', body.preferred_booster_id)
+          .eq('status', 'approved')
+          .maybeSingle()
+        if (boosterErr) return errorResponse(req, 'Failed to validate booster', 500)
+        if (!boosterRow) return badRequest(req, 'Booster inválido ou não aprovado')
+        preferredBoosterId = boosterRow.user_id
+      }
 
       const routed = routingSchema.safeParse(body.intent)
       if (!routed.success) {
@@ -321,6 +355,8 @@ serve(async (req) => {
           currentPdl: mp.current_pdl,
           avgPdlGain: mp.avg_pdl_gain,
           avgPdlLoss: mp.avg_pdl_loss,
+          riotId: mp.riot_id,
+          boosterServiceId: null,
         }
       } else if (flow) {
         const std = parsedIntent.data as z.infer<typeof standardEloIntentSchema>
@@ -347,6 +383,8 @@ serve(async (req) => {
           currentPdl: null,
           avgPdlGain: null,
           avgPdlLoss: null,
+          riotId: std.riot_id,
+          boosterServiceId: null,
         }
       } else {
         const other = parsedIntent.data as z.infer<typeof otherServiceIntentSchema>
@@ -370,6 +408,8 @@ serve(async (req) => {
           currentPdl: null,
           avgPdlGain: null,
           avgPdlLoss: null,
+          riotId: null,
+          boosterServiceId: other.booster_service_id,
         }
       }
 
@@ -381,6 +421,38 @@ serve(async (req) => {
       if (!service || !game || !service.is_active || !game.is_active
           || service.game_id !== game.id || service.type !== normalized.serviceType) {
         return badRequest(req, 'Serviço ou jogo inválido/inativo')
+      }
+
+      // ── Coaching agora exige um pacote real de um booster (booster_services,
+      // service_type='coaching') — preço nunca vem do cliente, sempre lido do
+      // pacote. O booster vinculado ao pedido também vem sempre do pacote,
+      // nunca de body.preferred_booster_id (evita pagar o pacote do booster A
+      // mas vincular exclusividade ao booster B).
+      let coachPackagePrice: number | null = null
+      if (normalized.serviceType === 'coaching') {
+        if (!normalized.boosterServiceId) return badRequest(req, 'Selecione um pacote de coach')
+
+        const { data: coachPackage, error: coachPackageErr } = await serviceClient
+          .from('booster_services')
+          .select('id, booster_id, price, is_active, service_type')
+          .eq('id', normalized.boosterServiceId)
+          .eq('service_type', 'coaching')
+          .eq('is_active', true)
+          .maybeSingle()
+        if (coachPackageErr) return errorResponse(req, 'Failed to validate coach package', 500)
+        if (!coachPackage) return badRequest(req, 'Pacote de coach inválido ou inativo')
+
+        const { data: coachBoosterRow, error: coachBoosterErr } = await serviceClient
+          .from('booster_profiles')
+          .select('user_id')
+          .eq('user_id', coachPackage.booster_id)
+          .eq('status', 'approved')
+          .maybeSingle()
+        if (coachBoosterErr) return errorResponse(req, 'Failed to validate booster', 500)
+        if (!coachBoosterRow) return badRequest(req, 'Booster do pacote não está aprovado')
+
+        coachPackagePrice = Number(coachPackage.price)
+        preferredBoosterId = coachBoosterRow.user_id
       }
 
       // ── Addons: validados contra a whitelist do fluxo E contra o catálogo
@@ -423,6 +495,7 @@ serve(async (req) => {
         sessionsPurchased: normalized.sessionsPurchased,
         extras: extras.map((e) => ({ id: e.id, priceModifier: Number(e.price_modifier), priceModifierPct: Number(e.price_modifier_pct) })),
         winPackage: normalized.winPackage,
+        coachPackagePrice,
       }
 
       const priced = computeOrderPrice(priceInput)
@@ -467,6 +540,9 @@ serve(async (req) => {
           avg_pdl_loss: normalized.avgPdlLoss,
           pricing_version: 'v2',
           idempotency_key: body.idempotency_key ?? null,
+          preferred_booster_id: preferredBoosterId,
+          riot_id: normalized.riotId,
+          booster_service_id: normalized.boosterServiceId,
         })
         .select('id, customer_id, total_price, mp_payment_id')
         .single()

@@ -12,6 +12,7 @@ import {
 } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Shield, Star, Gem, Diamond, Crown, Flame, Check } from 'lucide-react'
+import { CoachPackagePicker } from './CoachPackagePicker'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 
@@ -205,14 +206,15 @@ function LpCounter({ label, value, min, max, onChange }: {
 export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
-    winsPurchased, sessionsPurchased,
+    winsPurchased,
     currentLp, avgLpGain, avgLpLoss,
     currentPdl, avgPdlGain, avgPdlLoss,
+    riotId,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
     setCurrentLp, setAvgLpGain, setAvgLpLoss,
     setCurrentPdl, setAvgPdlGain, setAvgPdlLoss,
-    setBasePrice, setEstimatedHours,
+    setBasePrice, setEstimatedHours, setRiotId,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -282,12 +284,11 @@ export function StepConfigure() {
       const pricePerWin = getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
-    } else if (serviceType === 'coaching') {
-      setBasePrice(0)
-      setEstimatedHours(sessionsPurchased ?? 1)
     }
+    // coaching: preço vem do pacote escolhido em CoachPackagePicker
+    // (setBasePrice chamado lá), não recalculado aqui.
   }, [
-    serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased,
+    serviceType, currentRank, targetRank, boostMode, winsPurchased,
     currentLp, avgLpGain, avgLpLoss, currentIsMasterPlus, masterPlusPriceRow,
     setBasePrice, setEstimatedHours,
   ])
@@ -448,6 +449,21 @@ export function StepConfigure() {
           </div>
         )}
 
+        {/* Riot ID — necessário pra verificar automaticamente se a conta
+            chegou no rank alvo antes de concluir o pedido. */}
+        {serviceType === 'elo_boost' && (
+          <FormField label="Riot ID" required hint="Nome de invocador e tag, ex: Faker#BR1. Usamos isso pra confirmar que a conta atingiu o rank alvo.">
+            <input
+              type="text"
+              value={riotId}
+              onChange={e => setRiotId(e.target.value)}
+              placeholder="NomeDoInvocador#TAG"
+              className="input-base"
+              maxLength={22}
+            />
+          </FormField>
+        )}
+
         {/* Rank — win boost */}
         {serviceType === 'win_boost' && (
           <FormField label="Rank Atual" required>
@@ -499,16 +515,9 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Coaching */}
-        {serviceType === 'coaching' && (
-          <div className="rounded-xl border border-bg-elevated bg-bg-elevated/40 p-4 space-y-1.5">
-            <p className="text-sm font-semibold text-ink">Coaching por sessão</p>
-            <p className="text-xs text-ink-secondary leading-relaxed">
-              O valor é combinado diretamente com o booster após a criação do pedido. Nenhum pagamento antecipado é necessário.
-            </p>
-            <p className="text-sm font-bold text-brand mt-1">Valor a combinar</p>
-          </div>
-        )}
+        {/* Coaching — escolhe um pacote real de um booster; preço vem do
+            pacote, nunca é combinado depois. */}
+        {serviceType === 'coaching' && <CoachPackagePicker />}
       </div>
     </div>
   )

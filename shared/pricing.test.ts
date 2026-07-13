@@ -15,6 +15,7 @@ function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
     sessionsPurchased: null,
     extras: [],
     winPackage: null,
+    coachPackagePrice: null,
     ...overrides,
   }
 }

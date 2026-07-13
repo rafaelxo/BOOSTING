@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Briefcase, Lock, Swords, Users } from 'lucide-react'
+import { Briefcase, Lock, Sparkles, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -17,10 +17,12 @@ interface SlotInfo {
   max_total: number
   max_duo: number
   is_top5: boolean
+  exclusive_slot_used: boolean
+  max_exclusive: number
 }
 
 function SlotIndicator({ slots }: { slots: SlotInfo }) {
-  const { solo_count, duo_count, total_count, max_total, max_duo, is_top5 } = slots
+  const { solo_count, duo_count, total_count, max_total, max_duo, is_top5, exclusive_slot_used } = slots
   const remaining = max_total - total_count
   const color = remaining === 0 ? 'text-danger' : remaining === 1 ? 'text-warning' : 'text-success'
 
@@ -46,8 +48,24 @@ function SlotIndicator({ slots }: { slots: SlotInfo }) {
           Duo: {duo_count}/{max_duo}
         </span>
       </div>
+      <div className="h-3 w-px bg-bg-elevated" />
+      <span className={`flex items-center gap-1 text-[11px] font-medium ${exclusive_slot_used ? 'text-ink-muted' : 'text-accent'}`}>
+        <Sparkles className="h-3 w-3" />
+        Exclusivo: {exclusive_slot_used ? 1 : 0}/1
+      </span>
     </div>
   )
+}
+
+// Só o booster para quem o pedido foi vinculado vê o rótulo — para todos os
+// outros o pedido simplesmente não aparece (filtrado no available_boost_orders).
+function exclusiveTimeLeft(job: Order, myUserId?: string): string | null {
+  if (!myUserId || job.preferred_booster_id !== myUserId || !job.exclusive_until) return null
+  const msLeft = new Date(job.exclusive_until).getTime() - Date.now()
+  if (msLeft <= 0) return null
+  const hours = Math.floor(msLeft / 3_600_000)
+  const minutes = Math.floor((msLeft % 3_600_000) / 60_000)
+  return hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`
 }
 
 export function AvailableJobsPage() {
@@ -64,7 +82,7 @@ export function AvailableJobsPage() {
   ]
 
   const { data: boosterProfile } = useQuery({
-    queryKey: ['booster-profile', profile?.id],
+    queryKey: ['booster-profile-slots', profile?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('booster_profiles')
@@ -91,9 +109,11 @@ export function AvailableJobsPage() {
         solo_count: result.solo_count ?? 0,
         duo_count: result.duo_count ?? 0,
         total_count: result.total_count ?? 0,
-        max_total: result.max_total ?? 2,
+        max_total: result.max_total ?? 3,
         max_duo: result.max_duo ?? 1,
         is_top5: result.is_top5 ?? false,
+        exclusive_slot_used: result.exclusive_slot_used ?? false,
+        max_exclusive: result.max_exclusive ?? 1,
       } as SlotInfo
     },
     enabled: !!profile?.id && boosterProfile?.status === 'approved',
@@ -128,6 +148,8 @@ export function AvailableJobsPage() {
           order_no_longer_available: 'Este pedido já foi aceito por outro booster.',
           slot_limit_reached: 'Você atingiu o limite de pedidos ativos.',
           duo_slot_limit_reached: 'Você atingiu o limite de slots Duo.',
+          exclusive_slot_already_used: 'Você já tem um pedido exclusivo ativo. Conclua-o para liberar o slot extra.',
+          order_exclusive_to_another_booster: 'Este pedido é exclusivo de outro booster no momento.',
           booster_not_approved: 'Sua conta de booster não está aprovada.',
           unauthorized: 'Ação não autorizada.',
         }
@@ -144,6 +166,9 @@ export function AvailableJobsPage() {
 
   const canAcceptJob = (job: Order): boolean => {
     if (!slotInfo) return false
+    // Pedido exclusivo pra mim, ainda dentro da janela: usa o slot bônus
+    // (máx 1), independente dos 3 slots normais estarem cheios ou não.
+    if (exclusiveTimeLeft(job, profile?.id)) return !slotInfo.exclusive_slot_used
     if (slotInfo.total_count >= slotInfo.max_total) return false
     if (job.boost_mode === 'duo' && slotInfo.duo_count >= slotInfo.max_duo) return false
     return true
@@ -190,6 +215,7 @@ export function AvailableJobsPage() {
       {slotInfo && slotInfo.total_count >= slotInfo.max_total && (
         <div className="bg-warning/10 border border-warning/20 rounded-xl px-4 py-3 text-sm text-warning font-medium">
           Você atingiu o limite de {slotInfo.max_total} pedidos ativos. Conclua um pedido para liberar um slot.
+          {!slotInfo.exclusive_slot_used && ' Você ainda pode aceitar 1 pedido exclusivo, se algum estiver vinculado a você.'}
         </div>
       )}
 
@@ -221,9 +247,10 @@ export function AvailableJobsPage() {
             const isDuo = job.boost_mode === 'duo'
             const blocked = slotInfo && !canAcceptJob(job)
             const duoBlocked = slotInfo && isDuo && slotInfo.duo_count >= slotInfo.max_duo && slotInfo.total_count < slotInfo.max_total
+            const exclusiveLabel = exclusiveTimeLeft(job, profile?.id)
 
             return (
-              <Card key={job.id} className="flex items-center justify-between gap-4">
+              <Card key={job.id} className={`flex items-center justify-between gap-4 ${exclusiveLabel ? 'border-accent/40' : ''}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs font-mono text-ink-muted">#{job.id.slice(0, 8).toUpperCase()}</span>
@@ -237,6 +264,12 @@ export function AvailableJobsPage() {
                     }`}>
                       {isDuo ? 'Duo Boost' : 'Solo Boost'}
                     </span>
+                    {exclusiveLabel && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-accent/15 text-accent border border-accent/30">
+                        <Sparkles className="h-3 w-3" />
+                        Exclusivo para você · {exclusiveLabel}
+                      </span>
+                    )}
                   </div>
                   {job.current_rank && job.target_rank && (
                     <div className="flex items-center gap-2 mt-1">

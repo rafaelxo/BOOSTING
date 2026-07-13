@@ -4,15 +4,8 @@ import { Plus, X } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { LANES } from '@/lib/lolTaxonomy'
 import type { RankTier } from '@/types'
-
-const LANES = [
-  { key: 'top',     label: 'Topo'     },
-  { key: 'jungle',  label: 'Selva'    },
-  { key: 'mid',     label: 'Meio'     },
-  { key: 'bot',     label: 'Atirador' },
-  { key: 'support', label: 'Suporte'  },
-]
 
 const DAYS = [
   { key: 'mon', label: 'Seg' },

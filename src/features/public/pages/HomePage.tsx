@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Button, RankBadge } from '@/components/ui'
 import { RANK_TIER_ORDER } from '@/lib/utils'
+import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -310,31 +311,56 @@ export function HomePage() {
                   </div>
                 ))}
               </div>
-              <Button asChild size="lg" variant="secondary">
-                <Link to="/security">{t('home.trust.policy')}</Link>
-              </Button>
             </motion.div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {TRUST_FEATURES.map(({ icon: Icon, label, desc }, i) => (
-                <motion.div key={label}
-                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
-                  className="card p-5 space-y-3 hover:border-success/25 transition-colors"
-                >
-                  <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center">
-                    <Icon className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-ink text-sm">{label}</h4>
-                    <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{desc}</p>
-                  </div>
-                </motion.div>
-              ))}
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                {TRUST_FEATURES.map(({ icon: Icon, label, desc }, i) => (
+                  <motion.div key={label}
+                    initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }} transition={{ duration: 0.4, delay: i * 0.08 }}
+                    className="card p-5 space-y-3 hover:border-success/25 transition-colors"
+                  >
+                    <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center">
+                      <Icon className="h-5 w-5 text-success" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-ink text-sm">{label}</h4>
+                      <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }} transition={{ duration: 0.4, delay: 0.32 }}
+                className="mt-6"
+              >
+                <Button asChild size="lg" variant="secondary">
+                  <Link to="/security">{t('home.trust.policy')}</Link>
+                </Button>
+              </motion.div>
             </div>
 
           </div>
         </div>
+      </section>
+
+      {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
+      <section className="py-28 bg-bg-base overflow-hidden">
+        <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }} transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <p className="section-label mb-3">{t('home.reviewsSection.sectionLabel')}</p>
+            <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.reviewsSection.title')}</h2>
+          </motion.div>
+        </div>
+
+        <TestimonialsCarousel />
       </section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { TrendingUp, Zap, Users, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { BoostFlow } from '@/types'
 
 const SERVICES = [
@@ -88,7 +88,8 @@ const EXTRA_GROUPS: { flow: BoostFlow; label: string }[] = [
 ]
 
 function ExtraGroup({ flow, label }: { flow: BoostFlow; label: string }) {
-  const { data: extras = [], isLoading } = useBoostAddons(flow)
+  const { data, isLoading } = useBoostAddons(flow)
+  const extras = data ?? EMPTY_ADDONS
 
   if (isLoading) {
     return <Skeleton className="h-24 rounded-2xl" />

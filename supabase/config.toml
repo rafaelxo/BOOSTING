@@ -52,3 +52,12 @@ enabled = true
 # 401 before it ever reaches our code, so payments would never auto-confirm.
 [functions.mercadopago-webhook]
 verify_jwt = false
+
+# Invoked by a Supabase Database Webhook and by discord-init-channels'
+# bootstrap flow respectively — neither call carries a Supabase JWT, both are
+# gated by their own x-webhook-secret header check instead.
+[functions.discord-order-channel]
+verify_jwt = false
+
+[functions.discord-init-channels]
+verify_jwt = false

@@ -45,7 +45,7 @@ export function AdminDuoAccountsPage() {
   const { data: accounts, isLoading } = useQuery({
     queryKey: ['admin-duo-accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('admin_duo_accounts').select('*').order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('admin_duo_accounts').select('*').order('created_at', { ascending: false }).limit(100)
       if (error) throw error
       return data as unknown as DuoAccount[]
     },

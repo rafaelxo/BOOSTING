@@ -234,6 +234,17 @@ export interface Order {
   avg_pdl_gain: number | null
   avg_pdl_loss: number | null
   pricing_version: string
+  // Pedido direto: booster escolhido no perfil público antes do pagamento.
+  // exclusive_until é setado só quando o pagamento é confirmado — enquanto
+  // estiver no futuro, o pedido só aparece para esse booster no pool.
+  preferred_booster_id: string | null
+  exclusive_until: string | null
+  // Riot ID (nome#tag) usado pra verificar automaticamente se o rank alvo
+  // foi atingido — só coletado em fluxos que têm target_rank (elo_boost).
+  riot_id: string | null
+  // Pacote de coach comprado (booster_services.id) — só setado quando
+  // service_type === 'coaching'.
+  booster_service_id: string | null
 }
 
 export interface OrderStatusHistory {
@@ -243,6 +254,20 @@ export interface OrderStatusHistory {
   to_status: OrderStatus
   changed_by: string
   reason: string | null
+  created_at: string
+}
+
+export interface OrderRankVerification {
+  id: string
+  order_id: string
+  requested_by: string
+  riot_id_checked: string
+  fetched_tier: RankTier | null
+  fetched_division: Division | null
+  target_tier: RankTier
+  target_division: Division | null
+  passed: boolean
+  error_reason: string | null
   created_at: string
 }
 
@@ -416,6 +441,10 @@ export interface BoosterService {
   availability_note: string | null
   is_active: boolean
   rules: string | null
+  // Pacotes de coach: até 2 lanes e especialidades de um vocabulário fixo
+  // (src/lib/lolTaxonomy.ts) — null pra registros antigos não-coaching.
+  lanes: string[] | null
+  specialties: string[] | null
   created_at: string
   updated_at: string
 }

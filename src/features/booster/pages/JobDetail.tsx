@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -107,6 +107,26 @@ export function JobDetailPage() {
       if (!result.success) throw new Error(result.error ?? 'Erro ao registrar resultado')
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+  })
+
+  const verifyRank = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('verify-order-rank', {
+        body: { order_id: id! },
+      })
+      if (error) throw new Error(data?.error ?? error.message ?? 'Erro ao verificar rank')
+      return data as {
+        passed: boolean
+        reason?: string
+        fetched_tier?: RankTier
+        fetched_division?: Division | null
+        target_tier?: RankTier
+        target_division?: Division | null
+      }
+    },
+    onSuccess: (result) => {
+      if (result.passed) queryClient.invalidateQueries({ queryKey: ['order', id] })
+    },
   })
 
   const requestDrop = useMutation({
@@ -308,6 +328,48 @@ export function JobDetailPage() {
                   +1 Loss
                 </Button>
               </div>
+            </Card>
+          )}
+
+          {/* Verificação de rank — só pra pedidos com rank alvo + Riot ID
+              cadastrados. Aprovado conclui o pedido automaticamente (via
+              complete_verified_order no servidor); reprovado só mostra o
+              motivo, sem mudar o status. */}
+          {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-brand" />
+                Verificação de Rank
+              </h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Confirma automaticamente, via Riot Games, se a conta já atingiu o rank alvo. Se sim, o pedido é concluído.
+              </p>
+              <Button
+                className="w-full"
+                variant="success"
+                leftIcon={<ShieldCheck className="h-4 w-4" />}
+                loading={verifyRank.isPending}
+                onClick={() => verifyRank.mutate()}
+              >
+                Verificar Rank e Concluir
+              </Button>
+              {verifyRank.isError && (
+                <p className="text-xs text-danger mt-2">
+                  {verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'}
+                </p>
+              )}
+              {verifyRank.data && !verifyRank.data.passed && (
+                <div className="text-xs text-warning mt-2 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                  {verifyRank.data.reason === 'account_not_found' && 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.'}
+                  {verifyRank.data.reason === 'unranked' && 'A conta ainda não tem partidas ranqueadas solo/duo nesta temporada.'}
+                  {verifyRank.data.reason === 'target_not_reached' && verifyRank.data.fetched_tier && (
+                    <>
+                      Rank atual verificado: <strong>{formatRank(verifyRank.data.fetched_tier, verifyRank.data.fetched_division ?? null)}</strong> —
+                      alvo: <strong>{formatRank(verifyRank.data.target_tier!, verifyRank.data.target_division ?? null)}</strong>. Ainda não bateu.
+                    </>
+                  )}
+                </div>
+              )}
             </Card>
           )}
 

@@ -95,7 +95,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) {
       // Real failure (RLS, rede, etc.) — não mascarar como "perfil ausente".
-      console.error('fetchProfile: failed to load profile', error)
+      // Detalhe do erro (código/policy do Postgrest) só em dev — em produção
+      // isso não deve vazar pra um monitor de erros externo.
+      if (import.meta.env.DEV) console.error('fetchProfile: failed to load profile', error)
       setProfile(null)
       setLoading(false)
       setInitialized(true)
@@ -111,7 +113,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .maybeSingle()
       if (result.error) {
-        console.error('fetchProfile: failed to load profile after ensure_profile_exists', result.error)
+        if (import.meta.env.DEV) console.error('fetchProfile: failed to load profile after ensure_profile_exists', result.error)
         setProfile(null)
         setLoading(false)
         setInitialized(true)

@@ -4,7 +4,7 @@ import { Button, Skeleton, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { PLACEMENT_PRICE, getWinBoostPrice, ELO_TIERS } from '@/lib/pricing'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
 
@@ -21,7 +21,8 @@ function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string):
 }
 
 function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_standard' | 'duo_standard' | 'master_plus'; currency: (n: number) => string }) {
-  const { data: extras = [], isLoading } = useBoostAddons(flow)
+  const { data, isLoading } = useBoostAddons(flow)
+  const extras = data ?? EMPTY_ADDONS
 
   if (isLoading) {
     return (
