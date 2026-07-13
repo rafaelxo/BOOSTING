@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { X, LogOut, ArrowRight } from 'lucide-react'
+import { X, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase, signOut } from '@/lib/supabase'
@@ -18,12 +18,8 @@ const ROLE_BADGE: Record<UserRole, { label: string; className: string }> = {
   admin:    { label: 'Admin',    className: 'text-danger bg-danger/10'     },
 }
 
-// Booster não tem mais uma página "Meu Perfil" separada — os dados pessoais já
-// estão todos aqui no popover, e o perfil profissional vive em Serviços.
-const FULL_PROFILE_PATH: Partial<Record<UserRole, string>> = {
-  customer: '/profile',
-  admin: '/admin/profile',
-}
+// A personalização do perfil acontece exclusivamente aqui no popover —
+// não existe mais página "Meu Perfil" separada para nenhum papel.
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -227,18 +223,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
               <span className="text-ink font-medium truncate max-w-[160px]">{profile?.email ?? '—'}</span>
             </div>
           </div>
-
-          {/* Link to full profile page — não existe para booster (tudo já está aqui ou em Serviços) */}
-          {FULL_PROFILE_PATH[role] && (
-            <button
-              type="button"
-              onClick={() => { onClose(); navigate(FULL_PROFILE_PATH[role]!) }}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-bg-elevated hover:border-brand/40 hover:bg-bg-elevated transition-colors text-sm font-semibold text-ink"
-            >
-              Editar perfil completo
-              <ArrowRight className="h-4 w-4 text-ink-muted" />
-            </button>
-          )}
 
           {/* Username */}
           <div className="space-y-2">

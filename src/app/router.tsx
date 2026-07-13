@@ -29,9 +29,6 @@ const CustomerDashboard = lazy(() => import('@/features/customer/pages/Dashboard
 const OrderBuilderPage  = lazy(() => import('@/features/customer/pages/OrderBuilder').then(m => ({ default: m.OrderBuilderPage })))
 const OrderDetailPage   = lazy(() => import('@/features/customer/pages/OrderDetail').then(m => ({ default: m.OrderDetailPage })))
 const OrderHistoryPage  = lazy(() => import('@/features/customer/pages/OrderHistory').then(m => ({ default: m.OrderHistoryPage })))
-const SupportPage       = lazy(() => import('@/features/customer/pages/Support').then(m => ({ default: m.SupportPage })))
-const TicketDetailPage  = lazy(() => import('@/features/customer/pages/TicketDetail').then(m => ({ default: m.TicketDetailPage })))
-const CustomerProfilePage = lazy(() => import('@/features/customer/pages/Profile').then(m => ({ default: m.CustomerProfilePage })))
 
 // Booster pages
 const BoosterDashboard    = lazy(() => import('@/features/booster/pages/Dashboard').then(m => ({ default: m.BoosterDashboard })))
@@ -57,7 +54,6 @@ const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services')
 const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
-const AdminProfilePage    = lazy(() => import('@/features/admin/pages/Profile').then(m => ({ default: m.AdminProfilePage })))
 const ReviewsPage         = lazy(() => import('@/features/public/pages/ReviewsPage').then(m => ({ default: m.ReviewsPage })))
 
 export const router = createBrowserRouter([
@@ -108,9 +104,10 @@ export const router = createBrowserRouter([
           { path: '/orders/new',   element: <SuspensePage><OrderBuilderPage /></SuspensePage> },
           { path: '/orders/:id',   element: <SuspensePage><OrderDetailPage /></SuspensePage> },
           { path: '/orders',       element: <SuspensePage><OrderHistoryPage /></SuspensePage> },
-          { path: '/support',      element: <SuspensePage><SupportPage /></SuspensePage> },
-          { path: '/support/:id',  element: <SuspensePage><TicketDetailPage /></SuspensePage> },
-          { path: '/profile',      element: <SuspensePage><CustomerProfilePage /></SuspensePage> },
+          // Rotas antigas — mantidas como redirect para não quebrar links/bookmarks existentes.
+          { path: '/support',      element: <Navigate to="/dashboard" replace /> },
+          { path: '/support/:id',  element: <Navigate to="/dashboard" replace /> },
+          { path: '/profile',      element: <Navigate to="/dashboard" replace /> },
         ],
       },
     ],
@@ -160,7 +157,8 @@ export const router = createBrowserRouter([
           { path: '/admin/reviews',      element: <SuspensePage><AdminReviewsPage /></SuspensePage> },
           { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
           { path: '/admin/duo-accounts', element: <SuspensePage><AdminDuoAccountsPage /></SuspensePage> },
-          { path: '/admin/profile',      element: <SuspensePage><AdminProfilePage /></SuspensePage> },
+          // Rota antiga — mantida como redirect para não quebrar links/bookmarks existentes.
+          { path: '/admin/profile',      element: <Navigate to="/admin" replace /> },
         ],
       },
     ],

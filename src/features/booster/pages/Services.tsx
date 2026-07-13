@@ -5,8 +5,6 @@ import { Button } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterProfessionalProfileForm } from '@/features/booster/components/BoosterProfessionalProfileForm'
-import { BoosterStats } from '@/features/booster/components/BoosterStats'
-import { BoosterReviews } from '@/features/booster/components/BoosterReviews'
 import { BoosterServicesList } from '@/features/booster/components/BoosterServicesList'
 
 export function BoosterServicesPage() {
@@ -44,8 +42,6 @@ export function BoosterServicesPage() {
       </div>
 
       <BoosterProfessionalProfileForm userId={profile.id} />
-      <BoosterStats userId={profile.id} />
-      <BoosterReviews userId={profile.id} />
       <BoosterServicesList userId={profile.id} />
     </div>
   )

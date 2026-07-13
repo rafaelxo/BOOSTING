@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   HeadphonesIcon, Settings, Shield, Star,
-  RefreshCw, Eye, AlertTriangle, Landmark, User,
+  RefreshCw, Eye, AlertTriangle, Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
@@ -44,12 +44,6 @@ export function AdminLayout() {
       items: [
         { href: '/admin/services', icon: Settings, label: t('admin.nav.services')  },
         { href: '/admin/audit',    icon: Eye,      label: t('admin.nav.audit') },
-      ],
-    },
-    {
-      label: 'Conta',
-      items: [
-        { href: '/admin/profile', icon: User, label: t('admin.nav.profile') },
       ],
     },
   ]

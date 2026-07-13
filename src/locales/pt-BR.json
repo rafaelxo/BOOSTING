@@ -136,8 +136,6 @@
       "dashboard": "Painel",
       "newOrder": "Novo Pedido",
       "myOrders": "Meus Pedidos",
-      "support": "Suporte",
-      "profile": "Perfil",
       "signOut": "Sair",
       "role": "Cliente"
     },
@@ -178,8 +176,8 @@
       "timeline": "Histórico de Status",
       "noHistory": "Sem histórico ainda.",
       "needHelp": "Precisa de ajuda?",
-      "ticketDesc": "Abra um chamado de suporte para este pedido.",
-      "openTicket": "Abrir Chamado",
+      "ticketDesc": "Fale com nosso suporte pelo Discord.",
+      "openTicket": "Abrir Discord",
       "soloQueue": "Solo/Duo",
       "flexQueue": "Flex",
       "paymentSuccess": "Pagamento confirmado!",
@@ -200,20 +198,6 @@
       "emptyFilter": "Tente mudar o filtro.",
       "emptyAll": "Faça seu primeiro pedido para começar.",
       "startBoost": "Começar Boost"
-    },
-    "profile": {
-      "title": "Perfil",
-      "username": "Nome de usuário",
-      "email": "E-mail",
-      "emailHint": "O e-mail não pode ser alterado aqui. Entre em contato com o suporte.",
-      "saveProfile": "Salvar Perfil",
-      "saved": "Salvo!",
-      "changePassword": "Alterar Senha",
-      "newPassword": "Nova Senha",
-      "confirmPassword": "Confirmar Nova Senha",
-      "updatePassword": "Atualizar Senha",
-      "passwordUpdated": "Senha atualizada!",
-      "role": "Cliente"
     }
   },
   "auth": {
@@ -373,7 +357,6 @@
       "reviews": "Avaliações",
       "services": "Serviços",
       "audit": "Auditoria",
-      "profile": "Meu Perfil",
       "signOut": "Sair",
       "role": "Admin",
       "panel": "Painel Admin"

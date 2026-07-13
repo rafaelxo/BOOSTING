@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, ShoppingBag, Plus, HeadphonesIcon, User,
+  LayoutDashboard, ShoppingBag, Plus,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -20,8 +20,6 @@ export function CustomerLayout() {
     { href: '/dashboard',  icon: LayoutDashboard, label: t('customer.nav.dashboard') },
     { href: '/orders/new', icon: Plus,            label: t('customer.nav.newOrder')   },
     { href: '/orders',     icon: ShoppingBag,     label: t('customer.nav.myOrders')   },
-    { href: '/support',    icon: HeadphonesIcon,  label: t('customer.nav.support')    },
-    { href: '/profile',    icon: User,            label: t('customer.nav.profile')    },
   ]
 
   return (
@@ -93,7 +91,7 @@ export function CustomerLayout() {
 
         {/* Mobile bottom nav */}
         <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0">
-          {NAV_ITEMS.filter(i => i.href !== '/orders/new' && i.href !== '/profile').map(({ href, icon: Icon, label }) => {
+          {NAV_ITEMS.filter(i => i.href !== '/orders/new').map(({ href, icon: Icon, label }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (
               <Link

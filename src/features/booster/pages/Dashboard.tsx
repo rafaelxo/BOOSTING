@@ -1,14 +1,14 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Briefcase, DollarSign, Star, TrendingUp, Clock, ChevronRight, Swords, Users,
+  Briefcase, Clock, Swords, Users,
   Wallet, Banknote, PiggyBank, Hourglass, CalendarClock,
 } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, EmptyState, RankBadge } from '@/components/ui'
+import { Button, Card, Skeleton, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, formatRank, formatDate, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
-import type { Division, Order, BoosterProfile, RankTier, PayoutRecord } from '@/types'
+import { formatDate } from '@/lib/utils'
+import type { Order, BoosterProfile, PayoutRecord } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
@@ -51,7 +51,7 @@ export function BoosterDashboard() {
   const { t } = useTranslation()
   const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
-  const { data: activeOrders, isLoading: ordersLoading } = useAssignedOrders(boosterProfile?.id)
+  const { data: activeOrders } = useAssignedOrders(boosterProfile?.id)
 
   const { data: slotInfo } = useQuery({
     queryKey: ['booster-slots', profile?.id],
@@ -117,10 +117,6 @@ export function BoosterDashboard() {
     )
   }
 
-  const completedCount = boosterProfile?.total_completed ?? 0
-  const rating = boosterProfile?.rating ?? 0
-  const earnings = boosterProfile?.total_earnings ?? 0
-
   // Total Ganho: soma líquida de todos os payouts, independente do status.
   const totalEarned = payouts?.reduce((s, p) => s + Number(p.net_amount), 0) ?? 0
   // Total Sacado: já pago/transferido ao booster.
@@ -154,24 +150,6 @@ export function BoosterDashboard() {
             {t('booster.dashboard.browseJobs')}
           </Link>
         </Button>
-      </div>
-
-      {/* Indicadores de desempenho */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: t('booster.dashboard.stats.active'), value: activeOrders?.length ?? 0, icon: Briefcase, color: 'text-brand bg-brand/10' },
-          { label: t('booster.dashboard.stats.completed'), value: completedCount, icon: TrendingUp, color: 'text-success bg-success/10' },
-          { label: t('booster.dashboard.stats.earned'), value: currency(earnings), icon: DollarSign, color: 'text-accent bg-accent/10' },
-          { label: t('booster.dashboard.stats.rating'), value: rating.toFixed(1), icon: Star, color: 'text-warning bg-warning/10' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} padding="md">
-            <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
-              <Icon className="h-4 w-4" />
-            </div>
-            <p className="text-2xl font-bold text-ink">{value}</p>
-            <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
-          </Card>
-        ))}
       </div>
 
       {/* Saldo e movimentações */}
@@ -228,70 +206,6 @@ export function BoosterDashboard() {
           </div>
         </Card>
       )}
-
-      {/* Active assignments */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-ink">{t('booster.dashboard.activeTitle')}</h2>
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/booster/orders">{t('booster.dashboard.viewAll')}</Link>
-          </Button>
-        </div>
-
-        {ordersLoading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : !activeOrders?.length ? (
-          <EmptyState
-            icon={Briefcase}
-            title={t('booster.dashboard.empty')}
-            description={t('booster.dashboard.emptyDesc')}
-            action={{ label: t('booster.dashboard.browseJobs'), onClick: () => {} }}
-          />
-        ) : (
-          <div className="space-y-3">
-            {activeOrders.map((order) => (
-              <Link key={order.id} to={`/booster/jobs/${order.id}`}>
-                <Card className="flex items-center justify-between gap-4 hover:border-brand/20 hover:shadow-card-hover transition-all cursor-pointer">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-sm font-semibold text-ink">#{order.id.slice(0, 8).toUpperCase()}</p>
-                    </div>
-                    {order.current_rank && order.target_rank && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <RankBadge
-                          tier={(order.current_rank as { tier: RankTier }).tier}
-                          division={(order.current_rank as { division: Division }).division}
-                          size="xs"
-                          showLabel={false}
-                        />
-                        <span className="text-xs font-medium text-ink-secondary">
-                          {formatRank((order.current_rank as { tier: RankTier }).tier, (order.current_rank as { division: Division }).division)}
-                        </span>
-                        <span className="text-ink-muted text-xs">→</span>
-                        <RankBadge
-                          tier={(order.target_rank as { tier: RankTier }).tier}
-                          division={(order.target_rank as { division: Division }).division}
-                          size="xs"
-                          showLabel={false}
-                        />
-                        <span className="text-xs font-medium text-ink-secondary">
-                          {formatRank((order.target_rank as { tier: RankTier }).tier, (order.target_rank as { division: Division }).division)}
-                        </span>
-                      </div>
-                    )}
-                    <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(order.created_at)}</p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-sm font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</span>
-                    <OrderStatusBadge status={order.status} />
-                    <ChevronRight className="h-4 w-4 text-ink-muted" />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Serviços concluídos este mês */}
       <div>

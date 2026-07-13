@@ -38,19 +38,12 @@ interface ProfessionalProfileData {
   bio: string | null
   lanes: string[] | null
   specialties: string[] | null
-  games: string[] | null
   peak_rank: { tier: RankTier; division: string | null } | null
   opgg_link: string | null
   available_days: string[] | null
   hours_per_day_min: number | null
   hours_per_day_max: number | null
   can_coach: boolean | null
-  is_available: boolean
-}
-
-interface GameOption {
-  slug: string
-  name: string
 }
 
 export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
@@ -61,14 +54,12 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   const [lanes, setLanes]                   = useState<string[]>([])
   const [specialties, setSpecialties]       = useState<string[]>([])
   const [specialtyInput, setSpecialtyInput] = useState('')
-  const [games, setGames]                   = useState<string[]>([])
   const [peakTier, setPeakTier]             = useState<string | null>(null)
   const [opggLink, setOpggLink]             = useState('')
   const [availableDays, setAvailableDays]   = useState<string[]>([])
   const [hoursMin, setHoursMin]             = useState('')
   const [hoursMax, setHoursMax]             = useState('')
   const [canCoach, setCanCoach]             = useState<boolean | null>(null)
-  const [isAvailable, setIsAvailable]       = useState(false)
   const [saving, setSaving]                 = useState(false)
   const [saved, setSaved]                   = useState(false)
   const [error, setError]                   = useState<string | null>(null)
@@ -78,7 +69,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_profiles')
-        .select('display_name, bio, lanes, specialties, games, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max, can_coach, is_available')
+        .select('display_name, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max, can_coach')
         .eq('user_id', userId)
         .maybeSingle()
       if (error) throw error
@@ -87,38 +78,22 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     enabled: !!userId,
   })
 
-  const { data: gameOptions } = useQuery({
-    queryKey: ['active-games'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('games').select('slug, name').eq('is_active', true).order('sort_order')
-      if (error) throw error
-      return data as GameOption[]
-    },
-    staleTime: 1000 * 60 * 30,
-  })
-
   useEffect(() => {
     if (!profile) return
     setDisplayName(profile.display_name ?? '')
     setBio(profile.bio ?? '')
     setLanes(profile.lanes ?? [])
     setSpecialties(profile.specialties ?? [])
-    setGames(profile.games ?? [])
     setPeakTier(profile.peak_rank?.tier ?? null)
     setOpggLink(profile.opgg_link ?? '')
     setAvailableDays(profile.available_days ?? [])
     setHoursMin(profile.hours_per_day_min != null ? String(profile.hours_per_day_min) : '')
     setHoursMax(profile.hours_per_day_max != null ? String(profile.hours_per_day_max) : '')
     setCanCoach(profile.can_coach)
-    setIsAvailable(profile.is_available ?? false)
   }, [profile])
 
   function toggleLane(key: string) {
     setLanes(prev => (prev.includes(key) ? prev.filter(l => l !== key) : prev.length < 2 ? [...prev, key] : prev))
-  }
-
-  function toggleGame(slug: string) {
-    setGames(prev => (prev.includes(slug) ? prev.filter(g => g !== slug) : [...prev, slug]))
   }
 
   function toggleDay(key: string) {
@@ -146,14 +121,12 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
         bio: bio.trim() || null,
         lanes,
         specialties,
-        games,
         peak_rank: peakTier ? { tier: peakTier, division: null } : null,
         opgg_link: opggLink.trim() || null,
         available_days: availableDays,
         hours_per_day_min: hoursMin ? Number(hoursMin) : null,
         hours_per_day_max: hoursMax ? Number(hoursMax) : null,
         can_coach: canCoach,
-        is_available: isAvailable,
       })
       .eq('user_id', userId)
     setSaving(false)
@@ -184,27 +157,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
         {!isComplete && (
           <p className="text-xs text-warning mt-2">Complete suas informações profissionais para aparecer para os clientes.</p>
         )}
-      </div>
-
-      {/* Disponibilidade para novos pedidos */}
-      <div className="flex items-center justify-between rounded-xl border border-bg-elevated px-4 py-3">
-        <div>
-          <p className="text-sm font-semibold text-ink">Disponível para novos pedidos</p>
-          <p className="text-xs text-ink-muted mt-0.5">Controla se você aparece como disponível no seu perfil público.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsAvailable(v => !v)}
-          className={cn(
-            'relative h-6 w-11 rounded-full transition-colors shrink-0',
-            isAvailable ? 'bg-success' : 'bg-bg-elevated',
-          )}
-        >
-          <span className={cn(
-            'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform',
-            isAvailable ? 'translate-x-5' : 'translate-x-0.5',
-          )} />
-        </button>
       </div>
 
       {/* Nome de exibição */}
@@ -255,33 +207,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
           ))}
         </div>
       </div>
-
-      {/* Modos de jogo */}
-      {!!gameOptions?.length && (
-        <div className="space-y-2">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Jogos</label>
-          <div className="flex flex-wrap gap-2">
-            {gameOptions.map(({ slug, name }) => {
-              const selected = games.includes(slug)
-              return (
-                <button
-                  key={slug}
-                  type="button"
-                  onClick={() => toggleGame(slug)}
-                  className={cn(
-                    'px-3.5 py-1.5 rounded-xl text-xs font-bold border-2 transition-all',
-                    selected
-                      ? 'bg-brand/15 border-brand text-brand'
-                      : 'border-bg-elevated text-ink-secondary hover:border-brand/40 hover:text-ink',
-                  )}
-                >
-                  {name}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Lanes */}
       <div className="space-y-2">
