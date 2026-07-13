@@ -9,6 +9,7 @@ import {
   isValidMasterPlusProgression,
   hasDuplicateAddonCodes,
   getPdlBracket,
+  NO_DIVISION_TIERS,
 } from '../../../shared/boostDomain.ts'
 import { handleCors } from '../_shared/cors.ts'
 import { errorResponse, jsonResponse } from '../_shared/responses.ts'
@@ -32,6 +33,21 @@ const standardRankSchema = z.object({
   tier: z.enum(STANDARD_TIERS),
   division: z.enum(DIVISIONS).nullable().optional(),
 }).strict()
+
+// Rank alvo do fluxo padrão pode ir além de Diamond — até Master, Grão-Mestre
+// ou Challenger — usando a mesma progressão por degrau (mesma fórmula de
+// preço, sem tabela de PDL: isso é diferente do fluxo Master+, que só existe
+// quando o rank ATUAL já é Master/Grão-Mestre). Tiers sem divisão devem vir
+// com division nula.
+const ALL_TIERS = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger'] as const
+const standardTargetRankSchema = z.object({
+  tier: z.enum(ALL_TIERS),
+  division: z.enum(DIVISIONS).nullable().optional(),
+}).strict().superRefine((val, ctx) => {
+  if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
+  }
+})
 
 const masterPlusCurrentRankSchema = z.object({
   tier: z.enum(['master', 'grandmaster']),
@@ -65,7 +81,7 @@ const standardEloIntentSchema = z.object({
   boost_mode: z.enum(['solo', 'duo']),
   server: z.string().min(1, 'server é obrigatório'),
   current_rank: standardRankSchema,
-  target_rank: standardRankSchema,
+  target_rank: standardTargetRankSchema,
   current_lp: z.number().int().min(0).max(100).default(0),
   avg_lp_gain: z.number().int().min(1).max(50).default(20),
   avg_lp_loss: z.number().int().min(1).max(50).default(15),

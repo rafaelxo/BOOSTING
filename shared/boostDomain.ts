@@ -40,6 +40,17 @@ export function isMasterPlusCurrentTier(tier: RankTier): tier is 'master' | 'gra
   return tier === 'master' || tier === 'grandmaster'
 }
 
+// Tiers sem divisão (I–IV) — Master, Grão-Mestre e Challenger são medidos só
+// por PDL, sem subdivisões. Vale tanto para rank atual quanto para rank
+// alvo: um cliente Diamond pode mirar Master/Grão-Mestre/Challenger pelo
+// fluxo padrão (progressão por degrau, mesma fórmula de Iron–Diamond), e
+// nesse caso o rank alvo também não tem divisão.
+export const NO_DIVISION_TIERS: readonly RankTier[] = ['master', 'grandmaster', 'challenger']
+
+export function tierHasDivisions(tier: RankTier): boolean {
+  return !NO_DIVISION_TIERS.includes(tier)
+}
+
 // Progressões válidas no Master+: Master pode ir para Grão-Mestre ou direto
 // para Challenger; Grão-Mestre só pode ir para Challenger.
 export const MASTER_PLUS_PROGRESSIONS: ReadonlyArray<{

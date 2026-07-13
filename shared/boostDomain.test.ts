@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   BOOST_CURRENT_RANK_TIERS, STANDARD_RANK_TIERS, PRIORITY_ADDON_CODE,
-  BOOST_ADDON_CODES, PDL_BRACKETS, MASTER_PLUS_PROGRESSIONS,
-  isStandardTier, isMasterPlusCurrentTier, getBoostFlow,
+  BOOST_ADDON_CODES, PDL_BRACKETS, MASTER_PLUS_PROGRESSIONS, NO_DIVISION_TIERS,
+  isStandardTier, isMasterPlusCurrentTier, getBoostFlow, tierHasDivisions,
   getValidMasterPlusTargets, isValidMasterPlusProgression,
   getPdlBracket, isAddonCodeValidForFlow, hasDuplicateAddonCodes,
   sortAddonsBySortOrder,
 } from './boostDomain'
-import type { RankTier } from './pricing'
+import { rankStep, type RankTier } from './pricing'
 
 describe('BOOST_CURRENT_RANK_TIERS — origem dos ranks atuais', () => {
   it('não contém Challenger na fonte de opções (não é só filtrado na tela)', () => {
@@ -194,5 +194,27 @@ describe('isStandardTier / isMasterPlusCurrentTier', () => {
     const tier: RankTier = 'challenger'
     expect(isStandardTier(tier)).toBe(false)
     expect(isMasterPlusCurrentTier(tier)).toBe(false)
+  })
+})
+
+describe('Rank alvo do fluxo padrão pode ultrapassar Diamond (ex.: Diamond → Master)', () => {
+  it('Master, Grão-Mestre e Challenger não têm divisão', () => {
+    expect(NO_DIVISION_TIERS).toEqual(['master', 'grandmaster', 'challenger'])
+    expect(tierHasDivisions('diamond')).toBe(true)
+    expect(tierHasDivisions('master')).toBe(false)
+    expect(tierHasDivisions('grandmaster')).toBe(false)
+    expect(tierHasDivisions('challenger')).toBe(false)
+  })
+
+  it('rankStep trata Diamond I → Master/Grão-Mestre/Challenger como progressão válida (passo maior)', () => {
+    const diamondI = rankStep('diamond', 'I')
+    expect(rankStep('master', null)).toBeGreaterThan(diamondI)
+    expect(rankStep('grandmaster', null)).toBeGreaterThan(diamondI)
+    expect(rankStep('challenger', null)).toBeGreaterThan(diamondI)
+  })
+
+  it('um rank atual Iron/Bronze/etc também pode mirar Master+ (passo bem maior)', () => {
+    const ironIV = rankStep('iron', 'IV')
+    expect(rankStep('challenger', null)).toBeGreaterThan(ironIV)
   })
 })

@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
+import { RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
-  BOOST_CURRENT_RANK_TIERS, STANDARD_RANK_TIERS,
-  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
+  BOOST_CURRENT_RANK_TIERS,
+  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket, tierHasDivisions,
 } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Shield, Star, Gem, Diamond, Crown, Flame, Check } from 'lucide-react'
@@ -103,7 +104,7 @@ function RankPicker({
   const minIdx = minTier ? tiers.indexOf(minTier) : 0
   const availableSet = new Set(minIdx >= 0 ? tiers.slice(minIdx) : tiers)
 
-  const validDivisions = selectedTier
+  const validDivisions = selectedTier && tierHasDivisions(selectedTier)
     ? DIVISIONS.filter(d => {
         if (!minTier || selectedTier !== minTier) return true
         return divStep(d) > divStep(minDiv ?? 'IV')
@@ -112,6 +113,9 @@ function RankPicker({
 
   function handleTier(tier: RankTier) {
     if (!availableSet.has(tier)) return
+    // Master/Grão-Mestre/Challenger não têm divisão — seja como rank atual,
+    // seja como rank alvo (ex.: Diamond mirando Master pelo fluxo padrão).
+    if (!tierHasDivisions(tier)) { onChange(tier, null); return }
     const div = selectedDivision ?? 'IV'
     if (minTier && tier === minTier && minDiv) {
       const first = DIVISIONS.find(d => divStep(d) > divStep(minDiv))
@@ -360,59 +364,31 @@ export function StepConfigure() {
                   tiers={BOOST_CURRENT_RANK_TIERS}
                   selectedTier={currentRank?.tier ?? null}
                   selectedDivision={currentRank?.division ?? null}
-                  onChange={(tier, division) => setCurrentRank({ tier, division: isMasterPlusCurrentTier(tier) ? null : division })}
+                  onChange={(tier, division) => setCurrentRank({ tier, division })}
                 />
 
-                {/* PDL — fluxo padrão (Iron–Diamond) */}
-                {currentRank && !currentIsMasterPlus && (
+                {/* PDL Atual — mesmo layout (grid de 3 contadores) para os
+                    dois fluxos, só trocando quais campos do estado ficam
+                    ligados a cada contador. Master+ não tem PDL alvo — o
+                    preço depende da faixa do PDL atual, não de um alvo
+                    informado pelo cliente. */}
+                {currentRank && (
                   <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
                     <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
                     <div className="grid grid-cols-3 gap-2">
-                      <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
-                      <LpCounter label="Méd. Ganhos" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
-                      <LpCounter label="Méd. Perdidos" value={avgLpLoss} min={1} max={40} onChange={setAvgLpLoss} />
-                    </div>
-                  </div>
-                )}
-
-                {/* PDL — fluxo Master+: PDL atual, média de ganho e média de
-                    perda. Não existe PDL alvo — o preço depende da faixa de
-                    PDL atual, não de um alvo informado pelo cliente. */}
-                {currentRank && currentIsMasterPlus && (
-                  <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-3">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-semibold text-ink-secondary">PDL atual no rank</p>
-                      <input
-                        type="number"
-                        min={0}
-                        value={currentPdl || ''}
-                        onChange={e => setCurrentPdl(Math.max(0, parseInt(e.target.value) || 0))}
-                        placeholder="ex: 65"
-                        className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-semibold text-ink-secondary">Méd. PDL ganho/vitória</p>
-                        <input
-                          type="number"
-                          min={1}
-                          value={avgPdlGain || ''}
-                          onChange={e => setAvgPdlGain(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-semibold text-ink-secondary">Méd. PDL perdido/derrota</p>
-                        <input
-                          type="number"
-                          min={1}
-                          value={avgPdlLoss || ''}
-                          onChange={e => setAvgPdlLoss(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </div>
+                      {currentIsMasterPlus ? (
+                        <>
+                          <LpCounter label="PDL Atual" value={currentPdl} min={0} max={9999} onChange={setCurrentPdl} />
+                          <LpCounter label="Méd. Ganhos" value={avgPdlGain} min={1} max={200} onChange={setAvgPdlGain} />
+                          <LpCounter label="Méd. Perdidos" value={avgPdlLoss} min={1} max={200} onChange={setAvgPdlLoss} />
+                        </>
+                      ) : (
+                        <>
+                          <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
+                          <LpCounter label="Méd. Ganhos" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
+                          <LpCounter label="Méd. Perdidos" value={avgLpLoss} min={1} max={40} onChange={setAvgLpLoss} />
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -440,6 +416,7 @@ export function StepConfigure() {
                           currentRank.tier === 'grandmaster' && 'cursor-default',
                         )}
                       >
+                        <RankBadge tier={tier} size="xs" showLabel={false} />
                         <span className="text-sm font-bold">{RANK_TIER_LABEL[tier]}</span>
                       </button>
                     ))}
@@ -452,8 +429,13 @@ export function StepConfigure() {
                     )}
                   </div>
                 ) : (
+                  // Rank alvo do fluxo padrão pode ir além de Diamond — até
+                  // Master/Grão-Mestre/Challenger — usando a mesma progressão
+                  // por degrau (o preço de cada degrau acima de Diamond segue
+                  // a taxa de Diamante). O fluxo Master+ propriamente dito só
+                  // se aplica quando o rank ATUAL já é Master/Grão-Mestre.
                   <RankPicker
-                    tiers={STANDARD_RANK_TIERS}
+                    tiers={RANK_TIER_ORDER}
                     selectedTier={targetRank?.tier ?? null}
                     selectedDivision={targetRank?.division ?? null}
                     onChange={(tier, division) => setTargetRank({ tier, division })}
