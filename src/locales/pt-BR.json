@@ -261,11 +261,10 @@
   "booster": {
     "nav": {
       "dashboard": "Painel",
-      "jobs": "Pedidos",
-      "completed": "Concluídos",
+      "jobs": "Jobs",
+      "orders": "Pedidos",
+      "services": "Serviços",
       "accounts": "Contas",
-      "earnings": "Ganhos",
-      "profile": "Meu Perfil",
       "signOut": "Sair",
       "role": "Booster",
       "pendingBanner": "Candidatura pendente",
@@ -276,7 +275,7 @@
       "activeCount": "{{count}} pedido ativo",
       "activeCountPlural": "{{count}} pedidos ativos",
       "noActive": "Sem pedidos ativos no momento.",
-      "browseJobs": "Ver Pedidos",
+      "browseJobs": "Ver Jobs",
       "stats": {
         "active": "Pedidos Ativos",
         "completed": "Concluídos",
@@ -294,17 +293,17 @@
       }
     },
     "jobs": {
-      "title": "Pedidos Disponíveis",
-      "count": "{{count}} pedido disponível",
-      "countPlural": "{{count}} pedidos disponíveis",
+      "title": "Jobs Disponíveis",
+      "count": "{{count}} job disponível",
+      "countPlural": "{{count}} jobs disponíveis",
       "live": "Ao vivo",
       "accept": "Aceitar",
       "yourCut": "Seu corte (75%)",
       "posted": "Publicado {{time}}",
       "soloQueue": "Solo/Duo",
       "flexQueue": "Flex",
-      "empty": "Sem pedidos disponíveis",
-      "emptyDesc": "Volte em breve — pedidos chegam frequentemente.",
+      "empty": "Sem jobs disponíveis",
+      "emptyDesc": "Volte em breve — jobs chegam frequentemente.",
       "locked": {
         "pending": "Candidatura em análise",
         "pendingDesc": "Nossa equipe está analisando seu perfil. Você será notificado quando aprovado.",
@@ -344,13 +343,6 @@
       "noPayouts": "Sem pagamentos ainda. Conclua pedidos para começar a ganhar.",
       "order": "Pedido #{{id}}",
       "earned": "Ganho"
-    },
-    "profile": {
-      "title": "Meu Perfil & Reputação",
-      "reviews": "{{count}} avaliações",
-      "ordersDone": "Pedidos Concluídos",
-      "avgRating": "Avaliação Média",
-      "peakRank": "Rank de Pico"
     },
     "onboarding": {
       "title": "Complete Seu Perfil de Booster",

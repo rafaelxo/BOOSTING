@@ -1,10 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap, DollarSign, Package } from 'lucide-react'
-import { Button, Card, RankBadge, Avatar, Skeleton } from '@/components/ui'
+import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap, DollarSign, Package, MessageSquare } from 'lucide-react'
+import { Button, Card, RankBadge, Avatar, Skeleton, StarRating, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { timeAgo, formatRank } from '@/lib/utils'
-import type { BoosterProfile, BoosterService, RankTier } from '@/types'
+import { timeAgo, formatRank, formatDate } from '@/lib/utils'
+import type { BoosterProfile, BoosterService, Review, RankTier } from '@/types'
 import { useCurrency } from '@/hooks/useCurrency'
 
 // ── Lane labels ───────────────────────────────────────────────────────────────
@@ -27,21 +27,6 @@ const RANK_GROUPS: { key: RankGroup; label: string; sublabel: string }[] = [
   { key: 'master_plus',  label: 'Mestre+',             sublabel: 'Mestre · Grão-mestre · Desafiante'        },
 ]
 
-function StarRating({ rating, count }: { rating: number; count: number }) {
-  const filled = Math.round(rating)
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Star key={i} className={`h-4 w-4 ${i <= filled ? 'text-warning fill-warning' : 'text-bg-overlay'}`} />
-        ))}
-      </div>
-      <span className="text-sm font-bold text-ink">{rating.toFixed(1)}</span>
-      <span className="text-xs text-ink-muted">({count} avaliações)</span>
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function BoosterPublicProfilePage() {
@@ -56,9 +41,9 @@ export function BoosterPublicProfilePage() {
         .from('public_booster_profiles')
         .select('*')
         .eq('id', id!)
-        .single()
+        .maybeSingle()
       if (error) throw error
-      return data as BoosterProfile
+      return data as BoosterProfile | null
     },
     enabled: !!id,
   })
@@ -70,9 +55,25 @@ export function BoosterPublicProfilePage() {
         .from('booster_services')
         .select('*')
         .eq('booster_id', booster!.user_id)
+        .eq('is_active', true)
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as BoosterService[]
+    },
+    enabled: !!booster?.user_id,
+  })
+
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['public-booster-reviews', booster?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('booster_id', booster!.user_id)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as Review[]
     },
     enabled: !!booster?.user_id,
   })
@@ -268,6 +269,29 @@ export function BoosterPublicProfilePage() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </Card>
+
+      {/* Avaliações */}
+      <Card padding="md">
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="h-4 w-4 text-brand" />
+          <h2 className="text-sm font-bold text-ink">Avaliações</h2>
+        </div>
+        {!reviews.length ? (
+          <EmptyState icon={MessageSquare} title="Este booster ainda não recebeu avaliações." />
+        ) : (
+          <div className="space-y-3">
+            {reviews.map(review => (
+              <div key={review.id} className="rounded-xl border border-bg-elevated p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <StarRating rating={review.rating} size="xs" showValue={false} />
+                  <span className="text-[10px] text-ink-muted">{formatDate(review.created_at)}</span>
+                </div>
+                {review.content && <p className="text-xs text-ink-secondary leading-relaxed">{review.content}</p>}
+              </div>
+            ))}
           </div>
         )}
       </Card>

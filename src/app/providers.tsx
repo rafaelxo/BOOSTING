@@ -86,11 +86,21 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function fetchProfile(userId: string, displayName?: string) {
     setLoading(true)
-    let { data } = await supabase
+    const { data: initialData, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
+    let data = initialData
+
+    if (error) {
+      // Real failure (RLS, rede, etc.) — não mascarar como "perfil ausente".
+      console.error('fetchProfile: failed to load profile', error)
+      setProfile(null)
+      setLoading(false)
+      setInitialized(true)
+      return
+    }
 
     if (!data) {
       // Profile missing (Discord OAuth trigger may have failed) — create via RPC
@@ -99,7 +109,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
+      if (result.error) {
+        console.error('fetchProfile: failed to load profile after ensure_profile_exists', result.error)
+        setProfile(null)
+        setLoading(false)
+        setInitialized(true)
+        return
+      }
       data = result.data
     }
 

@@ -5,6 +5,12 @@ const DEFAULT_DEV_ORIGINS = [
   'http://127.0.0.1:4173',
 ]
 
+// Origin de produção conhecida — mantida como fallback além de ALLOWED_ORIGINS/APP_URL
+// para que a function funcione mesmo se o secret ainda não tiver sido configurado no Supabase.
+const DEFAULT_PROD_ORIGINS = [
+  'https://elo-peak.vercel.app',
+]
+
 function configuredOrigins(): string[] {
   const raw = Deno.env.get('ALLOWED_ORIGINS') ?? Deno.env.get('ALLOWED_ORIGIN') ?? ''
   const explicit = raw.split(',').map((origin) => origin.trim()).filter(Boolean)
@@ -14,7 +20,7 @@ function configuredOrigins(): string[] {
     ? `https://${Deno.env.get('VERCEL_URL')}`
     : ''
 
-  return [...explicit, appUrl, vercelUrl, ...DEFAULT_DEV_ORIGINS]
+  return [...explicit, appUrl, vercelUrl, ...DEFAULT_PROD_ORIGINS, ...DEFAULT_DEV_ORIGINS]
     .filter(Boolean)
     .map((origin) => origin.replace(/\/$/, ''))
 }

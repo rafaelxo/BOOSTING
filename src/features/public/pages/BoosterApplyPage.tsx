@@ -1,19 +1,23 @@
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Zap } from 'lucide-react'
-import { ThemeToggle } from '@/components/ui'
+import { PageLoader, ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterApplicationForm } from '@/features/booster/components/BoosterApplicationForm'
+import { useBoosterStatus } from '@/features/booster/hooks/useBoosterStatus'
+import { PendingScreen, RejectedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 
 export function BoosterApplyPage() {
   const [searchParams] = useSearchParams()
   const { profile, setProfile } = useAuthStore()
   const isBoosterIntent = searchParams.get('booster') === '1'
+  const isAlreadyBooster = profile?.role === 'booster'
+  const { state } = useBoosterStatus()
 
   if (!isBoosterIntent) return <Navigate to="/" replace />
   if (!profile) return null
-  if (profile.role === 'booster') return <Navigate to="/booster" replace />
-  if (profile.role !== 'customer') return <Navigate to="/" replace />
+  if (profile.role !== 'customer' && !isAlreadyBooster) return <Navigate to="/" replace />
+  if (isAlreadyBooster && state === 'approved') return <Navigate to="/booster" replace />
 
   async function ensureBoosterRole() {
     if (!profile) return false
@@ -28,20 +32,43 @@ export function BoosterApplyPage() {
     return true
   }
 
+  const header = (
+    <div className="flex items-center justify-between">
+      <Link to="/" className="flex items-center gap-2">
+        <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
+          <Zap className="h-5 w-5 text-white" />
+        </div>
+        <span className="text-xl font-bold text-ink">
+          Elo<span className="text-brand">Peak</span>
+        </span>
+      </Link>
+      <ThemeToggle />
+    </div>
+  )
+
+  // Role já é 'booster' — a fonte de verdade sobre o que mostrar em /apply passa
+  // a ser o status real da candidatura (evita depender só do role, que já foi
+  // trocado antes de onboard_booster criar a linha em booster_profiles). Se não
+  // houver candidatura (falha parcial após a troca de role), o formulário abaixo
+  // funciona como rota de recuperação.
+  if (isAlreadyBooster && state !== 'no_application') {
+    return (
+      <div className="min-h-screen bg-bg-base px-4 py-10 flex flex-col">
+        <div className="mx-auto w-full max-w-lg space-y-8">{header}</div>
+        <div className="flex-1 flex items-center justify-center">
+          {state === 'loading' && <PageLoader />}
+          {state === 'pending' && <PendingScreen />}
+          {state === 'rejected' && <RejectedScreen />}
+          {state === 'error' && <BoosterStatusErrorScreen />}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-bg-base px-4 py-10">
       <div className="mx-auto w-full max-w-lg space-y-8">
-        <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-ink">
-              Elo<span className="text-brand">Peak</span>
-            </span>
-          </Link>
-          <ThemeToggle />
-        </div>
+        {header}
 
         <div>
           <p className="section-label mb-3">Candidatura</p>

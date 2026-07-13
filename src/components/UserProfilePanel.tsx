@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { X, LogOut, ExternalLink, ArrowRight } from 'lucide-react'
+import { X, LogOut, ArrowRight } from 'lucide-react'
 import { Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase, signOut } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { AvatarIconPicker } from '@/components/profile/AvatarIconPicker'
+import { DiscordAccountNotice } from '@/components/DiscordAccountNotice'
 import type { UserRole } from '@/types'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -17,9 +18,10 @@ const ROLE_BADGE: Record<UserRole, { label: string; className: string }> = {
   admin:    { label: 'Admin',    className: 'text-danger bg-danger/10'     },
 }
 
-const FULL_PROFILE_PATH: Record<UserRole, string> = {
+// Booster não tem mais uma página "Meu Perfil" separada — os dados pessoais já
+// estão todos aqui no popover, e o perfil profissional vive em Serviços.
+const FULL_PROFILE_PATH: Partial<Record<UserRole, string>> = {
   customer: '/profile',
-  booster: '/booster/profile',
   admin: '/admin/profile',
 }
 
@@ -71,9 +73,9 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
         .from('booster_profiles')
         .select('display_name, full_name, cpf')
         .eq('user_id', profile!.id)
-        .single()
+        .maybeSingle()
       if (error) throw error
-      return data as { display_name: string; full_name: string | null; cpf: string | null }
+      return data as { display_name: string; full_name: string | null; cpf: string | null } | null
     },
     enabled: !!profile?.id && open && isBooster,
   })
@@ -186,7 +188,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
       <aside className="fixed right-0 top-0 h-full w-80 bg-bg-surface border-l border-bg-elevated z-50 flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-bg-elevated shrink-0">
-          <h2 className="text-sm font-bold text-ink">Configurações de Perfil</h2>
+          <h2 className="text-sm font-bold text-ink">Minha Conta</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-bg-elevated text-ink-muted hover:text-ink transition-colors"
@@ -210,15 +212,33 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
             </div>
           </div>
 
-          {/* Link to full profile page (avatar, email, senha, dados completos) */}
-          <button
-            type="button"
-            onClick={() => { onClose(); navigate(FULL_PROFILE_PATH[role]) }}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-bg-elevated hover:border-brand/40 hover:bg-bg-elevated transition-colors text-sm font-semibold text-ink"
-          >
-            Editar perfil completo
-            <ArrowRight className="h-4 w-4 text-ink-muted" />
-          </button>
+          {/* Dados da conta */}
+          <div className="rounded-xl border border-bg-elevated p-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-ink-muted">Username do Discord</span>
+              <span className="text-ink font-medium truncate max-w-[160px]">{profile?.username ?? '—'}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-ink-muted">ID do Discord</span>
+              <span className="text-ink font-medium font-mono truncate max-w-[160px]">{profile?.discord_id ?? '—'}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-ink-muted">E-mail</span>
+              <span className="text-ink font-medium truncate max-w-[160px]">{profile?.email ?? '—'}</span>
+            </div>
+          </div>
+
+          {/* Link to full profile page — não existe para booster (tudo já está aqui ou em Serviços) */}
+          {FULL_PROFILE_PATH[role] && (
+            <button
+              type="button"
+              onClick={() => { onClose(); navigate(FULL_PROFILE_PATH[role]!) }}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-bg-elevated hover:border-brand/40 hover:bg-bg-elevated transition-colors text-sm font-semibold text-ink"
+            >
+              Editar perfil completo
+              <ArrowRight className="h-4 w-4 text-ink-muted" />
+            </button>
+          )}
 
           {/* Username */}
           <div className="space-y-2">
@@ -324,22 +344,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
             </div>
           )}
 
-          {/* Discord note */}
-          <div className="rounded-xl border border-bg-elevated bg-bg-elevated/30 p-3 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Conta Discord</p>
-            <p className="text-[11px] text-ink-secondary leading-relaxed">
-              Seu email é gerenciado pelo Discord. Você também pode definir uma senha
-              para entrar por email — acesse &quot;Editar perfil completo&quot; acima.
-            </p>
-            <a
-              href="https://discord.gg/elopeak"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] text-brand font-semibold hover:underline"
-            >
-              Ir para o servidor <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
+          <DiscordAccountNotice />
         </div>
 
         {/* Footer */}

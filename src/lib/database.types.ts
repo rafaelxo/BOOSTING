@@ -253,31 +253,52 @@ export type Database = {
       }
       booster_services: {
         Row: {
+          availability_note: string | null
           booster_id: string
           created_at: string | null
           description: string | null
           id: string
+          is_active: boolean
           price: number
+          requirements: string | null
+          rules: string | null
+          service_type: string | null
           tempo: string | null
           title: string
+          unit: string
+          updated_at: string
         }
         Insert: {
+          availability_note?: string | null
           booster_id: string
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean
           price?: number
+          requirements?: string | null
+          rules?: string | null
+          service_type?: string | null
           tempo?: string | null
           title: string
+          unit?: string
+          updated_at?: string
         }
         Update: {
+          availability_note?: string | null
           booster_id?: string
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean
           price?: number
+          requirements?: string | null
+          rules?: string | null
+          service_type?: string | null
           tempo?: string | null
           title?: string
+          unit?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1205,11 +1226,13 @@ export type Database = {
           id: string | null
           is_available: boolean | null
           is_top5: boolean | null
+          lanes: string[] | null
           last_active_at: string | null
           peak_rank: Json | null
           rank_stats: Json | null
           rating: number | null
           rating_count: number | null
+          specialties: string[] | null
           total_completed: number | null
           updated_at: string | null
           user_id: string | null
@@ -1222,11 +1245,13 @@ export type Database = {
           id?: string | null
           is_available?: boolean | null
           is_top5?: boolean | null
+          lanes?: string[] | null
           last_active_at?: string | null
           peak_rank?: Json | null
           rank_stats?: Json | null
           rating?: number | null
           rating_count?: number | null
+          specialties?: string[] | null
           total_completed?: number | null
           updated_at?: string | null
           user_id?: string | null
@@ -1239,11 +1264,13 @@ export type Database = {
           id?: string | null
           is_available?: boolean | null
           is_top5?: boolean | null
+          lanes?: string[] | null
           last_active_at?: string | null
           peak_rank?: Json | null
           rank_stats?: Json | null
           rating?: number | null
           rating_count?: number | null
+          specialties?: string[] | null
           total_completed?: number | null
           updated_at?: string | null
           user_id?: string | null

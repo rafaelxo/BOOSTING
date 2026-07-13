@@ -378,7 +378,14 @@ export interface BoosterService {
   description: string | null
   tempo: string | null
   price: number
+  service_type: string | null
+  unit: string
+  requirements: string | null
+  availability_note: string | null
+  is_active: boolean
+  rules: string | null
   created_at: string
+  updated_at: string
 }
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────

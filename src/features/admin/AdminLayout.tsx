@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
@@ -6,16 +5,12 @@ import {
   RefreshCw, Eye, AlertTriangle, Landmark, User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/stores/authStore'
-import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
+import { LogoMark } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
-import { UserProfilePanel } from '@/components/UserProfilePanel'
-import { NotificationBell } from '@/components/NotificationBell'
+import { UserAccountBadge } from '@/components/UserAccountBadge'
 
 export function AdminLayout() {
   const { pathname } = useLocation()
-  const { profile } = useAuthStore()
-  const [panelOpen, setPanelOpen] = useState(false)
   const { t } = useTranslation()
 
   const NAV_SECTIONS = [
@@ -110,24 +105,13 @@ export function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
           <p className="text-sm text-ink-muted font-medium">{t('admin.nav.panel')}</p>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <NotificationBell />
-            <button
-              onClick={() => setPanelOpen(true)}
-              className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"
-            >
-              <Avatar src={profile?.avatar_url} name={profile?.username} size="sm" />
-            </button>
-          </div>
+          <UserAccountBadge />
         </header>
 
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
-
-      <UserProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   )
 }

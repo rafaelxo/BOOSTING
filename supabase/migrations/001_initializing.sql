@@ -1,23 +1,49 @@
 -- ============================================================
--- EloBoost — Complete Reset & Rebuild
+-- EloBoost — Complete Reset & Rebuild (squashed baseline)
 --
 -- WARNING: DESTRUCTIVE BASELINE MIGRATION.
--- This migration intentionally drops public tables/functions/types and deletes
--- all auth.users before rebuilding the schema. It exists as the original reset
--- baseline for this project and must not be replayed against any environment
--- that contains production/staging data. New schema changes should be added as
--- forward-only migrations instead of editing this reset flow.
+-- This migration intentionally drops public tables/functions/types/views and
+-- deletes all auth.users before rebuilding the schema from scratch. It is the
+-- single source of truth for the schema — new schema changes should be added
+-- as forward-only migrations on top of this file, not by editing this reset
+-- flow, once this has been applied to a shared environment.
 --
--- Run in Supabase SQL Editor (with service_role / postgres context)
--- This file: drops all users, drops all tables/functions/types,
--- then rebuilds from scratch using only what is currently in use.
+-- This file replaces the previous chain of 16 incremental migrations
+-- (001_initializing.sql ... 20260712180000_duo_accounts.sql), which are kept
+-- for historical reference in supabase/migrations/_archive/ but are no longer
+-- executed by the Supabase CLI (files there are outside supabase/migrations/,
+-- so `supabase db push` / `db reset` only ever sees this one file).
+--
+-- Why it was squashed: 20260712170000_remove_support_role.sql tried to
+-- `drop type public.user_role;` while public.handle_new_user(),
+-- public.onboard_booster(...) and public.request_booster_role() still
+-- declared local variables of that type — Postgres refuses to drop a type
+-- that other objects still depend on, so that migration (and every migration
+-- chained after it, including 20260712180000_duo_accounts.sql) failed to
+-- apply. Rather than patch the enum-swap dance in place, the full history was
+-- squashed into one script that simply creates the enum correctly from the
+-- start (no 'support' value, no swap needed) and reflects the true final
+-- state of every table/function/policy after all 16 migrations.
+--
+-- Operational prerequisite (not managed by this file): a Supabase Vault
+-- secret named 'credential_key' (>= 32 chars) must exist in this project —
+-- it backs pgp_sym_encrypt/decrypt for order and duo-account credentials.
+--
+-- Run in Supabase SQL Editor (with service_role / postgres context), or via
+-- `supabase db reset` / `supabase db push` against a fresh project.
 -- ============================================================
 
 -- ─── 1. DROP TRIGGERS ────────────────────────────────────────────────────────
+-- Only auth.users needs an explicit drop here: it's a Supabase-managed table
+-- that is never dropped by this script, so its trigger would otherwise
+-- survive a reset. Every other trigger below lives on a public.* table that
+-- gets dropped (with CASCADE) in section 4 — dropping the table already
+-- takes its triggers with it, and `DROP TRIGGER IF EXISTS x ON t` still
+-- raises "relation t does not exist" when t is missing (IF EXISTS only
+-- guards the trigger name, not the table), which would break this script on
+-- a genuinely empty database. So they're intentionally not repeated here.
 
-drop trigger if exists on_auth_user_created             on auth.users;
-drop trigger if exists order_completed_refresh_top5     on public.orders;
-drop trigger if exists set_booster_applications_updated_at on public.booster_applications;
+drop trigger if exists on_auth_user_created on auth.users;
 
 -- ─── 2. DROP FUNCTIONS ───────────────────────────────────────────────────────
 
@@ -44,9 +70,28 @@ drop function if exists public.resolve_drop_request(uuid, boolean, text)        
 drop function if exists public.onboard_booster(text, text, jsonb, text, integer, integer, text, text) cascade;
 drop function if exists public.onboard_booster(text, text, text[], text[], jsonb)             cascade;
 drop function if exists public.onboard_booster(text, text, jsonb, text, integer, integer, text, text, text, text) cascade;
+drop function if exists public.set_order_credentials(uuid, text, text)                        cascade;
+drop function if exists public.get_order_credentials(uuid)                                    cascade;
+drop function if exists public.trg_fn_booster_active_on_message()                              cascade;
+drop function if exists public.trg_fn_booster_active_on_accept()                               cascade;
+drop function if exists public.request_booster_role()                                         cascade;
+drop function if exists public.trg_fn_order_paid_customer_stats()                              cascade;
+drop function if exists public.trg_fn_order_completed_booster_stats()                          cascade;
+drop function if exists public.expire_stale_pix_orders()                                      cascade;
+drop function if exists public.trg_fn_guard_booster_profile_trust_columns()                    cascade;
+drop function if exists public.trg_fn_guard_customer_profile_trust_columns()                   cascade;
+drop function if exists public.update_duo_accounts_updated_at()                                cascade;
+drop function if exists public.set_duo_account_credentials(uuid, text, text)                  cascade;
+drop function if exists public.get_duo_account_credentials(uuid)                              cascade;
 
--- ─── 3. DROP TABLES (children first) ─────────────────────────────────────────
+-- ─── 3. DROP VIEWS ────────────────────────────────────────────────────────────
 
+drop view if exists public.public_booster_profiles cascade;
+
+-- ─── 4. DROP TABLES (children first) ─────────────────────────────────────────
+
+drop table if exists public.duo_accounts         cascade;
+drop table if exists public.booster_services     cascade;
 drop table if exists public.payout_records       cascade;
 drop table if exists public.audit_logs           cascade;
 drop table if exists public.notifications        cascade;
@@ -71,7 +116,7 @@ drop table if exists public.profiles             cascade;
 -- Runs AFTER tables are dropped so no FK constraints block the cascade.
 delete from auth.users;
 
--- ─── 4. DROP TYPES ───────────────────────────────────────────────────────────
+-- ─── 5. DROP TYPES ───────────────────────────────────────────────────────────
 
 drop type if exists public.payout_status   cascade;
 drop type if exists public.ticket_priority cascade;
@@ -83,13 +128,24 @@ drop type if exists public.queue_type      cascade;
 drop type if exists public.service_type    cascade;
 drop type if exists public.user_role       cascade;
 
--- ─── 5. EXTENSIONS ───────────────────────────────────────────────────────────
+-- ─── 6. EXTENSIONS ───────────────────────────────────────────────────────────
 
 create extension if not exists "pg_trgm";
+create extension if not exists "pgcrypto";
 
--- ─── 6. ENUMS ─────────────────────────────────────────────────────────────────
+do $$
+begin
+  create extension if not exists pg_cron;
+exception when insufficient_privilege then
+  raise notice 'pg_cron could not be enabled (insufficient privilege) — schedule expire_stale_pix_orders() manually';
+end $$;
 
-create type public.user_role      as enum ('customer', 'booster', 'admin', 'support');
+-- ─── 7. ENUMS ─────────────────────────────────────────────────────────────────
+-- user_role has only ever needed 'customer' / 'booster' / 'admin' — 'support'
+-- existed briefly but was never treated differently from 'admin' anywhere in
+-- the app (is_admin() always matched both), so it is not recreated here.
+
+create type public.user_role      as enum ('customer', 'booster', 'admin');
 create type public.service_type   as enum ('elo_boost', 'win_boost', 'coaching', 'placement_matches', 'md5');
 create type public.queue_type     as enum ('solo_duo', 'flex');
 create type public.order_status   as enum (
@@ -103,18 +159,21 @@ create type public.ticket_status  as enum ('open', 'in_progress', 'waiting_custo
 create type public.ticket_priority as enum ('low', 'medium', 'high', 'urgent');
 create type public.payout_status  as enum ('pending', 'processing', 'paid', 'failed');
 
--- ─── 7. TABLES ────────────────────────────────────────────────────────────────
+-- ─── 8. TABLES ────────────────────────────────────────────────────────────────
 
 -- profiles (extends auth.users)
 create table public.profiles (
-  id          uuid primary key references auth.users(id) on delete cascade,
-  email       text not null unique,
-  role        public.user_role not null default 'customer',
-  username    text not null unique,
-  avatar_url  text,
-  discord_id  text,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+  id                   uuid primary key references auth.users(id) on delete cascade,
+  email                text not null unique,
+  role                 public.user_role not null default 'customer',
+  username             text not null unique,
+  avatar_url           text,
+  discord_id           text,
+  terms_accepted_at    timestamptz,
+  privacy_accepted_at  timestamptz,
+  legal_version        text,
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now()
 );
 
 create index profiles_email_idx on public.profiles(email);
@@ -146,12 +205,18 @@ create table public.booster_profiles (
   games               text[] not null default '{}',
   queue_preferences   text[] not null default '{}',
   region_preferences  text[] not null default '{}',
+  lanes               text[],
+  specialties         text[],
+  can_coach           boolean,
+  available_days      text[],
   total_completed     integer not null default 0,
   total_earnings      numeric(10,2) not null default 0,
   rating              numeric(3,2) not null default 0,
   rating_count        integer not null default 0,
   is_available        boolean not null default false,
   is_top5             boolean not null default false,
+  rank_stats          jsonb,
+  last_active_at      timestamptz,
   opgg_link           text,
   hours_per_day_min   smallint,
   hours_per_day_max   smallint,
@@ -217,6 +282,7 @@ create table public.orders (
   target_rank              jsonb,
   wins_purchased           integer,
   sessions_purchased       integer,
+  win_package              smallint check (win_package in (1, 3, 5)),
   extras                   jsonb not null default '[]',
   base_price               numeric(10,2) not null,
   extras_price             numeric(10,2) not null default 0,
@@ -229,6 +295,8 @@ create table public.orders (
   assigned_booster_id      uuid references public.profiles(id),
   mp_payment_id            text unique,
   payment_status           public.payment_status,
+  game_credentials         text,     -- pgp_sym_encrypt(login||'|'||senha, chave)
+  credentials_set          boolean not null default false,
   discord_voice_channel_id text,
   completed_at             timestamptz,
   created_at               timestamptz not null default now(),
@@ -448,24 +516,81 @@ create table public.booster_applications (
 create index booster_applications_status_idx     on public.booster_applications(status);
 create index booster_applications_created_at_idx on public.booster_applications(created_at desc);
 
--- ─── 8. FUNCTIONS ─────────────────────────────────────────────────────────────
+-- booster_services (catálogo de serviços próprios do booster)
+create table public.booster_services (
+  id           uuid primary key default gen_random_uuid(),
+  booster_id   uuid not null references public.profiles(id) on delete cascade,
+  title        text not null,
+  description  text,
+  tempo        text,
+  price        numeric(10,2) not null default 0,
+  created_at   timestamptz default now()
+);
+
+create index booster_services_booster_idx on public.booster_services(booster_id);
+
+-- duo_accounts (contas smurf de propriedade da empresa, para Duo Boost)
+create table public.duo_accounts (
+  id                     uuid primary key default gen_random_uuid(),
+  game_id                text not null default 'lol',
+  label                  text not null,                 -- ex.: "Conta Duo #3" — visível para o booster
+  current_rank           jsonb,                          -- { tier, division } opcional, contexto pro booster
+  notes                  text,                           -- observações internas (somente admin)
+  encrypted_credentials  text,                           -- pgp_sym_encrypt(login||'|'||senha, chave)
+  is_active              boolean not null default true,
+  created_by             uuid references public.profiles(id),
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now()
+);
+
+create index duo_accounts_active_idx on public.duo_accounts(is_active);
+
+-- ─── 9. VIEWS ─────────────────────────────────────────────────────────────────
+--
+-- Public, PII-safe view of approved boosters. No broad RLS policy is added to
+-- booster_profiles for anon/authenticated because that would expose columns
+-- with PII (email, cpf, full_name, total_earnings). security_barrier ensures
+-- the status='approved' filter is applied before any caller-supplied
+-- condition — no infer-via-filter risk.
+
+create or replace view public.public_booster_profiles
+  with (security_barrier = true) as
+select
+  id,
+  user_id,
+  display_name,
+  bio,
+  current_rank,
+  peak_rank,
+  games,
+  rating,
+  rating_count,
+  total_completed,
+  is_available,
+  is_top5,
+  rank_stats,
+  last_active_at,
+  updated_at
+from public.booster_profiles
+where status = 'approved';
+
+-- ─── 10. FUNCTIONS ────────────────────────────────────────────────────────────
 
 -- Helper: current_user_role
 create or replace function public.current_user_role()
-returns public.user_role language sql stable security definer as $$
+returns public.user_role language sql stable security definer set search_path = public as $$
   select role from public.profiles where id = auth.uid()
 $$;
 
 -- Helper: is_admin
 create or replace function public.is_admin()
-returns boolean language sql stable security definer as $$
+returns boolean language sql stable security definer set search_path = public as $$
   select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role in ('admin', 'support')
+    select 1 from public.profiles where id = auth.uid() and role = 'admin'
   )
 $$;
 
--- Trigger: handle_new_user (final version from migration 009)
+-- Trigger: handle_new_user
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
@@ -516,7 +641,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- RPC: ensure_profile_exists (final version from migration 009)
+-- RPC: ensure_profile_exists
 create or replace function public.ensure_profile_exists(p_display_name text default null)
 returns void
 language plpgsql security definer set search_path = public as $$
@@ -575,17 +700,12 @@ create trigger set_booster_applications_updated_at
   before update on public.booster_applications
   for each row execute function public.update_booster_applications_updated_at();
 
--- Helper: booster_active_slot_counts (security-hardened from migration 005)
+-- Helper: booster_active_slot_counts (security-hardened)
 create or replace function public.booster_active_slot_counts(p_booster_user_id uuid)
 returns table(solo_count integer, duo_count integer, total_count integer)
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if auth.uid() is distinct from p_booster_user_id
-     and not exists (
-       select 1 from public.profiles
-       where id = auth.uid() and role in ('admin', 'support')
-     )
-  then
+  if auth.uid() is distinct from p_booster_user_id and not public.is_admin() then
     raise exception 'forbidden';
   end if;
 
@@ -601,6 +721,7 @@ end;
 $$;
 
 -- RPC: can_booster_accept_order
+-- Normal: 3 pedidos total, máx 1 duo. Top5: 3 pedidos total, máx 2 duo.
 create or replace function public.can_booster_accept_order(
   p_booster_user_id uuid,
   p_boost_mode      text
@@ -626,7 +747,7 @@ begin
   if v_is_top5 then
     v_max_total := 3; v_max_duo := 2;
   else
-    v_max_total := 2; v_max_duo := 1;
+    v_max_total := 3; v_max_duo := 1;
   end if;
 
   select solo_count, duo_count, total_count
@@ -709,10 +830,7 @@ language plpgsql security definer set search_path = public as $$
 declare
   v_top5_ids uuid[];
 begin
-  if auth.uid() is not null and not exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role in ('admin', 'support')
-  ) then
+  if auth.uid() is not null and not public.is_admin() then
     raise exception 'forbidden: admin role required';
   end if;
 
@@ -1083,7 +1201,7 @@ begin
 end;
 $$;
 
--- RPC: onboard_booster (final version from migration 013)
+-- RPC: onboard_booster
 create or replace function public.onboard_booster(
   p_display_name      text,
   p_bio               text,
@@ -1133,7 +1251,432 @@ begin
 end;
 $$;
 
--- ─── 9. ROW LEVEL SECURITY ────────────────────────────────────────────────────
+-- ─── Credenciais de conta no pedido ───────────────────────────────────────────
+-- Armazena login + senha da conta do cliente, criptografados com pgp_sym_encrypt.
+-- A chave de criptografia vem do Supabase Vault ('credential_key'), nunca do cliente.
+
+-- RPC: set_order_credentials (cliente define as credenciais do pedido)
+create or replace function public.set_order_credentials(
+  p_order_id uuid,
+  p_login    text,
+  p_password text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_order record;
+  v_key   text;
+begin
+  select id, customer_id, status into v_order
+  from   public.orders
+  where  id = p_order_id for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'order_not_found');
+  end if;
+
+  if auth.uid() is distinct from v_order.customer_id then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  if v_order.status in ('completed', 'canceled', 'refunded', 'disputed') then
+    return jsonb_build_object('success', false, 'error', 'order_not_active');
+  end if;
+
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
+
+  if v_key is null or length(v_key) < 32 then
+    return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
+  end if;
+
+  update public.orders
+  set
+    game_credentials = pgp_sym_encrypt(p_login || '|' || p_password, v_key),
+    credentials_set  = true,
+    updated_at       = now()
+  where id = p_order_id;
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+-- RPC: get_order_credentials (apenas booster atribuído ou admin pode ler)
+create or replace function public.get_order_credentials(p_order_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_order     record;
+  v_key       text;
+  v_decrypted text;
+  v_parts     text[];
+begin
+  select id, customer_id, assigned_booster_id, game_credentials, credentials_set
+  into   v_order
+  from   public.orders
+  where  id = p_order_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'order_not_found');
+  end if;
+
+  if auth.uid() is distinct from v_order.assigned_booster_id and not public.is_admin() then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  if not v_order.credentials_set or v_order.game_credentials is null then
+    return jsonb_build_object('success', false, 'error', 'no_credentials');
+  end if;
+
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
+
+  if v_key is null or length(v_key) < 32 then
+    return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
+  end if;
+
+  begin
+    v_decrypted := pgp_sym_decrypt(v_order.game_credentials::bytea, v_key);
+  exception when others then
+    return jsonb_build_object('success', false, 'error', 'decrypt_failed');
+  end;
+
+  v_parts := string_to_array(v_decrypted, '|');
+
+  return jsonb_build_object(
+    'success', true,
+    'login',    v_parts[1],
+    'password', v_parts[2]
+  );
+end;
+$$;
+
+-- ─── Página pública de boosters: last_active_at ───────────────────────────────
+
+-- Quando booster envia mensagem no chat
+create or replace function public.trg_fn_booster_active_on_message()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if NEW.sender_role = 'booster' then
+    update public.booster_profiles
+      set last_active_at = now()
+      where user_id = NEW.sender_id;
+  end if;
+  return NEW;
+end;
+$$;
+
+create trigger trg_booster_active_on_message
+  after insert on public.order_messages
+  for each row execute function public.trg_fn_booster_active_on_message();
+
+-- Quando booster é atribuído a um pedido (aceita o job)
+create or replace function public.trg_fn_booster_active_on_accept()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if NEW.assigned_booster_id is not null
+     and (OLD.assigned_booster_id is null or OLD.assigned_booster_id <> NEW.assigned_booster_id)
+  then
+    update public.booster_profiles
+      set last_active_at = now()
+      where user_id = NEW.assigned_booster_id;
+  end if;
+  return NEW;
+end;
+$$;
+
+create trigger trg_booster_active_on_accept
+  after update of assigned_booster_id on public.orders
+  for each row execute function public.trg_fn_booster_active_on_accept();
+
+-- ─── profiles.role: customer → booster ────────────────────────────────────────
+-- Usada em BoosterApplyPage.tsx ao iniciar a candidatura de booster. Nunca
+-- aceita um role vindo do cliente — só promove o próprio auth.uid() e só a
+-- partir de 'customer', igual ao guard já existente em profiles_update_own
+-- contra auto-escalonamento de privilégio.
+
+create or replace function public.request_booster_role()
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_role public.user_role;
+begin
+  select role into v_role from public.profiles where id = auth.uid();
+
+  if v_role is null then
+    return jsonb_build_object('success', false, 'error', 'not_authenticated');
+  end if;
+
+  if v_role <> 'customer' then
+    return jsonb_build_object('success', false, 'error', 'invalid_role');
+  end if;
+
+  update public.profiles set role = 'booster', updated_at = now() where id = auth.uid();
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+-- ─── Estatísticas agregadas + expiração de pedidos ───────────────────────────
+
+-- Stats do cliente: no momento em que o pagamento é confirmado
+-- (transição awaiting_payment → awaiting_assignment, feita pelo webhook do MP)
+create or replace function public.trg_fn_order_paid_customer_stats()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if NEW.status = 'awaiting_assignment' and OLD.status = 'awaiting_payment' then
+    update public.customer_profiles
+      set total_orders = total_orders + 1,
+          total_spent  = total_spent + NEW.total_price
+      where user_id = NEW.customer_id;
+  end if;
+  return NEW;
+end;
+$$;
+
+create trigger trg_order_paid_customer_stats
+  after update of status on public.orders
+  for each row execute function public.trg_fn_order_paid_customer_stats();
+
+-- Stats do booster + payout_records: no momento da conclusão
+-- Comissão de 25% (mesmo default já usado na coluna payout_records.commission_rate).
+create or replace function public.trg_fn_order_completed_booster_stats()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  v_commission_rate   constant numeric(5,4) := 0.25;
+  v_commission_amount numeric(10,2);
+  v_net_amount        numeric(10,2);
+begin
+  if NEW.status = 'completed'
+     and OLD.status is distinct from 'completed'
+     and NEW.assigned_booster_id is not null
+  then
+    v_commission_amount := round(NEW.total_price * v_commission_rate, 2);
+    v_net_amount := NEW.total_price - v_commission_amount;
+
+    update public.booster_profiles
+      set total_completed = total_completed + 1,
+          total_earnings  = total_earnings + v_net_amount
+      where user_id = NEW.assigned_booster_id;
+
+    insert into public.payout_records(
+      booster_id, order_id, gross_amount, commission_rate, commission_amount, net_amount, status
+    ) values (
+      NEW.assigned_booster_id, NEW.id, NEW.total_price, v_commission_rate, v_commission_amount, v_net_amount, 'pending'
+    );
+  end if;
+  return NEW;
+end;
+$$;
+
+create trigger trg_order_completed_booster_stats
+  after update of status on public.orders
+  for each row execute function public.trg_fn_order_completed_booster_stats();
+
+-- Expiração de pedidos presos em awaiting_payment.
+-- Não existe status "expired" no enum order_status — o mais próximo
+-- semanticamente é "canceled" (nunca chegou a ser pago). O PIX em si expira
+-- em 30 min (StepPayment.tsx / create-pix-payment), então 35 min de folga
+-- garante que não cancelamos um pedido que ainda pode ser pago.
+create or replace function public.expire_stale_pix_orders()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  update public.orders
+  set status = 'canceled', updated_at = now()
+  where status = 'awaiting_payment'
+    and created_at < now() - interval '35 minutes';
+end;
+$$;
+
+do $$
+begin
+  perform cron.unschedule('expire-stale-pix-orders');
+exception when others then
+  null;
+end $$;
+
+do $$
+begin
+  perform cron.schedule(
+    'expire-stale-pix-orders',
+    '*/10 * * * *',
+    $cron$select public.expire_stale_pix_orders();$cron$
+  );
+exception when others then
+  raise notice 'pg_cron scheduling unavailable — expire_stale_pix_orders() exists but is not scheduled';
+end $$;
+
+-- ─── Trava colunas de confiança/financeiras contra auto-alteração do cliente ──
+-- customer_profiles/booster_profiles não têm WITH CHECK nas policies de
+-- update, então qualquer authenticated poderia, via update direto do browser,
+-- alterar total_earnings, total_completed, rating, rating_count, is_top5,
+-- status, verified_at, current_rank, rank_stats (booster) ou total_orders/
+-- total_spent (customer) — colunas que só devem mudar via RPC SECURITY
+-- DEFINER ou pelas triggers de stats acima. Trigger BEFORE UPDATE reverte
+-- essas colunas para o valor anterior quando quem executa não é admin nem um
+-- contexto de sistema (service_role/RPC/pg_cron/migration nunca rodam como
+-- `authenticated`).
+
+create or replace function public.trg_fn_guard_booster_profile_trust_columns()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if current_user = 'authenticated' and not public.is_admin() then
+    new.status          := old.status;
+    new.total_completed := old.total_completed;
+    new.total_earnings  := old.total_earnings;
+    new.rating          := old.rating;
+    new.rating_count    := old.rating_count;
+    new.is_top5         := old.is_top5;
+    new.verified_at     := old.verified_at;
+    new.current_rank    := old.current_rank;
+    new.rank_stats      := old.rank_stats;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_guard_booster_profile_trust_columns
+  before update on public.booster_profiles
+  for each row execute function public.trg_fn_guard_booster_profile_trust_columns();
+
+create or replace function public.trg_fn_guard_customer_profile_trust_columns()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if current_user = 'authenticated' and not public.is_admin() then
+    new.total_orders := old.total_orders;
+    new.total_spent  := old.total_spent;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_guard_customer_profile_trust_columns
+  before update on public.customer_profiles
+  for each row execute function public.trg_fn_guard_customer_profile_trust_columns();
+
+-- ─── Pool de contas duo boost da empresa ──────────────────────────────────────
+
+create or replace function public.update_duo_accounts_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger set_duo_accounts_updated_at
+  before update on public.duo_accounts
+  for each row execute function public.update_duo_accounts_updated_at();
+
+-- RPC: admin define/atualiza login+senha da conta duo
+create or replace function public.set_duo_account_credentials(
+  p_account_id uuid,
+  p_login      text,
+  p_password   text
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_key text;
+begin
+  if not public.is_admin() then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  if not exists (select 1 from public.duo_accounts where id = p_account_id) then
+    return jsonb_build_object('success', false, 'error', 'account_not_found');
+  end if;
+
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
+
+  if v_key is null or length(v_key) < 32 then
+    return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
+  end if;
+
+  update public.duo_accounts
+  set
+    encrypted_credentials = pgp_sym_encrypt(p_login || '|' || p_password, v_key),
+    updated_at            = now()
+  where id = p_account_id;
+
+  insert into public.audit_logs(actor_id, actor_role, action, entity_type, entity_id)
+  values (auth.uid(), public.current_user_role(), 'duo_account.credentials_set', 'duo_account', p_account_id::text);
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+-- RPC: booster aprovado (ou admin) revela login+senha da conta duo
+create or replace function public.get_duo_account_credentials(p_account_id uuid)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  v_account   record;
+  v_key       text;
+  v_decrypted text;
+  v_parts     text[];
+  v_is_booster boolean;
+begin
+  select id, is_active, encrypted_credentials
+  into   v_account
+  from   public.duo_accounts
+  where  id = p_account_id;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'account_not_found');
+  end if;
+
+  select exists (
+    select 1 from public.booster_profiles
+    where user_id = auth.uid() and status = 'approved'
+  ) into v_is_booster;
+
+  if not public.is_admin() and not v_is_booster then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  if not v_account.is_active and not public.is_admin() then
+    return jsonb_build_object('success', false, 'error', 'account_inactive');
+  end if;
+
+  if v_account.encrypted_credentials is null then
+    return jsonb_build_object('success', false, 'error', 'no_credentials');
+  end if;
+
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
+
+  if v_key is null or length(v_key) < 32 then
+    return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
+  end if;
+
+  begin
+    v_decrypted := pgp_sym_decrypt(v_account.encrypted_credentials::bytea, v_key);
+  exception when others then
+    return jsonb_build_object('success', false, 'error', 'decrypt_failed');
+  end;
+
+  v_parts := string_to_array(v_decrypted, '|');
+
+  insert into public.audit_logs(actor_id, actor_role, action, entity_type, entity_id)
+  values (auth.uid(), public.current_user_role(), 'duo_account.credentials_viewed', 'duo_account', p_account_id::text);
+
+  return jsonb_build_object(
+    'success', true,
+    'login',    v_parts[1],
+    'password', v_parts[2]
+  );
+end;
+$$;
+
+-- ─── 11. ROW LEVEL SECURITY ───────────────────────────────────────────────────
 
 alter table public.profiles              enable row level security;
 alter table public.customer_profiles     enable row level security;
@@ -1154,6 +1697,8 @@ alter table public.notifications         enable row level security;
 alter table public.audit_logs            enable row level security;
 alter table public.payout_records        enable row level security;
 alter table public.booster_applications  enable row level security;
+alter table public.booster_services      enable row level security;
+alter table public.duo_accounts          enable row level security;
 
 -- profiles
 create policy "profiles_read_own"   on public.profiles for select using (id = auth.uid() or public.is_admin());
@@ -1183,33 +1728,30 @@ create policy "service_extras_public_read"  on public.service_extras for select 
 create policy "service_extras_admin_write"  on public.service_extras for all   using (public.is_admin());
 
 -- orders
+-- No customer INSERT policy: order creation goes through the create-pix-payment
+-- Edge Function (service role, bypasses RLS), which recalculates the price
+-- server-side from shared/pricing.ts — the client never inserts orders directly.
 create policy "orders_customer_read" on public.orders for select using (
   customer_id = auth.uid() or assigned_booster_id = auth.uid() or public.is_admin()
 );
-create policy "orders_customer_insert" on public.orders for insert with check (customer_id = auth.uid());
-create policy "orders_update" on public.orders for update using (
-  (customer_id = auth.uid() and status = 'draft')
-  or assigned_booster_id = auth.uid()
-  or public.is_admin()
-);
+-- Direct client UPDATE is admin-only: every legitimate status transition
+-- (booster and admin) goes through the SECURITY DEFINER RPCs
+-- (update_order_status / admin_override_order_status / accept_boost_order),
+-- which bypass RLS.
+create policy "orders_update" on public.orders for update
+  using (public.is_admin())
+  with check (public.is_admin());
 
--- order_status_history
+-- order_status_history (writes happen via SECURITY DEFINER RPCs; direct
+-- client insert restricted to admin)
 create policy "order_status_history_read" on public.order_status_history for select using (
   exists (
     select 1 from public.orders o
     where o.id = order_id and (o.customer_id = auth.uid() or o.assigned_booster_id = auth.uid())
   ) or public.is_admin()
 );
-create policy "order_status_history_insert" on public.order_status_history for insert with check (
-  changed_by = auth.uid()
-  and (
-    exists (
-      select 1 from public.orders o
-      where o.id = order_id and (o.customer_id = auth.uid() or o.assigned_booster_id = auth.uid())
-    )
-    or public.is_admin()
-  )
-);
+create policy "order_status_history_insert" on public.order_status_history for insert
+  with check (public.is_admin());
 
 -- order_messages
 create policy "order_messages_read" on public.order_messages for select using (
@@ -1220,9 +1762,13 @@ create policy "order_messages_read" on public.order_messages for select using (
 );
 create policy "order_messages_insert" on public.order_messages for insert with check (
   sender_id = auth.uid()
-  and exists (
-    select 1 from public.orders o
-    where o.id = order_id and (o.customer_id = auth.uid() or o.assigned_booster_id = auth.uid())
+  and (
+    exists (
+      select 1 from public.orders o
+      where o.id = order_id
+        and (o.customer_id = auth.uid() or o.assigned_booster_id = auth.uid())
+    )
+    or public.is_admin()
   )
 );
 
@@ -1284,9 +1830,10 @@ create policy "reviews_customer_insert" on public.reviews for insert with check 
 create policy "notifications_read_own"   on public.notifications for select using (user_id = auth.uid());
 create policy "notifications_update_own" on public.notifications for update using (user_id = auth.uid());
 
--- audit_logs
+-- audit_logs (writes happen via SECURITY DEFINER RPCs; direct client insert
+-- restricted to admin)
 create policy "audit_logs_admin_read" on public.audit_logs for select using (public.is_admin());
-create policy "audit_logs_insert"     on public.audit_logs for insert with check (actor_id = auth.uid());
+create policy "audit_logs_insert"     on public.audit_logs for insert with check (public.is_admin());
 
 -- payout_records
 create policy "payout_records_read" on public.payout_records for select using (booster_id = auth.uid() or public.is_admin());
@@ -1295,20 +1842,52 @@ create policy "payout_records_read" on public.payout_records for select using (b
 create policy "Anyone can submit an application" on public.booster_applications
   for insert with check (true);
 create policy "Admins can manage applications" on public.booster_applications
-  for all using (
+  for all using (public.is_admin());
+
+-- booster_services
+create policy "booster_services_owner_all" on public.booster_services
+  for all
+  using (booster_id = auth.uid())
+  with check (booster_id = auth.uid());
+create policy "booster_services_public_read" on public.booster_services
+  for select
+  using (
     exists (
-      select 1 from public.profiles
-      where profiles.id = auth.uid() and profiles.role in ('admin', 'support')
+      select 1 from public.booster_profiles bp
+      where bp.user_id = booster_services.booster_id
+        and bp.status = 'approved'
     )
   );
 
--- ─── 10. GRANTS ───────────────────────────────────────────────────────────────
+-- duo_accounts
+-- Leitura: admin sempre; booster aprovado só enquanto a conta estiver ativa.
+create policy "duo_accounts_read" on public.duo_accounts for select using (
+  public.is_admin()
+  or (
+    is_active
+    and exists (
+      select 1 from public.booster_profiles bp
+      where bp.user_id = auth.uid() and bp.status = 'approved'
+    )
+  )
+);
+-- Escrita (insert/update/delete) de metadados: somente admin.
+create policy "duo_accounts_admin_write" on public.duo_accounts for all using (public.is_admin());
+
+-- ─── 12. GRANTS ───────────────────────────────────────────────────────────────
 
 grant usage on schema public to anon, authenticated;
 
 -- booster_applications: anon can insert (public form)
 grant insert on public.booster_applications to anon, authenticated;
 grant select on public.booster_applications to authenticated;
+
+-- public_booster_profiles view: safe columns only, no table-level policy needed
+grant select on public.public_booster_profiles to anon, authenticated;
+
+-- booster_services
+grant select, insert, update, delete on public.booster_services to authenticated;
+grant select on public.booster_services to anon;
 
 -- RPCs
 grant execute on function public.ensure_profile_exists(text)                                    to authenticated;
@@ -1329,8 +1908,13 @@ grant execute on function public.log_match_result(uuid, integer, integer)       
 grant execute on function public.request_order_drop(uuid, text)                                 to authenticated;
 grant execute on function public.resolve_drop_request(uuid, boolean, text)                      to authenticated;
 grant execute on function public.onboard_booster(text, text, jsonb, text, integer, integer, text, text) to authenticated;
+grant execute on function public.set_order_credentials(uuid, text, text)                        to authenticated;
+grant execute on function public.get_order_credentials(uuid)                                    to authenticated;
+grant execute on function public.request_booster_role()                                         to authenticated;
+grant execute on function public.set_duo_account_credentials(uuid, text, text)                  to authenticated;
+grant execute on function public.get_duo_account_credentials(uuid)                              to authenticated;
 
--- ─── 11. SEED DATA ────────────────────────────────────────────────────────────
+-- ─── 13. SEED DATA ────────────────────────────────────────────────────────────
 
 -- Games (only lol active)
 insert into public.games (slug, name, is_active, sort_order) values
@@ -1349,13 +1933,20 @@ from lol, (values
   ('placement_matches'::public.service_type, 'Placement Matches',   'O melhor começo de temporada possível',     4)
 ) as t(svc_type, svc_name, svc_desc, svc_ord);
 
--- Service extras (final PT-BR version from migration 007)
+-- Service extras (final state after all product decisions: Duo Boost is now
+-- a boost_mode checkbox on the order itself, not a paid extra; Solo Queue
+-- Only, Live Monitoring and Appear Offline were discontinued)
 insert into public.service_extras (name, description, price_modifier, price_modifier_pct, sort_order, icon, is_active)
 values
-  ('Duo Boost',           'Jogue ao lado do seu booster em duo queue. +50% sobre o valor base.',         0,    50, 1, 'users',   true),
-  ('Priority Processing', 'Atribuição imediata ao booster mais bem avaliado. Início mais rápido.',       0,    15, 2, 'zap',     true),
-  ('Solo Queue Only',     'O booster joga apenas SoloQ. Sem duo ou flex.',                               0,    10, 3, 'trophy',  true),
-  ('Mono Champion',       'Seu campeão favorito em cada partida. Especifique nas observações.',          0,     5, 4, 'eye',     true),
-  ('Live Stream',         'Assista seu booster via link de stream privado.',                             4.99,  0, 5, 'tv',      true),
-  ('Live Monitoring',     'Nossa equipe monitora seu pedido e envia atualizações periódicas.',           2.99,  0, 6, 'radio',   true),
-  ('Appear Offline',      'Sua conta fica offline durante todo o serviço.',                              0,     0, 7, 'eye-off', true);
+  ('Apenas Solo',
+   'O booster joga exclusivamente em solo queue, sem duo com outros jogadores.',
+   0, 20, 1, 'user', true),
+  ('Processamento Prioritário',
+   'Atribuição imediata ao booster mais bem avaliado. Seu pedido vai direto para frente da fila.',
+   0, 15, 2, 'zap', true),
+  ('Campeão Único',
+   'Seu campeão favorito em cada partida. Especifique nas observações do pedido.',
+   0, 10, 3, 'crosshair', true),
+  ('Transmissão ao Vivo',
+   'Assista seu booster jogar em tempo real via link de stream privado.',
+   0, 10, 4, 'tv', true);

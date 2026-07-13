@@ -7,7 +7,6 @@ import { Button, Card, FormField, Input, Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import { AvatarIconPicker } from '@/components/profile/AvatarIconPicker'
-import { PasswordCard } from '@/components/profile/PasswordCard'
 
 const profileSchema = z.object({
   username: z.string().min(3).max(24).regex(/^[a-zA-Z0-9_]+$/),
@@ -89,8 +88,6 @@ export function AdminProfilePage() {
       <Card padding="md">
         <AvatarIconPicker currentUrl={profile?.avatar_url} onSelect={handleSelectIcon} />
       </Card>
-
-      <PasswordCard />
     </div>
   )
 }

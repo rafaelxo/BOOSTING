@@ -22,8 +22,6 @@ const PrivacyPage                 = lazy(() => import('@/features/public/pages/L
 
 // Auth pages
 const LoginPage          = lazy(() => import('@/features/auth/LoginPage').then(m => ({ default: m.LoginPage })))
-const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage').then(m => ({ default: m.ForgotPasswordPage })))
-const ResetPasswordPage  = lazy(() => import('@/features/auth/ResetPasswordPage').then(m => ({ default: m.ResetPasswordPage })))
 const LegalAcceptancePage = lazy(() => import('@/features/auth/LegalAcceptancePage').then(m => ({ default: m.LegalAcceptancePage })))
 
 // Customer pages
@@ -39,10 +37,8 @@ const CustomerProfilePage = lazy(() => import('@/features/customer/pages/Profile
 const BoosterDashboard    = lazy(() => import('@/features/booster/pages/Dashboard').then(m => ({ default: m.BoosterDashboard })))
 const AvailableJobsPage   = lazy(() => import('@/features/booster/pages/AvailableJobs').then(m => ({ default: m.AvailableJobsPage })))
 const JobDetailPage       = lazy(() => import('@/features/booster/pages/JobDetail').then(m => ({ default: m.JobDetailPage })))
-const BoosterEarningsPage = lazy(() => import('@/features/booster/pages/Earnings').then(m => ({ default: m.BoosterEarningsPage })))
-const CompletedOrdersPage = lazy(() => import('@/features/booster/pages/CompletedOrders').then(m => ({ default: m.CompletedOrdersPage })))
+const BoosterOrdersPage   = lazy(() => import('@/features/booster/pages/Orders').then(m => ({ default: m.BoosterOrdersPage })))
 const BoosterAccountsPage = lazy(() => import('@/features/booster/pages/Accounts').then(m => ({ default: m.BoosterAccountsPage })))
-const BoosterProfilePage  = lazy(() => import('@/features/booster/pages/Profile').then(m => ({ default: m.BoosterProfilePage })))
 const BoosterServicesPage = lazy(() => import('@/features/booster/pages/Services').then(m => ({ default: m.BoosterServicesPage })))
 const BoosterOnboardingPage = lazy(() => import('@/features/booster/pages/Onboarding').then(m => ({ default: m.BoosterOnboardingPage })))
 
@@ -91,23 +87,15 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Auth routes (guest only)
+  // Auth routes (guest only) — login é exclusivamente via Discord OAuth,
+  // não existe fluxo de senha (login por e-mail/senha, recuperação, etc.).
   {
     element: <RequireGuest />,
     children: [
-      { path: '/login',           element: <SuspensePage><LoginPage /></SuspensePage> },
-      { path: '/register',        element: <Navigate to="/login?mode=register" replace /> },
-      { path: '/forgot-password', element: <SuspensePage><ForgotPasswordPage /></SuspensePage> },
+      { path: '/login',    element: <SuspensePage><LoginPage /></SuspensePage> },
+      { path: '/register', element: <Navigate to="/login?mode=register" replace /> },
     ],
   },
-
-  // Password recovery — NOT behind RequireGuest. Clicking the email link
-  // (ForgotPasswordPage.tsx → resetPasswordForEmail redirectTo) makes
-  // Supabase establish a real session via the recovery token before this
-  // route renders, so isAuthenticated() is already true here. Under
-  // RequireGuest that session would trigger an immediate redirect to the
-  // user's dashboard and the reset form would never be reachable.
-  { path: '/reset-password', element: <SuspensePage><ResetPasswordPage /></SuspensePage> },
 
   // Customer routes
   {
@@ -138,12 +126,14 @@ export const router = createBrowserRouter([
           { path: '/booster',             element: <SuspensePage><BoosterDashboard /></SuspensePage> },
           { path: '/booster/jobs',        element: <SuspensePage><AvailableJobsPage /></SuspensePage> },
           { path: '/booster/jobs/:id',    element: <SuspensePage><JobDetailPage /></SuspensePage> },
-          { path: '/booster/completed',   element: <SuspensePage><CompletedOrdersPage /></SuspensePage> },
+          { path: '/booster/orders',      element: <SuspensePage><BoosterOrdersPage /></SuspensePage> },
           { path: '/booster/accounts',    element: <SuspensePage><BoosterAccountsPage /></SuspensePage> },
-          { path: '/booster/earnings',    element: <SuspensePage><BoosterEarningsPage /></SuspensePage> },
           { path: '/booster/services',    element: <SuspensePage><BoosterServicesPage /></SuspensePage> },
-          { path: '/booster/profile',     element: <SuspensePage><BoosterProfilePage /></SuspensePage> },
           { path: '/booster/onboarding',  element: <SuspensePage><BoosterOnboardingPage /></SuspensePage> },
+          // Rotas antigas — mantidas como redirect para não quebrar links/bookmarks existentes.
+          { path: '/booster/completed',   element: <Navigate to="/booster/orders" replace /> },
+          { path: '/booster/earnings',    element: <Navigate to="/booster" replace /> },
+          { path: '/booster/profile',     element: <Navigate to="/booster/services" replace /> },
         ],
       },
     ],

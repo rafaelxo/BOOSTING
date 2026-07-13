@@ -63,7 +63,6 @@ export function PricingPage() {
                   <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Solo / div</th>
                   <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Duo / div <span className="text-brand normal-case font-normal">(+50%)</span></th>
                   <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Tier completo (solo)</th>
-                  <th className="py-3 px-5 text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bg-elevated">
@@ -82,13 +81,6 @@ export function PricingPage() {
                       <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(perDiv)}</td>
                       <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(duoDiv)}</td>
                       <td className="py-3.5 px-5 text-right text-ink-secondary font-medium">{currency(perDiv * 4)}</td>
-                      <td className="py-3.5 px-5 text-right">
-                        <Button asChild size="xs" variant="primary">
-                          <Link to={`/orders/new?service=elo_boost`}>
-                            Pedir <ChevronRight className="h-3 w-3" />
-                          </Link>
-                        </Button>
-                      </td>
                     </tr>
                   )
                 })}
@@ -96,6 +88,60 @@ export function PricingPage() {
             </table>
           </div>
           <p className="text-xs text-ink-muted mt-2">* Diamante IV→Mestre: 4 divs × R$75 = R$300 mínimo (solo) · R$450 em duo</p>
+        </section>
+
+        {/* ── Coaching ── */}
+        <section>
+          <div className="card p-6 flex items-start gap-4">
+            <div className="h-11 w-11 rounded-2xl bg-success/20 border border-success/30 flex items-center justify-center shrink-0">
+              <MessageCircle className="h-5 w-5 text-success" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-ink mb-1">Coaching</h2>
+              <p className="text-sm text-ink-secondary mb-3">
+                Sessões individuais com um booster Grão-mestre ou Desafiante. O valor é combinado diretamente com o booster — não há cobrança antecipada.
+              </p>
+              <div className="flex flex-wrap gap-3 text-sm mb-3">
+                {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
+                  <span key={item} className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
+                  </span>
+                ))}
+              </div>
+              <p className="text-lg font-bold text-brand">Valor a combinar · por sessão</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── MD5 — 5 Placements ── */}
+        <section>
+          <h2 className="text-xl font-bold text-ink mb-1">MD5 — 5 Partidas de Posicionamento</h2>
+          <p className="text-sm text-ink-secondary mb-4">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
+          <div className="card overflow-hidden p-0">
+            <table className="w-full text-sm">
+              <thead className="border-b border-bg-elevated">
+                <tr>
+                  <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Rank desejado</th>
+                  <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Preço</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bg-elevated">
+                {MD5_TIERS.map((tier) => (
+                  <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
+                    <td className="py-3 px-5">
+                      <div className="flex items-center gap-3">
+                        <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
+                        <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
+                          {RANK_TIER_LABEL[tier]}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(PLACEMENT_PRICE[tier])}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* ── Vitórias ── */}
@@ -114,50 +160,6 @@ export function PricingPage() {
                 </div>
               )
             })}
-          </div>
-          <div className="mt-3 text-right">
-            <Button asChild size="sm">
-              <Link to="/orders/new?service=win_boost">Comprar vitórias <ChevronRight className="h-4 w-4" /></Link>
-            </Button>
-          </div>
-        </section>
-
-        {/* ── MD5 — 5 Placements ── */}
-        <section>
-          <h2 className="text-xl font-bold text-ink mb-1">MD5 — 5 Partidas de Posicionamento</h2>
-          <p className="text-sm text-ink-secondary mb-4">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
-          <div className="card overflow-hidden p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b border-bg-elevated">
-                <tr>
-                  <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Rank desejado</th>
-                  <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Preço</th>
-                  <th className="py-3 px-5 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-bg-elevated">
-                {MD5_TIERS.map((tier) => (
-                  <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
-                    <td className="py-3 px-5">
-                      <div className="flex items-center gap-3">
-                        <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
-                        <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
-                          {RANK_TIER_LABEL[tier]}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(PLACEMENT_PRICE[tier])}</td>
-                    <td className="py-3.5 px-5 text-right">
-                      <Button asChild size="xs" variant="outline">
-                        <Link to="/orders/new?service=placement_matches">
-                          Pedir <ChevronRight className="h-3 w-3" />
-                        </Link>
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
 
@@ -189,32 +191,6 @@ export function PricingPage() {
                 ))}
             </div>
           )}
-        </section>
-
-        {/* ── Coaching ── */}
-        <section>
-          <div className="card p-6 flex items-start gap-4">
-            <div className="h-11 w-11 rounded-2xl bg-success/20 border border-success/30 flex items-center justify-center shrink-0">
-              <MessageCircle className="h-5 w-5 text-success" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-ink mb-1">Coaching</h2>
-              <p className="text-sm text-ink-secondary mb-3">
-                Sessões individuais com um booster Grão-mestre ou Desafiante. O valor é combinado diretamente com o booster — não há cobrança antecipada.
-              </p>
-              <div className="flex flex-wrap gap-3 text-sm mb-3">
-                {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
-                  <span key={item} className="flex items-center gap-1.5 text-xs text-ink-secondary">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
-                  </span>
-                ))}
-              </div>
-              <p className="text-lg font-bold text-brand">Valor a combinar · por sessão</p>
-            </div>
-            <Button asChild size="sm" className="shrink-0 self-center">
-              <Link to="/orders/new?service=coaching">Solicitar</Link>
-            </Button>
-          </div>
         </section>
 
         {/* CTA */}
