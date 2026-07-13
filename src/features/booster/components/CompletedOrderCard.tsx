@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Clock, ArrowRight } from 'lucide-react'
 import { Card, OrderStatusBadge, RankBadge } from '@/components/ui'
-import { formatRank, formatDate, getServiceLabel, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
+import { formatRank, formatDate, getServiceLabel, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Division, Order, RankTier } from '@/types'
 
@@ -36,6 +36,16 @@ export function CompletedOrderCard({ order }: CompletedOrderCardProps) {
             <span className="text-xs text-ink-secondary">
               {formatRank(currentRank.tier, currentRank.division)} → {formatRank(targetRank.tier, targetRank.division)}
             </span>
+          </div>
+        )}
+
+        {order.extras?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {sortOrderExtras(order.extras).map((extra) => (
+              <span key={extra.extra_id} className="text-[9px] font-medium bg-bg-elevated text-ink-secondary px-1.5 py-0.5 rounded-md">
+                {extra.name}
+              </span>
+            ))}
           </div>
         )}
 

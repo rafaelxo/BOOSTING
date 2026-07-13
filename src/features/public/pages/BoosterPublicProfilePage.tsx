@@ -68,12 +68,12 @@ export function BoosterPublicProfilePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('reviews')
-        .select('*')
+        .select('id, rating, content, created_at')
         .eq('booster_id', booster!.user_id)
         .eq('is_public', true)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as Review[]
+      return data as Pick<Review, 'id' | 'rating' | 'content' | 'created_at'>[]
     },
     enabled: !!booster?.user_id,
   })

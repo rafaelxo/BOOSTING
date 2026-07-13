@@ -4,7 +4,7 @@ import { Briefcase, Lock, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, formatRank, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
+import { timeAgo, formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
 import type { Division, Order, QueueType, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -259,6 +259,15 @@ export function AvailableJobsPage() {
                       <span className="text-xs font-medium text-ink-secondary">
                         {formatRank((job.target_rank as { tier: RankTier }).tier, (job.target_rank as { division: Division }).division)}
                       </span>
+                    </div>
+                  )}
+                  {job.extras?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {sortOrderExtras(job.extras).map((extra) => (
+                        <span key={extra.extra_id} className="text-[10px] font-medium bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">
+                          {extra.name}
+                        </span>
+                      ))}
                     </div>
                   )}
                   {duoBlocked && (

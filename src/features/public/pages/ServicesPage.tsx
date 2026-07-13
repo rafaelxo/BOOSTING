@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { TrendingUp, Zap, Users, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
-import { Button, RankBadge } from '@/components/ui'
+import { Button, RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
+import type { BoostFlow } from '@/types'
 
 const SERVICES = [
   {
@@ -79,12 +81,33 @@ const SERVICES = [
   },
 ]
 
-const EXTRAS = [
-  { name: 'Apenas Solo',               desc: 'O booster joga exclusivamente em solo queue, sem duo com outros jogadores.' },
-  { name: 'Processamento Prioritário', desc: 'Atribuição imediata ao booster mais bem avaliado. Seu pedido vai direto para frente da fila.' },
-  { name: 'Campeão Único',             desc: 'Seu campeão favorito em cada partida. Especifique nas observações do pedido.' },
-  { name: 'Transmissão ao Vivo',       desc: 'Assista seu booster jogar em tempo real via link de stream privado.' },
+const EXTRA_GROUPS: { flow: BoostFlow; label: string }[] = [
+  { flow: 'solo_standard', label: 'Solo Boost' },
+  { flow: 'duo_standard', label: 'Duo Boost' },
+  { flow: 'master_plus', label: 'Boost Master+' },
 ]
+
+function ExtraGroup({ flow, label }: { flow: BoostFlow; label: string }) {
+  const { data: extras = [], isLoading } = useBoostAddons(flow)
+
+  if (isLoading) {
+    return <Skeleton className="h-24 rounded-2xl" />
+  }
+
+  return (
+    <div className="card p-4 space-y-3">
+      <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">{label}</p>
+      <div className="space-y-2">
+        {extras.map((extra) => (
+          <div key={extra.id}>
+            <p className="text-sm font-semibold text-ink">{extra.name}</p>
+            <p className="text-xs text-ink-secondary leading-relaxed">{extra.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function ServicesPage() {
   return (
@@ -152,11 +175,8 @@ export function ServicesPage() {
             <p className="text-ink-secondary mt-2">Adicione a qualquer pedido durante o checkout.</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {EXTRAS.map(({ name, desc }) => (
-              <div key={name} className="card p-4 space-y-2">
-                <p className="text-sm font-semibold text-ink">{name}</p>
-                <p className="text-xs text-ink-secondary leading-relaxed">{desc}</p>
-              </div>
+            {EXTRA_GROUPS.map(({ flow, label }) => (
+              <ExtraGroup key={flow} flow={flow} label={label} />
             ))}
           </div>
         </div>

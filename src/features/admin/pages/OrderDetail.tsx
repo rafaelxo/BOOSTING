@@ -5,7 +5,7 @@ import { ArrowLeft, RefreshCw, MessageCircle, Send, Clock } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Avatar } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL } from '@/lib/utils'
+import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus, OrderMessage, OrderStatusHistory } from '@/types'
 
@@ -139,7 +139,14 @@ export function AdminOrderDetailPage() {
                 ['Cliente', order.customer_id.slice(0, 12) + '...'],
                 ['Serviço', getServiceLabel(order.service_id as string)],
                 ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
-                ['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'],
+                ...(!order.pdl_bracket ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']] : []),
+                ['Rank Atual', order.current_rank ? formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division) : '—'],
+                ['Rank Alvo', order.target_rank ? formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division) : '—'],
+                ...(order.pdl_bracket ? [
+                  ['PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
+                  ['Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
+                  ['Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
+                ] : []),
                 ['Base', currency(order.base_price)],
                 ['Extras', currency(order.extras_price)],
                 ['Total', currency(order.total_price)],
@@ -152,6 +159,20 @@ export function AdminOrderDetailPage() {
                 </div>
               ))}
             </div>
+
+            {order.extras?.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-bg-elevated">
+                <p className="text-xs text-ink-muted mb-2">Extras selecionados</p>
+                <div className="space-y-1.5">
+                  {sortOrderExtras(order.extras).map((extra) => (
+                    <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                      <span className="text-ink-secondary">{extra.name}{extra.code ? ` (${extra.code})` : ''}</span>
+                      <span className="font-semibold text-ink">{currency(extra.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Chat ao vivo (pedidos ativos) ou Transcript (pedidos encerrados) */}

@@ -1,35 +1,22 @@
 import { useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { CheckCircle2, Zap, Radio, Tv, Users, Crosshair, Star, MapPin, User, Trophy } from 'lucide-react'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { CheckCircle2, Zap, Tv, Crosshair, User, Trophy, Shield, Lightbulb, Mic } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { getWinBoostPrice } from '@/lib/pricing'
+import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { ServiceExtra } from '@/types'
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  zap:      Zap,
-  tv:       Tv,
-  crosshair:Crosshair,
-  'map-pin':MapPin,
-  user:     User,
-  star:     Star,
-  radio:    Radio,
-  users:    Users,
-}
-
-const HIDDEN_NAMES = [
-  'offline', 'appear offline', 'aparecer offline',
-  'monitoramento', 'live monitoring', 'live monitor',
-  'duo boost',
-  'lane específica', 'lane especifica',
-]
-
-function isHidden(name: string): boolean {
-  const lower = name.toLowerCase()
-  return HIDDEN_NAMES.some(h => lower.includes(h))
+  zap: Zap,
+  tv: Tv,
+  crosshair: Crosshair,
+  user: User,
+  shield: Shield,
+  lightbulb: Lightbulb,
+  mic: Mic,
 }
 
 const WIN_PACKAGES = [
@@ -40,15 +27,21 @@ const WIN_PACKAGES = [
 
 export function StepExtras() {
   const {
-    selectedExtras, toggleExtra, basePrice, setExtrasPrice,
-    serviceType, currentRank, winPackage, setWinPackage,
+    selectedExtraIds, toggleExtra, basePrice, setExtrasPrice,
+    serviceType, currentRank, boostMode, winPackage, setWinPackage,
   } = useOrderBuilderStore()
   const currency = useCurrency()
-  const selectedIds = new Set(selectedExtras.map(e => e.extra.id))
 
-  const showWinPackages = currentRank && serviceType === 'elo_boost'
+  const flow = serviceType === 'elo_boost' && currentRank
+    ? getBoostFlow(currentRank.tier, boostMode)
+    : null
+  const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
 
-  const unitWinPrice = showWinPackages
+  // Pacote de vitórias não existe no Master+ — o preço lá vem da tabela
+  // comercial por faixa de PDL, não de um preço por vitória.
+  const showWinPackages = !!currentRank && serviceType === 'elo_boost' && !currentIsMasterPlus
+
+  const unitWinPrice = showWinPackages && currentRank
     ? getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
     : 0
 
@@ -56,37 +49,28 @@ export function StepExtras() {
     return Math.round(unitWinPrice * wins * (1 - discountPct / 100) * 100) / 100
   }
 
-  const { data: allExtras = [], isLoading } = useQuery({
-    queryKey: ['service-extras'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('service_extras')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order')
-      if (error) throw error
-      return data as ServiceExtra[]
-    },
-    staleTime: 1000 * 60 * 10,
-  })
-
-  const extras = allExtras.filter(e => !isHidden(e.name))
+  // Addons são específicos do fluxo (Solo padrão / Duo padrão / Master+) —
+  // a query já vem filtrada por `flow`, nunca é a lista inteira escondida
+  // por tipo de modalidade. A ordem vem de `sort_order` (Acesso Prioritário
+  // sempre por último — ver a seed em supabase/migrations).
+  const { data: extras = [], isLoading } = useBoostAddons(flow)
 
   useEffect(() => {
-    let total = selectedExtras.reduce((sum, { extra }) => {
+    const selected = extras.filter(e => selectedExtraIds.has(e.id))
+    let total = selected.reduce((sum, extra) => {
       if (extra.price_modifier > 0) return sum + extra.price_modifier
       if (extra.price_modifier_pct > 0) return sum + (basePrice * extra.price_modifier_pct) / 100
       return sum
     }, 0)
 
-    if (winPackage && currentRank) {
+    if (winPackage && showWinPackages) {
       const pkg = WIN_PACKAGES.find(p => p.wins === winPackage)
       if (pkg) total += packageTotal(pkg.wins, pkg.discountPct)
     }
 
     setExtrasPrice(Math.round(total * 100) / 100)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExtras, basePrice, winPackage, currentRank, setExtrasPrice])
+  }, [extras, selectedExtraIds, basePrice, winPackage, showWinPackages, setExtrasPrice])
 
   function getExtraPrice(extra: ServiceExtra): number {
     if (extra.price_modifier > 0) return extra.price_modifier
@@ -108,8 +92,11 @@ export function StepExtras() {
       </p>
 
       <div className="space-y-6">
-        {/* Regular extras */}
-        {isLoading ? (
+        {serviceType !== 'elo_boost' ? null : !currentRank ? (
+          <p className="text-sm text-ink-muted text-center py-8">
+            Selecione o rank atual na etapa anterior para ver os extras disponíveis.
+          </p>
+        ) : isLoading ? (
           <div className="grid sm:grid-cols-2 gap-3">
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
           </div>
@@ -122,14 +109,14 @@ export function StepExtras() {
             )}
             <div className="grid sm:grid-cols-2 gap-3">
               {extras.map((extra) => {
-                const selected = selectedIds.has(extra.id)
+                const selected = selectedExtraIds.has(extra.id)
                 const Icon = ICON_MAP[extra.icon ?? 'zap'] ?? Zap
                 const price = getExtraPrice(extra)
 
                 return (
                   <button
                     key={extra.id}
-                    onClick={() => toggleExtra(extra)}
+                    onClick={() => toggleExtra(extra.id)}
                     className={cn(
                       'relative flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-150',
                       selected
@@ -162,7 +149,7 @@ export function StepExtras() {
           </div>
         )}
 
-        {/* Win packages — only for elo_boost with rank selected */}
+        {/* Win packages — Solo/Duo padrão com rank selecionado (não existe no Master+) */}
         {showWinPackages && (
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-ink-muted mb-3">Pacotes de Vitórias</p>

@@ -6,7 +6,7 @@ import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, Eye, EyeOff, ShieldChe
 import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
 
@@ -221,6 +221,9 @@ export function OrderDetailPage() {
               {[
                 { label: t('customer.order.service'),     value: getServiceLabel(order.service_id as string) },
                 { label: t('customer.order.queue'),       value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') },
+                ...(order.service_id === 'elo_boost' && !order.pdl_bracket
+                  ? [{ label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
+                  : []),
                 {
                   label: t('customer.order.currentRank'),
                   value: order.current_rank ? formatRank(
@@ -235,6 +238,11 @@ export function OrderDetailPage() {
                     (order.target_rank as { division: string }).division
                   ) : '—',
                 },
+                ...(order.pdl_bracket ? [
+                  { label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
+                  { label: 'Méd. PDL Ganho/Vitória', value: order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—' },
+                  { label: 'Méd. PDL Perdido/Derrota', value: order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—' },
+                ] : []),
                 { label: t('customer.order.totalPaid'),   value: currency(order.total_price) },
               ].map(({ label, value }) => (
                 <div key={label}>
@@ -243,6 +251,20 @@ export function OrderDetailPage() {
                 </div>
               ))}
             </div>
+
+            {order.extras?.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-bg-elevated">
+                <p className="text-xs text-ink-muted mb-2">Extras</p>
+                <div className="space-y-1.5">
+                  {sortOrderExtras(order.extras).map((extra) => (
+                    <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                      <span className="text-ink-secondary">{extra.name}</span>
+                      <span className="font-semibold text-ink">{currency(extra.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {order.customer_notes && (
               <div className="mt-4 pt-4 border-t border-bg-elevated">

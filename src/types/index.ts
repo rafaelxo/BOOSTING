@@ -154,16 +154,33 @@ export interface Service {
   sort_order: number
 }
 
+// Fluxo do configurador de boost ao qual um addon pertence. null = extra
+// legado (pré-reforma), mantido só para exibição de pedidos antigos —
+// nunca oferecido no configurador atual.
+export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
+
 export interface ServiceExtra {
   id: string
   service_id: string | null  // null = applies to all
   name: string
   description: string
-  price_modifier: number       // flat USD
+  price_modifier: number       // flat BRL
   price_modifier_pct: number   // % of base price
   is_active: boolean
   sort_order: number
   icon: string | null
+  flow: BoostFlow | null
+  code: string | null          // identificador estável — nunca o label
+}
+
+export interface MasterPlusPricing {
+  id: string
+  current_tier: 'master' | 'grandmaster'
+  target_tier: 'grandmaster' | 'challenger'
+  pdl_bracket: '0_49' | '50_89' | '90_119' | '120_plus'
+  price: number | null   // null = faixa ainda sem preço comercial definido
+  updated_at: string
+  updated_by: string | null
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -172,6 +189,14 @@ export interface OrderExtra {
   extra_id: string
   name: string
   price: number
+  // Campos novos (pedidos criados após a reforma do configurador) — podem
+  // ser undefined em pedidos antigos, que só tinham extra_id/name/price.
+  code?: string
+  percentage?: number
+  // Posição de exibição travada no momento da criação do pedido — não
+  // depende de reconsultar service_extras (que pode mudar depois). Acesso
+  // Prioritário é sempre o maior valor aqui.
+  sort_order?: number
 }
 
 export interface Order {
@@ -202,6 +227,13 @@ export interface Order {
   completed_at: string | null
   created_at: string
   updated_at: string
+  // Boost Master+ — null para pedidos que não são Master+ (Solo/Duo padrão
+  // não têm PDL atual/médias; ver shared/boostDomain.ts).
+  current_pdl: number | null
+  pdl_bracket: '0_49' | '50_89' | '90_119' | '120_plus' | null
+  avg_pdl_gain: number | null
+  avg_pdl_loss: number | null
+  pricing_version: string
 }
 
 export interface OrderStatusHistory {

@@ -5,7 +5,7 @@ import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTrian
 import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank, BOOSTER_EARNINGS_SHARE } from '@/lib/utils'
+import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
 import type { Division, Order, OrderMessage, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -162,6 +162,15 @@ export function JobDetailPage() {
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
+              {!order.pdl_bracket && (
+                <div><p className="text-xs text-ink-muted">Modo</p><p className="text-sm font-semibold text-ink">{order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'}</p></div>
+              )}
+              {order.pdl_bracket && (
+                <>
+                  <div><p className="text-xs text-ink-muted">PDL Atual</p><p className="text-sm font-semibold text-ink">{order.current_pdl ?? '—'} PDL</p></div>
+                  <div><p className="text-xs text-ink-muted">Méd. Ganho/Perda</p><p className="text-sm font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</p></div>
+                </>
+              )}
               {order.current_rank && (
                 <div>
                   <p className="text-xs text-ink-muted mb-1">{t('booster.job.from')}</p>
@@ -195,6 +204,18 @@ export function JobDetailPage() {
                 </div>
               )}
             </div>
+            {order.extras?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-ink-muted mb-1.5">Extras</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {sortOrderExtras(order.extras).map((extra) => (
+                    <span key={extra.extra_id} className="text-[11px] font-medium bg-bg-elevated text-ink-secondary px-2 py-1 rounded-lg">
+                      {extra.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             {order.customer_notes && (
               <div className="bg-bg-elevated rounded-xl p-3">
                 <p className="text-xs text-ink-muted mb-1">{t('booster.job.customerNotes')}</p>

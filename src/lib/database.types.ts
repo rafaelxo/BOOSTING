@@ -425,6 +425,44 @@ export type Database = {
         }
         Relationships: []
       }
+      master_plus_pricing: {
+        Row: {
+          current_tier: string
+          id: string
+          pdl_bracket: string
+          price: number | null
+          target_tier: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          current_tier: string
+          id?: string
+          pdl_bracket: string
+          price?: number | null
+          target_tier: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          current_tier?: string
+          id?: string
+          pdl_bracket?: string
+          price?: number | null
+          target_tier?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_plus_pricing_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string
@@ -632,12 +670,15 @@ export type Database = {
       orders: {
         Row: {
           assigned_booster_id: string | null
+          avg_pdl_gain: number | null
+          avg_pdl_loss: number | null
           base_price: number
           boost_mode: string
           booster_notes: string | null
           completed_at: string | null
           created_at: string
           credentials_set: boolean
+          current_pdl: number | null
           current_rank: Json
           customer_id: string
           customer_notes: string | null
@@ -651,6 +692,8 @@ export type Database = {
           losses_played: number
           mp_payment_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
+          pdl_bracket: string | null
+          pricing_version: string
           queue_type: Database["public"]["Enums"]["queue_type"]
           server: string
           service_id: string
@@ -664,12 +707,15 @@ export type Database = {
         }
         Insert: {
           assigned_booster_id?: string | null
+          avg_pdl_gain?: number | null
+          avg_pdl_loss?: number | null
           base_price: number
           boost_mode?: string
           booster_notes?: string | null
           completed_at?: string | null
           created_at?: string
           credentials_set?: boolean
+          current_pdl?: number | null
           current_rank: Json
           customer_id: string
           customer_notes?: string | null
@@ -683,6 +729,8 @@ export type Database = {
           losses_played?: number
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          pdl_bracket?: string | null
+          pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
           server: string
           service_id: string
@@ -696,12 +744,15 @@ export type Database = {
         }
         Update: {
           assigned_booster_id?: string | null
+          avg_pdl_gain?: number | null
+          avg_pdl_loss?: number | null
           base_price?: number
           boost_mode?: string
           booster_notes?: string | null
           completed_at?: string | null
           created_at?: string
           credentials_set?: boolean
+          current_pdl?: number | null
           current_rank?: Json
           customer_id?: string
           customer_notes?: string | null
@@ -715,6 +766,8 @@ export type Database = {
           losses_played?: number
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          pdl_bracket?: string | null
+          pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
           server?: string
           service_id?: string
@@ -1023,7 +1076,9 @@ export type Database = {
       }
       service_extras: {
         Row: {
+          code: string | null
           description: string
+          flow: string | null
           icon: string | null
           id: string
           is_active: boolean
@@ -1034,7 +1089,9 @@ export type Database = {
           sort_order: number
         }
         Insert: {
+          code?: string | null
           description: string
+          flow?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
@@ -1045,7 +1102,9 @@ export type Database = {
           sort_order?: number
         }
         Update: {
+          code?: string | null
           description?: string
+          flow?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean

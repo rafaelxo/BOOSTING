@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { OrderStatus, RankTier, TicketStatus, TicketPriority, BoosterStatus } from '@/types'
+import type { OrderStatus, RankTier, TicketStatus, TicketPriority, BoosterStatus, OrderExtra } from '@/types'
 
 // Tailwind class merging
 export function cn(...inputs: ClassValue[]) {
@@ -92,6 +92,14 @@ export function formatRank(tier: RankTier, division?: string | null) {
   const tierLabel = RANK_TIER_LABEL[tier]
   if (!division || ['master', 'grandmaster', 'challenger'].includes(tier)) return tierLabel
   return `${tierLabel} ${division}`
+}
+
+// Ordena o snapshot de extras gravado no pedido pela posição travada na
+// criação (sort_order) — nunca pela ordem em que veio do banco/array.
+// Pedidos antigos (sem sort_order) caem no fim, na ordem em que já
+// estavam, sem quebrar a exibição.
+export function sortOrderExtras(extras: OrderExtra[]): OrderExtra[] {
+  return [...extras].sort((a, b) => (a.sort_order ?? Number.MAX_SAFE_INTEGER) - (b.sort_order ?? Number.MAX_SAFE_INTEGER))
 }
 
 // ─── Booster status ───────────────────────────────────────────────────────────

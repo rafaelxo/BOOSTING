@@ -5,6 +5,8 @@ import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { getBoostFlow } from '@/lib/boostDomain'
 import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw } from 'lucide-react'
 
 // PIX states
@@ -40,6 +42,18 @@ export function StepPayment() {
   const [pix, setPix] = useState<PixState>({ phase: 'idle' })
   const [copied, setCopied] = useState(false)
   const pollRef = useRef<number | null>(null)
+
+  const flow = store.serviceType === 'elo_boost' && store.currentRank
+    ? getBoostFlow(store.currentRank.tier, store.boostMode)
+    : null
+  // Mesma queryKey usada em StepExtras/StepReview — já em cache. Precisamos
+  // do catálogo aqui só para traduzir os ids selecionados em códigos
+  // estáveis (addon_codes) — o payload nunca envia o id interno do banco.
+  const { data: addonCatalog = [] } = useBoostAddons(flow)
+  const addonCodes = addonCatalog
+    .filter(e => store.selectedExtraIds.has(e.id))
+    .map(e => e.code)
+    .filter((code): code is string => !!code)
 
   // Estimativa exibida antes de gerar o PIX (mesma conta que StepReview já
   // mostrou ao cliente). O valor cobrado de fato é sempre o que a Edge
@@ -152,27 +166,52 @@ export function StepPayment() {
         return
       }
 
-      await invokePix({
-        intent: {
-          service_type: store.serviceType,
-          service_id: store.serviceId ?? store.serviceType ?? '',
-          game_id: store.gameId ?? store.gameSlug ?? '',
-          queue_type: store.queueType,
-          boost_mode: store.boostMode,
-          server: store.server,
-          current_rank: store.currentRank,
-          target_rank: store.targetRank,
-          current_lp: store.currentLp,
-          avg_lp_gain: store.avgLpGain,
-          avg_lp_loss: store.avgLpLoss,
-          target_lp: store.targetLp,
-          wins_purchased: store.winsPurchased,
-          sessions_purchased: store.sessionsPurchased,
-          extra_ids: store.selectedExtras.map(({ extra }) => extra.id),
-          win_package: store.winPackage,
-          customer_notes: store.customerNotes || null,
-        },
-      })
+      const base = {
+        service_type: store.serviceType,
+        service_id: store.serviceId ?? store.serviceType ?? '',
+        game_id: store.gameId ?? store.gameSlug ?? '',
+        queue_type: store.queueType,
+        server: store.server,
+        current_rank: store.currentRank,
+        target_rank: store.targetRank,
+        customer_notes: store.customerNotes || null,
+      }
+
+      // O contrato é diferente por fluxo — Master+ não tem PDL alvo, LP,
+      // pacote de vitórias nem Duo; o fluxo padrão não tem PDL atual/médias
+      // de PDL. Nunca mandamos os dois conjuntos de campos juntos.
+      const intent = flow === 'master_plus'
+        ? {
+            ...base,
+            boost_mode: 'solo',
+            current_pdl: store.currentPdl,
+            avg_pdl_gain: store.avgPdlGain,
+            avg_pdl_loss: store.avgPdlLoss,
+            addon_codes: addonCodes,
+          }
+        : flow
+          ? {
+              ...base,
+              boost_mode: store.boostMode,
+              current_lp: store.currentLp,
+              avg_lp_gain: store.avgLpGain,
+              avg_lp_loss: store.avgLpLoss,
+              addon_codes: addonCodes,
+              win_package: store.winPackage,
+            }
+          : {
+              ...base,
+              boost_mode: store.boostMode,
+              current_lp: store.currentLp,
+              avg_lp_gain: store.avgLpGain,
+              avg_lp_loss: store.avgLpLoss,
+              wins_purchased: store.winsPurchased,
+              sessions_purchased: store.sessionsPurchased,
+              addon_codes: [] as string[],
+              win_package: store.winPackage,
+            }
+
+      await invokePix({ intent })
     } catch (err) {
       setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }

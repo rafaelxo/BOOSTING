@@ -7,6 +7,7 @@ import { RANK_TIER_LABEL } from '@/lib/utils'
 import type { DuoAccount } from '@/types'
 
 type RevealState = { login: string; password: string } | 'loading' | 'error'
+type BoosterVisibleDuoAccount = Pick<DuoAccount, 'id' | 'label' | 'current_rank' | 'is_active'>
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
@@ -33,15 +34,15 @@ export function BoosterAccountsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('duo_accounts')
-        .select('*')
+        .select('id, label, current_rank, is_active')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
       if (error) throw error
-      return data as unknown as DuoAccount[]
+      return data as unknown as BoosterVisibleDuoAccount[]
     },
   })
 
-  async function toggleReveal(a: DuoAccount) {
+  async function toggleReveal(a: BoosterVisibleDuoAccount) {
     if (revealed[a.id] && revealed[a.id] !== 'error') {
       setRevealed((r) => { const next = { ...r }; delete next[a.id]; return next })
       return

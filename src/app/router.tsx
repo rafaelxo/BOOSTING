@@ -54,6 +54,7 @@ const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services')
 const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
+const AdminBoostConfigPage = lazy(() => import('@/features/admin/pages/BoostConfig').then(m => ({ default: m.AdminBoostConfigPage })))
 const ReviewsPage         = lazy(() => import('@/features/public/pages/ReviewsPage').then(m => ({ default: m.ReviewsPage })))
 
 export const router = createBrowserRouter([
@@ -154,6 +155,7 @@ export const router = createBrowserRouter([
           { path: '/admin/tickets',      element: <SuspensePage><AdminTicketsPage /></SuspensePage> },
           { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
           { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
+          { path: '/admin/boost-config', element: <SuspensePage><AdminBoostConfigPage /></SuspensePage> },
           { path: '/admin/reviews',      element: <SuspensePage><AdminReviewsPage /></SuspensePage> },
           { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
           { path: '/admin/duo-accounts', element: <SuspensePage><AdminDuoAccountsPage /></SuspensePage> },

@@ -107,19 +107,17 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 export const COACHING_PRICE_NEGOTIABLE = true
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
+// Duo Boost só existe para o fluxo padrão (Iron–Diamond) — Master+ não aceita
+// Duo (ver shared/boostDomain.ts::getBoostFlow). Este percentual nunca é
+// aplicado a um preço de Master+.
 export const DUO_BOOST_PCT = 50
 
-// ── Master+ LP-based pricing ──────────────────────────────────────────────────
-const MASTER_LP_RATE: Record<string, number> = {
-  master: 0.45,
-  grandmaster: 0.75,
-  challenger: 1.20,
-}
-
-export function calcMasterPlusPrice(tier: RankTier, currentLp: number, targetLp: number): number {
-  const rate = MASTER_LP_RATE[tier] ?? 0.45
-  return Math.max(0, Math.round((targetLp - currentLp) * rate * 100) / 100)
-}
+// ── Master+ — preço vem da tabela comercial `master_plus_pricing` ───────────
+// Não existe fórmula de LP-alvo para Master+: o preço é definido pela regra
+// comercial (origem × destino × faixa de PDL atual), consultada no banco
+// pela Edge Function e repassada para computeOrderPrice via
+// `input.masterPlusPrice`. Ver shared/boostDomain.ts (PDL_BRACKETS,
+// MASTER_PLUS_PROGRESSIONS) e a migration que cria `master_plus_pricing`.
 
 // ── LP Modifier for Iron–Diamond ──────────────────────────────────────────────
 export function applyLpModifier(
@@ -164,7 +162,12 @@ export interface OrderPriceInput {
   currentLp: number
   avgLpGain: number
   avgLpLoss: number
-  targetLp: number | null
+  // Preço já consultado em `master_plus_pricing` para a combinação
+  // (origem, destino, faixa de PDL atual) — null quando a faixa ainda não
+  // tem preço configurado (pedido deve ser bloqueado, nunca com valor
+  // inventado). Ignorado para qualquer serviceType/rank que não seja
+  // elo_boost com rank atual Master+/Grão-Mestre.
+  masterPlusPrice: number | null
   winsPurchased: number | null
   sessionsPurchased: number | null
   extras: OrderExtraInput[]
@@ -186,16 +189,16 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
 
   switch (input.serviceType) {
     case 'elo_boost': {
-      const { currentRank, targetRank, boostMode, currentLp, avgLpGain, avgLpLoss, targetLp } = input
+      const { currentRank, targetRank, boostMode, currentLp, avgLpGain, avgLpLoss } = input
       if (!currentRank) break
 
       if (isMasterPlus(currentRank.tier)) {
-        if (targetLp === null || targetLp <= currentLp) break
-        const price = calcMasterPlusPrice(currentRank.tier, currentLp, targetLp)
-        basePrice = boostMode === 'duo'
-          ? Math.round(price * (1 + DUO_BOOST_PCT / 100) * 100) / 100
-          : price
-        estimatedHours = Math.max(1, Math.round((targetLp - currentLp) / 25))
+        // Master+ não aceita Duo — basePrice fica 0 (bloqueado) se boostMode
+        // vier 'duo' aqui; a rejeição explícita acontece antes disso, na
+        // validação de fluxo (getBoostFlow retorna null para essa combinação).
+        if (boostMode === 'duo' || input.masterPlusPrice == null) break
+        basePrice = input.masterPlusPrice
+        estimatedHours = null
       } else {
         if (!targetRank) break
         const { price, hours } = calcEloPrice(

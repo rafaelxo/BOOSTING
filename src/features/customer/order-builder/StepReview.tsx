@@ -1,7 +1,9 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { formatRank, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
 import { getWinBoostPrice } from '@/lib/pricing'
+import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight, ChevronLeft } from 'lucide-react'
 
@@ -17,11 +19,17 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
-    winsPurchased, sessionsPurchased, selectedExtras, winPackage,
-    currentLp, avgLpGain, avgLpLoss, targetLp,
+    winsPurchased, sessionsPurchased, selectedExtraIds, winPackage,
+    currentLp, avgLpGain, avgLpLoss, currentPdl, avgPdlGain, avgPdlLoss,
     basePrice, extrasPrice, estimatedHours, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
+
+  const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
+  const flow = serviceType === 'elo_boost' && currentRank ? getBoostFlow(currentRank.tier, boostMode) : null
+  // Mesma queryKey usada em StepExtras — já em cache, não refaz a chamada.
+  const { data: addonCatalog = [] } = useBoostAddons(flow)
+  const selectedAddons = addonCatalog.filter(e => selectedExtraIds.has(e.id))
 
   const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
   const winPackagePrice = winPackage && currentRank
@@ -32,7 +40,6 @@ export function StepReview() {
         * 100
       ) / 100
     : 0
-  const MASTER_PLUS = ['master', 'grandmaster', 'challenger']
   const currency = useCurrency()
 
   const totalPrice = basePrice + extrasPrice
@@ -54,7 +61,7 @@ export function StepReview() {
               <ReviewRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
             )}
             <ReviewRow label="Serviço" value={serviceName} />
-            {serviceType === 'elo_boost' && (
+            {serviceType === 'elo_boost' && !currentIsMasterPlus && (
               <ReviewRow label="Modo" value={boostMode === 'duo' ? 'Duo Boost (+50%)' : 'Solo Boost'} />
             )}
             {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
@@ -66,16 +73,15 @@ export function StepReview() {
                 value={formatRank(currentRank.tier, currentRank.division)}
               />
             )}
-            {targetRank && serviceType === 'elo_boost' && !MASTER_PLUS.includes(currentRank?.tier ?? '') && (
+            {targetRank && serviceType === 'elo_boost' && (
               <ReviewRow label="Rank Alvo" value={formatRank(targetRank.tier, targetRank.division)} />
             )}
             {serviceType === 'elo_boost' && currentRank && (
-              MASTER_PLUS.includes(currentRank.tier) ? (
+              currentIsMasterPlus ? (
                 <>
-                  <ReviewRow label="LP Atual" value={`${currentLp} LP`} />
-                  {targetLp !== null && (
-                    <ReviewRow label="LP Alvo" value={`${targetLp} LP`} />
-                  )}
+                  <ReviewRow label="PDL Atual" value={`${currentPdl} PDL`} />
+                  <ReviewRow label="Méd. PDL Ganho/Vitória" value={`+${avgPdlGain} PDL`} />
+                  <ReviewRow label="Méd. PDL Perdido/Derrota" value={`−${avgPdlLoss} PDL`} />
                 </>
               ) : (
                 <ReviewRow
@@ -97,7 +103,7 @@ export function StepReview() {
         </div>
 
         {/* Extras */}
-        {(selectedExtras.length > 0 || winPackage) && (
+        {(selectedAddons.length > 0 || winPackage) && (
           <div>
             <p className="section-label mb-2">Extras</p>
             <div className="card p-0 px-2">
@@ -107,7 +113,7 @@ export function StepReview() {
                   value={`+${currency(winPackagePrice)}`}
                 />
               )}
-              {selectedExtras.map(({ extra }) => (
+              {selectedAddons.map((extra) => (
                 <ReviewRow
                   key={extra.id}
                   label={extra.name}

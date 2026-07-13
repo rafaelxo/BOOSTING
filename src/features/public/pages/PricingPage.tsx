@@ -4,8 +4,7 @@ import { Button, Skeleton, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { PLACEMENT_PRICE, getWinBoostPrice, ELO_TIERS } from '@/lib/pricing'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
 
@@ -21,22 +20,40 @@ function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string):
   return 'Grátis'
 }
 
+function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_standard' | 'duo_standard' | 'master_plus'; currency: (n: number) => string }) {
+  const { data: extras = [], isLoading } = useBoostAddons(flow)
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-bold text-ink-secondary uppercase tracking-wide mb-3">{title}</h3>
+      <div className="grid grid-cols-2 gap-3">
+        {extras.map((extra) => (
+          <div key={extra.id} className="card p-4 flex items-start gap-3">
+            <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-ink">{extra.name}</p>
+                <span className="text-xs font-bold text-brand">{formatExtraPrice(extra, currency)}</span>
+              </div>
+              <p className="text-xs text-ink-secondary">{extra.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function PricingPage() {
   const currency = useCurrency()
-
-  const { data: extras = [], isLoading: extrasLoading } = useQuery({
-    queryKey: ['service-extras'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('service_extras')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order')
-      if (error) throw error
-      return data as ServiceExtra[]
-    },
-    staleTime: 1000 * 60 * 10,
-  })
 
   return (
     <div className="py-16">
@@ -164,33 +181,14 @@ export function PricingPage() {
         </section>
 
         {/* ── Extras ── */}
-        <section>
-          <h2 className="text-xl font-bold text-ink mb-4">Extras Opcionais</h2>
-          {extrasLoading ? (
-            <div className="grid grid-cols-2 gap-3">
-              {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {[...extras]
-                .sort((a, b) => {
-                  const ORDER = ['Apenas Solo', 'Processamento Prioritário', 'Campeão Único', 'Transmissão ao Vivo']
-                  return ORDER.indexOf(a.name) - ORDER.indexOf(b.name)
-                })
-                .map((extra) => (
-                  <div key={extra.id} className="card p-4 flex items-start gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-ink">{extra.name}</p>
-                        <span className="text-xs font-bold text-brand">{formatExtraPrice(extra, currency)}</span>
-                      </div>
-                      <p className="text-xs text-ink-secondary">{extra.description}</p>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
+        <section className="space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-ink mb-1">Extras Opcionais</h2>
+            <p className="text-sm text-ink-secondary">Os extras disponíveis dependem da modalidade escolhida no configurador.</p>
+          </div>
+          <AddonGroup title="Solo Boost" flow="solo_standard" currency={currency} />
+          <AddonGroup title="Duo Boost" flow="duo_standard" currency={currency} />
+          <AddonGroup title="Boost Master+" flow="master_plus" currency={currency} />
         </section>
 
         {/* CTA */}

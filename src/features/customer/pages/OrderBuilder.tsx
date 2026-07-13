@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
 import { Stepper, Button, Card } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useBoostAddons } from '@/hooks/useBoostAddons'
+import { getBoostFlow } from '@/lib/boostDomain'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star } from 'lucide-react'
 import type { ServiceType } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
@@ -33,9 +35,18 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 }
 
 export function OrderBuilderPage() {
-  const { step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours, selectedExtras, gameSlug, serviceType, setService, setStep, reset } = useOrderBuilderStore()
+  const {
+    step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
+    selectedExtraIds, currentRank, boostMode, gameSlug, serviceType,
+    setService, setStep, reset,
+  } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
+
+  const flow = serviceType === 'elo_boost' && currentRank ? getBoostFlow(currentRank.tier, boostMode) : null
+  // Mesma queryKey usada em StepExtras/StepReview — já em cache.
+  const { data: addonCatalog = [] } = useBoostAddons(flow)
+  const selectedAddons = addonCatalog.filter(e => selectedExtraIds.has(e.id))
 
   useEffect(() => {
     const service = searchParams.get('service') as ServiceType | null
@@ -112,11 +123,11 @@ export function OrderBuilderPage() {
                 {estimatedHours && (
                   <SummaryRow label="Entrega est." value={`~${estimatedHours}h`} />
                 )}
-                {selectedExtras.length > 0 && (
+                {selectedAddons.length > 0 && (
                   <div>
                     <p className="text-xs text-ink-muted mb-1.5">Extras</p>
                     <div className="space-y-1">
-                      {selectedExtras.map(({ extra }) => (
+                      {selectedAddons.map((extra) => (
                         <div key={extra.id} className="flex justify-between text-xs">
                           <span className="text-ink-secondary">{extra.name}</span>
                           <span className="text-ink font-medium">

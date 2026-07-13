@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
+import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
+import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
-  calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT,
-  calcMasterPlusPrice, applyLpModifier,
-} from '@/lib/pricing'
+  BOOST_CURRENT_RANK_TIERS, STANDARD_RANK_TIERS,
+  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
+} from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Shield, Star, Gem, Diamond, Crown, Flame, Trophy, Check } from 'lucide-react'
+import { Shield, Star, Gem, Diamond, Crown, Flame, Check } from 'lucide-react'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
 const TIER_IMAGE: Record<RankTier, string> = {
   iron:        '/ranks/1_iron.webp',
@@ -27,7 +29,7 @@ const TIER_IMAGE: Record<RankTier, string> = {
 
 const TIER_FALLBACK: Record<RankTier, React.ElementType> = {
   iron: Shield, bronze: Shield, silver: Star, gold: Star, platinum: Gem,
-  emerald: Gem, diamond: Diamond, master: Crown, grandmaster: Flame, challenger: Trophy,
+  emerald: Gem, diamond: Diamond, master: Crown, grandmaster: Flame, challenger: Flame,
 }
 
 function divStep(d: Division): number {
@@ -81,26 +83,27 @@ function RankCardButton({
 }
 
 // ── RankPicker ────────────────────────────────────────────────────────────────
+// `tiers` é a fonte de opções JÁ filtrada por quem chama — nunca a lista
+// completa de 10 tiers escondendo os inválidos. Ex.: rank atual de
+// elo_boost passa BOOST_CURRENT_RANK_TIERS (sem Challenger); rank alvo do
+// fluxo padrão passa STANDARD_RANK_TIERS (Iron–Diamond).
 
 interface RankPickerProps {
+  tiers: RankTier[]
   selectedTier: RankTier | null
   selectedDivision: Division | null
   onChange: (tier: RankTier, division: Division | null) => void
   minTier?: RankTier | null
   minDiv?: Division | null
-  maxTier?: RankTier | null
 }
 
 function RankPicker({
-  selectedTier, selectedDivision, onChange, minTier, minDiv, maxTier,
+  tiers, selectedTier, selectedDivision, onChange, minTier, minDiv,
 }: RankPickerProps) {
-  const minIdx = minTier ? RANK_TIER_ORDER.indexOf(minTier) : 0
-  const maxIdx = maxTier ? RANK_TIER_ORDER.indexOf(maxTier) + 1 : RANK_TIER_ORDER.length
-  const availableSet = new Set(RANK_TIER_ORDER.slice(minIdx, maxIdx))
+  const minIdx = minTier ? tiers.indexOf(minTier) : 0
+  const availableSet = new Set(minIdx >= 0 ? tiers.slice(minIdx) : tiers)
 
-  const isMasterPlus = selectedTier ? MASTER_PLUS.includes(selectedTier) : false
-
-  const validDivisions = !isMasterPlus && selectedTier
+  const validDivisions = selectedTier
     ? DIVISIONS.filter(d => {
         if (!minTier || selectedTier !== minTier) return true
         return divStep(d) > divStep(minDiv ?? 'IV')
@@ -109,7 +112,7 @@ function RankPicker({
 
   function handleTier(tier: RankTier) {
     if (!availableSet.has(tier)) return
-    const div = MASTER_PLUS.includes(tier) ? null : (selectedDivision ?? 'IV')
+    const div = selectedDivision ?? 'IV'
     if (minTier && tier === minTier && minDiv) {
       const first = DIVISIONS.find(d => divStep(d) > divStep(minDiv))
       onChange(tier, first ?? 'I')
@@ -121,7 +124,7 @@ function RankPicker({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-5 gap-1">
-        {RANK_TIER_ORDER.map(tier => (
+        {tiers.map(tier => (
           <RankCardButton
             key={tier}
             tier={tier}
@@ -131,7 +134,7 @@ function RankPicker({
           />
         ))}
       </div>
-      {!isMasterPlus && selectedTier && validDivisions.length > 0 && (
+      {selectedTier && validDivisions.length > 0 && (
         <div className="flex gap-1.5">
           {validDivisions.map(div => (
             <button
@@ -199,31 +202,58 @@ export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased, sessionsPurchased,
-    currentLp, avgLpGain, avgLpLoss, targetLp,
+    currentLp, avgLpGain, avgLpLoss,
+    currentPdl, avgPdlGain, avgPdlLoss,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
-    setCurrentLp, setAvgLpGain, setAvgLpLoss, setTargetLp,
+    setCurrentLp, setAvgLpGain, setAvgLpLoss,
+    setCurrentPdl, setAvgPdlGain, setAvgPdlLoss,
     setBasePrice, setEstimatedHours,
   } = useOrderBuilderStore()
 
-  const currentIsMasterPlus = currentRank ? MASTER_PLUS.includes(currentRank.tier) : false
+  const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
+  const pdlBracket = currentIsMasterPlus ? getPdlBracket(currentPdl) : null
+
+  // Grão-Mestre só tem um destino válido (Challenger) — a interface pode
+  // preenchê-lo automaticamente, mas o backend valida a combinação de novo.
+  useEffect(() => {
+    if (currentRank?.tier === 'grandmaster' && targetRank?.tier !== 'challenger') {
+      setTargetRank({ tier: 'challenger', division: null })
+    }
+  }, [currentRank, targetRank, setTargetRank])
+
+  // Preço do Master+ vem da tabela comercial (origem × destino × faixa de
+  // PDL atual) — não existe fórmula local. Se a combinação ainda não tem
+  // preço configurado, o preço fica indefinido e o pedido não avança.
+  const { data: masterPlusPriceRow, isFetching: loadingMasterPlusPrice } = useQuery({
+    queryKey: ['master-plus-price', currentRank?.tier, targetRank?.tier, pdlBracket],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('master_plus_pricing')
+        .select('price')
+        .eq('current_tier', currentRank!.tier)
+        .eq('target_tier', targetRank!.tier)
+        .eq('pdl_bracket', pdlBracket!)
+        .maybeSingle()
+      if (error) throw error
+      return data as { price: number | null } | null
+    },
+    enabled: currentIsMasterPlus && !!currentRank && !!targetRank && !!pdlBracket,
+  })
 
   useEffect(() => {
     if (serviceType === 'elo_boost') {
       if (!currentRank) return
 
       if (currentIsMasterPlus) {
-        if (targetLp === null || targetLp <= currentLp) {
+        const price = masterPlusPriceRow?.price
+        if (!targetRank || price == null) {
           setBasePrice(0)
           setEstimatedHours(null)
           return
         }
-        const price = calcMasterPlusPrice(currentRank.tier, currentLp, targetLp)
-        const finalPrice = boostMode === 'duo'
-          ? Math.round(price * (1 + DUO_BOOST_PCT / 100) * 100) / 100
-          : price
-        setBasePrice(finalPrice)
-        setEstimatedHours(Math.max(1, Math.round((targetLp - currentLp) / 25)))
+        setBasePrice(price)
+        setEstimatedHours(null)
         return
       }
 
@@ -254,9 +284,13 @@ export function StepConfigure() {
     }
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, sessionsPurchased,
-    currentLp, avgLpGain, avgLpLoss, targetLp, currentIsMasterPlus,
+    currentLp, avgLpGain, avgLpLoss, currentIsMasterPlus, masterPlusPriceRow,
     setBasePrice, setEstimatedHours,
   ])
+
+  const masterPlusTargets = currentRank && currentIsMasterPlus
+    ? getValidMasterPlusTargets(currentRank.tier as 'master' | 'grandmaster')
+    : []
 
   return (
     <div>
@@ -264,8 +298,8 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
-        {/* Duo Boost toggle */}
-        {serviceType === 'elo_boost' && (
+        {/* Duo Boost toggle — não existe no fluxo Master+ */}
+        {serviceType === 'elo_boost' && !currentIsMasterPlus && (
           <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
             <button
               type="button"
@@ -323,41 +357,62 @@ export function StepConfigure() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
 
                 <RankPicker
+                  tiers={BOOST_CURRENT_RANK_TIERS}
                   selectedTier={currentRank?.tier ?? null}
                   selectedDivision={currentRank?.division ?? null}
-                  onChange={(tier, division) => {
-                    setCurrentRank({ tier, division })
-                    if (MASTER_PLUS.includes(tier)) {
-                      setCurrentLp(0); setTargetLp(null); setTargetRank(null)
-                    } else {
-                      setTargetLp(null); setCurrentLp(0)
-                    }
-                  }}
+                  onChange={(tier, division) => setCurrentRank({ tier, division: isMasterPlusCurrentTier(tier) ? null : division })}
                 />
 
-                {/* LP fields — current rank */}
-                {currentRank && (
+                {/* PDL — fluxo padrão (Iron–Diamond) */}
+                {currentRank && !currentIsMasterPlus && (
                   <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
                     <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
                     <div className="grid grid-cols-3 gap-2">
-                      {currentIsMasterPlus ? (
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-ink-secondary">LP Atual</p>
-                          <input
-                            type="number"
-                            min={0}
-                            max={9999}
-                            value={currentLp || ''}
-                            onChange={e => setCurrentLp(Math.max(0, parseInt(e.target.value) || 0))}
-                            placeholder="ex: 200"
-                            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                        </div>
-                      ) : (
-                        <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
-                      )}
+                      <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
                       <LpCounter label="Méd. Ganhos" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
                       <LpCounter label="Méd. Perdidos" value={avgLpLoss} min={1} max={40} onChange={setAvgLpLoss} />
+                    </div>
+                  </div>
+                )}
+
+                {/* PDL — fluxo Master+: PDL atual, média de ganho e média de
+                    perda. Não existe PDL alvo — o preço depende da faixa de
+                    PDL atual, não de um alvo informado pelo cliente. */}
+                {currentRank && currentIsMasterPlus && (
+                  <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-3">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-semibold text-ink-secondary">PDL atual no rank</p>
+                      <input
+                        type="number"
+                        min={0}
+                        value={currentPdl || ''}
+                        onChange={e => setCurrentPdl(Math.max(0, parseInt(e.target.value) || 0))}
+                        placeholder="ex: 65"
+                        className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-ink-secondary">Méd. PDL ganho/vitória</p>
+                        <input
+                          type="number"
+                          min={1}
+                          value={avgPdlGain || ''}
+                          onChange={e => setAvgPdlGain(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-ink-secondary">Méd. PDL perdido/derrota</p>
+                        <input
+                          type="number"
+                          min={1}
+                          value={avgPdlLoss || ''}
+                          onChange={e => setAvgPdlLoss(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -367,40 +422,44 @@ export function StepConfigure() {
               <div className="p-4 space-y-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Alvo</p>
 
-                {currentRank ? (
-                  <>
-                    <RankPicker
-                      selectedTier={targetRank?.tier ?? null}
-                      selectedDivision={targetRank?.division ?? null}
-                      onChange={(tier, division) => setTargetRank({ tier, division })}
-                      minTier={currentRank.tier}
-                      minDiv={currentRank.division}
-                    />
-
-                    {/* LP alvo — only shown when current is Master+ */}
-                    {currentIsMasterPlus && (
-                      <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Alvo</p>
-                        <div className="space-y-1">
-                          <p className="text-[10px] font-semibold text-ink-secondary">LP Alvo</p>
-                          <input
-                            type="number"
-                            min={0}
-                            max={9999}
-                            value={targetLp ?? ''}
-                            onChange={e => {
-                              const v = parseInt(e.target.value)
-                              setTargetLp(isNaN(v) ? null : Math.max(0, v))
-                            }}
-                            placeholder="ex: 800"
-                            className="input-base text-center font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
+                {!currentRank ? (
                   <p className="text-xs text-ink-muted pt-2">Selecione o rank atual primeiro.</p>
+                ) : currentIsMasterPlus ? (
+                  <div className="space-y-2">
+                    {masterPlusTargets.map(tier => (
+                      <button
+                        key={tier}
+                        type="button"
+                        onClick={() => setTargetRank({ tier, division: null })}
+                        disabled={currentRank.tier === 'grandmaster'}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all text-left',
+                          targetRank?.tier === tier
+                            ? 'border-brand bg-brand/10 text-brand'
+                            : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                          currentRank.tier === 'grandmaster' && 'cursor-default',
+                        )}
+                      >
+                        <span className="text-sm font-bold">{RANK_TIER_LABEL[tier]}</span>
+                      </button>
+                    ))}
+                    {currentRank.tier === 'grandmaster' && (
+                      <p className="text-[11px] text-ink-muted">Único destino possível a partir de Grão-Mestre.</p>
+                    )}
+                    {loadingMasterPlusPrice && <p className="text-[11px] text-ink-muted">Calculando preço…</p>}
+                    {!loadingMasterPlusPrice && targetRank && masterPlusPriceRow?.price == null && (
+                      <p className="text-[11px] text-warning">Preço ainda não configurado para essa combinação. Fale com o suporte.</p>
+                    )}
+                  </div>
+                ) : (
+                  <RankPicker
+                    tiers={STANDARD_RANK_TIERS}
+                    selectedTier={targetRank?.tier ?? null}
+                    selectedDivision={targetRank?.division ?? null}
+                    onChange={(tier, division) => setTargetRank({ tier, division })}
+                    minTier={currentRank.tier}
+                    minDiv={currentRank.division}
+                  />
                 )}
               </div>
             </div>
@@ -411,6 +470,7 @@ export function StepConfigure() {
         {serviceType === 'win_boost' && (
           <FormField label="Rank Atual" required>
             <RankPicker
+              tiers={RANK_TIER_ORDER}
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
@@ -422,6 +482,7 @@ export function StepConfigure() {
         {serviceType === 'placement_matches' && (
           <FormField label="Rank Final da Última Temporada" required>
             <RankPicker
+              tiers={RANK_TIER_ORDER}
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
