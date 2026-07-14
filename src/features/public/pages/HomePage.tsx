@@ -202,19 +202,19 @@ export function HomePage() {
       </section>
 
       {/* ── SERVICES ─────────────────────────────────────────────────────── */}
-      <section id="services" className="py-28 bg-bg-surface scroll-mt-20">
+      <section id="services" className="py-20 bg-bg-surface scroll-mt-20">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-16"
+            className="text-center mb-12"
           >
             <p className="section-label mb-3">{t('home.services.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.services.title')}</h2>
             <p className="mt-4 text-ink-secondary text-lg max-w-xl mx-auto">{t('home.services.desc')}</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="grid sm:grid-cols-3 gap-5">
             {SERVICES.map(({ icon: Icon, title, href, badge, color, desc }, i) => (
               <motion.div key={title}
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
@@ -259,13 +259,13 @@ export function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-      <section className="py-28 bg-bg-base relative overflow-hidden">
+      <section className="py-20 bg-bg-base relative overflow-hidden">
         <div className="absolute inset-0 bg-grid pointer-events-none opacity-40" />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-16"
+            className="text-center mb-12"
           >
             <p className="section-label mb-3">{t('home.howItWorks.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.howItWorks.title')}</h2>
@@ -306,7 +306,7 @@ export function HomePage() {
       </section>
 
       {/* ── TRUST & SECURITY ─────────────────────────────────────────────── */}
-      <section className="py-28 bg-bg-surface">
+      <section className="py-20 bg-bg-surface">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-start">
 
@@ -372,7 +372,7 @@ export function HomePage() {
 
       {/* ── BOOSTERS ─────────────────────────────────────────────────────── */}
       {featuredBoosters.length > 0 && (
-        <section className="py-28 bg-bg-base">
+        <section className="py-20 bg-bg-base">
           <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -452,12 +452,12 @@ export function HomePage() {
       )}
 
       {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
-      <section className="py-28 bg-bg-base overflow-hidden">
+      <section className="py-20 bg-bg-base overflow-hidden">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-16"
+            className="text-center mb-12"
           >
             <p className="section-label mb-3">{t('home.reviewsSection.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.reviewsSection.title')}</h2>
@@ -468,7 +468,7 @@ export function HomePage() {
       </section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
-      <section className="py-28 bg-bg-surface relative overflow-hidden">
+      <section className="py-20 bg-bg-surface relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
         <div className="absolute inset-0 bg-grid opacity-40 pointer-events-none" />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
