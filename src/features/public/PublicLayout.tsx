@@ -173,7 +173,6 @@ export function PublicLayout() {
               { title: t('footer.services'), links: [
                 { href: '/orders/new?service=elo_boost',          label: t('footer.eloBoost') },
                 { href: '/orders/new?service=win_boost',          label: t('footer.winBoost') },
-                { href: '/orders/new?service=placement_matches',  label: t('footer.md5')      },
                 { href: '/orders/new?service=coaching',           label: t('footer.coaching') },
               ]},
               { title: t('footer.company'), links: [

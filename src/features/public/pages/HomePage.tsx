@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Shield, Zap, Clock, Users, ChevronRight,
   TrendingUp, MessageCircle, CheckCircle2,
-  ArrowRight, Lock, Trophy, Star,
+  ArrowRight, Lock, Star,
 } from 'lucide-react'
 import { Avatar, Button, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
@@ -77,14 +77,6 @@ export function HomePage() {
       badge: t('home.services.pro'),
       color: 'text-success bg-success/10',
       desc: t('home.services.coachingDesc'),
-    },
-    {
-      icon: Trophy,
-      title: t('home.services.placementsTitle'),
-      href: '/orders/new?service=placement_matches',
-      badge: null,
-      color: 'text-rank-grandmaster bg-rank-grandmaster/10',
-      desc: t('home.services.placementsDesc'),
     },
   ]
 

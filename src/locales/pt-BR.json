@@ -19,8 +19,7 @@
     "company": "Empresa",
     "account": "Conta",
     "eloBoost": "Solo Boost / Duo Boost",
-    "winBoost": "Vitórias",
-    "md5": "MD5",
+    "winBoost": "Vitórias / MD5",
     "coaching": "Coaching",
     "pricing": "Preços",
     "reviews": "Avaliações",
@@ -61,12 +60,10 @@
       "pro": "Pro",
       "eloBoostTitle": "Solo Boost / Duo Boost",
       "eloBoostDesc": "Nossos boosters jogam na sua conta (Solo) ou ao seu lado (Duo) e sobem do seu rank atual até o rank desejado, divisão por divisão.",
-      "winBoostTitle": "Vitórias",
-      "winBoostDesc": "Compre um número fixo de vitórias para ganhar LP rápido. Perfeito para promoções, missões diárias e bônus de LP.",
+      "winBoostTitle": "Vitórias / MD5",
+      "winBoostDesc": "Compre um número fixo de vitórias para ganhar LP rápido — ou, se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente.",
       "coachingTitle": "Coaching",
-      "coachingDesc": "Sessões 1-a-1 ao vivo. Seu coach analisa seus VODs, identifica erros e cria um plano de melhoria personalizado.",
-      "placementsTitle": "MD5",
-      "placementsDesc": "Comece cada temporada no rank que você merece. Jogamos suas 5 partidas de posicionamento com um pool aprovado por você."
+      "coachingDesc": "Sessões 1-a-1 ao vivo. Seu coach analisa seus VODs, identifica erros e cria um plano de melhoria personalizado."
     },
     "howItWorks": {
       "sectionLabel": "Processo simples",
