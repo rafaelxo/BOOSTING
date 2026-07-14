@@ -1,18 +1,25 @@
 export interface Testimonial {
   name: string
-  rank: string
+  service: 'boost' | 'coaching'
+  /** Boost: transição de rank ("Ouro → Platina"). Coaching: foco da sessão ("Coaching de Jungle"). */
+  tag: string
   rating: number
   comment: string
 }
 
 export const TESTIMONIALS: Testimonial[] = [
-  { name: 'Alex M.', rank: 'Ouro → Platina', rating: 5, comment: 'Experiência muito tranquila. Cheguei à Platina em 2 dias e recebi atualizações durante todo o pedido.' },
-  { name: 'TurboKai', rank: 'Prata → Diamante', rating: 5, comment: 'Fui do Prata ao Diamante em uma semana. Também usei coaching e mudou completamente minha forma de jogar.' },
-  { name: 'Sarah V.', rank: 'Ferro → Ouro', rating: 5, comment: 'Eu estava com receio no começo, mas o serviço foi seguro, rápido e com ótima comunicação.' },
-  { name: 'NightFury99', rank: 'Bronze → Platina', rating: 5, comment: 'Usei a transmissão ao vivo e acompanhei todas as partidas. O booster jogou muito bem.' },
-  { name: 'CosmicPlayer', rank: 'Platina → Diamante', rating: 5, comment: 'Segunda vez usando o serviço. O atendimento continua rápido e o booster foi muito responsivo.' },
-  { name: 'JaxMain', rank: 'Ouro → Esmeralda', rating: 4, comment: 'Demorou um pouco mais do que o previsto, mas o booster manteve boa comunicação. Fiquei satisfeito.' },
-  { name: 'CryptoADC', rank: 'Prata → Ouro', rating: 5, comment: 'Pedi tarde da noite e de manhã o booster já tinha começado. A velocidade surpreendeu.' },
-  { name: 'VoidWalker_', rank: 'Diamante → Mestre', rating: 5, comment: 'O serviço high elo é sério. Booster nível Desafiante, ótima taxa de vitória e execução impecável.' },
-  { name: 'MidOrFeed22', rank: 'Bronze → Ouro', rating: 5, comment: 'Além de subir minha conta, aprendi bastante acompanhando as partidas pela transmissão.' },
+  { name: 'Bruno S.',       service: 'boost',    tag: 'Ouro → Platina',      rating: 5, comment: 'Experiência muito tranquila. Paguei no PIX e acompanhei as partidas ao vivo — cheguei na Platina em 2 dias.' },
+  { name: 'kaduzera',       service: 'boost',    tag: 'Prata → Diamante',    rating: 5, comment: 'Do Prata ao Diamante em uma semana. Depois ainda peguei umas sessões de coaching e mudou completamente meu jogo de mid.' },
+  { name: 'Larissa F.',     service: 'boost',    tag: 'Ferro → Ouro',        rating: 5, comment: 'Tava com receio no começo, mas foi tudo seguro e o suporte respondeu rápido em qualquer dúvida.' },
+  { name: 'raphaADC',       service: 'boost',    tag: 'Bronze → Platina',    rating: 5, comment: 'Usei a transmissão ao vivo pra acompanhar. O booster jogava de ADC do jeito que eu pedi, dava pra aprender só assistindo.' },
+  { name: 'Camila R.',      service: 'boost',    tag: 'Platina → Diamante',  rating: 5, comment: 'Segunda vez usando o serviço. O atendimento continua rápido e o booster foi super educado.' },
+  { name: 'Thiago A.',      service: 'coaching', tag: 'Coaching de Jungle',  rating: 5, comment: 'Fiz 3 sessões focadas em jungle. O coach revisou minhas replays e hoje eu leio o mapa muito melhor.' },
+  { name: 'biel.top',       service: 'boost',    tag: 'Ouro → Esmeralda',    rating: 4, comment: 'Demorou um pouco mais que o previsto, mas o booster manteve contato o tempo todo. Fiquei satisfeito.' },
+  { name: 'gih.support',    service: 'coaching', tag: 'Coaching de Suporte', rating: 5, comment: 'Achei que já sabia jogar de suporte, mas o coach me mostrou erros de posicionamento que eu nem enxergava. Valeu cada centavo.' },
+  { name: 'nandinha_mid',   service: 'boost',    tag: 'Prata → Ouro',        rating: 5, comment: 'Pedi de madrugada e de manhã já tinha começado. Não esperava essa velocidade.' },
+  { name: 'Matheus B.',     service: 'coaching', tag: 'Coaching de Mid',     rating: 5, comment: 'O coach analisou meu VOD e me passou um plano de treino. Em duas semanas já senti diferença no farm e nas trocas.' },
+  { name: 'VoidWalker_BR',  service: 'boost',    tag: 'Diamante → Mestre',   rating: 5, comment: 'Serviço de high elo é sério mesmo. Booster nível Desafiante, taxa de vitória absurda e execução impecável.' },
+  { name: 'julinha.gg',     service: 'coaching', tag: 'Coaching de ADC',     rating: 5, comment: 'Sessão ao vivo — o coach jogava junto e ia corrigindo na hora. Muito mais rápido que assistir vídeo sozinha.' },
+  { name: 'davizera_',      service: 'boost',    tag: 'Bronze → Ouro',       rating: 5, comment: 'Além de subir a conta, aprendi bastante só de ver as partidas pela transmissão.' },
+  { name: 'renatinho10',    service: 'coaching', tag: 'Coaching de Top',     rating: 5, comment: 'Sempre travava contra tank. O coach me ensinou timing de wave e trocas — subi de elo sozinho depois.' },
 ]

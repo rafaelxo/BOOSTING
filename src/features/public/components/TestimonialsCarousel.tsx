@@ -1,25 +1,31 @@
-import { StarRating } from '@/components/ui'
 import { TESTIMONIALS } from '../data/testimonials'
+import { TestimonialCard } from './TestimonialCard'
 
-const TRACK = [...TESTIMONIALS, ...TESTIMONIALS]
+// Duas fileiras, sentidos opostos — cada uma pega metade dos depoimentos
+// (índices pares/ímpares, pra misturar boost e coaching nas duas), duplicada
+// pra fechar o loop sem emenda. Velocidades diferentes evitam o efeito de
+// "esteira única" e dão mais vida à seção sem virar bagunça.
+const ROW_A = TESTIMONIALS.filter((_, i) => i % 2 === 0)
+const ROW_B = TESTIMONIALS.filter((_, i) => i % 2 === 1)
+
+function MarqueeRow({ items, animationClass }: { items: typeof TESTIMONIALS; animationClass: string }) {
+  const track = [...items, ...items]
+  return (
+    <div className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
+      <div className={`flex w-max gap-5 motion-reduce:animate-none group-hover:[animation-play-state:paused] ${animationClass}`}>
+        {track.map((testimonial, i) => (
+          <TestimonialCard key={`${testimonial.name}-${i}`} {...testimonial} className="w-80 shrink-0" />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function TestimonialsCarousel() {
   return (
-    <div
-      className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]"
-    >
-      <div className="flex w-max gap-5 animate-marquee group-hover:[animation-play-state:paused]">
-        {TRACK.map(({ name, rank, rating, comment }, i) => (
-          <div key={`${name}-${i}`} className="card p-5 space-y-4 w-80 shrink-0">
-            <StarRating rating={rating} showValue={false} />
-            <p className="text-sm text-ink-secondary leading-relaxed">"{comment}"</p>
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink">{name}</p>
-              <span className="text-xs text-brand font-medium bg-brand/10 px-2 py-0.5 rounded-full">{rank}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+    <div className="space-y-5">
+      <MarqueeRow items={ROW_A} animationClass="animate-marquee" />
+      <MarqueeRow items={ROW_B} animationClass="animate-marquee-reverse" />
     </div>
   )
 }

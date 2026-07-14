@@ -1,6 +1,6 @@
 import { Star } from 'lucide-react'
-import { StarRating } from '@/components/ui'
 import { TESTIMONIALS } from '../data/testimonials'
+import { TestimonialCard } from '../components/TestimonialCard'
 
 export function ReviewsPage() {
   const avg = (TESTIMONIALS.reduce((sum, r) => sum + r.rating, 0) / TESTIMONIALS.length).toFixed(1)
@@ -23,15 +23,8 @@ export function ReviewsPage() {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {TESTIMONIALS.map(({ name, rank, rating, comment }) => (
-            <div key={name} className="card p-5 space-y-4">
-              <StarRating rating={rating} showValue={false} />
-              <p className="text-sm text-ink-secondary leading-relaxed">"{comment}"</p>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-ink">{name}</p>
-                <span className="text-xs text-brand font-medium bg-brand/10 px-2 py-0.5 rounded-full">{rank}</span>
-              </div>
-            </div>
+          {TESTIMONIALS.map((testimonial) => (
+            <TestimonialCard key={testimonial.name} {...testimonial} />
           ))}
         </div>
       </div>
