@@ -9,6 +9,8 @@ import { timeAgo } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order } from '@/types'
 
+// Pedidos cancelados ficam só na aba "Meus Pedidos" (/orders) — nunca
+// aparecem no painel, nem na lista de recentes nem nos cartões de destaque.
 function useRecentOrders(customerId: string) {
   return useQuery({
     queryKey: ['customer-orders', customerId, 'recent'],
@@ -17,11 +19,47 @@ function useRecentOrders(customerId: string) {
         .from('orders')
         .select('*')
         .eq('customer_id', customerId)
+        .neq('status', 'canceled')
         .order('created_at', { ascending: false })
         .limit(5)
 
       if (error) throw error
       return data as unknown as Order[]
+    },
+  })
+}
+
+// Estatísticas do painel vêm de contagens/valores reais (não da lista de
+// recentes, que é limitada a 5 linhas e não representaria um total de
+// verdade). "total gasto"/"total de pedidos" vêm de customer_profiles —
+// contadores persistidos no backend (trigger em supabase/migrations/
+// 024_customer_stats_exclude_canceled.sql), que descontam automaticamente
+// quando um pedido pago é cancelado ou reembolsado depois — nunca contam
+// pedidos cancelados/reembolsados/não pagos como "gasto".
+function useDashboardStats(customerId: string) {
+  return useQuery({
+    queryKey: ['customer-dashboard-stats', customerId],
+    queryFn: async () => {
+      const [{ data: profileStats, error: profileError }, { count: activeCount, error: activeError }, { count: completedCount, error: completedError }] = await Promise.all([
+        supabase.from('customer_profiles').select('total_orders, total_spent').eq('user_id', customerId).maybeSingle(),
+        supabase.from('orders').select('id', { count: 'exact', head: true })
+          .eq('customer_id', customerId)
+          .in('status', ['paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer']),
+        supabase.from('orders').select('id', { count: 'exact', head: true })
+          .eq('customer_id', customerId)
+          .eq('status', 'completed'),
+      ])
+
+      if (profileError) throw profileError
+      if (activeError) throw activeError
+      if (completedError) throw completedError
+
+      return {
+        totalOrders: profileStats?.total_orders ?? 0,
+        totalSpent: Number(profileStats?.total_spent ?? 0),
+        activeCount: activeCount ?? 0,
+        completedCount: completedCount ?? 0,
+      }
     },
   })
 }
@@ -32,12 +70,13 @@ export function CustomerDashboard() {
   const navigate = useNavigate()
   const currency = useCurrency()
   const { data: orders, isLoading } = useRecentOrders(profile?.id ?? '')
+  const { data: stats } = useDashboardStats(profile?.id ?? '')
 
   const activeOrders = orders?.filter(o =>
     ['paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(o.status)
   ) ?? []
 
-  const completedCount = orders?.filter(o => o.status === 'completed').length ?? 0
+  const activeCount = stats?.activeCount ?? 0
 
   const hour = new Date().getHours()
   const greeting = hour < 12
@@ -46,11 +85,11 @@ export function CustomerDashboard() {
       ? t('customer.dashboard.afternoon')
       : t('customer.dashboard.evening')
 
-  const activeMsg = activeOrders.length === 0
+  const activeMsg = activeCount === 0
     ? t('customer.dashboard.noActive')
-    : activeOrders.length === 1
+    : activeCount === 1
       ? t('customer.dashboard.activeCount', { count: 1 })
-      : t('customer.dashboard.activeCountPlural', { count: activeOrders.length })
+      : t('customer.dashboard.activeCountPlural', { count: activeCount })
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -74,10 +113,10 @@ export function CustomerDashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: t('customer.dashboard.stats.active'),    value: activeOrders.length,  icon: Zap,           color: 'text-brand bg-brand/10' },
-          { label: t('customer.dashboard.stats.total'),     value: orders?.length ?? 0,  icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
-          { label: t('customer.dashboard.stats.completed'), value: completedCount,        icon: ShoppingBag,   color: 'text-success bg-success/10' },
-          { label: t('customer.dashboard.stats.spent'),     value: currency(orders?.reduce((s, o) => s + o.total_price, 0) ?? 0), icon: MessageCircle, color: 'text-info bg-info/10' },
+          { label: t('customer.dashboard.stats.active'),    value: activeCount,                        icon: Zap,           color: 'text-brand bg-brand/10' },
+          { label: t('customer.dashboard.stats.total'),     value: stats?.totalOrders ?? 0,             icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
+          { label: t('customer.dashboard.stats.completed'), value: stats?.completedCount ?? 0,          icon: ShoppingBag,   color: 'text-success bg-success/10' },
+          { label: t('customer.dashboard.stats.spent'),     value: currency(stats?.totalSpent ?? 0),    icon: MessageCircle, color: 'text-info bg-info/10' },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} padding="md">
             <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
