@@ -7,18 +7,22 @@ import { HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 import {
   fetchLeagueEntries,
+  fetchRankedMatchIdsThisSplit,
   fetchRiotAccount,
   NO_DIVISION_TIERS,
   RIOT_DIVISION_MAP,
+  RIOT_QUEUE_TYPE,
   RIOT_TIER_MAP,
 } from '../_shared/riotLookup.ts'
 
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const REGIONAL_ROUTE = 'americas'
 const PLATFORM_ROUTE = 'br1'
+const SPLIT_START_TIMESTAMP = Number(Deno.env.get('LOL_SPLIT_START_TIMESTAMP') ?? '0')
 
 const bodySchema = z.object({
   riot_id: z.string().trim().min(3).max(32).regex(/^[^#]{1,16}#[A-Za-z0-9]{2,5}$/),
+  queue: z.enum(['solo_duo', 'flex']).default('solo_duo'),
 }).strict()
 
 function badRequest(req: Request, message: string) {
@@ -44,6 +48,8 @@ serve(async (req) => {
     if (!parsedBody.success) return badRequest(req, 'Riot ID inválido')
 
     const riotId = parsedBody.data.riot_id
+    const queue = parsedBody.data.queue
+    const { leagueQueue } = RIOT_QUEUE_TYPE[queue]
 
     const accountResult = await fetchRiotAccount(riotId, RIOT_API_KEY, REGIONAL_ROUTE)
     if (!accountResult.ok) {
@@ -67,35 +73,50 @@ serve(async (req) => {
       return errorResponse(req, 'Falha ao consultar elo na Riot', 502)
     }
 
-    const soloEntry = leagueResult.entries.find((entry) => entry.queueType === 'RANKED_SOLO_5x5')
+    const queueEntry = leagueResult.entries.find((entry) => entry.queueType === leagueQueue)
+    const tier = queueEntry?.tier ? RIOT_TIER_MAP[queueEntry.tier] ?? null : null
 
-    const tier = soloEntry?.tier ? RIOT_TIER_MAP[soloEntry.tier] ?? null : null
-    if (!soloEntry || !tier) {
+    if (!queueEntry || !tier) {
+      // No ranked entry for this queue — still in placements (or never played
+      // ranked at all this split). MD5-eligible; count how many placement
+      // games remain via Match-V5 (League-V4 has no direct field for this).
+      let matchesRemaining = 5
+      if (SPLIT_START_TIMESTAMP > 0) {
+        const matchResult = await fetchRankedMatchIdsThisSplit(
+          account.puuid, RIOT_API_KEY, REGIONAL_ROUTE, queue, SPLIT_START_TIMESTAMP,
+        )
+        if (matchResult.ok) matchesRemaining = Math.max(0, 5 - matchResult.matchIds.length)
+      }
       return jsonResponse(req, {
         found: true,
         ranked: false,
+        queue,
         riot_id: `${account.gameName}#${account.tagLine}`,
+        md5_eligible: true,
+        matches_remaining: matchesRemaining,
       })
     }
 
     const division = NO_DIVISION_TIERS.includes(tier)
       ? null
-      : soloEntry.rank ? RIOT_DIVISION_MAP[soloEntry.rank] ?? null : null
+      : queueEntry.rank ? RIOT_DIVISION_MAP[queueEntry.rank] ?? null : null
 
     return jsonResponse(req, {
       found: true,
       ranked: true,
+      queue,
       riot_id: `${account.gameName}#${account.tagLine}`,
       tier,
       division,
-      league_points: Math.max(0, Number(soloEntry.leaguePoints ?? 0)),
-      wins: Number(soloEntry.wins ?? 0),
-      losses: Number(soloEntry.losses ?? 0),
+      league_points: Math.max(0, Number(queueEntry.leaguePoints ?? 0)),
+      wins: Number(queueEntry.wins ?? 0),
+      losses: Number(queueEntry.losses ?? 0),
       // Riot League-V4 exposes current LP, wins and losses, but not average LP
       // gain/loss. Keep these nullable so the UI only overwrites averages if a
       // future backend implementation can compute them safely.
       avg_lp_gain: null,
       avg_lp_loss: null,
+      md5_eligible: false,
       message: 'Elo e LP atual preenchidos pela Riot. Médias de ganho/perda continuam editáveis.',
     })
   } catch (err) {
