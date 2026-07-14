@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { cn, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { isRankLocked } from '@/lib/boostDomain'
+import { isRankLocked, tierHasDivisions } from '@/lib/boostDomain'
 import type { Division, RankTier } from '@/types'
 import { Shield, Star, Gem, Diamond, Crown, Flame } from 'lucide-react'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-const NO_DIVISION_TIERS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
 const TIER_IMAGE: Record<RankTier, string> = {
   iron: '/ranks/1_iron.webp', bronze: '/ranks/2_bronze.webp', silver: '/ranks/3_silver.webp',
@@ -60,7 +59,7 @@ function TierButton({ tier, isSelected, isLocked, onClick }: {
 
 export function RankLockGrid({ current, selectedTier, selectedDivision, onChange, tiers }: RankLockGridProps) {
   function handleTier(tier: RankTier) {
-    if (!NO_DIVISION_TIERS.includes(tier)) {
+    if (tierHasDivisions(tier)) {
       // Pick the first unlocked division for this tier, defaulting to IV.
       const firstOpen = DIVISIONS.find((d) => !isRankLocked({ tier, division: d }, current)) ?? 'IV'
       onChange(tier, firstOpen)
@@ -70,7 +69,7 @@ export function RankLockGrid({ current, selectedTier, selectedDivision, onChange
     onChange(tier, null)
   }
 
-  const validDivisions = selectedTier && !NO_DIVISION_TIERS.includes(selectedTier) ? DIVISIONS : []
+  const validDivisions = selectedTier && tierHasDivisions(selectedTier) ? DIVISIONS : []
 
   return (
     <div className="space-y-2">
@@ -80,10 +79,13 @@ export function RankLockGrid({ current, selectedTier, selectedDivision, onChange
             key={tier}
             tier={tier}
             isSelected={selectedTier === tier}
+            // rankStep is monotonic within a tier (I is always the highest
+            // division) — a tier is fully locked exactly when its highest
+            // division is locked, no need to also check the lowest.
             isLocked={isRankLocked(
-              { tier, division: NO_DIVISION_TIERS.includes(tier) ? null : 'I' },
+              { tier, division: tierHasDivisions(tier) ? 'I' : null },
               current,
-            ) && isRankLocked({ tier, division: NO_DIVISION_TIERS.includes(tier) ? null : 'IV' }, current)}
+            )}
             onClick={() => handleTier(tier)}
           />
         ))}
