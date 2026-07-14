@@ -186,6 +186,16 @@ export const DUO_BOOST_PCT = 50
 // MASTER_PLUS_PROGRESSIONS) e a migration que cria `master_plus_pricing`.
 
 // ── LP Modifier for Iron–Diamond ──────────────────────────────────────────────
+// Percentual de eficiência aplicado conforme a média de LP por partida —
+// função isolada para que `applyLpModifier` e `computeOrderPrice` consultem
+// os mesmos limiares (19/20/25/26) sem duas checagens independentes
+// divergirem no futuro.
+export function lpModifierPct(avgLpPerGame: number): number {
+  if (avgLpPerGame < 20) return 15
+  if (avgLpPerGame > 25) return -5
+  return 0
+}
+
 export function applyLpModifier(
   basePrice: number,
   fTier: RankTier,
@@ -202,7 +212,8 @@ export function applyLpModifier(
   const baseCents = moneyToCents(basePrice)
   const divPriceCents = moneyToCents(getEloDivPrice(queueType, fTier))
   const lpDiscountCents = Math.round(currentLp * divPriceCents / 100)
-  const efficiencyMod = avgLpPerGame < 20 ? 1.15 : avgLpPerGame > 25 ? 0.95 : 1
+  const pct = lpModifierPct(avgLpPerGame)
+  const efficiencyMod = 1 + pct / 100
   return centsToMoney(Math.max(0, Math.round((baseCents - lpDiscountCents) * efficiencyMod)))
 }
 
@@ -256,6 +267,10 @@ export interface OrderPriceResult {
   estimatedHours: number | null
   winPackagePrice: number
   extrasBreakdown: { id: string; price: number }[]
+  // Percentual de modificador de PDL efetivamente aplicado (-5, 0 ou +15) —
+  // só existe no fluxo padrão elo_boost (Iron–Diamond); `null` para Master+
+  // e para qualquer outro serviceType, onde este modificador nunca se aplica.
+  pdlModifierPct: number | null
 }
 
 export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
@@ -268,6 +283,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
   }
   let basePrice = 0
   let estimatedHours: number | null = null
+  let pdlModifierPct: number | null = null
 
   switch (input.serviceType) {
     case 'elo_boost': {
@@ -278,6 +294,8 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
         // Master+ não aceita Duo — basePrice fica 0 (bloqueado) se boostMode
         // vier 'duo' aqui; a rejeição explícita acontece antes disso, na
         // validação de fluxo (getBoostFlow retorna null para essa combinação).
+        // O modificador de PDL nunca se aplica ao Master+ — pdlModifierPct
+        // permanece null.
         if (boostMode === 'duo' || input.masterPlusPrice == null) break
         basePrice = centsToMoney(moneyToCents(input.masterPlusPrice))
         estimatedHours = null
@@ -293,6 +311,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
           ? centsToMoney(moneyToCents(withLp) + percentageOfCents(moneyToCents(withLp), DUO_BOOST_PCT))
           : centsToMoney(moneyToCents(withLp))
         estimatedHours = hours || null
+        pdlModifierPct = lpModifierPct(avgLpGain)
       }
       break
     }
@@ -348,5 +367,5 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
   const extrasPrice = centsToMoney(extrasPriceCents)
   const totalPrice = centsToMoney(basePriceCents + extrasPriceCents)
 
-  return { basePrice, extrasPrice, totalPrice, estimatedHours, winPackagePrice, extrasBreakdown }
+  return { basePrice, extrasPrice, totalPrice, estimatedHours, winPackagePrice, extrasBreakdown, pdlModifierPct }
 }

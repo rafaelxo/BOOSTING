@@ -21,9 +21,9 @@ export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased, sessionsPurchased, selectedExtraIds, winPackage,
-    isMd5, md5MatchesRemaining,
+    isMd5, md5MatchesRemaining, riotId,
     currentLp, avgLpGain, currentPdl, avgPdlGain,
-    basePrice, extrasPrice, estimatedHours, customerNotes,
+    basePrice, extrasPrice, estimatedHours, pdlModifierPct, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
 
@@ -51,6 +51,10 @@ export function StepReview() {
 
   const totalPrice = basePrice + extrasPrice
   const serviceName = serviceType ? getServiceLabel(serviceType) : '—'
+  // Preço por unidade — só faz sentido para serviços vendidos por vitória.
+  const unitPrice = (serviceType === 'win_boost' || serviceType === 'md5')
+    ? basePrice / (winsPurchased || 1)
+    : null
 
   return (
     <div>
@@ -73,6 +77,9 @@ export function StepReview() {
             )}
             {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
               <ReviewRow label="Fila" value={queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex'} />
+            )}
+            {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && riotId.trim() && (
+              <ReviewRow label="Riot ID" value={riotId.trim()} />
             )}
             {currentRank && (
               <ReviewRow
@@ -97,7 +104,10 @@ export function StepReview() {
               )
             )}
             {winsPurchased && (
-              <ReviewRow label="Vitórias" value={`${winsPurchased} vitórias`} />
+              <ReviewRow label="Quantidade de Vitórias" value={`${winsPurchased} vitórias`} />
+            )}
+            {isMd5 && (
+              <ReviewRow label="Indicador MD5" value="Sim" />
             )}
             {isMd5 && md5MatchesRemaining != null && (
               <ReviewRow label="Partidas Restantes (Booster)" value={`${md5MatchesRemaining}`} />
@@ -160,9 +170,18 @@ export function StepReview() {
             </div>
           ) : (
             <div className="card p-0 px-2">
+              {unitPrice != null && (
+                <ReviewRow label="Preço Unitário" value={currency(unitPrice)} />
+              )}
               <ReviewRow label="Preço Base" value={currency(basePrice)} />
               {extrasPrice > 0 && (
                 <ReviewRow label="Extras" value={`+${currency(extrasPrice)}`} />
+              )}
+              {!!pdlModifierPct && (
+                <ReviewRow
+                  label="Modificador de PDL"
+                  value={`${pdlModifierPct > 0 ? '+' : ''}${pdlModifierPct}%`}
+                />
               )}
               <div className="flex items-center justify-between py-3">
                 <span className="text-base font-bold text-ink">Total</span>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier,
+  computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
   moneyToCents, type OrderPriceInput, type RankTier,
 } from './pricing'
 
@@ -312,5 +312,72 @@ describe('Modificador de PDL — limiares corrigidos (15%/normal/-5%)', () => {
   })
   it('26 PDL de média aplica -5%', () => {
     expect(applyLpModifier(100, 'gold', 0, 26)).toBeCloseTo(95, 2)
+  })
+})
+
+describe('lpModifierPct — mesmos limiares expostos como percentual', () => {
+  it('19 PDL de média => +15', () => {
+    expect(lpModifierPct(19)).toBe(15)
+  })
+  it('20 PDL de média => 0 (limite inferior incluído)', () => {
+    expect(lpModifierPct(20)).toBe(0)
+  })
+  it('25 PDL de média => 0 (limite superior incluído)', () => {
+    expect(lpModifierPct(25)).toBe(0)
+  })
+  it('26 PDL de média => -5', () => {
+    expect(lpModifierPct(26)).toBe(-5)
+  })
+})
+
+describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padrão elo_boost)', () => {
+  it.each([
+    [19, 15],
+    [20, 0],
+    [25, 0],
+    [26, -5],
+  ])('avgLpGain=%i => pdlModifierPct=%i', (avgLpGain, expectedPct) => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'iron', division: 'IV' },
+      targetRank: { tier: 'iron', division: 'I' },
+      avgLpGain,
+    }))
+    expect(priced.pdlModifierPct).toBe(expectedPct)
+  })
+
+  it('Master+ nunca recebe o modificador de PDL (pdlModifierPct fica null)', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'master', division: null },
+      targetRank: { tier: 'challenger', division: null },
+      masterPlusPrice: 250,
+    }))
+    expect(priced.pdlModifierPct).toBeNull()
+  })
+
+  it('win_boost nunca recebe o modificador de PDL (pdlModifierPct fica null)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: 3,
+    }))
+    expect(priced.pdlModifierPct).toBeNull()
+  })
+
+  it('md5 nunca recebe o modificador de PDL (pdlModifierPct fica null)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5',
+      currentRank: { tier: 'gold', division: null },
+      winsPurchased: 3,
+    }))
+    expect(priced.pdlModifierPct).toBeNull()
+  })
+
+  it('coaching nunca recebe o modificador de PDL (pdlModifierPct fica null)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'coaching',
+      coachPackagePrice: 100,
+      sessionsPurchased: 1,
+    }))
+    expect(priced.pdlModifierPct).toBeNull()
   })
 })

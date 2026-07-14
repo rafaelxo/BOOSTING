@@ -82,6 +82,10 @@ interface OrderBuilderState {
   basePrice: number
   extrasPrice: number
   estimatedHours: number | null
+  // Percentual de modificador de PDL efetivamente aplicado ao basePrice
+  // (-5, 0 ou +15) — null para Master+ e para qualquer serviceType que não
+  // seja elo_boost padrão (Iron–Diamond). Espelha OrderPriceResult.pdlModifierPct.
+  pdlModifierPct: number | null
 
   // Actions
   setStep: (step: OrderBuilderStep) => void
@@ -117,6 +121,7 @@ interface OrderBuilderState {
   setBasePrice: (price: number) => void
   setExtrasPrice: (price: number) => void
   setEstimatedHours: (hours: number | null) => void
+  setPdlModifierPct: (pct: number | null) => void
   reset: () => void
 }
 
@@ -158,6 +163,7 @@ const initialState = {
   basePrice: 0,
   extrasPrice: 0,
   estimatedHours: null,
+  pdlModifierPct: null as number | null,
 }
 
 // Fluxo do configurador (solo_standard/duo_standard/master_plus) para o
@@ -304,6 +310,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setBasePrice: (basePrice) => set({ basePrice }),
   setExtrasPrice: (extrasPrice) => set({ extrasPrice }),
   setEstimatedHours: (estimatedHours) => set({ estimatedHours }),
+  setPdlModifierPct: (pdlModifierPct) => set({ pdlModifierPct }),
 
   reset: () => set({ ...initialState, selectedExtraIds: new Set<string>() }),
 }))

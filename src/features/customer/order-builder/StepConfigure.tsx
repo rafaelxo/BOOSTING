@@ -5,7 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { RankBadge, RankLockGrid, WinCountButtons, PdlFieldRow } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct } from '@/lib/pricing'
 import {
   isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
 } from '@/lib/boostDomain'
@@ -28,7 +28,7 @@ export function StepConfigure() {
     setIsMd5, setMd5MatchesRemaining, setMd5MatchesRemainingFromApi,
     setCurrentLp, setAvgLpGain,
     setCurrentPdl, setAvgPdlGain,
-    setBasePrice, setEstimatedHours, setRiotId, setRiotAutoFilled, setRiotLookupLoading,
+    setBasePrice, setEstimatedHours, setPdlModifierPct, setRiotId, setRiotAutoFilled, setRiotLookupLoading,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -181,6 +181,8 @@ export function StepConfigure() {
 
       if (currentIsMasterPlus) {
         const price = masterPlusPriceRow?.price
+        // Modificador de PDL nunca se aplica ao Master+ — sempre null aqui.
+        setPdlModifierPct(null)
         if (!targetRank || price == null) {
           setBasePrice(0)
           setEstimatedHours(null)
@@ -203,29 +205,33 @@ export function StepConfigure() {
         : withLp
       setBasePrice(finalPrice)
       setEstimatedHours(hours || null)
+      setPdlModifierPct(lpModifierPct(avgLpGain))
 
     } else if (serviceType === 'placement_matches') {
       if (!currentRank) return
       setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
       setEstimatedHours(3)
+      setPdlModifierPct(null)
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
+      setPdlModifierPct(null)
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
       const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
+      setPdlModifierPct(null)
     }
     // coaching: preço vem do pacote escolhido em CoachPackagePicker
     // (setBasePrice chamado lá), não recalculado aqui.
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
     currentLp, avgLpGain, currentIsMasterPlus, masterPlusPriceRow,
-    setBasePrice, setEstimatedHours,
+    setBasePrice, setEstimatedHours, setPdlModifierPct,
   ])
 
   const masterPlusTargets = currentRank && currentIsMasterPlus

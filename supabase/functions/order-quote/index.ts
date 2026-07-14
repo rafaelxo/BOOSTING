@@ -60,6 +60,9 @@ serve(async (req) => {
       subtotal: priced.basePrice,
       extras_price: priced.extrasPrice,
       total: priced.totalPrice,
+      // Percentual de modificador de PDL já aplicado ao basePrice — null
+      // quando o modificador não se aplica (Master+ ou serviceType != elo_boost).
+      modifier_pct: priced.pdlModifierPct,
       currency: 'BRL',
       pricing_version: 'v2',
     })
