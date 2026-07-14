@@ -518,6 +518,7 @@ serve(async (req) => {
         .insert({
           customer_id: user.id,
           service_id: normalized.serviceId,
+          service_type: normalized.serviceType,
           game_id: normalized.gameId,
           status: 'awaiting_payment',
           queue_type: normalized.queueType,

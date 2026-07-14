@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       audit_logs: {
@@ -259,10 +284,12 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          lanes: string[] | null
           price: number
           requirements: string | null
           rules: string | null
           service_type: string | null
+          specialties: string[] | null
           tempo: string | null
           title: string
           unit: string
@@ -275,10 +302,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          lanes?: string[] | null
           price?: number
           requirements?: string | null
           rules?: string | null
           service_type?: string | null
+          specialties?: string[] | null
           tempo?: string | null
           title: string
           unit?: string
@@ -291,10 +320,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          lanes?: string[] | null
           price?: number
           requirements?: string | null
           rules?: string | null
           service_type?: string | null
+          specialties?: string[] | null
           tempo?: string | null
           title?: string
           unit?: string
@@ -397,6 +428,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      edge_rate_limits: {
+        Row: {
+          request_count: number
+          scope: string
+          subject: string
+          window_started_at: string
+        }
+        Insert: {
+          request_count: number
+          scope: string
+          subject: string
+          window_started_at: string
+        }
+        Update: {
+          request_count?: number
+          scope?: string
+          subject?: string
+          window_started_at?: string
+        }
+        Relationships: []
       }
       games: {
         Row: {
@@ -569,6 +621,13 @@ export type Database = {
             foreignKeyName: "order_drop_requests_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_drop_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -610,12 +669,83 @@ export type Database = {
             foreignKeyName: "order_messages_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "order_messages_sender_id_fkey"
             columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_rank_verifications: {
+        Row: {
+          created_at: string
+          error_reason: string | null
+          fetched_division: string | null
+          fetched_tier: string | null
+          id: string
+          order_id: string
+          passed: boolean
+          requested_by: string
+          riot_id_checked: string
+          target_division: string | null
+          target_tier: string
+        }
+        Insert: {
+          created_at?: string
+          error_reason?: string | null
+          fetched_division?: string | null
+          fetched_tier?: string | null
+          id?: string
+          order_id: string
+          passed: boolean
+          requested_by: string
+          riot_id_checked: string
+          target_division?: string | null
+          target_tier: string
+        }
+        Update: {
+          created_at?: string
+          error_reason?: string | null
+          fetched_division?: string | null
+          fetched_tier?: string | null
+          id?: string
+          order_id?: string
+          passed?: boolean
+          requested_by?: string
+          riot_id_checked?: string
+          target_division?: string | null
+          target_tier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_rank_verifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_rank_verifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_rank_verifications_requested_by_fkey"
+            columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -662,6 +792,13 @@ export type Database = {
             foreignKeyName: "order_status_history_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -675,6 +812,7 @@ export type Database = {
           base_price: number
           boost_mode: string
           booster_notes: string | null
+          booster_service_id: string | null
           completed_at: string | null
           created_at: string
           credentials_set: boolean
@@ -684,6 +822,7 @@ export type Database = {
           customer_notes: string | null
           discord_voice_channel_id: string | null
           estimated_hours: number | null
+          exclusive_until: string | null
           extras: Json
           extras_price: number
           game_credentials: string | null
@@ -694,15 +833,20 @@ export type Database = {
           mp_payment_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket: string | null
+          preferred_booster_id: string | null
           pricing_version: string
           queue_type: Database["public"]["Enums"]["queue_type"]
+          riot_id: string | null
           server: string
           service_id: string
+          service_type: Database["public"]["Enums"]["service_type"]
           sessions_purchased: number | null
           status: Database["public"]["Enums"]["order_status"]
           target_rank: Json | null
           total_price: number
           updated_at: string
+          used_exclusive_slot: boolean
+          win_package: number | null
           wins_played: number
           wins_purchased: number | null
         }
@@ -713,6 +857,7 @@ export type Database = {
           base_price: number
           boost_mode?: string
           booster_notes?: string | null
+          booster_service_id?: string | null
           completed_at?: string | null
           created_at?: string
           credentials_set?: boolean
@@ -722,6 +867,7 @@ export type Database = {
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
           estimated_hours?: number | null
+          exclusive_until?: string | null
           extras?: Json
           extras_price?: number
           game_credentials?: string | null
@@ -732,15 +878,20 @@ export type Database = {
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket?: string | null
+          preferred_booster_id?: string | null
           pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
+          riot_id?: string | null
           server: string
           service_id: string
+          service_type: Database["public"]["Enums"]["service_type"]
           sessions_purchased?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           target_rank?: Json | null
           total_price: number
           updated_at?: string
+          used_exclusive_slot?: boolean
+          win_package?: number | null
           wins_played?: number
           wins_purchased?: number | null
         }
@@ -751,6 +902,7 @@ export type Database = {
           base_price?: number
           boost_mode?: string
           booster_notes?: string | null
+          booster_service_id?: string | null
           completed_at?: string | null
           created_at?: string
           credentials_set?: boolean
@@ -760,6 +912,7 @@ export type Database = {
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
           estimated_hours?: number | null
+          exclusive_until?: string | null
           extras?: Json
           extras_price?: number
           game_credentials?: string | null
@@ -770,15 +923,20 @@ export type Database = {
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket?: string | null
+          preferred_booster_id?: string | null
           pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
+          riot_id?: string | null
           server?: string
           service_id?: string
+          service_type?: Database["public"]["Enums"]["service_type"]
           sessions_purchased?: number | null
           status?: Database["public"]["Enums"]["order_status"]
           target_rank?: Json | null
           total_price?: number
           updated_at?: string
+          used_exclusive_slot?: boolean
+          win_package?: number | null
           wins_played?: number
           wins_purchased?: number | null
         }
@@ -791,8 +949,22 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_booster_service_id_fkey"
+            columns: ["booster_service_id"]
+            isOneToOne: false
+            referencedRelation: "booster_services"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_preferred_booster_id_fkey"
+            columns: ["preferred_booster_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -857,6 +1029,13 @@ export type Database = {
             foreignKeyName: "payments_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -905,6 +1084,13 @@ export type Database = {
             columns: ["booster_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
             referencedColumns: ["id"]
           },
           {
@@ -1004,6 +1190,13 @@ export type Database = {
             foreignKeyName: "refunds_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refunds_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1066,6 +1259,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "available_boost_orders"
             referencedColumns: ["id"]
           },
           {
@@ -1224,6 +1424,13 @@ export type Database = {
             foreignKeyName: "support_tickets_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -1291,7 +1498,37 @@ export type Database = {
           notes: string | null
           updated_at: string | null
         }
-        Relationships: []
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          current_rank?: Json | null
+          game_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          current_rank?: Json | null
+          game_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          label?: string | null
+          notes?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       available_boost_orders: {
         Row: {
@@ -1302,11 +1539,13 @@ export type Database = {
           current_pdl: number | null
           current_rank: Json | null
           estimated_hours: number | null
+          exclusive_until: string | null
           extras: Json | null
           game_id: string | null
           id: string | null
           losses_played: number | null
           pdl_bracket: string | null
+          preferred_booster_id: string | null
           pricing_version: string | null
           queue_type: Database["public"]["Enums"]["queue_type"] | null
           server: string | null
@@ -1320,7 +1559,71 @@ export type Database = {
           wins_played: number | null
           wins_purchased: number | null
         }
-        Relationships: []
+        Insert: {
+          avg_pdl_gain?: number | null
+          avg_pdl_loss?: number | null
+          boost_mode?: string | null
+          created_at?: string | null
+          current_pdl?: number | null
+          current_rank?: Json | null
+          estimated_hours?: number | null
+          exclusive_until?: string | null
+          extras?: Json | null
+          game_id?: string | null
+          id?: string | null
+          losses_played?: number | null
+          pdl_bracket?: string | null
+          preferred_booster_id?: string | null
+          pricing_version?: string | null
+          queue_type?: Database["public"]["Enums"]["queue_type"] | null
+          server?: string | null
+          service_id?: string | null
+          sessions_purchased?: number | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          target_rank?: Json | null
+          total_price?: number | null
+          updated_at?: string | null
+          win_package?: number | null
+          wins_played?: number | null
+          wins_purchased?: number | null
+        }
+        Update: {
+          avg_pdl_gain?: number | null
+          avg_pdl_loss?: number | null
+          boost_mode?: string | null
+          created_at?: string | null
+          current_pdl?: number | null
+          current_rank?: Json | null
+          estimated_hours?: number | null
+          exclusive_until?: string | null
+          extras?: Json | null
+          game_id?: string | null
+          id?: string | null
+          losses_played?: number | null
+          pdl_bracket?: string | null
+          preferred_booster_id?: string | null
+          pricing_version?: string | null
+          queue_type?: Database["public"]["Enums"]["queue_type"] | null
+          server?: string | null
+          service_id?: string | null
+          sessions_purchased?: number | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          target_rank?: Json | null
+          total_price?: number | null
+          updated_at?: string | null
+          win_package?: number | null
+          wins_played?: number | null
+          wins_purchased?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_preferred_booster_id_fkey"
+            columns: ["preferred_booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       public_booster_profiles: {
         Row: {
@@ -1396,6 +1699,7 @@ export type Database = {
         Args: { p_booster_user_id: string; p_order_id: string }
         Returns: Json
       }
+      admin_dashboard_stats: { Args: never; Returns: Json }
       admin_override_order_status: {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
@@ -1413,8 +1717,38 @@ export type Database = {
           total_count: number
         }[]
       }
+      booster_has_active_exclusive_slot: {
+        Args: { p_booster_user_id: string }
+        Returns: boolean
+      }
+      booster_payout_summary: {
+        Args: { p_booster_user_id: string }
+        Returns: Json
+      }
       can_booster_accept_order: {
         Args: { p_boost_mode: string; p_booster_user_id: string }
+        Returns: Json
+      }
+      check_own_write_rate_limit: {
+        Args: { p_limit: number; p_scope: string; p_window_seconds: number }
+        Returns: boolean
+      }
+      complete_verified_order: {
+        Args: {
+          p_fetched_division: string
+          p_fetched_tier: string
+          p_order_id: string
+          p_requested_by: string
+        }
+        Returns: Json
+      }
+      consume_edge_rate_limit: {
+        Args: {
+          p_limit: number
+          p_scope: string
+          p_subject: string
+          p_window_seconds: number
+        }
         Returns: Json
       }
       current_user_role: {
@@ -1425,12 +1759,14 @@ export type Database = {
         Args: { p_display_name?: string }
         Returns: undefined
       }
+      expire_stale_pix_orders: { Args: never; Returns: undefined }
       get_duo_account_credentials: {
         Args: { p_account_id: string }
         Returns: Json
       }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
+      is_approved_booster: { Args: never; Returns: boolean }
       log_match_result: {
         Args: { p_losses: number; p_order_id: string; p_wins: number }
         Returns: Json
@@ -1464,6 +1800,42 @@ export type Database = {
             }
             Returns: Json
           }
+      order_requires_access_token: {
+        Args: {
+          p_boost_mode: string
+          p_service_type: Database["public"]["Enums"]["service_type"]
+        }
+        Returns: boolean
+      }
+      process_mp_payment_event: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_event_id: string
+          p_mp_payment_id: string
+          p_order_id: string
+          p_provider_status: string
+          p_refund_id?: string
+        }
+        Returns: Json
+      }
+      rank_step: {
+        Args: { p_division: string; p_tier: string }
+        Returns: number
+      }
+      record_pix_payment: {
+        Args: {
+          p_amount: number
+          p_customer_id: string
+          p_mp_payment_id: string
+          p_order_id: string
+        }
+        Returns: Json
+      }
+      refresh_booster_rating: {
+        Args: { p_booster_id: string }
+        Returns: undefined
+      }
       refresh_top5_boosters: { Args: never; Returns: undefined }
       request_booster_role: { Args: never; Returns: Json }
       request_order_drop: {
@@ -1476,6 +1848,10 @@ export type Database = {
           p_approve: boolean
           p_request_id: string
         }
+        Returns: Json
+      }
+      resolve_order_access_token: {
+        Args: { p_access_token: string }
         Returns: Json
       }
       set_duo_account_credentials: {
@@ -1553,6 +1929,456 @@ export type Database = {
         | "resolved"
         | "closed"
       user_role: "customer" | "booster" | "admin"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  storage: {
+    Tables: {
+      buckets: {
+        Row: {
+          allowed_mime_types: string[] | null
+          avif_autodetection: boolean | null
+          created_at: string | null
+          file_size_limit: number | null
+          id: string
+          name: string
+          owner: string | null
+          owner_id: string | null
+          public: boolean | null
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string | null
+        }
+        Insert: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id: string
+          name: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+        }
+        Update: {
+          allowed_mime_types?: string[] | null
+          avif_autodetection?: boolean | null
+          created_at?: string | null
+          file_size_limit?: number | null
+          id?: string
+          name?: string
+          owner?: string | null
+          owner_id?: string | null
+          public?: boolean | null
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      buckets_analytics: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          format: string
+          id: string
+          name: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          format?: string
+          id?: string
+          name?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      buckets_vectors: {
+        Row: {
+          created_at: string
+          id: string
+          type: Database["storage"]["Enums"]["buckettype"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          type?: Database["storage"]["Enums"]["buckettype"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      migrations: {
+        Row: {
+          executed_at: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Insert: {
+          executed_at?: string | null
+          hash: string
+          id: number
+          name: string
+        }
+        Update: {
+          executed_at?: string | null
+          hash?: string
+          id?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      objects: {
+        Row: {
+          bucket_id: string | null
+          created_at: string | null
+          id: string
+          last_accessed_at: string | null
+          metadata: Json | null
+          name: string | null
+          owner: string | null
+          owner_id: string | null
+          path_tokens: string[] | null
+          updated_at: string | null
+          user_metadata: Json | null
+          version: string | null
+        }
+        Insert: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Update: {
+          bucket_id?: string | null
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner?: string | null
+          owner_id?: string | null
+          path_tokens?: string[] | null
+          updated_at?: string | null
+          user_metadata?: Json | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "objects_bucketId_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          id: string
+          in_progress_size: number
+          key: string
+          metadata: Json | null
+          owner_id: string | null
+          upload_signature: string
+          user_metadata: Json | null
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          id: string
+          in_progress_size?: number
+          key: string
+          metadata?: Json | null
+          owner_id?: string | null
+          upload_signature: string
+          user_metadata?: Json | null
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          id?: string
+          in_progress_size?: number
+          key?: string
+          metadata?: Json | null
+          owner_id?: string | null
+          upload_signature?: string
+          user_metadata?: Json | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      s3_multipart_uploads_parts: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          etag: string
+          id: string
+          key: string
+          owner_id: string | null
+          part_number: number
+          size: number
+          upload_id: string
+          version: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          etag: string
+          id?: string
+          key: string
+          owner_id?: string | null
+          part_number: number
+          size?: number
+          upload_id: string
+          version: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          etag?: string
+          id?: string
+          key?: string
+          owner_id?: string | null
+          part_number?: number
+          size?: number
+          upload_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "s3_multipart_uploads_parts_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "s3_multipart_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vector_indexes: {
+        Row: {
+          bucket_id: string
+          created_at: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id: string
+          metadata_configuration: Json | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          bucket_id: string
+          created_at?: string
+          data_type: string
+          dimension: number
+          distance_metric: string
+          id?: string
+          metadata_configuration?: Json | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          bucket_id?: string
+          created_at?: string
+          data_type?: string
+          dimension?: number
+          distance_metric?: string
+          id?: string
+          metadata_configuration?: Json | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vector_indexes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "buckets_vectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      allow_any_operation: {
+        Args: { expected_operations: string[] }
+        Returns: boolean
+      }
+      allow_only_operation: {
+        Args: { expected_operation: string }
+        Returns: boolean
+      }
+      can_insert_object: {
+        Args: { bucketid: string; metadata: Json; name: string; owner: string }
+        Returns: undefined
+      }
+      extension: { Args: { name: string }; Returns: string }
+      filename: { Args: { name: string }; Returns: string }
+      foldername: { Args: { name: string }; Returns: string[] }
+      get_common_prefix: {
+        Args: { p_delimiter: string; p_key: string; p_prefix: string }
+        Returns: string
+      }
+      get_size_by_bucket: {
+        Args: never
+        Returns: {
+          bucket_id: string
+          size: number
+        }[]
+      }
+      list_multipart_uploads_with_delimiter: {
+        Args: {
+          bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_key_token?: string
+          next_upload_token?: string
+          prefix_param: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+        }[]
+      }
+      list_objects_with_delimiter: {
+        Args: {
+          _bucket_id: string
+          delimiter_param: string
+          max_keys?: number
+          next_token?: string
+          prefix_param: string
+          sort_order?: string
+          start_after?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      operation: { Args: never; Returns: string }
+      search: {
+        Args: {
+          bucketname: string
+          levels?: number
+          limits?: number
+          offsets?: number
+          prefix: string
+          search?: string
+          sortcolumn?: string
+          sortorder?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_by_timestamp: {
+        Args: {
+          p_bucket_id: string
+          p_level: number
+          p_limit: number
+          p_prefix: string
+          p_sort_column: string
+          p_sort_column_after: string
+          p_sort_order: string
+          p_start_after: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+      search_v2: {
+        Args: {
+          bucket_name: string
+          levels?: number
+          limits?: number
+          prefix: string
+          sort_column?: string
+          sort_column_after?: string
+          sort_order?: string
+          start_after?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          key: string
+          last_accessed_at: string
+          metadata: Json
+          name: string
+          updated_at: string
+        }[]
+      }
+    }
+    Enums: {
+      buckettype: "STANDARD" | "ANALYTICS" | "VECTOR"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1678,6 +2504,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       booster_status: [
@@ -1729,6 +2558,11 @@ export const Constants = {
         "closed",
       ],
       user_role: ["customer", "booster", "admin"],
+    },
+  },
+  storage: {
+    Enums: {
+      buckettype: ["STANDARD", "ANALYTICS", "VECTOR"],
     },
   },
 } as const

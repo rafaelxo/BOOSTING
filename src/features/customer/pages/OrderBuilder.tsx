@@ -41,7 +41,7 @@ export function OrderBuilderPage() {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
     selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType,
     setGame, setService, setStep, reset, preferredBoosterName, setPreferredBooster,
-    selectedCoachPackage, setSelectedCoachPackage, setBasePrice, winsPurchased,
+    selectedCoachPackage, setSelectedCoachPackage, setBasePrice, winsPurchased, riotId,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
@@ -190,6 +190,7 @@ export function OrderBuilderPage() {
                     currentRank,
                     targetRank,
                     winsPurchased,
+                    riotId,
                   })}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
@@ -287,6 +288,12 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+function isValidRiotId(riotId: string): boolean {
+  const trimmed = riotId.trim()
+  const hashIdx = trimmed.lastIndexOf('#')
+  return hashIdx > 0 && hashIdx < trimmed.length - 1
+}
+
 function isStepComplete(
   step: OrderBuilderStep,
   state: {
@@ -295,11 +302,12 @@ function isStepComplete(
     currentRank: unknown | null
     targetRank: unknown | null
     winsPurchased: number | null
+    riotId: string
   }
 ) {
   if (step === 'service') return !!state.serviceType
   if (step === 'configure') {
-    if (state.serviceType === 'elo_boost') return !!state.currentRank && !!state.targetRank
+    if (state.serviceType === 'elo_boost') return !!state.currentRank && !!state.targetRank && isValidRiotId(state.riotId)
     if (state.serviceType === 'win_boost') return !!state.currentRank && !!state.winsPurchased
     if (state.serviceType === 'placement_matches') return !!state.currentRank
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackageId

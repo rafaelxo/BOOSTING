@@ -12,10 +12,10 @@ import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
 
 function orderRequiresAccountAccess(order: Order): boolean {
   return (
-    (order.service_id === 'elo_boost' && order.boost_mode === 'solo') ||
-    order.service_id === 'win_boost' ||
-    order.service_id === 'placement_matches' ||
-    order.service_id === 'md5'
+    (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
+    order.service_type === 'win_boost' ||
+    order.service_type === 'placement_matches' ||
+    order.service_type === 'md5'
   )
 }
 

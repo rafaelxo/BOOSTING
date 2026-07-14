@@ -203,6 +203,9 @@ export interface Order {
   id: string
   customer_id: string
   service_id: string
+  // Denormalized at creation time from services.type — service_id is a
+  // uuid (services.id), never compare it directly against a ServiceType slug.
+  service_type: ServiceType
   game_id: string
   status: OrderStatus
   queue_type: QueueType
