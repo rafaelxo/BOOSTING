@@ -36,7 +36,6 @@ interface ProfessionalProfileData {
   available_days: string[] | null
   hours_per_day_min: number | null
   hours_per_day_max: number | null
-  can_coach: boolean | null
 }
 
 export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
@@ -52,7 +51,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   const [availableDays, setAvailableDays]   = useState<string[]>([])
   const [hoursMin, setHoursMin]             = useState('')
   const [hoursMax, setHoursMax]             = useState('')
-  const [canCoach, setCanCoach]             = useState<boolean | null>(null)
   const [saving, setSaving]                 = useState(false)
   const [saved, setSaved]                   = useState(false)
   const [error, setError]                   = useState<string | null>(null)
@@ -62,7 +60,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_profiles')
-        .select('display_name, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max, can_coach')
+        .select('display_name, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max')
         .eq('user_id', userId)
         .maybeSingle()
       if (error) throw error
@@ -82,7 +80,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     setAvailableDays(profile.available_days ?? [])
     setHoursMin(profile.hours_per_day_min != null ? String(profile.hours_per_day_min) : '')
     setHoursMax(profile.hours_per_day_max != null ? String(profile.hours_per_day_max) : '')
-    setCanCoach(profile.can_coach)
   }, [profile])
 
   function toggleLane(key: string) {
@@ -119,7 +116,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
         available_days: availableDays,
         hours_per_day_min: hoursMin ? Number(hoursMin) : null,
         hours_per_day_max: hoursMax ? Number(hoursMax) : null,
-        can_coach: canCoach,
       })
       .eq('user_id', userId)
     setSaving(false)
@@ -313,30 +309,6 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
             <label className="text-xs text-ink-muted">Horas máx. / dia</label>
             <input type="number" min={1} max={24} value={hoursMax} onChange={e => setHoursMax(e.target.value)} className="input-base w-full text-sm" />
           </div>
-        </div>
-      </div>
-
-      {/* Coaching */}
-      <div className="space-y-2">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Tipo de serviço</label>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: false, label: 'Apenas Boost',     desc: 'Somente elo boost'         },
-            { value: true,  label: 'Boost + Coaching', desc: 'Aceito pedidos de coaching' },
-          ].map(({ value, label, desc }) => (
-            <button
-              key={String(value)}
-              type="button"
-              onClick={() => setCanCoach(value)}
-              className={cn(
-                'py-3 px-4 rounded-xl border-2 text-left transition-all',
-                canCoach === value ? 'bg-brand/15 border-brand' : 'border-bg-elevated hover:border-brand/40',
-              )}
-            >
-              <p className={cn('text-sm font-bold', canCoach === value ? 'text-brand' : 'text-ink')}>{label}</p>
-              <p className="text-xs text-ink-muted mt-0.5">{desc}</p>
-            </button>
-          ))}
         </div>
       </div>
 

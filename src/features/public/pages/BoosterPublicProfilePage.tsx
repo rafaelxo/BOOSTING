@@ -198,12 +198,12 @@ export function BoosterPublicProfilePage() {
         ))}
       </div>
 
-      {/* Pacotes de coach */}
+      {/* Serviços */}
       {services.length > 0 && (
         <Card padding="md">
           <div className="flex items-center gap-2 mb-4">
             <Package className="h-4 w-4 text-brand" />
-            <h2 className="text-sm font-bold text-ink">Pacotes de Coach</h2>
+            <h2 className="text-sm font-bold text-ink">Serviços</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {services.map(s => (
@@ -239,7 +239,11 @@ export function BoosterPublicProfilePage() {
                   </div>
                 </div>
                 <Button asChild size="sm" className="w-full mt-1">
-                  <Link to={`/orders/new?service=coaching&booster=${booster.user_id}&coach_package=${s.id}`}>Contratar</Link>
+                  <Link to={
+                    s.service_type === 'coaching'
+                      ? `/orders/new?service=coaching&booster=${booster.user_id}&coach_package=${s.id}`
+                      : `/orders/new?booster=${booster.user_id}`
+                  }>Contratar</Link>
                 </Button>
               </div>
             ))}

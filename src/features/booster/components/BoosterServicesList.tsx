@@ -12,10 +12,23 @@ import { EMPTY_SERVICE_FORM, serviceToForm, type ServiceFormData } from '@/featu
 
 const MAX_SERVICES = 3
 
+const SERVICE_TYPE_OPTIONS = [
+  { value: 'coaching', label: 'Coaching' },
+  { value: 'boost_package', label: 'Pacote de Boost' },
+  { value: 'other', label: 'Outro' },
+] as const
+
+const SERVICE_TYPE_LABEL: Record<string, string> = {
+  coaching: 'Coaching',
+  boost_package: 'Pacote de Boost',
+  other: 'Outro',
+}
+
 export function BoosterServicesList({ userId }: { userId: string }) {
   const qc = useQueryClient()
 
   const [adding, setAdding]               = useState(false)
+  const [newServiceType, setNewServiceType] = useState<string>(SERVICE_TYPE_OPTIONS[0].value)
   const [savingNew, setSavingNew]         = useState(false)
   const [editingId, setEditingId]         = useState<string | null>(null)
   const [savingEdit, setSavingEdit]       = useState(false)
@@ -30,7 +43,6 @@ export function BoosterServicesList({ userId }: { userId: string }) {
         .from('booster_services')
         .select('*')
         .eq('booster_id', userId)
-        .eq('service_type', 'coaching')
         .order('created_at', { ascending: true })
       if (error) throw error
       return data as BoosterService[]
@@ -50,7 +62,7 @@ export function BoosterServicesList({ userId }: { userId: string }) {
       booster_id: userId,
       title: form.title.trim(),
       description: form.description.trim() || null,
-      service_type: 'coaching',
+      service_type: newServiceType,
       unit: 'fixed',
       tempo: form.tempo.trim() || null,
       price: parseFloat(form.price),
@@ -58,8 +70,9 @@ export function BoosterServicesList({ userId }: { userId: string }) {
       specialties: form.specialties as never,
     })
     setSavingNew(false)
-    if (error) { setError('Erro ao salvar pacote. Tente novamente.'); return }
+    if (error) { setError('Erro ao salvar serviço. Tente novamente.'); return }
     setAdding(false)
+    setNewServiceType(SERVICE_TYPE_OPTIONS[0].value)
     invalidate()
   }
 
@@ -75,7 +88,7 @@ export function BoosterServicesList({ userId }: { userId: string }) {
       specialties: form.specialties as never,
     }).eq('id', id)
     setSavingEdit(false)
-    if (error) { setError('Erro ao salvar pacote. Tente novamente.'); return }
+    if (error) { setError('Erro ao salvar serviço. Tente novamente.'); return }
     setEditingId(null)
     invalidate()
   }
@@ -100,8 +113,8 @@ export function BoosterServicesList({ userId }: { userId: string }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-bold text-ink">Pacotes de Coach</h2>
-          <p className="text-xs text-ink-secondary mt-0.5">Crie até {MAX_SERVICES} pacotes de coaching para seus clientes.</p>
+          <h2 className="text-sm font-bold text-ink">Meus Serviços</h2>
+          <p className="text-xs text-ink-secondary mt-0.5">Crie até {MAX_SERVICES} serviços para seus clientes (coaching, boost ou outro).</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className={cn(
@@ -127,12 +140,34 @@ export function BoosterServicesList({ userId }: { userId: string }) {
       {error && <p className="text-xs text-danger">{error}</p>}
 
       {adding && (
-        <BoosterServiceForm
-          initial={EMPTY_SERVICE_FORM}
-          onSave={handleCreate}
-          onCancel={() => setAdding(false)}
-          saving={savingNew}
-        />
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Tipo de serviço</label>
+            <div className="flex flex-wrap gap-2">
+              {SERVICE_TYPE_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setNewServiceType(value)}
+                  className={cn(
+                    'px-3.5 py-1.5 rounded-xl text-xs font-bold border-2 transition-all',
+                    newServiceType === value
+                      ? 'bg-brand/15 border-brand text-brand'
+                      : 'border-bg-elevated text-ink-secondary hover:border-brand/40 hover:text-ink',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <BoosterServiceForm
+            initial={EMPTY_SERVICE_FORM}
+            onSave={handleCreate}
+            onCancel={() => { setAdding(false); setNewServiceType(SERVICE_TYPE_OPTIONS[0].value) }}
+            saving={savingNew}
+          />
+        </div>
       )}
 
       {isLoading ? (
@@ -151,15 +186,15 @@ export function BoosterServicesList({ userId }: { userId: string }) {
             <Package className="h-5 w-5 text-ink-muted" />
           </div>
           <div>
-            <p className="font-semibold text-ink text-sm">Você ainda não cadastrou nenhum pacote de coach.</p>
-            <p className="text-xs text-ink-muted mt-1">Adicione até {MAX_SERVICES} pacotes para oferecer aos clientes.</p>
+            <p className="font-semibold text-ink text-sm">Você ainda não cadastrou nenhum serviço.</p>
+            <p className="text-xs text-ink-muted mt-1">Adicione até {MAX_SERVICES} serviços para oferecer aos clientes.</p>
           </div>
           <button
             onClick={() => setAdding(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-white text-sm font-bold hover:bg-brand/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Criar primeiro pacote
+            Criar primeiro serviço
           </button>
         </div>
       ) : (
@@ -174,15 +209,19 @@ export function BoosterServicesList({ userId }: { userId: string }) {
                 saving={savingEdit}
               />
             ) : (
-              <BoosterServiceCard
-                key={service.id}
-                service={service}
-                onEdit={() => { setEditingId(service.id); setAdding(false) }}
-                onDelete={() => handleDelete(service.id)}
-                onToggleActive={() => handleToggleActive(service)}
-                deleting={deletingId === service.id}
-                togglingActive={togglingId === service.id}
-              />
+              <div key={service.id} className="flex flex-col gap-1.5">
+                <span className="self-start text-[10px] font-bold px-2 py-0.5 rounded-full bg-bg-elevated text-ink-muted uppercase tracking-wide">
+                  {SERVICE_TYPE_LABEL[service.service_type ?? ''] ?? 'Serviço'}
+                </span>
+                <BoosterServiceCard
+                  service={service}
+                  onEdit={() => { setEditingId(service.id); setAdding(false) }}
+                  onDelete={() => handleDelete(service.id)}
+                  onToggleActive={() => handleToggleActive(service)}
+                  deleting={deletingId === service.id}
+                  togglingActive={togglingId === service.id}
+                />
+              </div>
             )
           )}
         </div>
