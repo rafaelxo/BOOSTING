@@ -17,9 +17,17 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
 import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
+import {
+  fetchLeagueEntries,
+  fetchRankedMatchIdsThisSplit,
+  fetchRiotAccount,
+  RIOT_QUEUE_TYPE,
+  RIOT_TIER_MAP,
+} from '../_shared/riotLookup.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
+const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 // O contrato é diferente por fluxo (padrão vs. Master+) — cada um usa
@@ -143,6 +151,28 @@ const otherServiceIntentSchema = z.object({
   // schema — o mesmo schema também cobre win_boost/placement_matches, que
   // não usam pacote de coach nenhum).
   booster_service_id: z.string().uuid().nullable().default(null),
+}).strict()
+
+// MD5 — "Rank da última temporada": Iron–Challenger valid, no LP/PDL/target
+// concept (win-rate-guarantee is priced per net win, not per rank progression).
+const md5IntentSchema = z.object({
+  service_type: z.literal('md5'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
+  queue_type: z.enum(['solo_duo', 'flex']),
+  server: z.string().trim().min(2).max(16),
+  // "Rank da última temporada" — no LP/PDL, no target. Iron–Challenger valid;
+  // division required except Master+.
+  current_rank: genericRankSchema.strict().superRefine((val, ctx) => {
+    if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
+    } else if (!NO_DIVISION_TIERS.includes(val.tier) && !val.division) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Divisão é obrigatória para este rank', path: ['division'] })
+    }
+  }),
+  wins_purchased: z.number().int().min(1).max(5),
+  customer_notes: z.string().max(500).nullable().default(null),
+  riot_id: riotIdSchema,
 }).strict()
 
 const bodySchema = z.object({
@@ -301,7 +331,9 @@ serve(async (req) => {
         ? masterPlusIntentSchema
         : flow
           ? standardEloIntentSchema
-          : otherServiceIntentSchema
+          : routed.data.service_type === 'md5'
+            ? md5IntentSchema
+            : otherServiceIntentSchema
 
       const parsedIntent = schema.safeParse(body.intent)
       if (!parsedIntent.success) {
@@ -386,6 +418,31 @@ serve(async (req) => {
           riotId: std.riot_id,
           boosterServiceId: null,
         }
+      } else if (routed.data.service_type === 'md5') {
+        const md5 = parsedIntent.data as z.infer<typeof md5IntentSchema>
+        normalized = {
+          serviceType: 'md5',
+          serviceId: md5.service_id,
+          gameId: md5.game_id,
+          queueType: md5.queue_type,
+          boostMode: 'solo',
+          server: md5.server,
+          currentRank: { tier: md5.current_rank.tier, division: md5.current_rank.division ?? null },
+          targetRank: null,
+          currentLp: 0,
+          avgLpGain: 20,
+          avgLpLoss: 15,
+          winsPurchased: md5.wins_purchased,
+          sessionsPurchased: null,
+          addonCodes: [],
+          winPackage: null,
+          customerNotes: md5.customer_notes,
+          currentPdl: null,
+          avgPdlGain: null,
+          avgPdlLoss: null,
+          riotId: md5.riot_id,
+          boosterServiceId: null,
+        }
       } else {
         const other = parsedIntent.data as z.infer<typeof otherServiceIntentSchema>
         normalized = {
@@ -421,6 +478,38 @@ serve(async (req) => {
       if (!service || !game || !service.is_active || !game.is_active
           || service.game_id !== game.id || service.type !== normalized.serviceType) {
         return badRequest(req, 'Serviço ou jogo inválido/inativo')
+      }
+
+      // ── MD5: a pré-visualização do cliente (riot-account-rank) é só um
+      // preview — nunca confiável para decidir elegibilidade. Aqui a Riot é
+      // consultada de novo, server-side, e o pedido é bloqueado se a conta já
+      // tiver rank na fila selecionada nesta temporada.
+      let md5MatchesRemaining: number | null = null
+      if (normalized.serviceType === 'md5') {
+        if (!RIOT_API_KEY) return errorResponse(req, 'Server misconfigured', 500)
+        const accountResult = await fetchRiotAccount(normalized.riotId!, RIOT_API_KEY, 'americas')
+        if (!accountResult.ok) {
+          return accountResult.reason === 'rate_limited'
+            ? errorResponse(req, 'Verificação Riot temporariamente limitada. Tente novamente em instantes.', 503)
+            : badRequest(req, 'Conta Riot não encontrada')
+        }
+        const leagueResult = await fetchLeagueEntries(accountResult.account.puuid, RIOT_API_KEY, 'br1')
+        if (!leagueResult.ok) return errorResponse(req, 'Falha ao verificar elegibilidade MD5', 502)
+
+        const { leagueQueue } = RIOT_QUEUE_TYPE[normalized.queueType]
+        const alreadyRanked = leagueResult.entries.some((e) => e.queueType === leagueQueue && RIOT_TIER_MAP[e.tier ?? ''])
+        if (alreadyRanked) {
+          return badRequest(req, 'Esta conta já possui rank na fila selecionada nesta temporada — MD5 não está disponível.')
+        }
+
+        md5MatchesRemaining = 5
+        const splitStart = Number(Deno.env.get('LOL_SPLIT_START_TIMESTAMP') ?? '0')
+        if (splitStart > 0) {
+          const matchResult = await fetchRankedMatchIdsThisSplit(
+            accountResult.account.puuid, RIOT_API_KEY, 'americas', normalized.queueType, splitStart,
+          )
+          if (matchResult.ok) md5MatchesRemaining = Math.max(0, 5 - matchResult.matchIds.length)
+        }
       }
 
       // ── Coaching agora exige um pacote real de um booster (booster_services,
@@ -544,6 +633,7 @@ serve(async (req) => {
           preferred_booster_id: preferredBoosterId,
           riot_id: normalized.riotId,
           booster_service_id: normalized.boosterServiceId,
+          md5_matches_remaining: md5MatchesRemaining,
         })
         .select('id, customer_id, total_price, mp_payment_id')
         .single()
