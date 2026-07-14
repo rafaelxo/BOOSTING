@@ -225,9 +225,13 @@ export function StepConfigure() {
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
       setPdlModifierPct(null)
+    } else if (serviceType === 'coaching') {
+      // Preço vem do pacote escolhido em CoachPackagePicker (setBasePrice
+      // chamado lá, não recalculado aqui) — mas o modificador de PDL de uma
+      // configuração elo_boost anterior na mesma sessão não pode vazar para
+      // o resumo de um pedido de coaching.
+      setPdlModifierPct(null)
     }
-    // coaching: preço vem do pacote escolhido em CoachPackagePicker
-    // (setBasePrice chamado lá), não recalculado aqui.
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
     currentLp, avgLpGain, currentIsMasterPlus, masterPlusPriceRow,
