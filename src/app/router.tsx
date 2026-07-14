@@ -1,6 +1,6 @@
 import { lazy } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import { SuspensePage, RequireAuth, RequireGuest } from './routeGuards'
+import { SuspensePage, RequireAuth } from './routeGuards'
 
 // Layouts (eager — pequenos, reutilizados em toda a sessão)
 import { PublicLayout } from '@/features/public/PublicLayout'
@@ -22,7 +22,6 @@ const PrivacyPage                 = lazy(() => import('@/features/public/pages/L
 
 // Auth pages
 const LoginPage          = lazy(() => import('@/features/auth/LoginPage').then(m => ({ default: m.LoginPage })))
-const LegalAcceptancePage = lazy(() => import('@/features/auth/LegalAcceptancePage').then(m => ({ default: m.LegalAcceptancePage })))
 
 // Customer pages
 const CustomerDashboard = lazy(() => import('@/features/customer/pages/Dashboard').then(m => ({ default: m.CustomerDashboard })))
@@ -79,19 +78,16 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     children: [
       { path: '/apply', element: <SuspensePage><BoosterApplyPage /></SuspensePage> },
-      { path: '/legal/acceptance', element: <SuspensePage><LegalAcceptancePage /></SuspensePage> },
     ],
   },
 
-  // Auth routes (guest only) — login é exclusivamente via Discord OAuth,
-  // não existe fluxo de senha (login por e-mail/senha, recuperação, etc.).
-  {
-    element: <RequireGuest />,
-    children: [
-      { path: '/login',    element: <SuspensePage><LoginPage /></SuspensePage> },
-      { path: '/register', element: <Navigate to="/login?mode=register" replace /> },
-    ],
-  },
+  // Login/criar conta/aceite de termos — uma tela só, para qualquer estado
+  // de autenticação (login é exclusivamente via Discord OAuth, não existe
+  // fluxo de senha). Nunca fica atrás de RequireGuest: a mesma tela precisa
+  // continuar acessível logo após o retorno do OAuth, já autenticado, para
+  // mostrar os checkboxes de termos e o botão de painel.
+  { path: '/login',    element: <SuspensePage><LoginPage /></SuspensePage> },
+  { path: '/register', element: <Navigate to="/login" replace /> },
 
   // Customer routes
   {

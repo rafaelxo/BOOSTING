@@ -19,9 +19,9 @@ export function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' 
   }
   if (!profile) return <PageLoader />
 
-  if (!hasAcceptedLegal(profile) && location.pathname !== '/legal/acceptance') {
+  if (!hasAcceptedLegal(profile) && location.pathname !== '/login') {
     const redirect = encodeURIComponent(location.pathname + location.search)
-    return <Navigate to={`/legal/acceptance?redirect=${redirect}`} replace />
+    return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
 
   if (role && profile.role !== role) {
@@ -29,19 +29,6 @@ export function RequireAuth({ role }: { role?: 'customer' | 'booster' | 'admin' 
     if (profile.role === 'booster') return <Navigate to="/booster" replace />
     if (profile.role === 'customer') return <Navigate to="/dashboard" replace />
     return <Navigate to="/login" replace />
-  }
-
-  return <Outlet />
-}
-
-export function RequireGuest() {
-  const { isAuthenticated, profile, isLoading, isInitialized } = useAuthStore()
-
-  if (!isInitialized || isLoading) return <PageLoader />
-  if (isAuthenticated()) {
-    if (profile?.role === 'admin') return <Navigate to="/admin" replace />
-    if (profile?.role === 'booster') return <Navigate to="/booster" replace />
-    return <Navigate to="/dashboard" replace />
   }
 
   return <Outlet />

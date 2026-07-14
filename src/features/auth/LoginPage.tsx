@@ -1,11 +1,13 @@
-import { Link, useSearchParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import { Zap } from 'lucide-react'
-import { ThemeToggle } from '@/components/ui'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
+import { Button, ThemeToggle } from '@/components/ui'
+import { PageLoader } from '@/components/ui/Spinner'
 import { supabase } from '@/lib/supabase'
-import { useState } from 'react'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
-import { LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_VERSION } from '@/lib/legal'
+import { LEGAL_VERSION, hasAcceptedLegal } from '@/lib/legal'
+import { useAuthStore } from '@/stores/authStore'
+import { Zap } from 'lucide-react'
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -15,59 +17,118 @@ function DiscordIcon({ className }: { className?: string }) {
   )
 }
 
+// Único caminho pra entrar no app: vincular Discord → (se já aceitou os
+// termos antes) ou aceitar os termos agora → ir pro painel. Tudo na mesma
+// tela, nunca em telas separadas de login/criar conta/aceite — cada etapa
+// só libera quando a anterior está de fato concluída (checado a partir do
+// profile real vindo do banco, nunca de um estado só do cliente).
 export function LoginPage() {
   const [searchParams] = useSearchParams()
-  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { isAuthenticated, profile, isLoading, isInitialized } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [accepting, setAccepting] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
-  const isRegisterMode = searchParams.get('mode') === 'register'
-  const canSubmit = !loading && (!isRegisterMode || (termsAccepted && privacyAccepted))
+
+  const authenticated = isAuthenticated()
+  const alreadyAccepted = !!profile && hasAcceptedLegal(profile)
+
+  // Perfil que já aceitou os termos antes (usuário recorrente) — marca as
+  // caixinhas sozinho, refletindo o que já está gravado no banco. Um perfil
+  // novo (terms_accepted_at/privacy_accepted_at nulos) começa desmarcado e
+  // exige que o próprio usuário marque as duas.
+  useEffect(() => {
+    if (alreadyAccepted) {
+      setTermsAccepted(true)
+      setPrivacyAccepted(true)
+    }
+  }, [alreadyAccepted])
+
+  function targetPath() {
+    const raw = searchParams.get('redirect')
+    if (raw) {
+      try {
+        const decoded = decodeURIComponent(raw)
+        if (/^\/(?![/\\])/.test(decoded) && decoded !== '/login') return decoded
+      } catch { /* ignore malformed redirect */ }
+    }
+    if (profile?.role === 'admin') return '/admin'
+    if (profile?.role === 'booster') return '/booster'
+    return '/dashboard'
+  }
 
   async function handleDiscordLogin() {
-    if (isRegisterMode && (!termsAccepted || !privacyAccepted)) {
-      setError('Para criar sua conta, aceite os Termos de Uso e a Política de Privacidade.')
-      return
-    }
-
     if (!checkRateLimit('discord-login', limits.auth)) {
       setError('Muitas tentativas de login. Aguarde 1 minuto.')
       return
     }
-    setLoading(true)
+    setConnecting(true)
     setError(null)
 
-    // Validate ?redirect= — must be a same-origin path to prevent open redirect / token leak
-    const raw = searchParams.get('redirect')
-    let path = '/dashboard'
-    if (raw) {
-      try {
-        const decoded = decodeURIComponent(raw)
-        if (/^\/(?![/\\])/.test(decoded)) path = decoded
-      } catch { /* ignore malformed */ }
-    }
-    const redirectTo = `${window.location.origin}${path}`
-
-    if (isRegisterMode) {
-      localStorage.setItem(LEGAL_ACCEPTANCE_STORAGE_KEY, LEGAL_VERSION)
-    } else {
-      localStorage.removeItem(LEGAL_ACCEPTANCE_STORAGE_KEY)
-    }
+    // redirectTo sempre volta pra /login (nunca direto pro destino final) —
+    // é aqui que o restante do fluxo (marcar/aceitar termos) acontece, com o
+    // ?redirect= original preservado (re-codificado) pra usar depois de aceitar.
+    const redirectParam = searchParams.get('redirect')
+    const redirectTo = `${window.location.origin}/login${redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ''}`
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
-      options: {
-        scopes: 'identify email guilds.join',
-        redirectTo,
-      },
+      options: { scopes: 'identify email guilds.join', redirectTo },
     })
     if (oauthError) {
-      localStorage.removeItem(LEGAL_ACCEPTANCE_STORAGE_KEY)
       setError(oauthError.message)
-      setLoading(false)
+      setConnecting(false)
     }
   }
+
+  async function handleContinue() {
+    if (!profile) return
+
+    if (alreadyAccepted) {
+      navigate(targetPath(), { replace: true })
+      return
+    }
+
+    if (!termsAccepted || !privacyAccepted) return
+
+    setAccepting(true)
+    setError(null)
+
+    const acceptedAt = new Date().toISOString()
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        terms_accepted_at: acceptedAt,
+        privacy_accepted_at: acceptedAt,
+        legal_version: LEGAL_VERSION,
+      })
+      .eq('id', profile.id)
+
+    if (updateError) {
+      setError('Não foi possível registrar o aceite. Tente novamente.')
+      setAccepting(false)
+      return
+    }
+
+    useAuthStore.getState().setProfile({
+      ...profile,
+      terms_accepted_at: acceptedAt,
+      privacy_accepted_at: acceptedAt,
+      legal_version: LEGAL_VERSION,
+    })
+    navigate(targetPath(), { replace: true })
+  }
+
+  // Sessão ainda resolvendo, ou autenticado mas o profile real (fonte da
+  // verdade sobre o aceite) ainda não chegou — nunca decide os estados dos
+  // controles abaixo a partir de um profile incompleto/desatualizado.
+  if (!isInitialized || isLoading || (authenticated && !profile)) {
+    return <PageLoader />
+  }
+
+  const canContinue = authenticated && !!profile && (alreadyAccepted || (termsAccepted && privacyAccepted))
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg-base px-4">
@@ -87,102 +148,92 @@ export function LoginPage() {
         <div className="card p-6 space-y-5">
           <div>
             <h1 className="text-xl font-bold text-ink">
-              {isRegisterMode ? 'Criar conta' : t('auth.login.title')}
+              {!authenticated ? 'Entrar' : alreadyAccepted ? 'Bem-vindo de volta' : 'Antes de continuar'}
             </h1>
             <p className="text-sm text-ink-secondary mt-1">
-              {isRegisterMode
-                ? 'Leia e aceite os documentos abaixo antes de vincular sua conta com o Discord.'
-                : 'Acesse sua conta com o Discord para continuar.'}
+              {!authenticated
+                ? 'Vincule sua conta do Discord para entrar ou criar sua conta.'
+                : alreadyAccepted
+                  ? 'Sua conta já está pronta — é só continuar.'
+                  : 'Leia e aceite os documentos abaixo para liberar o painel.'}
             </p>
           </div>
 
-          {isRegisterMode && (
-            <div className="space-y-3">
-              <label className="flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(event) => setTermsAccepted(event.target.checked)}
-                  className="mt-1 h-4 w-4 accent-brand"
-                />
-                <span>
-                  Li e concordo com os{' '}
-                  <Link
-                    to="/terms"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-brand hover:underline"
-                  >
-                    Termos de Uso
-                  </Link>.
-                </span>
-              </label>
-
-              <label className="flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary">
-                <input
-                  type="checkbox"
-                  checked={privacyAccepted}
-                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
-                  className="mt-1 h-4 w-4 accent-brand"
-                />
-                <span>
-                  Li e concordo com a{' '}
-                  <Link
-                    to="/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-brand hover:underline"
-                  >
-                    Política de Privacidade
-                  </Link>.
-                </span>
-              </label>
-            </div>
-          )}
-
+          {/* 1. Vincular Discord */}
           <button
             type="button"
             onClick={handleDiscordLogin}
-            disabled={!canSubmit}
+            disabled={authenticated || connecting}
             className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-            style={{ backgroundColor: '#5865F2' }}
+            style={{ backgroundColor: authenticated ? undefined : '#5865F2' }}
           >
-            <DiscordIcon className="h-5 w-5" />
-            {loading ? 'Conectando...' : isRegisterMode ? 'Vincular com Discord' : 'Entrar com Discord'}
+            {authenticated ? (
+              <span className="w-full flex items-center justify-center gap-2 text-success">
+                <Check className="h-5 w-5" /> Discord vinculado
+              </span>
+            ) : (
+              <>
+                <DiscordIcon className="h-5 w-5" />
+                {connecting ? 'Conectando...' : 'Vincular Discord'}
+              </>
+            )}
           </button>
+
+          {/* 2. Termos — bloqueados até vincular o Discord */}
+          <div className="space-y-3">
+            <label
+              className={`flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary ${!authenticated ? 'opacity-50' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                disabled={!authenticated || alreadyAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                className="mt-1 h-4 w-4 accent-brand"
+              />
+              <span>
+                Li e concordo com os{' '}
+                <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                  Termos de Uso
+                </Link>.
+              </span>
+            </label>
+
+            <label
+              className={`flex items-start gap-3 rounded-xl border border-bg-elevated bg-bg-card p-3 text-sm text-ink-secondary ${!authenticated ? 'opacity-50' : ''}`}
+            >
+              <input
+                type="checkbox"
+                checked={privacyAccepted}
+                disabled={!authenticated || alreadyAccepted}
+                onChange={(event) => setPrivacyAccepted(event.target.checked)}
+                className="mt-1 h-4 w-4 accent-brand"
+              />
+              <span>
+                Li e concordo com a{' '}
+                <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+                  Política de Privacidade
+                </Link>.
+              </span>
+            </label>
+          </div>
 
           {error && (
             <p className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2">{error}</p>
           )}
 
+          {/* 3. Dashboard — só libera com Discord vinculado e termos aceitos */}
+          <Button className="w-full" disabled={!canContinue} loading={accepting} onClick={handleContinue}>
+            Ir para o Dashboard
+          </Button>
+
           <p className="text-xs text-ink-muted text-center">
-            {isRegisterMode ? 'Já tem conta?' : 'Ainda não tem conta?'}{' '}
-            <Link
-              to={isRegisterMode ? '/login' : '/register'}
-              className="text-brand hover:underline"
-            >
-              {isRegisterMode ? 'Entrar' : 'Criar conta'}
-            </Link>
+            Consulte os nossos{' '}
+            <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
+            {' '}e a{' '}
+            <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
           </p>
-
-          {!isRegisterMode && (
-            <p className="text-xs text-ink-muted text-center">
-              Consulte os nossos{' '}
-              <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
-              {' '}e a{' '}
-              <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
-            </p>
-          )}
-          {isRegisterMode && (
-            <p className="text-xs text-ink-muted text-center">
-              Os documentos podem ser consultados a qualquer momento em{' '}
-              <Link to="/terms" className="text-brand hover:underline">Termos de Uso</Link>
-              {' '}e{' '}
-              <Link to="/privacy" className="text-brand hover:underline">Política de Privacidade</Link>.
-            </p>
-          )}
         </div>
-
       </div>
     </div>
   )
