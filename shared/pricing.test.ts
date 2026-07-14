@@ -204,4 +204,23 @@ describe('MD5 — preço por vitória líquida (garantia de win rate nas placeme
     const priced = computeOrderPrice(baseInput({ serviceType: 'md5', currentRank: null, winsPurchased: null }))
     expect(priced.basePrice).toBe(0)
   })
+
+  it('com currentRank válido mas sem winsPurchased (ou vice-versa), preço continua zero', () => {
+    const semWins = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: null,
+    }))
+    expect(semWins.basePrice).toBe(0)
+
+    const semRank = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: null, winsPurchased: 3,
+    }))
+    expect(semRank.basePrice).toBe(0)
+  })
+
+  it('rejeita quantidade de vitórias fora da faixa 1-5 (garantia é só para as placements)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: 6,
+    }))
+    expect(priced.basePrice).toBe(0)
+  })
 })
