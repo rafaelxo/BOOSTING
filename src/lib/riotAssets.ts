@@ -1,34 +1,36 @@
-const RIOT_GAME_DATA_BASE =
-  'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1'
+import { supabase } from './supabase'
 
-export const RIOT_PROFILE_ICONS_INDEX_URL = `${RIOT_GAME_DATA_BASE}/profile-icons.json`
-
-interface RiotProfileIcon {
-  id: number | string
+interface ProfileIconsResponse {
+  version: string
+  icons: { id: number; url: string }[]
+  stale: boolean
 }
 
+let iconUrlById: Map<number, string> = new Map()
+
 export function riotProfileIconUrl(id: number): string {
-  return `${RIOT_GAME_DATA_BASE}/profile-icons/${id}.jpg`
+  return iconUrlById.get(id) ?? `https://ddragon.leagueoflegends.com/cdn/img/profileicon/${id}.png`
 }
 
 export function parseRiotProfileIconId(url: string | null | undefined): number | null {
-  const match = url?.match(/(?:profile-icons|profileicon)\/(\d+)\.(?:jpg|png|webp)/i)
+  const match = url?.match(/profileicon\/(\d+)\.(?:png|jpg|webp)/i)
   if (!match) return null
-
   const id = Number(match[1])
   return Number.isFinite(id) ? id : null
 }
 
 export async function fetchRiotProfileIconIds(): Promise<number[]> {
-  const response = await fetch(RIOT_PROFILE_ICONS_INDEX_URL)
-  if (!response.ok) {
+  // Internal proxy (supabase/functions/riot-profile-icons) fetches Data Dragon
+  // server-side — the browser never talks to ddragon.leagueoflegends.com or
+  // any third-party asset host directly for this call. `method: 'GET'` is
+  // required here: supabase-js's functions.invoke() defaults to POST, but
+  // this endpoint is a read-only, cacheable GET.
+  const { data, error } = await supabase.functions.invoke<ProfileIconsResponse>('riot-profile-icons', {
+    method: 'GET',
+  })
+  if (error || !data) {
     throw new Error('Não foi possível carregar os ícones de perfil do League of Legends.')
   }
-
-  const icons = (await response.json()) as RiotProfileIcon[]
-
-  return icons
-    .map(icon => Number(icon.id))
-    .filter(id => Number.isFinite(id))
-    .sort((a, b) => a - b)
+  iconUrlById = new Map(data.icons.map((icon) => [icon.id, icon.url]))
+  return data.icons.map((icon) => icon.id)
 }

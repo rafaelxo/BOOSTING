@@ -31,7 +31,7 @@ export function corsHeaders(req: Request): HeadersInit {
   const headers: Record<string, string> = {
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   }
 
   if (origin && allowed.includes(origin)) {
