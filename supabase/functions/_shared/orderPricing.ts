@@ -155,6 +155,10 @@ const otherServiceIntentSchema = z.object({
   // schema — o mesmo schema também cobre win_boost/placement_matches, que
   // não usam pacote de coach nenhum).
   booster_service_id: z.string().uuid().nullable().default(null),
+  // Riot ID — só win_boost usa (o booster precisa da conta pra logar e
+  // cumprir o pedido); placement_matches/coaching sempre mandam null aqui
+  // (reforçado pelas checagens de negócio abaixo).
+  riot_id: riotIdSchema.nullable().default(null),
 }).strict()
 
 // MD5 — "Rank da última temporada": Iron–Challenger valid, no LP/PDL/target
@@ -409,17 +413,20 @@ export async function validateAndPriceIntent(
       if (!other.wins_purchased) return { ok: false, response: badRequest(req, 'Quantidade de vitórias é obrigatória') }
       if (other.win_package) return { ok: false, response: badRequest(req, 'Pacote de vitórias extras não é aceito em Vitórias') }
       if (other.booster_service_id) return { ok: false, response: badRequest(req, 'Pacote de coach não é aceito em Vitórias') }
+      if (!other.riot_id) return { ok: false, response: badRequest(req, 'Riot ID é obrigatório para Vitórias') }
     }
     if (other.service_type === 'placement_matches') {
       if (!other.current_rank) return { ok: false, response: badRequest(req, 'Rank final da última temporada é obrigatório para MD5 Completo') }
       if (other.wins_purchased || other.win_package) return { ok: false, response: badRequest(req, 'Vitórias não são aceitas em MD5 Completo') }
       if (other.booster_service_id) return { ok: false, response: badRequest(req, 'Pacote de coach não é aceito em MD5 Completo') }
+      if (other.riot_id) return { ok: false, response: badRequest(req, 'Riot ID não é aceito em MD5 Completo') }
     }
     if (other.service_type === 'coaching') {
       if (!other.booster_service_id) return { ok: false, response: badRequest(req, 'Selecione um pacote de coach') }
       if (other.current_rank || other.target_rank || other.wins_purchased || other.win_package) {
         return { ok: false, response: badRequest(req, 'Ranks e vitórias não são aceitos em Coaching') }
       }
+      if (other.riot_id) return { ok: false, response: badRequest(req, 'Riot ID não é aceito em Coaching') }
     }
     normalized = {
       serviceType: other.service_type,
@@ -441,7 +448,7 @@ export async function validateAndPriceIntent(
       currentPdl: null,
       avgPdlGain: null,
       avgPdlLoss: null,
-      riotId: null,
+      riotId: other.riot_id,
       boosterServiceId: other.booster_service_id,
     }
   }

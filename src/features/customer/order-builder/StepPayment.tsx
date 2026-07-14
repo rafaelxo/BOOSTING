@@ -192,54 +192,62 @@ export function StepPayment() {
         queue_type: store.queueType,
         server: store.server,
         current_rank: store.currentRank,
-        target_rank: store.targetRank,
         customer_notes: store.customerNotes || null,
       }
 
       // O contrato é diferente por fluxo — Master+ não tem PDL alvo, LP,
       // pacote de vitórias nem Duo; o fluxo padrão não tem PDL atual/médias
       // de PDL. MD5 tem um contrato próprio: leva Riot ID e vitórias, mas não
-      // campos de LP/addons/pacote.
-      const intent = flow === 'master_plus'
-        ? {
-            ...base,
-            boost_mode: 'solo',
-            current_pdl: store.currentPdl,
-            avg_pdl_gain: store.avgPdlGain,
-            avg_pdl_loss: store.avgPdlLoss,
-            addon_codes: addonCodes,
-            riot_id: store.riotId,
-          }
-        : flow
-          ? {
-              ...base,
-              boost_mode: store.boostMode,
-              current_lp: store.currentLp,
-              avg_lp_gain: store.avgLpGain,
-              avg_lp_loss: store.avgLpLoss,
-              addon_codes: addonCodes,
-              win_package: store.winPackage,
-              riot_id: store.riotId,
-            }
-          : store.serviceType === 'md5'
+      // target_rank/addons/LP nenhum. `flow` aqui só serve pra decidir o
+      // catálogo de addons (StepExtras já reaproveita 'solo_standard' para
+      // win_boost/md5) — nunca para decidir o FORMATO do intent: usar `flow`
+      // pra isso já causou um bug real (toda ordem de Vitórias/MD5 caía no
+      // formato de elo_boost padrão, sem wins_purchased, e era rejeitada pelo
+      // backend com 400 em 100% dos casos). O formato do payload é decidido
+      // sempre por `store.serviceType` diretamente.
+      const intent = store.serviceType === 'elo_boost'
+        ? (flow === 'master_plus'
             ? {
                 ...base,
-                wins_purchased: store.winsPurchased,
+                target_rank: store.targetRank,
+                boost_mode: 'solo',
+                current_pdl: store.currentPdl,
+                avg_pdl_gain: store.avgPdlGain,
+                avg_pdl_loss: store.avgPdlLoss,
                 addon_codes: addonCodes,
                 riot_id: store.riotId,
               }
             : {
                 ...base,
+                target_rank: store.targetRank,
                 boost_mode: store.boostMode,
                 current_lp: store.currentLp,
                 avg_lp_gain: store.avgLpGain,
                 avg_lp_loss: store.avgLpLoss,
-                wins_purchased: store.winsPurchased,
-                sessions_purchased: store.sessionsPurchased,
                 addon_codes: addonCodes,
                 win_package: store.winPackage,
-                booster_service_id: store.selectedCoachPackage?.id ?? null,
-              }
+                riot_id: store.riotId,
+              })
+        : store.serviceType === 'md5'
+          ? {
+              ...base,
+              wins_purchased: store.winsPurchased,
+              riot_id: store.riotId,
+            }
+          : {
+              ...base,
+              target_rank: store.targetRank,
+              boost_mode: store.boostMode,
+              current_lp: store.currentLp,
+              avg_lp_gain: store.avgLpGain,
+              avg_lp_loss: store.avgLpLoss,
+              wins_purchased: store.winsPurchased,
+              sessions_purchased: store.sessionsPurchased,
+              addon_codes: addonCodes,
+              win_package: store.winPackage,
+              booster_service_id: store.selectedCoachPackage?.id ?? null,
+              riot_id: store.serviceType === 'win_boost' ? store.riotId : null,
+            }
 
       await invokePix({
         intent,
