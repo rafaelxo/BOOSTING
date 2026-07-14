@@ -489,12 +489,23 @@ serve(async (req) => {
         if (!RIOT_API_KEY) return errorResponse(req, 'Server misconfigured', 500)
         const accountResult = await fetchRiotAccount(normalized.riotId!, RIOT_API_KEY, 'americas')
         if (!accountResult.ok) {
-          return accountResult.reason === 'rate_limited'
-            ? errorResponse(req, 'Verificação Riot temporariamente limitada. Tente novamente em instantes.', 503)
-            : badRequest(req, 'Conta Riot não encontrada')
+          if (accountResult.reason === 'not_found') {
+            return badRequest(req, 'Conta Riot não encontrada')
+          }
+          if (accountResult.reason === 'rate_limited') {
+            return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+          }
+          console.error('Riot account lookup failed', accountResult.status)
+          return errorResponse(req, 'Falha ao consultar conta Riot', 502)
         }
         const leagueResult = await fetchLeagueEntries(accountResult.account.puuid, RIOT_API_KEY, 'br1')
-        if (!leagueResult.ok) return errorResponse(req, 'Falha ao verificar elegibilidade MD5', 502)
+        if (!leagueResult.ok) {
+          if (leagueResult.reason === 'rate_limited') {
+            return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+          }
+          console.error('Riot league lookup failed', leagueResult.status)
+          return errorResponse(req, 'Falha ao verificar elegibilidade MD5', 502)
+        }
 
         const { leagueQueue } = RIOT_QUEUE_TYPE[normalized.queueType]
         const alreadyRanked = leagueResult.entries.some((e) => e.queueType === leagueQueue && RIOT_TIER_MAP[e.tier ?? ''])
