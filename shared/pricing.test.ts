@@ -163,6 +163,26 @@ describe('Integridade monetária e entradas hostis', () => {
     expect(priced.totalPrice).toBe(priced.basePrice)
   })
 
+  it('calcula vitória avulsa Master+ com a tabela comercial atual', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'challenger', division: null },
+      winsPurchased: 2,
+    }))
+
+    expect(priced.basePrice).toBe(199.8)
+  })
+
+  it('calcula MD5 proporcional ao pacote de 5 partidas com Master+', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5',
+      currentRank: { tier: 'grandmaster', division: null },
+      winsPurchased: 3,
+    }))
+
+    expect(priced.basePrice).toBe(59.94)
+  })
+
   it('recusa quantidade negativa', () => {
     expect(() => computeOrderPrice(baseInput({
       serviceType: 'win_boost',

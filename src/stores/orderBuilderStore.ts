@@ -209,7 +209,12 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   }),
 
   setServer: (server) => set({ server }),
-  setWinsPurchased: (winsPurchased) => set({ winsPurchased }),
+  setWinsPurchased: (winsPurchased) => set((state) => {
+    const maxWins = state.isMd5 && state.md5MatchesRemaining != null
+      ? Math.max(1, state.md5MatchesRemaining)
+      : 50
+    return { winsPurchased: Math.max(1, Math.min(winsPurchased, maxWins)) }
+  }),
   setIsMd5: (isMd5) => set((state) => {
     const serviceType = isMd5 ? 'md5' : 'win_boost'
     return {
@@ -221,10 +226,25 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
       md5MatchesRemainingCeiling: isMd5 ? state.md5MatchesRemainingCeiling : null,
     }
   }),
-  setMd5MatchesRemaining: (md5MatchesRemaining) => set({ md5MatchesRemaining }),
-  setMd5MatchesRemainingFromApi: (n) => set({
-    md5MatchesRemaining: Math.max(0, Math.min(n, 5)),
-    md5MatchesRemainingCeiling: Math.max(0, Math.min(n, 5)),
+  setMd5MatchesRemaining: (md5MatchesRemaining) => set((state) => {
+    const ceiling = state.md5MatchesRemainingCeiling ?? 5
+    const next = Math.max(0, Math.min(md5MatchesRemaining, ceiling))
+    return {
+      md5MatchesRemaining: next,
+      winsPurchased: state.isMd5 && state.winsPurchased != null
+        ? Math.max(1, Math.min(state.winsPurchased, Math.max(1, next)))
+        : state.winsPurchased,
+    }
+  }),
+  setMd5MatchesRemainingFromApi: (n) => set((state) => {
+    const next = Math.max(0, Math.min(n, 5))
+    return {
+      md5MatchesRemaining: next,
+      md5MatchesRemainingCeiling: next,
+      winsPurchased: state.isMd5 && state.winsPurchased != null
+        ? Math.max(1, Math.min(state.winsPurchased, Math.max(1, next)))
+        : state.winsPurchased,
+    }
   }),
   setSessionsPurchased: (sessionsPurchased) => set({ sessionsPurchased }),
   setNotes: (customerNotes) => set({ customerNotes }),

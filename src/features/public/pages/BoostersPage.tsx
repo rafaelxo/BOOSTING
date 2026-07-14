@@ -58,7 +58,7 @@ function PodiumCard({ booster, position }: { booster: BoosterProfile; position: 
 
       {/* Avatar */}
       <div className="relative">
-        <Avatar name={booster.display_name} size={isFirst ? 'lg' : 'md'} />
+        <Avatar src={booster.avatar_url} name={booster.display_name} size={isFirst ? 'lg' : 'md'} />
         {booster.is_available && (
           <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
         )}
@@ -106,7 +106,7 @@ function BoosterCard({ booster }: { booster: BoosterProfile }) {
     <Link to={`/boosters/${booster.id}`}>
       <div className="card flex flex-col items-center text-center gap-3 p-4 hover:border-brand/30 hover:shadow-card-hover transition-all cursor-pointer h-full">
         <div className="relative">
-          <Avatar name={booster.display_name} size="lg" />
+          <Avatar src={booster.avatar_url} name={booster.display_name} size="lg" />
           {booster.is_available && (
             <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-success border-2 border-bg-surface" />
           )}

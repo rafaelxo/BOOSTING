@@ -70,6 +70,12 @@ const masterPlusTargetRankSchema = z.object({
 const genericRankSchema = z.object({
   tier: z.enum(['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger']),
   division: z.enum(DIVISIONS).nullable().optional(),
+}).strict().superRefine((val, ctx) => {
+  if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
+  } else if (!NO_DIVISION_TIERS.includes(val.tier) && !val.division) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Divisão é obrigatória para este rank', path: ['division'] })
+  }
 })
 
 // Parse leve, só para decidir qual schema estrito aplicar em seguida. Não é
@@ -551,7 +557,12 @@ serve(async (req) => {
           return badRequest(req, 'Conta já possui rank nesta fila — MD5 indisponível')
         }
         const playedCount = await fetchRankedMatchCountThisSplit(account.puuid, normalized.queueType)
+        if (playedCount == null) return errorResponse(req, 'Falha ao verificar partidas restantes da MD5', 502)
         md5MatchesRemaining = Math.max(0, 5 - (playedCount ?? 0))
+        if (md5MatchesRemaining < 1) return badRequest(req, 'MD5 já foi concluída nesta fila')
+        if (normalized.winsPurchased > md5MatchesRemaining) {
+          return badRequest(req, `MD5 possui no máximo ${md5MatchesRemaining} partida(s) restante(s) nesta fila`)
+        }
       }
 
       // ── Coaching agora exige um pacote real de um booster (booster_services,

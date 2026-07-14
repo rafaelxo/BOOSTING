@@ -1,26 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
-
-async function fetchVersion(): Promise<string> {
-  const res = await fetch('https://ddragon.leagueoflegends.com/api/versions.json')
-  const list: string[] = await res.json()
-  return list[0]
-}
-
-async function fetchIconIds(version: string): Promise<number[]> {
-  const res = await fetch(
-    `https://ddragon.leagueoflegends.com/cdn/${version}/data/pt_BR/profileicon.json`,
-  )
-  const json = await res.json()
-  return Object.keys(json.data as Record<string, unknown>)
-    .map(Number)
-    .sort((a, b) => a - b)
-}
-
-function iconUrl(version: string, id: number) {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${id}.png`
-}
+import { fetchRiotProfileIconIds, parseRiotProfileIconId, riotProfileIconUrl } from '@/lib/riotAssets'
 
 interface AvatarIconPickerProps {
   currentUrl: string | null | undefined
@@ -30,37 +11,26 @@ interface AvatarIconPickerProps {
 }
 
 // Shared League of Legends profile-icon picker used by every "meu perfil"
-// surface (drawer panel + full profile pages for all roles) so the DDragon
+// surface (drawer panel + full profile pages for all roles) so the Riot asset
 // fetch/selection logic lives in exactly one place.
 export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridClassName }: AvatarIconPickerProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (currentUrl) {
-      const m = currentUrl.match(/profileicon\/(\d+)\.png/)
-      if (m) setSelectedId(parseInt(m[1]))
-    }
+    setSelectedId(parseRiotProfileIconId(currentUrl))
   }, [currentUrl])
 
-  const { data: version } = useQuery({
-    queryKey: ['ddragon-version'],
-    queryFn: fetchVersion,
-    staleTime: 1000 * 60 * 60,
-  })
-
   const { data: iconIds = [] } = useQuery({
-    queryKey: ['ddragon-icons', version],
-    queryFn: () => fetchIconIds(version!),
-    enabled: !!version,
+    queryKey: ['riot-profile-icons'],
+    queryFn: fetchRiotProfileIconIds,
     staleTime: 1000 * 60 * 60,
   })
 
   async function handleSelect(id: number) {
-    if (!version) return
     setSelectedId(id)
     setSaving(true)
-    await onSelect(iconUrl(version, id))
+    await onSelect(riotProfileIconUrl(id))
     setSaving(false)
   }
 
@@ -71,7 +41,7 @@ export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridCla
         {saving && <span className="text-[10px] text-ink-muted">Salvando...</span>}
       </div>
       <p className="text-[11px] text-ink-secondary">Ícones oficiais do League of Legends.</p>
-      {version && iconIds.length > 0 ? (
+      {iconIds.length > 0 ? (
         <div className={cn('grid grid-cols-6 gap-1.5 max-h-64 overflow-y-auto pr-0.5', gridClassName)}>
           {iconIds.slice(0, maxIcons).map((id) => (
             <button
@@ -84,7 +54,7 @@ export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridCla
               )}
             >
               <img
-                src={iconUrl(version, id)}
+                src={riotProfileIconUrl(id)}
                 alt={`Ícone ${id}`}
                 className="w-full h-full object-cover"
                 loading="lazy"

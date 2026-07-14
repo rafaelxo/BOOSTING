@@ -100,6 +100,7 @@ export interface BoosterProfile {
   id: string
   user_id: string
   display_name: string
+  avatar_url: string | null
   status: BoosterStatus
   bio: string | null
   peak_rank: Rank | null

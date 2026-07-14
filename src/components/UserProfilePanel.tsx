@@ -305,7 +305,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
 
               {/* CPF */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">CPF</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">CPF (PIX)</p>
                 <div className="flex gap-2">
                   <input
                     value={cpf}

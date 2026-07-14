@@ -12,10 +12,10 @@ import { useCurrency } from '@/hooks/useCurrency'
 
 type RankGroup = 'gold_minus' | 'plat_diamond' | 'master_plus'
 
-const RANK_GROUPS: { key: RankGroup; label: string; sublabel: string }[] = [
-  { key: 'gold_minus',   label: 'Gold e Abaixo',      sublabel: 'Ferro · Bronze · Prata · Ouro'            },
-  { key: 'plat_diamond', label: 'Platina – Diamante',  sublabel: 'Platina · Esmeralda · Diamante'           },
-  { key: 'master_plus',  label: 'Mestre+',             sublabel: 'Mestre · Grão-mestre · Desafiante'        },
+const RANK_GROUPS: { key: RankGroup; label: string; sublabel: string; tiers: RankTier[] }[] = [
+  { key: 'gold_minus',   label: 'Gold e Abaixo',     sublabel: 'Ferro · Bronze · Prata · Ouro',      tiers: ['iron', 'bronze', 'silver', 'gold'] },
+  { key: 'plat_diamond', label: 'Platina - Diamante', sublabel: 'Platina · Esmeralda · Diamante',     tiers: ['platinum', 'emerald', 'diamond'] },
+  { key: 'master_plus',  label: 'Mestre+',            sublabel: 'Mestre · Grão-mestre · Desafiante',  tiers: ['master', 'grandmaster', 'challenger'] },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -88,6 +88,7 @@ export function BoosterPublicProfilePage() {
   )
 
   const hasRankStats  = booster.rank_stats && Object.keys(booster.rank_stats).length > 0
+  const rankGroups = RANK_GROUPS.filter(group => booster.rank_stats?.[group.key])
   const hasLanes      = booster.lanes && booster.lanes.length > 0
   const hasSpecialties = booster.specialties && booster.specialties.length > 0
 
@@ -102,7 +103,7 @@ export function BoosterPublicProfilePage() {
       <Card padding="lg">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           <div className="relative shrink-0">
-            <Avatar name={booster.display_name} size="xl" />
+            <Avatar src={booster.avatar_url} name={booster.display_name} size="xl" />
             {booster.is_available && (
               <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full bg-success border-2 border-bg-surface" title="Disponível" />
             )}
@@ -257,11 +258,16 @@ export function BoosterPublicProfilePage() {
           <p className="text-xs text-ink-muted py-4 text-center">Estatísticas ainda não informadas.</p>
         ) : (
           <div className="space-y-3">
-            {RANK_GROUPS.map(g => {
+            {rankGroups.map(g => {
               const stats = booster.rank_stats?.[g.key]
               return (
                 <div key={g.key} className="flex items-center gap-4 py-3 border-b border-bg-elevated last:border-0">
                   <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {g.tiers.map(tier => (
+                        <RankBadge key={tier} tier={tier} size="xs" showDivision={false} showLabel={false} />
+                      ))}
+                    </div>
                     <p className="text-xs font-semibold text-ink">{g.label}</p>
                     <p className="text-[10px] text-ink-muted">{g.sublabel}</p>
                   </div>

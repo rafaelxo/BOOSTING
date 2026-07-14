@@ -115,24 +115,15 @@ export function getWinBoostPrice(tier: RankTier, _div: Division | null): number 
 // Pacotes de vitórias oferecidos no StepExtras (desconto sobre o preço unitário)
 export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
 
-// ── MD5 — garantia de win rate nas placements restantes ───────────────────────
-// Valores oficiais por vitória líquida, fornecidos pela regra comercial.
-export const MD5_WIN_PRICE_PER_TIER: Record<string, number> = {
-  iron: 0.87, bronze: 0.87, silver: 1.17, gold: 1.17,
-  platinum: 2.07, emerald: 2.97,
-  diamond: 4.77,
-  master: 13.47, grandmaster: 17.97, challenger: 29.97,
-}
-
-export function getMd5WinPrice(tier: RankTier): number {
-  return MD5_WIN_PRICE_PER_TIER[tier] ?? 4.38
-}
-
 // ── MD5 — 5 Placement Matches ─────────────────────────────────────────────────
 export const PLACEMENT_PRICE: Record<string, number> = {
   iron: 14.90, bronze: 16.90, silver: 18.90, gold: 21.90,
   platinum: 30.90, emerald: 37.90, diamond: 41.90,
   master: 59.90, grandmaster: 99.90, challenger: 179.90,
+}
+
+export function getMd5MatchPrice(tier: RankTier): number {
+  return centsToMoney(Math.ceil(moneyToCents(PLACEMENT_PRICE[tier] ?? 14.90) / 5))
 }
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
@@ -271,8 +262,8 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     }
     case 'md5': {
       if (!input.winsPurchased || input.winsPurchased < 1 || input.winsPurchased > 5 || !input.currentRank) break
-      const pricePerWin = getMd5WinPrice(input.currentRank.tier)
-      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
+      const pricePerMatch = getMd5MatchPrice(input.currentRank.tier)
+      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerMatch))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
     }

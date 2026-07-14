@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -6,14 +7,44 @@ import {
   TrendingUp, MessageCircle, CheckCircle2,
   ArrowRight, Lock, Trophy, Star,
 } from 'lucide-react'
-import { Button, RankBadge } from '@/components/ui'
-import { RANK_TIER_ORDER } from '@/lib/utils'
+import { Avatar, Button, RankBadge } from '@/components/ui'
+import { supabase } from '@/lib/supabase'
+import { formatRank, RANK_TIER_ORDER } from '@/lib/utils'
+import type { BoosterProfile, RankTier } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+function overallWinRate(booster: BoosterProfile): number {
+  const stats = booster.rank_stats
+  if (!stats) return 0
+
+  const values = [stats.gold_minus?.winrate, stats.plat_diamond?.winrate, stats.master_plus?.winrate]
+    .filter((value): value is number => value !== undefined)
+
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+}
+
 export function HomePage() {
   const { t } = useTranslation()
+
+  const { data: featuredBoosters = [] } = useQuery({
+    queryKey: ['home-featured-boosters'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('public_booster_profiles')
+        .select('*')
+        .eq('is_available', true)
+        .order('is_top5', { ascending: false })
+        .order('rating', { ascending: false })
+        .limit(4)
+
+      if (error) throw error
+      return data as BoosterProfile[]
+    },
+    staleTime: 60_000,
+  })
 
   const STATS = [
     { value: '48.200+', label: t('home.stats.ordersCompleted') },
@@ -346,6 +377,87 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── BOOSTERS ─────────────────────────────────────────────────────── */}
+      {featuredBoosters.length > 0 && (
+        <section className="py-28 bg-bg-base">
+          <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }} transition={{ duration: 0.5 }}
+              className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-12"
+            >
+              <div>
+                <p className="section-label mb-3">Boosters</p>
+                <h2 className="text-4xl md:text-5xl font-black text-ink">Perfis em destaque</h2>
+                <p className="mt-4 text-ink-secondary text-lg max-w-xl">
+                  Boosters aprovados manualmente, com dados carregados direto do catálogo público.
+                </p>
+              </div>
+              <Button asChild variant="ghost">
+                <Link to="/boosters">
+                  Ver todos <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </motion.div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {featuredBoosters.map((booster, index) => {
+                const winRate = overallWinRate(booster)
+
+                return (
+                  <motion.div
+                    key={booster.id}
+                    initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }} transition={{ duration: 0.4, delay: index * 0.08 }}
+                  >
+                    <Link
+                      to={`/boosters/${booster.id}`}
+                      className="card p-5 flex flex-col gap-4 h-full hover:shadow-card-hover hover:-translate-y-1 hover:border-brand/25 transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative shrink-0">
+                          <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
+                          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-ink truncate">{booster.display_name}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Star className="h-3 w-3 text-warning fill-warning" />
+                            <span className="text-xs font-semibold text-ink-secondary">
+                              {booster.rating_count > 0 ? booster.rating.toFixed(1) : 'Novo'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {booster.current_rank && (
+                        <div className="flex items-center gap-2">
+                          <RankBadge tier={booster.current_rank.tier as RankTier} division={booster.current_rank.division} size="sm" showLabel={false} />
+                          <span className="text-xs font-semibold text-ink-secondary">
+                            {formatRank(booster.current_rank.tier as RankTier, booster.current_rank.division)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="mt-auto grid grid-cols-2 gap-3 pt-3 border-t border-bg-elevated">
+                        <div>
+                          <p className="text-[10px] text-ink-muted">Winrate</p>
+                          <p className="text-sm font-extrabold text-brand">{winRate > 0 ? `${winRate.toFixed(1)}%` : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-ink-muted">Pedidos</p>
+                          <p className="text-sm font-extrabold text-ink">{booster.total_completed}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
       <section className="py-28 bg-bg-base overflow-hidden">

@@ -5,7 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, getMd5MatchPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
   BOOST_CURRENT_RANK_TIERS,
   isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket, tierHasDivisions,
@@ -207,7 +207,7 @@ export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased,
-    isMd5, md5MatchesRemaining,
+    isMd5, md5MatchesRemaining, md5MatchesRemainingCeiling,
     currentLp, avgLpGain,
     currentPdl, avgPdlGain,
     riotId,
@@ -309,7 +309,7 @@ export function StepConfigure() {
       const remaining = result.matches_remaining ?? 5
       setIsMd5(true)
       setMd5MatchesRemainingFromApi(remaining)
-      setWinsPurchased(winsPurchased ?? 1)
+      setWinsPurchased(Math.min(remaining, winsPurchased ?? remaining))
       setMd5Message(
         `Conta ainda não rankeada nesta fila - MD5 ativado automaticamente. `
         + `Faltam ${remaining} partida(s) de posicionamento.`,
@@ -388,7 +388,7 @@ export function StepConfigure() {
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
-      const pricePerWin = getMd5WinPrice(currentRank.tier)
+      const pricePerWin = getMd5MatchPrice(currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
     }
@@ -710,6 +710,7 @@ export function StepConfigure() {
                   <button
                     type="button"
                     onClick={() => setMd5MatchesRemaining(md5MatchesRemaining + 1)}
+                    disabled={md5MatchesRemaining >= (md5MatchesRemainingCeiling ?? 5)}
                     className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     +
@@ -750,7 +751,8 @@ export function StepConfigure() {
               <button
                 type="button"
                 onClick={() => setWinsPurchased((winsPurchased ?? 1) + 1)}
-                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
+                disabled={isMd5 && md5MatchesRemaining != null && (winsPurchased ?? 1) >= md5MatchesRemaining}
+                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 +
               </button>
