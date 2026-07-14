@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeOrderPrice, type OrderPriceInput } from './pricing'
+import { computeOrderPrice, type OrderPriceInput, type RankTier } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
   return {
@@ -173,31 +173,28 @@ describe('Integridade monetária e entradas hostis', () => {
 })
 
 describe('MD5 — preço por vitória líquida (garantia de win rate nas placements)', () => {
-  it('preço por vitória = 30% do preço padrão de win_boost, arredondado a 2 casas', () => {
+  it('preço por vitória = tabela oficial ÷ 5, arredondado a 2 casas', () => {
     const priced = computeOrderPrice(baseInput({
       serviceType: 'md5',
       currentRank: { tier: 'gold', division: null },
       winsPurchased: 3,
     }))
-    // getWinBoostPrice('gold') = 3.90 => MD5 = 3.90 * 0.30 = 1.17/vitória
-    expect(priced.basePrice).toBeCloseTo(1.17 * 3, 2)
+    // tabela: Gold R$21.90 para as 5 vitórias => 21.90/5 = 4.38/vitória
+    expect(priced.basePrice).toBeCloseTo(4.38 * 3, 2)
   })
 
-  it('mestre/grão-mestre/desafiante usam os valores exatos informados (÷5 do preço fechado)', () => {
-    const master = computeOrderPrice(baseInput({
-      serviceType: 'md5', currentRank: { tier: 'master', division: null }, winsPurchased: 5,
-    }))
-    expect(master.basePrice).toBeCloseTo(59.90, 2)
-
-    const gm = computeOrderPrice(baseInput({
-      serviceType: 'md5', currentRank: { tier: 'grandmaster', division: null }, winsPurchased: 5,
-    }))
-    expect(gm.basePrice).toBeCloseTo(99.90, 2)
-
-    const challenger = computeOrderPrice(baseInput({
-      serviceType: 'md5', currentRank: { tier: 'challenger', division: null }, winsPurchased: 5,
-    }))
-    expect(challenger.basePrice).toBeCloseTo(149.90, 2)
+  it('todos os 10 tiers usam os valores exatos da tabela oficial (÷5 do preço fechado)', () => {
+    const cases: [string, number][] = [
+      ['iron', 14.90], ['bronze', 16.90], ['silver', 18.90], ['gold', 21.90],
+      ['platinum', 30.90], ['emerald', 37.90], ['diamond', 41.90],
+      ['master', 59.90], ['grandmaster', 99.90], ['challenger', 179.90],
+    ]
+    for (const [tier, fullPrice] of cases) {
+      const priced = computeOrderPrice(baseInput({
+        serviceType: 'md5', currentRank: { tier: tier as RankTier, division: null }, winsPurchased: 5,
+      }))
+      expect(priced.basePrice).toBeCloseTo(fullPrice, 2)
+    }
   })
 
   it('sem winsPurchased ou currentRank, preço fica zero (pedido bloqueado)', () => {

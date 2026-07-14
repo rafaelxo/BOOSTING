@@ -116,19 +116,17 @@ export function getWinBoostPrice(tier: RankTier, _div: Division | null): number 
 export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
 
 // ── MD5 — Win Rate Guarantee on placement matches ────────────────────────────
-// Per-net-win price. Master/GM/Challenger are the exact figures given by the
-// business (R$59.90/99.90/149.90 for 5 wins, ÷5). Iron–Diamond apply the same
-// ~30% multiplier against WIN_PRICE_PER_TIER for consistency — no separate
-// figures exist for those tiers yet; revisit if the business sets explicit
-// ones later.
+// Per-net-win price = the business's official full-5-wins table ÷ 5. Exact
+// figures for all 10 tiers, given directly by the business — do not derive
+// or approximate these.
 export const MD5_WIN_PRICE_PER_TIER: Record<string, number> = {
-  iron: 0.87, bronze: 0.87, silver: 1.17, gold: 1.17,
-  platinum: 2.07, emerald: 2.97, diamond: 4.77,
-  master: 11.98, grandmaster: 19.98, challenger: 29.98,
+  iron: 2.98, bronze: 3.38, silver: 3.78, gold: 4.38,
+  platinum: 6.18, emerald: 7.58, diamond: 8.38,
+  master: 11.98, grandmaster: 19.98, challenger: 35.98,
 }
 
 export function getMd5WinPrice(tier: RankTier): number {
-  return MD5_WIN_PRICE_PER_TIER[tier] ?? 1.17
+  return MD5_WIN_PRICE_PER_TIER[tier] ?? 4.38
 }
 
 // ── MD5 — 5 Placement Matches ─────────────────────────────────────────────────
