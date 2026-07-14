@@ -3,9 +3,15 @@ import { z } from 'https://esm.sh/zod@3.23.8'
 import { handleCors } from '../_shared/cors.ts'
 import { errorResponse, jsonResponse, rateLimitResponse } from '../_shared/responses.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
-import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
+import { HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
-import type { RankTier, Division } from '../../../shared/pricing.ts'
+import {
+  fetchLeagueEntries,
+  fetchRiotAccount,
+  NO_DIVISION_TIERS,
+  RIOT_DIVISION_MAP,
+  RIOT_TIER_MAP,
+} from '../_shared/riotLookup.ts'
 
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const REGIONAL_ROUTE = 'americas'
@@ -14,21 +20,6 @@ const PLATFORM_ROUTE = 'br1'
 const bodySchema = z.object({
   riot_id: z.string().trim().min(3).max(32).regex(/^[^#]{1,16}#[A-Za-z0-9]{2,5}$/),
 }).strict()
-
-const RIOT_TIER_MAP: Record<string, RankTier> = {
-  IRON: 'iron',
-  BRONZE: 'bronze',
-  SILVER: 'silver',
-  GOLD: 'gold',
-  PLATINUM: 'platinum',
-  EMERALD: 'emerald',
-  DIAMOND: 'diamond',
-  MASTER: 'master',
-  GRANDMASTER: 'grandmaster',
-  CHALLENGER: 'challenger',
-}
-const RIOT_DIVISION_MAP: Record<string, Division> = { I: 'I', II: 'II', III: 'III', IV: 'IV' }
-const NO_DIVISION_TIERS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
 function badRequest(req: Request, message: string) {
   return errorResponse(req, message, 400)
@@ -53,60 +44,37 @@ serve(async (req) => {
     if (!parsedBody.success) return badRequest(req, 'Riot ID inválido')
 
     const riotId = parsedBody.data.riot_id
-    const hashIdx = riotId.lastIndexOf('#')
-    const gameName = riotId.slice(0, hashIdx)
-    const tagLine = riotId.slice(hashIdx + 1)
 
-    const accountResp = await fetchWithTimeout(
-      `https://${REGIONAL_ROUTE}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-      { headers: { 'X-Riot-Token': RIOT_API_KEY } },
-    )
-
-    if (accountResp.status === 404) {
-      return jsonResponse(req, { found: false, ranked: false })
-    }
-    if (accountResp.status === 429) {
-      return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
-    }
-    if (!accountResp.ok) {
-      console.error('Riot account lookup failed', accountResp.status)
+    const accountResult = await fetchRiotAccount(riotId, RIOT_API_KEY, REGIONAL_ROUTE)
+    if (!accountResult.ok) {
+      if (accountResult.reason === 'not_found') {
+        return jsonResponse(req, { found: false, ranked: false })
+      }
+      if (accountResult.reason === 'rate_limited') {
+        return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+      }
+      console.error('Riot account lookup failed', accountResult.status)
       return errorResponse(req, 'Falha ao consultar conta Riot', 502)
     }
+    const account = accountResult.account
 
-    const account = await accountResp.json() as { puuid?: string; gameName?: string; tagLine?: string }
-    if (!account.puuid) return errorResponse(req, 'Falha ao consultar conta Riot', 502)
-
-    const leagueResp = await fetchWithTimeout(
-      `https://${PLATFORM_ROUTE}.api.riotgames.com/lol/league/v4/entries/by-puuid/${account.puuid}`,
-      { headers: { 'X-Riot-Token': RIOT_API_KEY } },
-    )
-
-    if (leagueResp.status === 429) {
-      return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
-    }
-    if (!leagueResp.ok) {
-      console.error('Riot league lookup failed', leagueResp.status)
+    const leagueResult = await fetchLeagueEntries(account.puuid, RIOT_API_KEY, PLATFORM_ROUTE)
+    if (!leagueResult.ok) {
+      if (leagueResult.reason === 'rate_limited') {
+        return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+      }
+      console.error('Riot league lookup failed', leagueResult.status)
       return errorResponse(req, 'Falha ao consultar elo na Riot', 502)
     }
 
-    const entries = await leagueResp.json() as {
-      queueType?: string
-      tier?: string
-      rank?: string
-      leaguePoints?: number
-      wins?: number
-      losses?: number
-    }[]
-    const soloEntry = Array.isArray(entries)
-      ? entries.find((entry) => entry.queueType === 'RANKED_SOLO_5x5')
-      : null
+    const soloEntry = leagueResult.entries.find((entry) => entry.queueType === 'RANKED_SOLO_5x5')
 
     const tier = soloEntry?.tier ? RIOT_TIER_MAP[soloEntry.tier] ?? null : null
     if (!soloEntry || !tier) {
       return jsonResponse(req, {
         found: true,
         ranked: false,
-        riot_id: `${account.gameName ?? gameName}#${account.tagLine ?? tagLine}`,
+        riot_id: `${account.gameName}#${account.tagLine}`,
       })
     }
 
@@ -117,7 +85,7 @@ serve(async (req) => {
     return jsonResponse(req, {
       found: true,
       ranked: true,
-      riot_id: `${account.gameName ?? gameName}#${account.tagLine ?? tagLine}`,
+      riot_id: `${account.gameName}#${account.tagLine}`,
       tier,
       division,
       league_points: Math.max(0, Number(soloEntry.leaguePoints ?? 0)),
