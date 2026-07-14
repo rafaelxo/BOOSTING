@@ -42,6 +42,7 @@ interface OrderBuilderState {
   // muda serviceType para 'md5' internamente (ver StepConfigure.tsx).
   isMd5: boolean
   md5MatchesRemaining: number | null
+  md5MatchesRemainingCeiling: number | null
 
   // Pacote de coach escolhido (booster_services) — preço vem sempre daqui,
   // nunca editável pelo cliente. Selecionar um pacote também vincula o
@@ -93,7 +94,8 @@ interface OrderBuilderState {
   setExtrasPrice: (price: number) => void
   setEstimatedHours: (hours: number | null) => void
   setIsMd5: (isMd5: boolean) => void
-  setMd5MatchesRemaining: (n: number | null) => void
+  setMd5MatchesRemaining: (n: number) => void
+  setMd5MatchesRemainingFromApi: (n: number) => void
   reset: () => void
 }
 
@@ -121,6 +123,7 @@ const initialState = {
   riotId: '',
   isMd5: false,
   md5MatchesRemaining: null as number | null,
+  md5MatchesRemainingCeiling: null as number | null,
   selectedCoachPackage: null,
   currentLp: 0,
   avgLpGain: 20,
@@ -242,10 +245,17 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
       serviceId: nextType,
       winsPurchased: isMd5 && state.winsPurchased && state.winsPurchased > 5 ? 5 : state.winsPurchased,
       md5MatchesRemaining: isMd5 ? state.md5MatchesRemaining : null,
+      md5MatchesRemainingCeiling: isMd5 ? state.md5MatchesRemainingCeiling : null,
     }
   }),
 
-  setMd5MatchesRemaining: (md5MatchesRemaining) => set({ md5MatchesRemaining }),
+  setMd5MatchesRemaining: (n) => set((state) => ({
+    md5MatchesRemaining: state.md5MatchesRemainingCeiling != null
+      ? Math.max(0, Math.min(n, state.md5MatchesRemainingCeiling))
+      : Math.max(0, n),
+  })),
+
+  setMd5MatchesRemainingFromApi: (n) => set({ md5MatchesRemaining: n, md5MatchesRemainingCeiling: n }),
 
   reset: () => set({ ...initialState, selectedExtraIds: new Set<string>() }),
 }))
