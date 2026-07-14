@@ -7,7 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck } from 'lucide-react'
-import type { ServiceType } from '@/types'
+import type { ServiceType, Rank } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
@@ -36,12 +36,58 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
   payment: StepPayment,
 }
 
+// Riot ID no formato Nome#TAG (3-16 chars antes do #, 2-5 alfanuméricos
+// depois) — mesmo formato aceito pelo lookup da Riot em StepConfigure.tsx.
+function isValidRiotId(riotId: string): boolean {
+  return /^.{3,16}#[A-Za-z0-9]{2,5}$/.test(riotId.trim())
+}
+
+// Regras de "step completo" usadas só para gatear o botão Continuar — a
+// validação que realmente importa (preço, elegibilidade, etc.) continua
+// sendo feita no backend ao criar o pedido. Isto é só UX: evita avançar
+// com campos obviamente faltando/inválidos ou enquanto uma consulta Riot
+// ainda está em andamento.
+function isStepComplete(
+  step: OrderBuilderStep,
+  state: {
+    serviceType: ServiceType | null
+    selectedCoachPackage: { id: string } | null
+    currentRank: Rank | null
+    targetRank: Rank | null
+    winsPurchased: number | null
+    riotId: string
+    isMd5: boolean
+    riotLookupLoading: boolean
+    md5MatchesRemaining: number | null
+  },
+): boolean {
+  if (state.riotLookupLoading) return false
+  if (step === 'service') return !!state.serviceType
+  if (step === 'configure') {
+    if (state.serviceType === 'elo_boost') {
+      return !!state.currentRank && !!state.targetRank && isValidRiotId(state.riotId)
+    }
+    if (state.serviceType === 'win_boost' || state.serviceType === 'md5') {
+      const winsOk = !!state.winsPurchased
+        && state.winsPurchased >= 1
+        && state.winsPurchased <= 5
+        && (!state.isMd5 || state.md5MatchesRemaining == null || state.winsPurchased <= state.md5MatchesRemaining)
+      return !!state.currentRank && winsOk && isValidRiotId(state.riotId)
+    }
+    if (state.serviceType === 'placement_matches') return !!state.currentRank
+    if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
+  }
+  return true
+}
+
 export function OrderBuilderPage() {
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
-    selectedExtraIds, currentRank, boostMode, gameSlug, gameId, serviceType,
+    selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType,
     setGame, setService, setStep, reset, preferredBoosterName, setPreferredBooster,
     setSelectedCoachPackage, setBasePrice,
+    winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading,
+    selectedCoachPackage, setStepAttempted,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
@@ -147,6 +193,10 @@ export function OrderBuilderPage() {
   const StepContent = STEP_COMPONENTS[step]
   const totalPrice = basePrice + extrasPrice
   const canGoBack = currentIdx > 0 && step !== 'payment'
+  const stepComplete = isStepComplete(step, {
+    serviceType, selectedCoachPackage, currentRank, targetRank,
+    winsPurchased, riotId, isMd5, riotLookupLoading, md5MatchesRemaining,
+  })
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -187,7 +237,12 @@ export function OrderBuilderPage() {
                   Voltar
                 </Button>
                 <Button
-                  onClick={nextStep}
+                  onClick={() => {
+                    if (!stepComplete) { setStepAttempted(true); return }
+                    setStepAttempted(false)
+                    nextStep()
+                  }}
+                  disabled={riotLookupLoading || !stepComplete}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Continuar

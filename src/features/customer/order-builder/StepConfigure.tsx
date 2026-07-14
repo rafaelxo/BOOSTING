@@ -22,18 +22,17 @@ export function StepConfigure() {
     isMd5, md5MatchesRemaining, md5MatchesRemainingCeiling,
     currentLp, avgLpGain,
     currentPdl, avgPdlGain,
-    riotId, riotAutoFilled,
+    riotId, riotAutoFilled, riotLookupLoading, stepAttempted,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
     setIsMd5, setMd5MatchesRemaining, setMd5MatchesRemainingFromApi,
     setCurrentLp, setAvgLpGain,
     setCurrentPdl, setAvgPdlGain,
-    setBasePrice, setEstimatedHours, setRiotId, setRiotAutoFilled,
+    setBasePrice, setEstimatedHours, setRiotId, setRiotAutoFilled, setRiotLookupLoading,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
   const pdlBracket = currentIsMasterPlus ? getPdlBracket(currentPdl) : null
-  const [riotLookupLoading, setRiotLookupLoading] = useState(false)
   const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
   const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
   const [md5Message, setMd5Message] = useState<string | null>(null)
@@ -243,7 +242,12 @@ export function StepConfigure() {
             may still edit everything afterwards; backend validation remains
             authoritative when creating/completing orders. */}
         {serviceType === 'elo_boost' && (
-          <FormField label="Riot ID" required hint="Informe antes de configurar. Ex: NomeDoInvocador#BR1. Vamos tentar preencher seu elo atual automaticamente.">
+          <FormField
+            label="Riot ID"
+            required
+            hint="Informe antes de configurar. Ex: NomeDoInvocador#BR1. Vamos tentar preencher seu elo atual automaticamente."
+            error={stepAttempted && !riotId.trim() ? 'Campo obrigatório' : undefined}
+          >
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
@@ -319,7 +323,12 @@ export function StepConfigure() {
         {/* Vitórias/MD5: Riot ID vem primeiro neste fluxo — a checagem de
             elegibilidade MD5 precisa acontecer antes de qualquer outro campo. */}
         {(serviceType === 'win_boost' || serviceType === 'md5') && (
-          <FormField label="Riot ID" required hint="Informe seu Nome#TAG. Usamos isso para checar automaticamente se sua conta já tem rank nesta fila (MD5).">
+          <FormField
+            label="Riot ID"
+            required
+            hint="Informe seu Nome#TAG. Usamos isso para checar automaticamente se sua conta já tem rank nesta fila (MD5)."
+            error={stepAttempted && !riotId.trim() ? 'Campo obrigatório' : undefined}
+          >
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
@@ -485,6 +494,9 @@ export function StepConfigure() {
                   onChange={(tier, division) => setCurrentRank({ tier, division })}
                   disabled={riotAutoFilled}
                 />
+                {stepAttempted && !currentRank && (
+                  <p className="text-xs text-danger">Selecione um rank</p>
+                )}
 
                 {/* PDL Atual — mesmo cartão para os dois fluxos, só trocando
                     quais campos do estado ficam ligados a cada input. Master+
@@ -561,6 +573,9 @@ export function StepConfigure() {
                     onChange={(tier, division) => setTargetRank({ tier, division })}
                   />
                 )}
+                {stepAttempted && currentRank && !targetRank && (
+                  <p className="text-xs text-danger">Selecione o rank alvo</p>
+                )}
               </div>
             </div>
           </div>
@@ -572,6 +587,7 @@ export function StepConfigure() {
             label={isMd5 ? 'Rank da Última Temporada' : 'Rank Atual'}
             required
             hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
+            error={stepAttempted && !currentRank ? 'Selecione um rank' : undefined}
             labelAction={riotAutoFilled && (
               <button type="button" onClick={() => setRiotAutoFilled(false)} className="text-[10px] font-bold text-brand hover:underline">
                 Editar

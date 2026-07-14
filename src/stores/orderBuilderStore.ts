@@ -37,6 +37,18 @@ interface OrderBuilderState {
   // rank alvo foi atingido antes de concluir o pedido.
   riotId: string
 
+  // Verdadeiro enquanto uma consulta à Riot (rank atual / elegibilidade MD5)
+  // está em andamento — movido de useState local em StepConfigure.tsx para
+  // o store pra que OrderBuilder.tsx possa bloquear o avanço de step
+  // enquanto a consulta não termina (ver isStepComplete).
+  riotLookupLoading: boolean
+
+  // Verdadeiro depois que o usuário tenta avançar de step com campos
+  // obrigatórios faltando/inválidos — liga os hints de erro inline em
+  // StepConfigure.tsx (FormField error=...) sem exibi-los antes da primeira
+  // tentativa.
+  stepAttempted: boolean
+
   // Verdadeiro assim que uma consulta Riot bem-sucedida preenche
   // rank/LP/PDL automaticamente — usado para travar esses campos até o
   // usuário clicar em "Editar" (setRiotAutoFilled(false)) ou alterar o
@@ -93,6 +105,8 @@ interface OrderBuilderState {
   setPreferredBooster: (id: string, name: string) => void
   setRiotId: (riotId: string) => void
   setRiotAutoFilled: (v: boolean) => void
+  setRiotLookupLoading: (v: boolean) => void
+  setStepAttempted: (v: boolean) => void
   setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null } | null) => void
   setCurrentLp: (lp: number) => void
   setAvgLpGain: (lp: number) => void
@@ -132,6 +146,8 @@ const initialState = {
   preferredBoosterName: null,
   riotId: '',
   riotAutoFilled: false,
+  riotLookupLoading: false,
+  stepAttempted: false,
   selectedCoachPackage: null,
   currentLp: 0,
   avgLpGain: 20,
@@ -275,6 +291,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
   setRiotId: (riotId) => set({ riotId, riotAutoFilled: false }),
   setRiotAutoFilled: (riotAutoFilled) => set({ riotAutoFilled }),
+  setRiotLookupLoading: (riotLookupLoading) => set({ riotLookupLoading }),
+  setStepAttempted: (stepAttempted) => set({ stepAttempted }),
   setSelectedCoachPackage: (selectedCoachPackage) => set({ selectedCoachPackage }),
 
   setCurrentLp: (currentLp) => set({ currentLp }),
