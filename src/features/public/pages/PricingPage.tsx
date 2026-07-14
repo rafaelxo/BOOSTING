@@ -8,10 +8,9 @@ import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
 
-const ELO_MASTER_PLUS_ROWS: { tier: RankTier; price: number }[] = [
-  { tier: 'master', price: 74.90 },
-  { tier: 'grandmaster', price: 899.90 },
-  { tier: 'challenger', price: 1249.90 },
+const ELO_MASTER_PLUS_ROWS: { label: string; price: number }[] = [
+  { label: 'Mestre → Grão-mestre', price: 899.90 },
+  { label: 'Grão-mestre → Desafiante', price: 1249.90 },
 ]
 
 const WIN_TIERS: RankTier[] = [
@@ -110,19 +109,14 @@ export function PricingPage() {
                     </tr>
                   )
                 })}
-                {ELO_MASTER_PLUS_ROWS.map(({ tier, price }) => (
-                  <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
+                {ELO_MASTER_PLUS_ROWS.map(({ label, price }) => (
+                  <tr key={label} className="hover:bg-bg-elevated/40 transition-colors">
                     <td className="py-3 px-5">
-                      <div className="flex items-center gap-3">
-                        <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
-                        <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
-                          {RANK_TIER_LABEL[tier]}
-                        </span>
-                      </div>
+                      <span className="font-semibold text-ink">{label}</span>
                     </td>
+                    <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
+                    <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
                     <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(price)}</td>
-                    <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
-                    <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
                   </tr>
                 ))}
               </tbody>
@@ -154,9 +148,9 @@ export function PricingPage() {
           </div>
         </section>
 
-        {/* ── Vitórias ── */}
+        {/* ── Vitórias / MD5 ── */}
         <section>
-          <h2 className="text-xl font-bold text-ink mb-1">Vitórias</h2>
+          <h2 className="text-xl font-bold text-ink mb-1">Vitórias / MD5</h2>
           <p className="text-sm text-ink-secondary mb-4">Preço por vitória de acordo com o seu rank atual.</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {WIN_TIERS.map((tier) => {
@@ -171,36 +165,36 @@ export function PricingPage() {
               )
             })}
           </div>
-        </section>
 
-        {/* ── MD5 Completo — 5 Placements ── */}
-        <section>
-          <h2 className="text-xl font-bold text-ink mb-1">MD5 Completo — 5 Partidas de Posicionamento</h2>
-          <p className="text-sm text-ink-secondary mb-4">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
-          <div className="card overflow-hidden p-0">
-            <table className="w-full text-sm">
-              <thead className="border-b border-bg-elevated">
-                <tr>
-                  <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Rank desejado</th>
-                  <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Preço</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-bg-elevated">
-                {MD5_TIERS.map((tier) => (
-                  <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
-                    <td className="py-3 px-5">
-                      <div className="flex items-center gap-3">
-                        <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
-                        <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
-                          {RANK_TIER_LABEL[tier]}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(PLACEMENT_PRICE[tier])}</td>
+          {/* + MD5 sub-row */}
+          <div className="mt-8">
+            <h3 className="text-sm font-bold text-ink mb-1">+ MD5: garantia de win rate — ative automaticamente se ainda não jogou o posicionamento</h3>
+            <p className="text-xs text-ink-secondary mb-3">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
+            <div className="card overflow-hidden p-0">
+              <table className="w-full text-sm">
+                <thead className="border-b border-bg-elevated">
+                  <tr>
+                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Rank desejado</th>
+                    <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Preço</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-bg-elevated">
+                  {MD5_TIERS.map((tier) => (
+                    <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
+                      <td className="py-3 px-5">
+                        <div className="flex items-center gap-3">
+                          <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
+                          <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
+                            {RANK_TIER_LABEL[tier]}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(PLACEMENT_PRICE[tier])}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 

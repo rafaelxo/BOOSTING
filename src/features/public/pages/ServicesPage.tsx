@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { TrendingUp, Zap, Users, Trophy, CheckCircle2, ChevronRight } from 'lucide-react'
+import { TrendingUp, Zap, Users, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
@@ -28,16 +28,16 @@ const SERVICES = [
   {
     icon: Zap,
     slug: 'win_boost',
-    title: 'Vitórias',
-    tagline: 'Compre um número fixo de vitórias rapidamente.',
+    title: 'Vitórias / MD5',
+    tagline: 'Compre vitórias avulsas ou ative a garantia MD5.',
     description:
-      'Perfeito para ganhar LP rápido, completar missões ou subir antes de uma virada de temporada. Escolha quantas vitórias precisa e nossos boosters cuidam do resto.',
+      'Perfeito para ganhar LP rápido, completar missões ou subir antes de uma virada de temporada. Escolha quantas vitórias precisa — e se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente no mesmo fluxo.',
     rankRange: RANK_TIER_ORDER,
     highlights: [
       'Escolha de 3 a 50 vitórias',
+      'Garantia MD5 automática para quem ainda não fez o posicionamento',
       'Solo queue ou flex',
       'Começa em até 30 minutos',
-      'Melhor custo-benefício por LP ganho',
     ],
     color: 'text-accent',
     bgColor: 'bg-accent/10',
@@ -60,24 +60,6 @@ const SERVICES = [
     color: 'text-success',
     bgColor: 'bg-success/10',
     cta: '/orders/new?service=coaching',
-  },
-  {
-    icon: Trophy,
-    slug: 'placement_matches',
-    title: 'MD5 Completo',
-    tagline: 'Comece a temporada no rank que você merece.',
-    description:
-      'Nossos profissionais jogam suas 5 partidas de posicionamento para garantir que você comece a temporada no rank mais alto possível. Inclui otimização de MMR.',
-    rankRange: RANK_TIER_ORDER,
-    highlights: [
-      '5 partidas de placement completas',
-      'Pré-boost de MMR disponível',
-      'Especialistas em início de temporada',
-      'Pool de campeões discutido com você',
-    ],
-    color: 'text-rank-grandmaster',
-    bgColor: 'bg-rank-grandmaster/10',
-    cta: '/orders/new?service=placement_matches',
   },
 ]
 

@@ -1,13 +1,12 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import type { ServiceType } from '@/types'
-import { TrendingUp, Zap, Users, Trophy, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, Zap, Users, CheckCircle2 } from 'lucide-react'
 
 const SERVICES: { type: ServiceType; name: string; desc: string; icon: React.ElementType; badge?: string }[] = [
-  { type: 'elo_boost',         name: 'Solo Boost / Duo Boost', desc: 'Suba do seu rank atual para a divisão desejada — solo ou duo.',         icon: TrendingUp, badge: 'Mais Popular' },
-  { type: 'win_boost',         name: 'Vitórias',               desc: 'Compre um número fixo de vitórias para ganhar LP rapidamente.',          icon: Zap,        badge: 'Rápido'       },
-  { type: 'coaching',          name: 'Coaching',               desc: 'Sessões individuais com coaches de alto ELO para evolução real.',        icon: Users                              },
-  { type: 'placement_matches', name: 'MD5',                    desc: 'Comece a temporada no rank mais alto com 5 partidas de posicionamento.', icon: Trophy                             },
+  { type: 'elo_boost', name: 'Solo Boost / Duo Boost', desc: 'Suba do seu rank atual para a divisão desejada — solo ou duo.', icon: TrendingUp, badge: 'Mais Popular' },
+  { type: 'win_boost', name: 'Vitórias / MD5', desc: 'Compre vitórias avulsas ou, se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente.', icon: Zap, badge: 'Rápido' },
+  { type: 'coaching', name: 'Coaching', desc: 'Sessões individuais com coaches de alto ELO para evolução real.', icon: Users },
 ]
 
 export function StepService() {
