@@ -37,6 +37,12 @@ interface OrderBuilderState {
   // rank alvo foi atingido antes de concluir o pedido.
   riotId: string
 
+  // Verdadeiro assim que uma consulta Riot bem-sucedida preenche
+  // rank/LP/PDL automaticamente — usado para travar esses campos até o
+  // usuário clicar em "Editar" (setRiotAutoFilled(false)) ou alterar o
+  // Riot ID manualmente.
+  riotAutoFilled: boolean
+
   // MD5: garantia de win rate nas partidas de posicionamento — toggle dentro
   // do fluxo "Vitórias" (win_boost), não um serviço separado na tela, mas
   // muda serviceType para 'md5' internamente (ver StepConfigure.tsx).
@@ -86,6 +92,7 @@ interface OrderBuilderState {
   setWinPackage: (wins: number | null) => void
   setPreferredBooster: (id: string, name: string) => void
   setRiotId: (riotId: string) => void
+  setRiotAutoFilled: (v: boolean) => void
   setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null } | null) => void
   setCurrentLp: (lp: number) => void
   setAvgLpGain: (lp: number) => void
@@ -124,6 +131,7 @@ const initialState = {
   preferredBoosterId: null,
   preferredBoosterName: null,
   riotId: '',
+  riotAutoFilled: false,
   selectedCoachPackage: null,
   currentLp: 0,
   avgLpGain: 20,
@@ -166,6 +174,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
     serviceType,
     serviceId,
     isMd5: serviceType === 'md5',
+    winsPurchased: serviceType === 'win_boost' || serviceType === 'md5' ? 5 : null,
     md5MatchesRemaining: serviceType === 'md5' ? null : null,
     md5MatchesRemainingCeiling: serviceType === 'md5' ? null : null,
   }),
@@ -216,7 +225,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setWinsPurchased: (winsPurchased) => set((state) => {
     const maxWins = state.isMd5 && state.md5MatchesRemaining != null
       ? Math.max(1, state.md5MatchesRemaining)
-      : 50
+      : 5
     return { winsPurchased: Math.max(1, Math.min(winsPurchased, maxWins)) }
   }),
   setIsMd5: (isMd5) => set((state) => {
@@ -243,14 +252,12 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
         : state.winsPurchased,
     }
   }),
-  setMd5MatchesRemainingFromApi: (n) => set((state) => {
+  setMd5MatchesRemainingFromApi: (n) => set(() => {
     const next = Math.max(0, Math.min(n, 5))
     return {
       md5MatchesRemaining: next,
       md5MatchesRemainingCeiling: next,
-      winsPurchased: state.isMd5 && state.winsPurchased != null
-        ? Math.max(1, Math.min(state.winsPurchased, Math.max(1, next)))
-        : state.winsPurchased,
+      winsPurchased: Math.max(1, next),
     }
   }),
   setSessionsPurchased: (sessionsPurchased) => set({ sessionsPurchased }),
@@ -266,7 +273,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
 
   setWinPackage: (winPackage) => set({ winPackage }),
   setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
-  setRiotId: (riotId) => set({ riotId }),
+  setRiotId: (riotId) => set({ riotId, riotAutoFilled: false }),
+  setRiotAutoFilled: (riotAutoFilled) => set({ riotAutoFilled }),
   setSelectedCoachPackage: (selectedCoachPackage) => set({ selectedCoachPackage }),
 
   setCurrentLp: (currentLp) => set({ currentLp }),

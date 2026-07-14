@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
-import { RankBadge, RankLockGrid } from '@/components/ui'
+import { RankBadge, RankLockGrid, WinCountButtons, PdlFieldRow } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
@@ -13,45 +13,6 @@ import type { Division, QueueType, RankTier } from '@/types'
 import { Check, Search, AlertCircle } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
 
-// ── LpCounter ─────────────────────────────────────────────────────────────────
-
-function LpCounter({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold text-ink-secondary">{label}</p>
-      <div className="flex items-center rounded-lg border border-bg-elevated bg-bg-card overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="px-2 py-1.5 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
-        >
-          −
-        </button>
-        <input
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          onChange={e => {
-            const v = parseInt(e.target.value)
-            if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v)))
-          }}
-          className="flex-1 text-center py-1.5 border-x border-bg-elevated bg-transparent text-xs font-extrabold text-ink focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        />
-        <button
-          type="button"
-          onClick={() => onChange(Math.min(max, value + 1))}
-          className="px-2 py-1.5 text-sm font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function StepConfigure() {
@@ -61,13 +22,13 @@ export function StepConfigure() {
     isMd5, md5MatchesRemaining, md5MatchesRemainingCeiling,
     currentLp, avgLpGain,
     currentPdl, avgPdlGain,
-    riotId,
+    riotId, riotAutoFilled,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
     setIsMd5, setMd5MatchesRemaining, setMd5MatchesRemainingFromApi,
     setCurrentLp, setAvgLpGain,
     setCurrentPdl, setAvgPdlGain,
-    setBasePrice, setEstimatedHours, setRiotId,
+    setBasePrice, setEstimatedHours, setRiotId, setRiotAutoFilled,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -124,6 +85,7 @@ export function StepConfigure() {
     }
 
     setRiotLookupMessage(result.message ?? 'Rank atual preenchido automaticamente. Você ainda pode alterar os dados.')
+    setRiotAutoFilled(true)
   }
 
   async function lookupForWinBoost() {
@@ -170,6 +132,7 @@ export function StepConfigure() {
       setIsMd5(false)
       setRiotLookupMessage(result.message ?? 'Conta já possui rank nesta fila - MD5 indisponível.')
     }
+    setRiotAutoFilled(true)
   }
 
   // Grão-Mestre só tem um destino válido (Challenger) — a interface pode
@@ -339,29 +302,8 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Queue type */}
-        {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
-          <FormField label="Tipo de Fila" required>
-            <div className="flex gap-3">
-              {(['solo_duo', 'flex'] as QueueType[]).map(q => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setQueueType(q)}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
-                    queueType === q
-                      ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
-                  )}
-                >
-                  {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
-                </button>
-              ))}
-            </div>
-          </FormField>
-        )}
-
+        {/* Vitórias/MD5: Riot ID vem primeiro neste fluxo — a checagem de
+            elegibilidade MD5 precisa acontecer antes de qualquer outro campo. */}
         {(serviceType === 'win_boost' || serviceType === 'md5') && (
           <FormField label="Riot ID" required hint="Informe seu Nome#TAG. Usamos isso para checar automaticamente se sua conta já tem rank nesta fila (MD5).">
             <div className="flex flex-col sm:flex-row gap-2">
@@ -408,13 +350,118 @@ export function StepConfigure() {
           </FormField>
         )}
 
+        {/* MD5 toggle — logo abaixo do Riot ID, antes da grade de vitórias. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Extras" hint="MD5: garantimos 80%+ de win rate nas suas partidas de posicionamento restantes, com desconto no preço por vitória.">
+            <button
+              type="button"
+              onClick={() => setIsMd5(!isMd5)}
+              className={cn(
+                'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
+                isMd5
+                  ? 'border-brand bg-brand/10 text-brand'
+                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
+              )}
+            >
+              <div>
+                <p className="text-sm font-bold">MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span></p>
+                <p className="text-[11px] font-normal mt-0.5 opacity-70">
+                  {md5MatchesRemaining == null && 'Disponível só para contas ainda não rankeadas nesta fila'}
+                </p>
+              </div>
+              <div className={cn(
+                'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
+                isMd5 ? 'border-brand bg-brand' : 'border-bg-overlay',
+              )}>
+                {isMd5 && <Check className="h-3 w-3 text-white" />}
+              </div>
+            </button>
+          </FormField>
+        )}
+
+        {/* Partidas restantes — só quando MD5 está ativo e o teto já foi
+            detectado pela Riot. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && isMd5 && md5MatchesRemaining != null && (
+          <FormField label="Partidas Restantes para o Booster" hint="Detectado automaticamente pela Riot. Você pode diminuir se já jogou mais partidas depois da checagem, mas não aumentar.">
+            <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
+              <button
+                type="button"
+                onClick={() => setMd5MatchesRemaining(md5MatchesRemaining - 1)}
+                disabled={md5MatchesRemaining <= 0}
+                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                -
+              </button>
+              <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
+                <p className="text-xl font-extrabold text-ink leading-none">{md5MatchesRemaining}</p>
+                <p className="text-[10px] text-ink-muted mt-0.5">partida(s)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMd5MatchesRemaining(md5MatchesRemaining + 1)}
+                disabled={md5MatchesRemaining >= (md5MatchesRemainingCeiling ?? 5)}
+                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                +
+              </button>
+            </div>
+          </FormField>
+        )}
+
+        {/* Vitórias — grade de botões 1..5 (ou até o teto de partidas
+            restantes, se MD5). Substitui o antigo stepper -/contagem/+. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Número de Vitórias" required>
+            <WinCountButtons
+              value={winsPurchased}
+              max={isMd5 ? Math.max(1, md5MatchesRemaining ?? 5) : 5}
+              onChange={setWinsPurchased}
+            />
+            <p className="text-xs text-ink-muted mt-1.5">
+              {isMd5 ? `Máximo ${Math.max(1, md5MatchesRemaining ?? 5)} (partidas restantes)` : 'Máximo 5'}
+            </p>
+          </FormField>
+        )}
+
+        {/* Queue type — compartilhado entre elo_boost e win_boost/md5. No
+            fluxo Vitórias/MD5 este campo vem depois de Riot ID/MD5/vitórias
+            (ver bloco acima); no fluxo elo_boost continua logo após Duo Boost. */}
+        {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Tipo de Fila" required>
+            <div className="flex gap-3">
+              {(['solo_duo', 'flex'] as QueueType[]).map(q => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setQueueType(q)}
+                  className={cn(
+                    'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                    queueType === q
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                  )}
+                >
+                  {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
+                </button>
+              ))}
+            </div>
+          </FormField>
+        )}
+
         {/* Rank selection — elo boost (split two-column layout) */}
         {serviceType === 'elo_boost' && (
           <div className="rounded-2xl border border-bg-elevated overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-2">
               {/* ── Current rank column ── */}
               <div className="p-4 space-y-4 border-b border-bg-elevated md:border-b-0 md:border-r">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
+                  {riotAutoFilled && (
+                    <button type="button" onClick={() => setRiotAutoFilled(false)} className="text-[10px] font-bold text-brand hover:underline">
+                      Editar
+                    </button>
+                  )}
+                </div>
 
                 <RankLockGrid
                   tiers={RANK_TIER_ORDER.filter(t => t !== 'challenger')}
@@ -422,29 +469,32 @@ export function StepConfigure() {
                   selectedTier={currentRank?.tier ?? null}
                   selectedDivision={currentRank?.division ?? null}
                   onChange={(tier, division) => setCurrentRank({ tier, division })}
+                  disabled={riotAutoFilled}
                 />
 
-                {/* PDL Atual — mesmo layout (grid de 3 contadores) para os
-                    dois fluxos, só trocando quais campos do estado ficam
-                    ligados a cada contador. Master+ não tem PDL alvo — o
-                    preço depende da faixa do PDL atual, não de um alvo
-                    informado pelo cliente. */}
+                {/* PDL Atual — mesmo cartão para os dois fluxos, só trocando
+                    quais campos do estado ficam ligados a cada input. Master+
+                    não tem PDL alvo — o preço depende da faixa do PDL atual,
+                    não de um alvo informado pelo cliente. */}
                 {currentRank && (
                   <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
                     <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {currentIsMasterPlus ? (
-                        <>
-                          <LpCounter label="PDL Atual" value={currentPdl} min={0} max={9999} onChange={setCurrentPdl} />
-                          <LpCounter label="Média/Partida" value={avgPdlGain} min={1} max={200} onChange={setAvgPdlGain} />
-                        </>
-                      ) : (
-                        <>
-                          <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
-                          <LpCounter label="Média/Partida" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
-                        </>
-                      )}
-                    </div>
+                    {currentIsMasterPlus ? (
+                      <PdlFieldRow fields={[
+                        { label: 'PDL Atual', value: currentPdl, min: 0, max: 9999, onChange: setCurrentPdl, disabled: riotAutoFilled },
+                        { label: 'Média/Partida', value: avgPdlGain, min: 1, max: 200, onChange: setAvgPdlGain, disabled: riotAutoFilled },
+                      ]} />
+                    ) : (
+                      <PdlFieldRow fields={[
+                        { label: 'LP Atual', value: currentLp, min: 0, max: 99, onChange: setCurrentLp, disabled: riotAutoFilled },
+                        { label: 'Média/Partida', value: avgLpGain, min: 1, max: 50, onChange: setAvgLpGain, disabled: riotAutoFilled },
+                      ]} />
+                    )}
+                    {riotAutoFilled && (
+                      <p className="text-[10px] text-ink-muted">
+                        Preenchido automaticamente pela Riot. Para editar, refaça a busca com outro Riot ID.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -504,74 +554,25 @@ export function StepConfigure() {
 
         {/* Rank — win boost / MD5 */}
         {(serviceType === 'win_boost' || serviceType === 'md5') && (
-          <>
-            <FormField
-              label={isMd5 ? 'Rank da Última Temporada' : 'Rank Atual'}
-              required
-              hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
-            >
-              <RankLockGrid
-                tiers={RANK_TIER_ORDER}
-                current={null}
-                selectedTier={currentRank?.tier ?? null}
-                selectedDivision={currentRank?.division ?? null}
-                onChange={(tier, division) => setCurrentRank({ tier, division })}
-              />
-            </FormField>
-
-            <FormField label="Extras" hint="MD5: garantimos 80%+ de win rate nas suas partidas de posicionamento restantes, com desconto no preço por vitória.">
-              <button
-                type="button"
-                onClick={() => setIsMd5(!isMd5)}
-                className={cn(
-                  'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
-                  isMd5
-                    ? 'border-brand bg-brand/10 text-brand'
-                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
-                )}
-              >
-                <div>
-                  <p className="text-sm font-bold">MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span></p>
-                  <p className="text-[11px] font-normal mt-0.5 opacity-70">
-                    {md5MatchesRemaining == null && 'Disponível só para contas ainda não rankeadas nesta fila'}
-                  </p>
-                </div>
-                <div className={cn(
-                  'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
-                  isMd5 ? 'border-brand bg-brand' : 'border-bg-overlay',
-                )}>
-                  {isMd5 && <Check className="h-3 w-3 text-white" />}
-                </div>
+          <FormField
+            label={isMd5 ? 'Rank da Última Temporada' : 'Rank Atual'}
+            required
+            hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
+            labelAction={riotAutoFilled && (
+              <button type="button" onClick={() => setRiotAutoFilled(false)} className="text-[10px] font-bold text-brand hover:underline">
+                Editar
               </button>
-            </FormField>
-
-            {isMd5 && md5MatchesRemaining != null && (
-              <FormField label="Partidas Restantes para o Booster" hint="Detectado automaticamente pela Riot. Você pode diminuir se já jogou mais partidas depois da checagem, mas não aumentar.">
-                <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
-                  <button
-                    type="button"
-                    onClick={() => setMd5MatchesRemaining(md5MatchesRemaining - 1)}
-                    disabled={md5MatchesRemaining <= 0}
-                    className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    -
-                  </button>
-                  <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
-                    <p className="text-xl font-extrabold text-ink leading-none">{md5MatchesRemaining}</p>
-                    <p className="text-[10px] text-ink-muted mt-0.5">partida(s)</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMd5MatchesRemaining(md5MatchesRemaining + 1)}
-                    disabled={md5MatchesRemaining >= (md5MatchesRemainingCeiling ?? 5)}
-                    className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    +
-                  </button>
-                </div>
-              </FormField>
             )}
-          </>
+          >
+            <RankLockGrid
+              tiers={RANK_TIER_ORDER}
+              current={null}
+              selectedTier={currentRank?.tier ?? null}
+              selectedDivision={currentRank?.division ?? null}
+              onChange={(tier, division) => setCurrentRank({ tier, division })}
+              disabled={riotAutoFilled}
+            />
+          </FormField>
         )}
 
         {/* Rank — placement matches */}
@@ -584,34 +585,6 @@ export function StepConfigure() {
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
             />
-          </FormField>
-        )}
-
-        {/* Wins counter — win boost / MD5 */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && (
-          <FormField label="Número de Vitórias" required>
-            <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
-              <button
-                type="button"
-                onClick={() => setWinsPurchased(Math.max(1, (winsPurchased ?? 1) - 1))}
-                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
-              >
-                −
-              </button>
-              <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
-                <p className="text-xl font-extrabold text-ink leading-none">{winsPurchased ?? 1}</p>
-                <p className="text-[10px] text-ink-muted mt-0.5">vitórias</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setWinsPurchased((winsPurchased ?? 1) + 1)}
-                disabled={isMd5 && md5MatchesRemaining != null && (winsPurchased ?? 1) >= md5MatchesRemaining}
-                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                +
-              </button>
-            </div>
-            <p className="text-xs text-ink-muted mt-1.5">{isMd5 ? 'Mínimo 1 - Máximo 5' : 'Mínimo 1 - Máximo 50'}</p>
           </FormField>
         )}
 

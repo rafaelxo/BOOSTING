@@ -24,6 +24,9 @@ interface RankLockGridProps {
   onChange: (tier: RankTier, division: Division | null) => void
   /** All 10 tiers, always — callers must never pre-filter this. */
   tiers: readonly RankTier[]
+  /** When true, every tier/division button is disabled regardless of lock
+   * state — used to lock the grid after a successful Riot auto-fill. */
+  disabled?: boolean
 }
 
 function TierButton({ tier, isSelected, isLocked, onClick }: {
@@ -57,8 +60,9 @@ function TierButton({ tier, isSelected, isLocked, onClick }: {
   )
 }
 
-export function RankLockGrid({ current, selectedTier, selectedDivision, onChange, tiers }: RankLockGridProps) {
+export function RankLockGrid({ current, selectedTier, selectedDivision, onChange, tiers, disabled }: RankLockGridProps) {
   function handleTier(tier: RankTier) {
+    if (disabled) return
     if (tierHasDivisions(tier)) {
       // Pick the first unlocked division for this tier, defaulting to IV.
       const firstOpen = DIVISIONS.find((d) => !isRankLocked({ tier, division: d }, current)) ?? 'IV'
@@ -82,7 +86,7 @@ export function RankLockGrid({ current, selectedTier, selectedDivision, onChange
             // rankStep is monotonic within a tier (I is always the highest
             // division) — a tier is fully locked exactly when its highest
             // division is locked, no need to also check the lowest.
-            isLocked={isRankLocked(
+            isLocked={disabled || isRankLocked(
               { tier, division: tierHasDivisions(tier) ? 'I' : null },
               current,
             )}
@@ -93,13 +97,13 @@ export function RankLockGrid({ current, selectedTier, selectedDivision, onChange
       {selectedTier && validDivisions.length > 0 && (
         <div className="flex gap-1.5">
           {validDivisions.map((div) => {
-            const locked = isRankLocked({ tier: selectedTier, division: div }, current)
+            const locked = disabled || isRankLocked({ tier: selectedTier, division: div }, current)
             return (
               <button
                 key={div}
                 type="button"
                 disabled={locked}
-                onClick={() => onChange(selectedTier, div)}
+                onClick={() => !disabled && onChange(selectedTier, div)}
                 className={cn(
                   'flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all',
                   selectedDivision === div ? 'border-brand bg-brand text-white'
