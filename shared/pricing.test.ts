@@ -171,3 +171,37 @@ describe('Integridade monetária e entradas hostis', () => {
     }))).toThrow(RangeError)
   })
 })
+
+describe('MD5 — preço por vitória líquida (garantia de win rate nas placements)', () => {
+  it('preço por vitória = 30% do preço padrão de win_boost, arredondado a 2 casas', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5',
+      currentRank: { tier: 'gold', division: null },
+      winsPurchased: 3,
+    }))
+    // getWinBoostPrice('gold') = 3.90 => MD5 = 3.90 * 0.30 = 1.17/vitória
+    expect(priced.basePrice).toBeCloseTo(1.17 * 3, 2)
+  })
+
+  it('mestre/grão-mestre/desafiante usam os valores exatos informados (÷5 do preço fechado)', () => {
+    const master = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'master', division: null }, winsPurchased: 5,
+    }))
+    expect(master.basePrice).toBeCloseTo(59.90, 2)
+
+    const gm = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'grandmaster', division: null }, winsPurchased: 5,
+    }))
+    expect(gm.basePrice).toBeCloseTo(99.90, 2)
+
+    const challenger = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'challenger', division: null }, winsPurchased: 5,
+    }))
+    expect(challenger.basePrice).toBeCloseTo(149.90, 2)
+  })
+
+  it('sem winsPurchased ou currentRank, preço fica zero (pedido bloqueado)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'md5', currentRank: null, winsPurchased: null }))
+    expect(priced.basePrice).toBe(0)
+  })
+})

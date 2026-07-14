@@ -71,7 +71,7 @@ const genericRankSchema = z.object({
 // Parse leve, só para decidir qual schema estrito aplicar em seguida. Não é
 // usado para nada além de roteamento.
 const routingSchema = z.object({
-  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching']),
+  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching', 'md5']),
   current_rank: genericRankSchema.nullable().optional(),
   boost_mode: z.enum(['solo', 'duo']).optional(),
 }).passthrough()

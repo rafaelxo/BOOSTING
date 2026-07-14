@@ -20,7 +20,7 @@ export type RankTier =
 
 export type Division = 'I' | 'II' | 'III' | 'IV'
 
-export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching'
+export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
 
 export const RANK_TIER_ORDER: RankTier[] = [
   'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
@@ -114,6 +114,22 @@ export function getWinBoostPrice(tier: RankTier, _div: Division | null): number 
 
 // Pacotes de vitórias oferecidos no StepExtras (desconto sobre o preço unitário)
 export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
+
+// ── MD5 — Win Rate Guarantee on placement matches ────────────────────────────
+// Per-net-win price. Master/GM/Challenger are the exact figures given by the
+// business (R$59.90/99.90/149.90 for 5 wins, ÷5). Iron–Diamond apply the same
+// ~30% multiplier against WIN_PRICE_PER_TIER for consistency — no separate
+// figures exist for those tiers yet; revisit if the business sets explicit
+// ones later.
+export const MD5_WIN_PRICE_PER_TIER: Record<string, number> = {
+  iron: 0.87, bronze: 0.87, silver: 1.17, gold: 1.17,
+  platinum: 2.07, emerald: 2.97, diamond: 4.77,
+  master: 11.98, grandmaster: 19.98, challenger: 29.98,
+}
+
+export function getMd5WinPrice(tier: RankTier): number {
+  return MD5_WIN_PRICE_PER_TIER[tier] ?? 1.17
+}
 
 // ── MD5 — 5 Placement Matches ─────────────────────────────────────────────────
 export const PLACEMENT_PRICE: Record<string, number> = {
@@ -254,6 +270,14 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     case 'win_boost': {
       if (!input.winsPurchased || !input.currentRank) break
       const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
+      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
+      estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
+      break
+    }
+    case 'md5': {
+      if (!input.winsPurchased || !input.currentRank) break
+      if (input.winsPurchased < 1 || input.winsPurchased > 5) break
+      const pricePerWin = getMd5WinPrice(input.currentRank.tier)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
