@@ -5,7 +5,7 @@ import {
   isStandardTier, isMasterPlusCurrentTier, getBoostFlow, tierHasDivisions,
   getValidMasterPlusTargets, isValidMasterPlusProgression,
   getPdlBracket, isAddonCodeValidForFlow, hasDuplicateAddonCodes,
-  sortAddonsBySortOrder,
+  sortAddonsBySortOrder, isRankLocked,
 } from './boostDomain'
 import { rankStep, type RankTier } from './pricing'
 
@@ -216,5 +216,34 @@ describe('Rank alvo do fluxo padrão pode ultrapassar Diamond (ex.: Diamond → 
   it('um rank atual Iron/Bronze/etc também pode mirar Master+ (passo bem maior)', () => {
     const ironIV = rankStep('iron', 'IV')
     expect(rankStep('challenger', null)).toBeGreaterThan(ironIV)
+  })
+})
+
+describe('isRankLocked', () => {
+  it('locks every tier/division at or below Diamond IV when current is Diamond IV', () => {
+    const current = { tier: 'diamond' as const, division: 'IV' as const }
+    expect(isRankLocked({ tier: 'iron', division: 'I' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'emerald', division: 'I' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'diamond', division: 'IV' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'diamond', division: 'III' }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'diamond', division: 'II' }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'diamond', division: 'I' }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'master', division: null }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'grandmaster', division: null }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'challenger', division: null }, current)).toBe(false)
+  })
+
+  it('locks Iron/Bronze/Silver and Gold IV-II when current is Gold II', () => {
+    const current = { tier: 'gold' as const, division: 'II' as const }
+    expect(isRankLocked({ tier: 'iron', division: 'I' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'silver', division: 'I' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'gold', division: 'III' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'gold', division: 'II' }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'gold', division: 'I' }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'platinum', division: 'IV' }, current)).toBe(false)
+  })
+
+  it('nothing is locked when there is no current rank yet', () => {
+    expect(isRankLocked({ tier: 'iron', division: 'I' }, null)).toBe(false)
   })
 })

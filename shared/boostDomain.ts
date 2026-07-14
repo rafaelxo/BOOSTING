@@ -13,7 +13,7 @@
 // funções para validar e rejeitar qualquer combinação inválida — não confie
 // em nenhuma decisão de fluxo/addon recalculada apenas no cliente.
 
-import type { RankTier } from './pricing'
+import { rankStep, type Division, type RankTier } from './pricing'
 
 export type BoostMode = 'solo' | 'duo'
 export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
@@ -138,6 +138,23 @@ export function hasDuplicateAddonCodes(codes: string[]): boolean {
 // addons de Solo/Duo/Master+.
 export function sortAddonsBySortOrder<T extends { sort_order: number }>(items: T[]): T[] {
   return [...items].sort((a, b) => a.sort_order - b.sort_order)
+}
+
+// ── Bloqueio de rank (grade sempre visível) ──────────────────────────────────
+
+// Único critério de bloqueio de rank: um candidato está bloqueado se seu
+// degrau (rankStep) for MENOR OU IGUAL ao degrau do rank atual — nunca
+// escondido da lista, apenas desabilitado. Usado tanto pela grade de ranks
+// do frontend (RankLockGrid) quanto por qualquer revalidação server-side
+// que precise da mesma regra (create-pix-payment já usa rankStep
+// diretamente para a mesma comparação no fluxo padrão — este helper existe
+// para os lugares que precisam de um booleano pronto, não uma reimplementação).
+export function isRankLocked(
+  candidate: { tier: RankTier; division: Division | null },
+  current: { tier: RankTier; division: Division | null } | null,
+): boolean {
+  if (!current) return false
+  return rankStep(candidate.tier, candidate.division) <= rankStep(current.tier, current.division)
 }
 
 // ── Campos proibidos por fluxo ───────────────────────────────────────────────

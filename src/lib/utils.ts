@@ -4,6 +4,8 @@ import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { OrderStatus, RankTier, TicketStatus, TicketPriority, BoosterStatus, OrderExtra } from '@/types'
 
+export { RANK_TIER_ORDER } from '../../shared/pricing'
+
 // Tailwind class merging
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -57,10 +59,6 @@ export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
 }
 
 // ─── Rank display ─────────────────────────────────────────────────────────────
-
-export const RANK_TIER_ORDER: RankTier[] = [
-  'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
-]
 
 export const RANK_TIER_COLOR: Record<RankTier, string> = {
   iron: 'text-rank-iron',

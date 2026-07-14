@@ -1,5 +1,6 @@
 export * from './Avatar'
 export * from './RankBadge'
+export * from './RankLockGrid'
 export * from './ThemeToggle'
 export * from './LogoMark'
 export * from './Badge'

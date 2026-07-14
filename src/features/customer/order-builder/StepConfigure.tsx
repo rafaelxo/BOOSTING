@@ -2,165 +2,16 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
-import { RankBadge } from '@/components/ui'
+import { RankBadge, RankLockGrid } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
+import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, getMd5MatchPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
-  BOOST_CURRENT_RANK_TIERS,
-  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket, tierHasDivisions,
+  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
 } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Shield, Star, Gem, Diamond, Crown, Flame, Check, Search, AlertCircle } from 'lucide-react'
+import { Check, Search, AlertCircle } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
-
-const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-
-const TIER_IMAGE: Record<RankTier, string> = {
-  iron:        '/ranks/1_iron.webp',
-  bronze:      '/ranks/2_bronze.webp',
-  silver:      '/ranks/3_silver.webp',
-  gold:        '/ranks/4_gold.webp',
-  platinum:    '/ranks/5_platinum.webp',
-  emerald:     '/ranks/7_emerald.webp',
-  diamond:     '/ranks/6_diamond.webp',
-  master:      '/ranks/7_master.webp',
-  grandmaster: '/ranks/8_grandmaster.webp',
-  challenger:  '/ranks/9_challenger.webp',
-}
-
-const TIER_FALLBACK: Record<RankTier, React.ElementType> = {
-  iron: Shield, bronze: Shield, silver: Star, gold: Star, platinum: Gem,
-  emerald: Gem, diamond: Diamond, master: Crown, grandmaster: Flame, challenger: Flame,
-}
-
-function divStep(d: Division): number {
-  return { IV: 0, III: 1, II: 2, I: 3 }[d]
-}
-
-// ── RankCardButton ────────────────────────────────────────────────────────────
-
-function RankCardButton({
-  tier, isSelected, isAvailable, onClick,
-}: {
-  tier: RankTier; isSelected: boolean; isAvailable: boolean; onClick: () => void
-}) {
-  const [imgErr, setImgErr] = useState(false)
-  const FallbackIcon = TIER_FALLBACK[tier]
-  const color = RANK_TIER_COLOR[tier]
-
-  return (
-    <button
-      type="button"
-      disabled={!isAvailable}
-      onClick={onClick}
-      className={cn(
-        'flex flex-col items-center justify-center gap-1 py-2.5 px-1 rounded-xl border-2 transition-all focus:outline-none',
-        isSelected
-          ? 'border-brand bg-brand/10'
-          : isAvailable
-            ? 'border-bg-elevated bg-bg-card hover:border-brand/30 hover:bg-bg-elevated/40'
-            : 'border-transparent bg-transparent opacity-20 cursor-not-allowed',
-      )}
-    >
-      {!imgErr ? (
-        <img
-          src={TIER_IMAGE[tier]}
-          alt={RANK_TIER_LABEL[tier]}
-          onError={() => setImgErr(true)}
-          className="w-8 h-8 object-contain"
-          draggable={false}
-        />
-      ) : (
-        <FallbackIcon className={cn('w-7 h-7', color)} />
-      )}
-      <span className={cn(
-        'text-[8px] font-semibold text-center leading-none',
-        isSelected ? 'text-brand' : 'text-ink-secondary',
-      )}>
-        {RANK_TIER_LABEL[tier]}
-      </span>
-    </button>
-  )
-}
-
-// ── RankPicker ────────────────────────────────────────────────────────────────
-// `tiers` é a fonte de opções JÁ filtrada por quem chama — nunca a lista
-// completa de 10 tiers escondendo os inválidos. Ex.: rank atual de
-// elo_boost passa BOOST_CURRENT_RANK_TIERS (sem Challenger); rank alvo do
-// fluxo padrão passa STANDARD_RANK_TIERS (Iron–Diamond).
-
-interface RankPickerProps {
-  tiers: RankTier[]
-  selectedTier: RankTier | null
-  selectedDivision: Division | null
-  onChange: (tier: RankTier, division: Division | null) => void
-  minTier?: RankTier | null
-  minDiv?: Division | null
-}
-
-function RankPicker({
-  tiers, selectedTier, selectedDivision, onChange, minTier, minDiv,
-}: RankPickerProps) {
-  const minIdx = minTier ? tiers.indexOf(minTier) : 0
-  const availableSet = new Set(minIdx >= 0 ? tiers.slice(minIdx) : tiers)
-
-  const validDivisions = selectedTier && tierHasDivisions(selectedTier)
-    ? DIVISIONS.filter(d => {
-        if (!minTier || selectedTier !== minTier) return true
-        return divStep(d) > divStep(minDiv ?? 'IV')
-      })
-    : []
-
-  function handleTier(tier: RankTier) {
-    if (!availableSet.has(tier)) return
-    // Master/Grão-Mestre/Challenger não têm divisão — seja como rank atual,
-    // seja como rank alvo (ex.: Diamond mirando Master pelo fluxo padrão).
-    if (!tierHasDivisions(tier)) { onChange(tier, null); return }
-    const div = selectedDivision ?? 'IV'
-    if (minTier && tier === minTier && minDiv) {
-      const first = DIVISIONS.find(d => divStep(d) > divStep(minDiv))
-      onChange(tier, first ?? 'I')
-      return
-    }
-    onChange(tier, div)
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-5 gap-1">
-        {tiers.map(tier => (
-          <RankCardButton
-            key={tier}
-            tier={tier}
-            isSelected={selectedTier === tier}
-            isAvailable={availableSet.has(tier)}
-            onClick={() => handleTier(tier)}
-          />
-        ))}
-      </div>
-      {selectedTier && validDivisions.length > 0 && (
-        <div className="flex gap-1.5">
-          {validDivisions.map(div => (
-            <button
-              key={div}
-              type="button"
-              onClick={() => onChange(selectedTier, div)}
-              className={cn(
-                'flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition-all',
-                selectedDivision === div
-                  ? 'border-brand bg-brand text-white'
-                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
-              )}
-            >
-              {div}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── LpCounter ─────────────────────────────────────────────────────────────────
 
@@ -564,8 +415,9 @@ export function StepConfigure() {
               <div className="p-4 space-y-4 border-b border-bg-elevated md:border-b-0 md:border-r">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
 
-                <RankPicker
-                  tiers={BOOST_CURRENT_RANK_TIERS}
+                <RankLockGrid
+                  tiers={RANK_TIER_ORDER.filter(t => t !== 'challenger')}
+                  current={null}
                   selectedTier={currentRank?.tier ?? null}
                   selectedDivision={currentRank?.division ?? null}
                   onChange={(tier, division) => setCurrentRank({ tier, division })}
@@ -636,13 +488,12 @@ export function StepConfigure() {
                   // por degrau (o preço de cada degrau acima de Diamond segue
                   // a taxa de Diamante). O fluxo Master+ propriamente dito só
                   // se aplica quando o rank ATUAL já é Master/Grão-Mestre.
-                  <RankPicker
+                  <RankLockGrid
                     tiers={RANK_TIER_ORDER}
+                    current={currentRank}
                     selectedTier={targetRank?.tier ?? null}
                     selectedDivision={targetRank?.division ?? null}
                     onChange={(tier, division) => setTargetRank({ tier, division })}
-                    minTier={currentRank.tier}
-                    minDiv={currentRank.division}
                   />
                 )}
               </div>
@@ -658,8 +509,9 @@ export function StepConfigure() {
               required
               hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
             >
-              <RankPicker
+              <RankLockGrid
                 tiers={RANK_TIER_ORDER}
+                current={null}
                 selectedTier={currentRank?.tier ?? null}
                 selectedDivision={currentRank?.division ?? null}
                 onChange={(tier, division) => setCurrentRank({ tier, division })}
@@ -724,8 +576,9 @@ export function StepConfigure() {
         {/* Rank — placement matches */}
         {serviceType === 'placement_matches' && (
           <FormField label="Rank Final da Última Temporada" required>
-            <RankPicker
+            <RankLockGrid
               tiers={RANK_TIER_ORDER}
+              current={null}
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
