@@ -240,7 +240,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
       isMd5,
       serviceType: nextType,
       serviceId: nextType,
-      winsPurchased: state.winsPurchased && state.winsPurchased > 5 ? 5 : state.winsPurchased,
+      winsPurchased: isMd5 && state.winsPurchased && state.winsPurchased > 5 ? 5 : state.winsPurchased,
       md5MatchesRemaining: isMd5 ? state.md5MatchesRemaining : null,
     }
   }),
