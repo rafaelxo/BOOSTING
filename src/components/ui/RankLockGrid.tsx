@@ -8,9 +8,9 @@ const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 
 const TIER_IMAGE: Record<RankTier, string> = {
   iron: '/ranks/1_iron.webp', bronze: '/ranks/2_bronze.webp', silver: '/ranks/3_silver.webp',
-  gold: '/ranks/4_gold.webp', platinum: '/ranks/5_platinum.webp', emerald: '/ranks/7_emerald.webp',
-  diamond: '/ranks/6_diamond.webp', master: '/ranks/7_master.webp',
-  grandmaster: '/ranks/8_grandmaster.webp', challenger: '/ranks/9_challenger.webp',
+  gold: '/ranks/4_gold.webp', platinum: '/ranks/5_platinum.webp', emerald: '/ranks/6_emerald.webp',
+  diamond: '/ranks/7_diamond.webp', master: '/ranks/8_master.webp',
+  grandmaster: '/ranks/9_grandmaster.webp', challenger: '/ranks/10_challenger.webp',
 }
 const TIER_FALLBACK: Record<RankTier, React.ElementType> = {
   iron: Shield, bronze: Shield, silver: Star, gold: Star, platinum: Gem,

@@ -25,11 +25,11 @@ const RANK_IMAGE: Record<RankTier, string> = {
   silver:      '/ranks/3_silver.webp',
   gold:        '/ranks/4_gold.webp',
   platinum:    '/ranks/5_platinum.webp',
-  emerald:     '/ranks/7_emerald.webp',
-  diamond:     '/ranks/6_diamond.webp',
-  master:      '/ranks/7_master.webp',
-  grandmaster: '/ranks/8_grandmaster.webp',
-  challenger:  '/ranks/9_challenger.webp',
+  emerald:     '/ranks/6_emerald.webp',
+  diamond:     '/ranks/7_diamond.webp',
+  master:      '/ranks/8_master.webp',
+  grandmaster: '/ranks/9_grandmaster.webp',
+  challenger:  '/ranks/10_challenger.webp',
 }
 
 type BadgeSize = 'xs' | 'sm' | 'md' | 'lg'
