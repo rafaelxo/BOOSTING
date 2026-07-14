@@ -30,7 +30,6 @@ const schema = z.object({
   opgg_link:         z.string().url('URL inválida').optional().or(z.literal('')),
   bio:               z.string().max(256, 'Máximo 256 caracteres').optional(),
   peak_tier:         z.enum(['grandmaster', 'challenger'], { required_error: 'Selecione seu rank de pico' }),
-  can_coach:         z.boolean(),
   available_days:    z.array(z.string()).min(1, 'Selecione ao menos um dia'),
   hours_per_day_min: z.coerce.number().min(1).max(24),
   hours_per_day_max: z.coerce.number().min(1).max(24),
@@ -71,7 +70,6 @@ export function BoosterApplicationForm({
       opgg_link:         initialData?.opgg_link ?? '',
       bio:               initialData?.bio ?? '',
       peak_tier:         initialData?.peak_tier as FormData['peak_tier'],
-      can_coach:         initialData?.can_coach ?? false,
       available_days:    initialData?.available_days ?? [],
       hours_per_day_min: initialData?.hours_per_day_min ?? 2,
       hours_per_day_max: initialData?.hours_per_day_max ?? 8,
@@ -79,7 +77,6 @@ export function BoosterApplicationForm({
   })
 
   const peakTier      = watch('peak_tier')
-  const canCoach      = watch('can_coach')
   const availableDays = watch('available_days') ?? []
   const cpfValue      = watch('cpf') ?? ''
   const bioValue      = watch('bio') ?? ''
@@ -138,7 +135,7 @@ export function BoosterApplicationForm({
 
     const { error: updateError } = await supabase
       .from('booster_profiles')
-      .update({ can_coach: data.can_coach, available_days: data.available_days })
+      .update({ available_days: data.available_days })
       .eq('user_id', profile.id)
 
     if (updateError) {
@@ -226,31 +223,6 @@ export function BoosterApplicationForm({
           ))}
         </div>
         {errors.peak_tier && <p className="text-xs text-danger mt-2">Selecione seu rank de pico</p>}
-      </Card>
-
-      <Card padding="md">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-3">Tipo de Serviço</p>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: false, label: 'Apenas Boost',     desc: 'Somente elo boost'         },
-            { value: true,  label: 'Boost + Coaching', desc: 'Aceito pedidos de coaching' },
-          ].map(({ value, label, desc }) => (
-            <button
-              key={String(value)}
-              type="button"
-              onClick={() => setValue('can_coach', value, { shouldValidate: true })}
-              className={cn(
-                'py-3 px-4 rounded-xl border-2 text-left transition-all',
-                canCoach === value
-                  ? 'bg-brand/15 border-brand'
-                  : 'border-bg-elevated hover:border-brand/40',
-              )}
-            >
-              <p className={cn('text-sm font-bold', canCoach === value ? 'text-brand' : 'text-ink')}>{label}</p>
-              <p className="text-xs text-ink-muted mt-0.5">{desc}</p>
-            </button>
-          ))}
-        </div>
       </Card>
 
       <Card padding="md">
