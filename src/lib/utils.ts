@@ -170,6 +170,15 @@ export const BOOSTER_EARNINGS_SHARE = 0.75
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Usado para distinguir um uuid real de catálogo (games.id/services.id) de um
+// slug/tipo cru (ex.: 'lol', 'win_boost') que ainda não foi resolvido — ver
+// OrderBuilder.tsx/StepPayment.tsx.
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value)
+}
+
 export function initials(name: string) {
   return name
     .split(' ')

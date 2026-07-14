@@ -7,6 +7,7 @@ import { Button } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
+import { isUuid } from '@/lib/utils'
 import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw } from 'lucide-react'
 
 // PIX states
@@ -64,6 +65,15 @@ export function StepPayment() {
   // Function retorna, recomputado no servidor a partir de shared/pricing.ts.
   const estimatedTotal = store.basePrice + store.extrasPrice
   const totalPrice = pix.phase === 'waiting' ? pix.total_price : estimatedTotal
+
+  // OrderBuilder.tsx grava store.gameId/serviceId com o slug/tipo cru
+  // ('lol', 'win_boost') até resolver os uuids reais de catálogo em segundo
+  // plano; um clique antes disso terminar mandaria o slug pro backend, que
+  // rejeita (.uuid() na Edge Function) — daí o bug de "só funciona no
+  // segundo clique". Derivado direto do store (já subscrito acima), sem
+  // precisar de um campo extra: fica correto assim que gameId/serviceId
+  // virarem uuids de verdade, sem round-trip.
+  const catalogReady = isUuid(store.gameId ?? '') && isUuid(store.serviceId ?? '')
   const expiresAt = pix.phase === 'waiting' ? pix.expires_at : null
   const { remaining, label: countdownLabel } = useCountdown(expiresAt)
 
@@ -156,6 +166,11 @@ export function StepPayment() {
   async function generatePix() {
     if (!profile) return
 
+    if (!catalogReady) {
+      setPix({ phase: 'error', message: 'Ainda carregando o catálogo — aguarde um instante e tente novamente.' })
+      return
+    }
+
     // Retry an errored attempt by order id. An expired PIX starts a fresh
     // order because Mercado Pago idempotency is scoped to the previous order.
     const existingOrderId =
@@ -172,8 +187,8 @@ export function StepPayment() {
 
       const base = {
         service_type: store.serviceType,
-        service_id: store.serviceId ?? store.serviceType ?? '',
-        game_id: store.gameId ?? store.gameSlug ?? '',
+        service_id: store.serviceId!,   // guarded by catalogReady above — never a raw slug here
+        game_id: store.gameId!,
         queue_type: store.queueType,
         server: store.server,
         current_rank: store.currentRank,
@@ -393,10 +408,10 @@ export function StepPayment() {
         className="w-full"
         loading={pix.phase === 'generating'}
         onClick={generatePix}
-        disabled={totalPrice <= 0}
+        disabled={totalPrice <= 0 || !catalogReady}
         leftIcon={<QrCode className="h-5 w-5" />}
       >
-        {pix.phase === 'generating' ? 'Gerando PIX…' : `Gerar PIX — ${currency(totalPrice)}`}
+        {!catalogReady ? 'Carregando catálogo…' : pix.phase === 'generating' ? 'Gerando PIX…' : `Gerar PIX — ${currency(totalPrice)}`}
       </Button>
 
       {totalPrice <= 0 && (
