@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface PdlFieldProps {
   label: string
@@ -16,6 +16,22 @@ interface PdlFieldProps {
 function PdlField({ label, value, min, max, onChange, disabled }: PdlFieldProps) {
   const [raw, setRaw] = useState(String(value))
   const [error, setError] = useState<string | null>(null)
+  // Rastreia o último valor que este campo mesmo enviou via onChange, para
+  // distinguir "o valor mudou porque o usuário está digitando" de "o valor
+  // mudou por fora" (nova busca na Riot, troca LP/PDL na fronteira Master+).
+  const lastCommittedRef = useRef(value)
+
+  useEffect(() => {
+    // Um campo desabilitado nunca está sendo editado pelo usuário, então é
+    // sempre seguro ressincronizar. Se habilitado, só ressincroniza quando o
+    // valor externo não bate com o último valor que este campo commitou —
+    // ou seja, a mudança veio de fora, não do próprio commit() do campo.
+    if (disabled || value !== lastCommittedRef.current) {
+      setRaw(String(value))
+      setError(null)
+      lastCommittedRef.current = value
+    }
+  }, [value, disabled])
 
   function commit(next: string) {
     setRaw(next)
@@ -37,6 +53,7 @@ function PdlField({ label, value, min, max, onChange, disabled }: PdlFieldProps)
       return
     }
     setError(null)
+    lastCommittedRef.current = parsed
     onChange(parsed)
   }
 

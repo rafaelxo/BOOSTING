@@ -108,6 +108,8 @@ export function StepConfigure() {
     const result = data as {
       found?: boolean
       ranked?: boolean
+      tier?: RankTier
+      division?: Division | null
       md5_eligible?: boolean
       matches_remaining?: number
       message?: string
@@ -119,6 +121,9 @@ export function StepConfigure() {
     }
 
     if (result.md5_eligible) {
+      // Conta ainda não rankeada nesta fila — não há "rank atual" para
+      // preencher (o usuário ainda precisa escolher manualmente o rank da
+      // última temporada), então a grade de rank NÃO é travada aqui.
       const remaining = result.matches_remaining ?? 5
       setIsMd5(true)
       setMd5MatchesRemainingFromApi(remaining)
@@ -128,11 +133,20 @@ export function StepConfigure() {
         + `Faltam ${remaining} partida(s) de posicionamento.`,
       )
     } else {
+      // Conta já rankeada nesta fila — a Riot retorna tier/division junto
+      // com `ranked: true`/`md5_eligible: false`; preenchemos o rank atual
+      // (preço de win_boost/md5 depende só de currentRank.tier — ver
+      // computeOrderPrice em shared/pricing.ts — então LP/PDL não são
+      // preenchidos aqui, seriam estado morto para este fluxo) e só então
+      // travamos a grade.
       setMd5MatchesRemainingFromApi(0)
       setIsMd5(false)
       setRiotLookupMessage(result.message ?? 'Conta já possui rank nesta fila - MD5 indisponível.')
+      if (result.tier) {
+        setCurrentRank({ tier: result.tier, division: result.division ?? null })
+        setRiotAutoFilled(true)
+      }
     }
-    setRiotAutoFilled(true)
   }
 
   // Grão-Mestre só tem um destino válido (Challenger) — a interface pode
