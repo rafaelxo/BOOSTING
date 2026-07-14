@@ -41,7 +41,7 @@ export function StepReview() {
   const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
   const winPackagePrice = winPackage && currentRank
     ? Math.round(
-        getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
+        getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
         * winPackage
         * (1 - (WIN_PACKAGE_DISCOUNTS[winPackage] ?? 0) / 100)
         * 100

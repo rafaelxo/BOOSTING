@@ -28,7 +28,7 @@ const WIN_PACKAGES = [
 export function StepExtras() {
   const {
     selectedExtraIds, toggleExtra, basePrice, setExtrasPrice,
-    serviceType, currentRank, boostMode, winPackage, setWinPackage,
+    serviceType, currentRank, boostMode, queueType, winPackage, setWinPackage,
   } = useOrderBuilderStore()
   const currency = useCurrency()
 
@@ -44,7 +44,7 @@ export function StepExtras() {
   const showWinPackages = !!currentRank && serviceType === 'elo_boost' && !currentIsMasterPlus
 
   const unitWinPrice = showWinPackages && currentRank
-    ? getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
+    ? getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
     : 0
 
   function packageTotal(wins: number, discountPct: number): number {

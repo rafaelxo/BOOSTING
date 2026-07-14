@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { computeOrderPrice, type OrderPriceInput, type RankTier } from './pricing'
+import {
+  computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier,
+  moneyToCents, type OrderPriceInput, type RankTier,
+} from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
   return {
     serviceType: 'elo_boost',
+    queueType: 'solo_duo',
     boostMode: 'solo',
     currentRank: null,
     targetRank: null,
@@ -180,7 +184,8 @@ describe('Integridade monetária e entradas hostis', () => {
       winsPurchased: 3,
     }))
 
-    expect(priced.basePrice).toBe(59.94)
+    // Tabela nova (direta, não mais ÷5): grandmaster = 99.90/vitória (igual nas duas filas)
+    expect(priced.basePrice).toBe(299.70)
   })
 
   it('recusa quantidade negativa', () => {
@@ -193,27 +198,27 @@ describe('Integridade monetária e entradas hostis', () => {
 })
 
 describe('MD5 — preço por vitória líquida (garantia de win rate nas placements)', () => {
-  it('preço por vitória = tabela oficial ÷ 5, arredondado a 2 casas', () => {
+  it('preço por vitória = tabela direta por fila (não mais ÷5), arredondado a 2 casas', () => {
     const priced = computeOrderPrice(baseInput({
       serviceType: 'md5',
       currentRank: { tier: 'gold', division: null },
       winsPurchased: 3,
     }))
-    // tabela: Gold R$21.90 para as 5 vitórias => 21.90/5 = 4.38/vitória
-    expect(priced.basePrice).toBeCloseTo(4.38 * 3, 2)
+    // tabela solo_duo: Gold = 21.90/vitória (tabela direta, não derivada mais)
+    expect(priced.basePrice).toBeCloseTo(21.90 * 3, 2)
   })
 
-  it('todos os 10 tiers usam os valores exatos da tabela oficial (÷5 do preço fechado)', () => {
+  it('todos os 10 tiers usam os valores exatos da nova tabela direta por vitória (solo_duo)', () => {
     const cases: [string, number][] = [
       ['iron', 14.90], ['bronze', 16.90], ['silver', 18.90], ['gold', 21.90],
       ['platinum', 30.90], ['emerald', 37.90], ['diamond', 41.90],
       ['master', 59.90], ['grandmaster', 99.90], ['challenger', 179.90],
     ]
-    for (const [tier, fullPrice] of cases) {
+    for (const [tier, perWinPrice] of cases) {
       const priced = computeOrderPrice(baseInput({
-        serviceType: 'md5', currentRank: { tier: tier as RankTier, division: null }, winsPurchased: 5,
+        serviceType: 'md5', currentRank: { tier: tier as RankTier, division: null }, winsPurchased: 1,
       }))
-      expect(priced.basePrice).toBeCloseTo(fullPrice, 2)
+      expect(priced.basePrice).toBeCloseTo(perWinPrice, 2)
     }
   })
 
@@ -239,5 +244,73 @@ describe('MD5 — preço por vitória líquida (garantia de win rate nas placeme
       serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: 6,
     }))
     expect(priced.basePrice).toBe(0)
+  })
+})
+
+describe('Preços por fila — Vitória Avulsa', () => {
+  const soloDuo: [RankTier, number][] = [
+    ['iron', 290], ['bronze', 290], ['silver', 390], ['gold', 390], ['platinum', 690],
+    ['emerald', 990], ['diamond', 1590], ['master', 4490], ['grandmaster', 5990], ['challenger', 9990],
+  ]
+  const flex: [RankTier, number][] = [
+    ['iron', 265], ['bronze', 265], ['silver', 370], ['gold', 370], ['platinum', 650],
+    ['emerald', 940], ['diamond', 1510], ['master', 4490], ['grandmaster', 5990], ['challenger', 9990],
+  ]
+  it.each(soloDuo)('solo_duo %s = %i centavos', (tier, cents) => {
+    expect(moneyToCents(getWinBoostPrice('solo_duo', tier))).toBe(cents)
+  })
+  it.each(flex)('flex %s = %i centavos', (tier, cents) => {
+    expect(moneyToCents(getWinBoostPrice('flex', tier))).toBe(cents)
+  })
+})
+
+describe('Preços por fila — MD5 (garantia de win rate, por vitória)', () => {
+  const soloDuo: [RankTier, number][] = [
+    ['iron', 1490], ['bronze', 1690], ['silver', 1890], ['gold', 2190], ['platinum', 3090],
+    ['emerald', 3790], ['diamond', 4190], ['master', 5990], ['grandmaster', 9990], ['challenger', 17990],
+  ]
+  const flex: [RankTier, number][] = [
+    ['iron', 1410], ['bronze', 1590], ['silver', 1790], ['gold', 2080], ['platinum', 2930],
+    ['emerald', 3600], ['diamond', 3990], ['master', 5990], ['grandmaster', 9990], ['challenger', 17990],
+  ]
+  it.each(soloDuo)('solo_duo %s = %i centavos', (tier, cents) => {
+    expect(moneyToCents(getMd5WinPrice('solo_duo', tier))).toBe(cents)
+  })
+  it.each(flex)('flex %s = %i centavos', (tier, cents) => {
+    expect(moneyToCents(getMd5WinPrice('flex', tier))).toBe(cents)
+  })
+})
+
+describe('Preços por fila — Elo Boost (por divisão)', () => {
+  // Iron..Diamond entry price per division, in cents.
+  const soloDuo: [RankTier, number][] = [
+    ['iron', 850], ['bronze', 990], ['silver', 1350], ['gold', 1690],
+    ['platinum', 2390], ['emerald', 4690], ['diamond', 7490],
+  ]
+  const flex: [RankTier, number][] = [
+    ['iron', 800], ['bronze', 940], ['silver', 1280], ['gold', 1590],
+    ['platinum', 2270], ['emerald', 4450], ['diamond', 7110],
+  ]
+  it.each(soloDuo)('solo_duo %s = %i centavos/divisão', (tier, cents) => {
+    expect(moneyToCents(getEloDivPrice('solo_duo', tier))).toBe(cents)
+  })
+  it.each(flex)('flex %s = %i centavos/divisão', (tier, cents) => {
+    expect(moneyToCents(getEloDivPrice('flex', tier))).toBe(cents)
+  })
+})
+
+describe('Modificador de PDL — limiares corrigidos (15%/normal/-5%)', () => {
+  it('19 PDL de média aplica +15%', () => {
+    const withMod = applyLpModifier(100, 'gold', 0, 19)
+    expect(withMod).toBeCloseTo(115, 2)
+  })
+  it('20 PDL de média é preço normal (limite inferior incluído)', () => {
+    expect(applyLpModifier(100, 'gold', 0, 20)).toBeCloseTo(100, 2)
+  })
+  it('25 PDL de média é preço normal (limite superior incluído)', () => {
+    expect(applyLpModifier(100, 'gold', 0, 25)).toBeCloseTo(100, 2)
+  })
+  it('26 PDL de média aplica -5%', () => {
+    expect(applyLpModifier(100, 'gold', 0, 26)).toBeCloseTo(95, 2)
   })
 })

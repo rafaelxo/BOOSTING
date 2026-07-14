@@ -5,7 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { RankBadge, RankLockGrid } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, getMd5MatchPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
   isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
 } from '@/lib/boostDomain'
@@ -217,10 +217,11 @@ export function StepConfigure() {
 
       if (!targetRank) return
       const { price, hours } = calcEloPrice(
+        queueType,
         currentRank.tier, currentRank.division ?? null,
         targetRank.tier, targetRank.division ?? null,
       )
-      const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain)
+      const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, undefined, queueType)
       const finalPrice = boostMode === 'duo'
         ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
         : withLp
@@ -233,20 +234,20 @@ export function StepConfigure() {
       setEstimatedHours(3)
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
-      const pricePerWin = getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
+      const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
-      const pricePerWin = getMd5MatchPrice(currentRank.tier)
+      const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
     }
     // coaching: preço vem do pacote escolhido em CoachPackagePicker
     // (setBasePrice chamado lá), não recalculado aqui.
   }, [
-    serviceType, currentRank, targetRank, boostMode, winsPurchased,
+    serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
     currentLp, avgLpGain, currentIsMasterPlus, masterPlusPriceRow,
     setBasePrice, setEstimatedHours,
   ])

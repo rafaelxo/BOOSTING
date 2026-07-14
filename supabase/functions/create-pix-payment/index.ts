@@ -618,6 +618,7 @@ serve(async (req) => {
 
       const priceInput: OrderPriceInput = {
         serviceType: normalized.serviceType,
+        queueType: normalized.queueType,
         boostMode: normalized.boostMode,
         currentRank: normalized.currentRank,
         targetRank: normalized.targetRank,

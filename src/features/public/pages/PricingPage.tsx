@@ -160,7 +160,7 @@ export function PricingPage() {
           <p className="text-sm text-ink-secondary mb-4">Preço por vitória de acordo com o seu rank atual.</p>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {WIN_TIERS.map((tier) => {
-              const price = getWinBoostPrice(tier, null)
+              const price = getWinBoostPrice('solo_duo', tier, null)
               return (
                 <div key={tier} className="card p-4 text-center flex flex-col items-center gap-1.5">
                   <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />

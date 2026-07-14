@@ -61,13 +61,25 @@ export function rankStep(tier: RankTier, div: Division | null): number {
   return ti * 4 + di
 }
 
-// ── Elo Boost ────────────────────────────────────────────────────────────────
-// Preço por divisão ao ENTRAR em cada tier (BRL)
-const ELO_DIV_PRICE: Record<string, number> = {
-  iron: 8.50, bronze: 9.90, silver: 13.50, gold: 16.90,
-  platinum: 23.90, emerald: 46.90, diamond: 74.90,
+export type QueueType = 'solo_duo' | 'flex'
+
+// ── Elo Boost — preço por divisão ao ENTRAR em cada tier, em CENTAVOS ───────
+// Tabela oficial por fila. Master+ não usa esta tabela — vem de
+// `master_plus_pricing` no banco (ver shared/boostDomain.ts e a migration
+// que cria essa tabela).
+const ELO_DIV_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
+  solo_duo: {
+    iron: 850, bronze: 990, silver: 1350, gold: 1690,
+    platinum: 2390, emerald: 4690, diamond: 7490,
+  },
+  flex: {
+    iron: 800, bronze: 940, silver: 1280, gold: 1590,
+    platinum: 2270, emerald: 4450, diamond: 7110,
+  },
 }
 
+// Tabela usada só pela página pública de preços (sem seleção de fila) —
+// reflete a fila solo_duo, a padrão exibida antes do configurador.
 export const ELO_TIERS: { tier: RankTier; perDiv: number }[] = [
   { tier: 'iron',     perDiv: 8.50  },
   { tier: 'bronze',   perDiv: 9.90  },
@@ -80,65 +92,85 @@ export const ELO_TIERS: { tier: RankTier; perDiv: number }[] = [
 
 const TIER_NAMES = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
 
-function divPriceForStep(step: number): number {
+export function getEloDivPrice(queue: QueueType, tier: RankTier): number {
+  return centsToMoney(ELO_DIV_PRICE_CENTS[queue][tier] ?? ELO_DIV_PRICE_CENTS[queue].diamond)
+}
+
+function divPriceCentsForStep(queue: QueueType, step: number): number {
   const ti = Math.min(Math.floor(step / 4), 6)
-  return ELO_DIV_PRICE[TIER_NAMES[ti]] ?? 74.90
+  return ELO_DIV_PRICE_CENTS[queue][TIER_NAMES[ti]] ?? ELO_DIV_PRICE_CENTS[queue].diamond
 }
 
 export function calcEloPrice(
+  queue: QueueType,
   fTier: RankTier, fDiv: Division | null,
   tTier: RankTier, tDiv: Division | null,
 ): { price: number; hours: number } {
   const from = rankStep(fTier, fDiv)
-  const to   = rankStep(tTier, tDiv)
+  const to = rankStep(tTier, tDiv)
   if (to <= from) return { price: 0, hours: 0 }
 
   let priceCents = 0
-  for (let s = from + 1; s <= to; s++) priceCents += moneyToCents(divPriceForStep(s))
+  for (let s = from + 1; s <= to; s++) priceCents += divPriceCentsForStep(queue, s)
 
   const hours = Math.max(1, Math.round((to - from) * 1.5))
   return { price: centsToMoney(priceCents), hours }
 }
 
-// ── Vitória Avulsa (Win Boost) ────────────────────────────────────────────────
-const WIN_PRICE_PER_TIER: Record<string, number> = {
-  iron: 2.90, bronze: 2.90, silver: 3.90, gold: 3.90,
-  platinum: 6.90, emerald: 9.90,
-  diamond: 15.90,
-  master: 44.90, grandmaster: 59.90, challenger: 99.90,
+// ── Vitória Avulsa (Win Boost) — preço por vitória, em CENTAVOS ─────────────
+const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
+  solo_duo: {
+    iron: 290, bronze: 290, silver: 390, gold: 390, platinum: 690,
+    emerald: 990, diamond: 1590, master: 4490, grandmaster: 5990, challenger: 9990,
+  },
+  flex: {
+    iron: 265, bronze: 265, silver: 370, gold: 370, platinum: 650,
+    emerald: 940, diamond: 1510, master: 4490, grandmaster: 5990, challenger: 9990,
+  },
 }
 
-export function getWinBoostPrice(tier: RankTier, _div: Division | null): number {
-  return WIN_PRICE_PER_TIER[tier] ?? 15.90
+export function getWinBoostPrice(queue: QueueType, tier: RankTier, _div?: Division | null): number {
+  return centsToMoney(WIN_PRICE_CENTS[queue][tier] ?? WIN_PRICE_CENTS[queue].diamond)
 }
 
 // Pacotes de vitórias oferecidos no StepExtras (desconto sobre o preço unitário)
 export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
 
-// ── MD5 — Win Rate Guarantee on placement matches ────────────────────────────
-// Per-net-win price = the business's official full-5-wins table ÷ 5. Exact
-// figures for all 10 tiers, given directly by the business — do not derive
-// or approximate these.
-export const MD5_WIN_PRICE_PER_TIER: Record<string, number> = {
-  iron: 2.98, bronze: 3.38, silver: 3.78, gold: 4.38,
-  platinum: 6.18, emerald: 7.58, diamond: 8.38,
-  master: 11.98, grandmaster: 19.98, challenger: 35.98,
+// ── MD5 — garantia de win rate, preço por vitória líquida, em CENTAVOS ──────
+// Tabela direta por fila — não é mais derivada de PLACEMENT_PRICE ÷ 5.
+const MD5_WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
+  solo_duo: {
+    iron: 1490, bronze: 1690, silver: 1890, gold: 2190, platinum: 3090,
+    emerald: 3790, diamond: 4190, master: 5990, grandmaster: 9990, challenger: 17990,
+  },
+  flex: {
+    iron: 1410, bronze: 1590, silver: 1790, gold: 2080, platinum: 2930,
+    emerald: 3600, diamond: 3990, master: 5990, grandmaster: 9990, challenger: 17990,
+  },
 }
 
-export function getMd5WinPrice(tier: RankTier): number {
-  return MD5_WIN_PRICE_PER_TIER[tier] ?? 4.38
+export function getMd5WinPrice(queue: QueueType, tier: RankTier): number {
+  return centsToMoney(MD5_WIN_PRICE_CENTS[queue][tier] ?? MD5_WIN_PRICE_CENTS[queue].diamond)
 }
 
-// ── MD5 — 5 Placement Matches ─────────────────────────────────────────────────
+// ── MD5 Completo (placement_matches) — legado, mantido só para pedidos
+// antigos e cálculo de preço histórico. Não oferecido como serviço novo
+// (StepService.tsx não lista mais este tile) — ver Task 6.
 export const PLACEMENT_PRICE: Record<string, number> = {
   iron: 14.90, bronze: 16.90, silver: 18.90, gold: 21.90,
   platinum: 30.90, emerald: 37.90, diamond: 41.90,
   master: 59.90, grandmaster: 99.90, challenger: 179.90,
 }
 
-export function getMd5MatchPrice(tier: RankTier): number {
-  return centsToMoney(Math.ceil(moneyToCents(PLACEMENT_PRICE[tier] ?? 14.90) / 5))
-}
+// ── Elo Boost Master+ — transições oficiais (mesmo valor nas duas filas) ────
+// Fonte de referência apenas — o preço autoritativo por faixa de PDL vem da
+// tabela `master_plus_pricing` (ver migration 020), que a Task 3 atualiza
+// para bater com estes valores em todas as 4 faixas de PDL (o negócio não
+// diferenciou por faixa nesta rodada — mesmo valor nas 4).
+export const MASTER_PLUS_TRANSITION_PRICE_CENTS = {
+  master_to_grandmaster: 89990,
+  grandmaster_to_challenger: 124990,
+} as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
 // Duo Boost só existe para o fluxo padrão (Iron–Diamond) — Master+ não aceita
@@ -160,6 +192,7 @@ export function applyLpModifier(
   currentLp: number,
   avgLpPerGame: number,
   _avgLpLoss?: number,
+  queueType: QueueType = 'solo_duo',
 ): number {
   if (basePrice <= 0) return 0
   if (![currentLp, avgLpPerGame].every(Number.isFinite)
@@ -167,9 +200,9 @@ export function applyLpModifier(
     throw new RangeError('Invalid LP values')
   }
   const baseCents = moneyToCents(basePrice)
-  const divPriceCents = moneyToCents(ELO_DIV_PRICE[fTier] ?? 0)
+  const divPriceCents = moneyToCents(getEloDivPrice(queueType, fTier))
   const lpDiscountCents = Math.round(currentLp * divPriceCents / 100)
-  const efficiencyMod = avgLpPerGame < 20 ? 1.2 : avgLpPerGame > 25 ? 0.95 : 1
+  const efficiencyMod = avgLpPerGame < 20 ? 1.15 : avgLpPerGame > 25 ? 0.95 : 1
   return centsToMoney(Math.max(0, Math.round((baseCents - lpDiscountCents) * efficiencyMod)))
 }
 
@@ -193,6 +226,7 @@ export interface OrderExtraInput {
 
 export interface OrderPriceInput {
   serviceType: ServiceType
+  queueType: QueueType
   boostMode: 'solo' | 'duo'
   currentRank: RankValue | null
   targetRank: RankValue | null
@@ -250,10 +284,11 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       } else {
         if (!targetRank) break
         const { price, hours } = calcEloPrice(
+          input.queueType,
           currentRank.tier, currentRank.division,
           targetRank.tier, targetRank.division,
         )
-        const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss)
+        const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss, input.queueType)
         basePrice = boostMode === 'duo'
           ? centsToMoney(moneyToCents(withLp) + percentageOfCents(moneyToCents(withLp), DUO_BOOST_PCT))
           : centsToMoney(moneyToCents(withLp))
@@ -269,7 +304,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     }
     case 'win_boost': {
       if (!input.winsPurchased || !input.currentRank) break
-      const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
+      const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
@@ -277,7 +312,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     case 'md5': {
       if (!input.winsPurchased || !input.currentRank) break
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
-      const pricePerWin = getMd5WinPrice(input.currentRank.tier)
+      const pricePerWin = getMd5WinPrice(input.queueType, input.currentRank.tier)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
@@ -303,7 +338,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
 
   let winPackagePrice = 0
   if (input.winPackage && input.currentRank) {
-    const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
+    const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
     const discountPct = WIN_PACKAGE_DISCOUNTS[input.winPackage] ?? 0
     const undiscountedCents = moneyToCents(pricePerWin) * input.winPackage
     winPackagePrice = centsToMoney(undiscountedCents - percentageOfCents(undiscountedCents, discountPct))
