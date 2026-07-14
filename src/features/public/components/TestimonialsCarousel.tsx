@@ -8,7 +8,7 @@ const TRACK = [...TESTIMONIALS, ...TESTIMONIALS]
 export function TestimonialsCarousel() {
   return (
     <div className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
-      <div className="flex w-max gap-5 animate-marquee motion-reduce:animate-none group-hover:[animation-play-state:paused]">
+      <div className="flex w-max gap-5 animate-marquee group-hover:[animation-play-state:paused]">
         {TRACK.map((testimonial, i) => (
           <TestimonialCard key={`${testimonial.name}-${i}`} {...testimonial} className="w-80 shrink-0" />
         ))}
