@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
-  moneyToCents, type OrderPriceInput, type RankTier,
+  moneyToCents, PLACEMENT_PRICE, type OrderPriceInput, type RankTier,
 } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
@@ -243,6 +243,22 @@ describe('MD5 — preço por vitória líquida (garantia de win rate nas placeme
     const priced = computeOrderPrice(baseInput({
       serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: 6,
     }))
+    expect(priced.basePrice).toBe(0)
+  })
+})
+
+describe('placement_matches (MD5 Completo, legado) — PLACEMENT_PRICE segue computável para pedidos antigos', () => {
+  it('usa PLACEMENT_PRICE por tier, tabela independente da MD5 nova (por vitória)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'placement_matches',
+      currentRank: { tier: 'gold', division: null },
+    }))
+    expect(priced.basePrice).toBe(PLACEMENT_PRICE.gold)
+    expect(priced.estimatedHours).toBe(3)
+  })
+
+  it('sem currentRank, preço fica zero (pedido bloqueado, mesma regra dos outros serviceTypes)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'placement_matches', currentRank: null }))
     expect(priced.basePrice).toBe(0)
   })
 })
