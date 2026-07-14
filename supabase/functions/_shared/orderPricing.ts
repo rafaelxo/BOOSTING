@@ -143,7 +143,10 @@ const otherServiceIntentSchema = z.object({
   current_lp: z.number().int().min(0).max(9999).default(0),
   avg_lp_gain: z.number().int().min(1).max(50).default(20),
   avg_lp_loss: z.number().int().min(1).max(50).default(15),
-  wins_purchased: z.number().int().min(1).max(50).nullable(),
+  // Vitórias — só win_boost usa este campo (1-5, mesmo cap do MD5, ver seção
+  // 14-bis); placement_matches/coaching sempre mandam null aqui (reforçado
+  // pelas checagens de negócio abaixo), então apertar o max não os afeta.
+  wins_purchased: z.number().int().min(1).max(5).nullable(),
   sessions_purchased: z.number().int().min(1).max(20).nullable(),
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),

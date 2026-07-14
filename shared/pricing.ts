@@ -323,6 +323,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     }
     case 'win_boost': {
       if (!input.winsPurchased || !input.currentRank) break
+      if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))

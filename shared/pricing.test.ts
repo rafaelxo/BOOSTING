@@ -157,7 +157,7 @@ describe('Integridade monetária e entradas hostis', () => {
     }))).toThrow(RangeError)
   })
 
-  it.each([1, 3, 50])('calcula quantidade válida de vitórias: %i', (winsPurchased) => {
+  it.each([1, 3, 5])('calcula quantidade válida de vitórias: %i', (winsPurchased) => {
     const priced = computeOrderPrice(baseInput({
       serviceType: 'win_boost',
       currentRank: { tier: 'gold', division: 'II' },
@@ -165,6 +165,32 @@ describe('Integridade monetária e entradas hostis', () => {
     }))
     expect(priced.basePrice).toBe(winsPurchased * 3.9)
     expect(priced.totalPrice).toBe(priced.basePrice)
+  })
+
+  it('rejeita quantidade de vitórias fora da faixa 1-5 (win_boost agora tem o mesmo cap do MD5)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: 50,
+    }))
+    expect(priced.basePrice).toBe(0)
+    expect(priced.totalPrice).toBe(0)
+  })
+
+  it('limite exato de win_boost: 5 é válido, 6 é rejeitado (basePrice zerado)', () => {
+    const validAtBoundary = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: 5,
+    }))
+    expect(validAtBoundary.basePrice).toBe(5 * 3.9)
+
+    const invalidAtBoundary = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: 6,
+    }))
+    expect(invalidAtBoundary.basePrice).toBe(0)
   })
 
   it('calcula vitória avulsa Master+ com a tabela comercial atual', () => {
@@ -188,12 +214,13 @@ describe('Integridade monetária e entradas hostis', () => {
     expect(priced.basePrice).toBe(299.70)
   })
 
-  it('recusa quantidade negativa', () => {
-    expect(() => computeOrderPrice(baseInput({
+  it('recusa quantidade negativa (basePrice zerado, mesma faixa 1-5 do MD5)', () => {
+    const priced = computeOrderPrice(baseInput({
       serviceType: 'win_boost',
       currentRank: { tier: 'gold', division: 'II' },
       winsPurchased: -1,
-    }))).toThrow(RangeError)
+    }))
+    expect(priced.basePrice).toBe(0)
   })
 })
 
