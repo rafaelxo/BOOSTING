@@ -16,12 +16,7 @@ export function TestimonialCard({ name, service, tag, rating, comment, className
         </div>
       </div>
       <p className="text-sm text-ink-secondary leading-relaxed relative">"{comment}"</p>
-      <span
-        className={cn(
-          'inline-flex items-center gap-1.5 self-start text-xs font-medium px-2.5 py-1 rounded-full relative',
-          isCoaching ? 'text-accent bg-accent/10' : 'text-brand bg-brand/10',
-        )}
-      >
+      <span className="inline-flex items-center gap-1.5 self-start text-xs font-medium px-2.5 py-1 rounded-full relative border border-brand/40 text-brand bg-brand/5">
         {isCoaching ? <Users className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
         {tag}
       </span>

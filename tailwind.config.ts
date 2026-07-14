@@ -86,7 +86,6 @@ export default {
         shimmer:      'shimmer 2s linear infinite',
         'float':      'float 6s ease-in-out infinite',
         marquee:      'marquee 42s linear infinite',
-        'marquee-reverse': 'marquee 52s linear infinite reverse',
       },
       keyframes: {
         fadeIn:    { from: { opacity: '0' }, to: { opacity: '1' } },
