@@ -36,7 +36,10 @@ describe('Ausência estrutural de PDL alvo no Master+', () => {
   }
 
   it('a Edge Function não declara target_lp nem target_pdl como campo no schema Master+', () => {
-    const content = read('supabase/functions/create-pix-payment/index.ts')
+    // masterPlusIntentSchema vive em _shared/orderPricing.ts (extraído de
+    // create-pix-payment/index.ts — ver Task 4/order-quote), reutilizado por
+    // create-pix-payment e order-quote.
+    const content = read('supabase/functions/_shared/orderPricing.ts')
     // Isola só a declaração do objeto Zod (até o `})` de fechamento), sem
     // arrastar comentários de código seguinte que apenas mencionam o termo.
     const start = content.indexOf('const masterPlusIntentSchema')
@@ -49,7 +52,7 @@ describe('Ausência estrutural de PDL alvo no Master+', () => {
   })
 
   it('o schema Master+ não aceita boost_mode "duo" (literal "solo" apenas)', () => {
-    const content = read('supabase/functions/create-pix-payment/index.ts')
+    const content = read('supabase/functions/_shared/orderPricing.ts')
     const start = content.indexOf('const masterPlusIntentSchema')
     const end = content.indexOf('\nconst ', start + 10)
     const block = content.slice(start, end === -1 ? undefined : end)

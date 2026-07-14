@@ -20,13 +20,15 @@ Mercado Pago webhook verification requires `MERCADOPAGO_WEBHOOK_SECRET` outside 
 
 ## Limites e payloads
 
-`create-pix-payment` aceita 6 requisições por usuário/minuto e `discord-join-server` 3 por usuário/5 minutos. Webhooks Discord possuem limites globais separados. Os contadores ficam em `public.edge_rate_limits`; excesso retorna `429` com `Retry-After`.
+`create-pix-payment` aceita 6 requisições por usuário/minuto, `order-quote` 20 por usuário/minuto (read-only, mas ainda reconsulta a Riot no fluxo MD5) e `discord-join-server` 3 por usuário/5 minutos. Webhooks Discord possuem limites globais separados. Os contadores ficam em `public.edge_rate_limits`; excesso retorna `429` com `Retry-After`.
 
 Funções HTTP aceitam somente `POST` (além de preflight CORS onde aplicável), JSON com `Content-Type: application/json`, payload limitado e chamadas externas com timeout. Não use `X-Forwarded-For` como identidade; os limites de browser usam o UUID autenticado.
 
 ## Pagamentos
 
 O cliente envia `idempotency_key` UUID por tentativa. `create-pix-payment` valida jogo/serviço ativos, recalcula em centavos e registra pedido/pagamento pela RPC `record_pix_payment`. O webhook valida HMAC e timestamp, reconsulta a API do Mercado Pago e chama `process_mp_payment_event`, que reconcilia moeda, valor exato, pedido e payment ID em uma transação.
+
+A validação do intent (schemas por fluxo, recheck de elegibilidade MD5 na Riot, pacote de coaching, addons) e o cálculo de preço vivem em `_shared/orderPricing.ts` (`validateAndPriceIntent`), compartilhados por `create-pix-payment` e `order-quote`. `order-quote` chama exatamente a mesma validação/precificação mas nunca insere em `orders` nem chama o Mercado Pago — é só a cotação (`POST { intent }` → `{ total, subtotal, ... }` ou erro estruturado) usada pelo configurador antes do cliente confirmar o pedido.
 
 ## Verificação de rank (Riot API)
 
