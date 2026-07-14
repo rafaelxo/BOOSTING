@@ -40,6 +40,13 @@ interface OrderBuilderState {
   // rank alvo foi atingido antes de concluir o pedido.
   riotId: string
 
+  // MD5: garantia de win rate nas partidas de posicionamento — toggle dentro
+  // do fluxo "Vitórias" (win_boost), não um serviço separado na tela, mas
+  // muda serviceType para 'md5' internamente (ver StepConfigure.tsx).
+  isMd5: boolean
+  md5MatchesRemaining: number | null
+  md5MatchesRemainingCeiling: number | null
+
   // Pacote de coach escolhido (booster_services) — preço vem sempre daqui,
   // nunca editável pelo cliente. Selecionar um pacote também vincula o
   // pedido ao booster dono dele via setPreferredBooster.
@@ -92,6 +99,9 @@ interface OrderBuilderState {
   setBasePrice: (price: number) => void
   setExtrasPrice: (price: number) => void
   setEstimatedHours: (hours: number | null) => void
+  setIsMd5: (isMd5: boolean) => void
+  setMd5MatchesRemaining: (n: number) => void
+  setMd5MatchesRemainingFromApi: (n: number) => void
   reset: () => void
 }
 
@@ -120,6 +130,9 @@ const initialState = {
   preferredBoosterId: null,
   preferredBoosterName: null,
   riotId: '',
+  isMd5: false,
+  md5MatchesRemaining: null as number | null,
+  md5MatchesRemainingCeiling: null as number | null,
   selectedCoachPackage: null,
   currentLp: 0,
   avgLpGain: 20,
@@ -271,6 +284,29 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setBasePrice: (basePrice) => set({ basePrice }),
   setExtrasPrice: (extrasPrice) => set({ extrasPrice }),
   setEstimatedHours: (estimatedHours) => set({ estimatedHours }),
+
+  setIsMd5: (isMd5) => set((state) => {
+    // Toggling MD5 swaps the underlying service_type — resolved to a real
+    // catalog uuid the same way StepService does (setService(slug, slug)
+    // placeholder, OrderBuilderPage's catalog-service query resolves the uuid).
+    const nextType = isMd5 ? 'md5' : 'win_boost'
+    return {
+      isMd5,
+      serviceType: nextType,
+      serviceId: nextType,
+      winsPurchased: isMd5 && state.winsPurchased && state.winsPurchased > 5 ? 5 : state.winsPurchased,
+      md5MatchesRemaining: isMd5 ? state.md5MatchesRemaining : null,
+      md5MatchesRemainingCeiling: isMd5 ? state.md5MatchesRemainingCeiling : null,
+    }
+  }),
+
+  setMd5MatchesRemaining: (n) => set((state) => ({
+    md5MatchesRemaining: state.md5MatchesRemainingCeiling != null
+      ? Math.max(0, Math.min(n, state.md5MatchesRemainingCeiling))
+      : Math.max(0, n),
+  })),
+
+  setMd5MatchesRemainingFromApi: (n) => set({ md5MatchesRemaining: n, md5MatchesRemainingCeiling: n }),
 
   reset: () => set({ ...initialState, selectedExtraIds: new Set<string>() }),
 }))

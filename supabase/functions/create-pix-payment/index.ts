@@ -17,13 +17,17 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
 import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
+import {
+  fetchLeagueEntries,
+  fetchRankedMatchIdsThisSplit,
+  fetchRiotAccount,
+  RIOT_QUEUE_TYPE,
+  RIOT_TIER_MAP,
+} from '../_shared/riotLookup.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
-const SPLIT_START_TIMESTAMP = Number(Deno.env.get('LOL_SPLIT_START_TIMESTAMP') ?? '0')
-const RIOT_REGIONAL_ROUTE = 'americas'
-const RIOT_PLATFORM_ROUTE = 'br1'
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 // O contrato é diferente por fluxo (padrão vs. Master+) — cada um usa
@@ -155,16 +159,24 @@ const otherServiceIntentSchema = z.object({
   booster_service_id: z.string().uuid().nullable().default(null),
 }).strict()
 
+// MD5 — "Rank da última temporada": Iron–Challenger valid, no LP/PDL/target
+// concept (win-rate-guarantee is priced per net win, not per rank progression).
 const md5IntentSchema = z.object({
   service_type: z.literal('md5'),
   service_id: z.string().uuid(),
   game_id: z.string().uuid(),
   queue_type: z.enum(['solo_duo', 'flex']),
   server: z.string().trim().min(2).max(16),
-  current_rank: genericRankSchema,
-  target_rank: genericRankSchema.nullable().default(null),
+  // "Rank da última temporada" — no LP/PDL, no target. Iron–Challenger valid;
+  // division required except Master+.
+  current_rank: genericRankSchema.strict().superRefine((val, ctx) => {
+    if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
+    } else if (!NO_DIVISION_TIERS.includes(val.tier) && !val.division) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Divisão é obrigatória para este rank', path: ['division'] })
+    }
+  }),
   wins_purchased: z.number().int().min(1).max(5),
-  addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
 }).strict()
@@ -209,57 +221,6 @@ interface NormalizedIntent {
 
 function badRequest(req: Request, message: string) {
   return errorResponse(req, message, 400)
-}
-
-const RIOT_QUEUE_TYPE = {
-  solo_duo: { leagueQueue: 'RANKED_SOLO_5x5', matchQueueId: 420 },
-  flex: { leagueQueue: 'RANKED_FLEX_SR', matchQueueId: 440 },
-} as const
-
-async function fetchRiotPuuid(riotId: string): Promise<{ found: boolean; puuid?: string }> {
-  const hashIdx = riotId.lastIndexOf('#')
-  const gameName = riotId.slice(0, hashIdx)
-  const tagLine = riotId.slice(hashIdx + 1)
-  const accountResp = await fetchWithTimeout(
-    `https://${RIOT_REGIONAL_ROUTE}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
-  )
-  if (accountResp.status === 404) return { found: false }
-  if (accountResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
-  if (!accountResp.ok) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
-  const account = await accountResp.json() as { puuid?: string }
-  if (!account.puuid) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
-  return { found: true, puuid: account.puuid }
-}
-
-async function hasRankedEntry(puuid: string, queue: 'solo_duo' | 'flex'): Promise<boolean> {
-  const leagueResp = await fetchWithTimeout(
-    `https://${RIOT_PLATFORM_ROUTE}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
-    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
-  )
-  if (leagueResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
-  if (!leagueResp.ok) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
-  const entries = await leagueResp.json() as { queueType?: string }[]
-  return Array.isArray(entries) && entries.some((entry) => entry.queueType === RIOT_QUEUE_TYPE[queue].leagueQueue)
-}
-
-async function fetchRankedMatchCountThisSplit(puuid: string, queue: 'solo_duo' | 'flex'): Promise<number | null> {
-  if (!Number.isFinite(SPLIT_START_TIMESTAMP) || SPLIT_START_TIMESTAMP <= 0) return null
-  const params = new URLSearchParams({
-    queue: String(RIOT_QUEUE_TYPE[queue].matchQueueId),
-    type: 'ranked',
-    startTime: String(Math.floor(SPLIT_START_TIMESTAMP)),
-    start: '0',
-    count: '5',
-  })
-  const matchResp = await fetchWithTimeout(
-    `https://${RIOT_REGIONAL_ROUTE}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?${params.toString()}`,
-    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
-  )
-  if (matchResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
-  if (!matchResp.ok) return null
-  const ids = await matchResp.json() as string[]
-  return Array.isArray(ids) ? ids.length : null
 }
 
 serve(async (req) => {
@@ -472,14 +433,14 @@ serve(async (req) => {
           queueType: md5.queue_type,
           boostMode: 'solo',
           server: md5.server,
-          currentRank: md5.current_rank as RankValue,
+          currentRank: { tier: md5.current_rank.tier, division: md5.current_rank.division ?? null },
           targetRank: null,
           currentLp: 0,
           avgLpGain: 20,
           avgLpLoss: 15,
           winsPurchased: md5.wins_purchased,
           sessionsPurchased: null,
-          addonCodes: md5.addon_codes,
+          addonCodes: [],
           winPackage: null,
           customerNotes: md5.customer_notes,
           currentPdl: null,
@@ -542,23 +503,50 @@ serve(async (req) => {
         return badRequest(req, 'Serviço ou jogo inválido/inativo')
       }
 
+      // ── MD5: a pré-visualização do cliente (riot-account-rank) é só um
+      // preview — nunca confiável para decidir elegibilidade. Aqui a Riot é
+      // consultada de novo, server-side, e o pedido é bloqueado se a conta já
+      // tiver rank na fila selecionada nesta temporada.
       let md5MatchesRemaining: number | null = null
       if (normalized.serviceType === 'md5') {
         if (!RIOT_API_KEY) return errorResponse(req, 'Server misconfigured', 500)
-        if (!normalized.riotId) return badRequest(req, 'Riot ID é obrigatório para MD5')
-        if (!normalized.currentRank) return badRequest(req, 'Rank da última temporada é obrigatório para MD5')
         if (!normalized.winsPurchased || normalized.winsPurchased < 1 || normalized.winsPurchased > 5) {
           return badRequest(req, 'MD5 aceita apenas 1 a 5 vitórias')
         }
-        if (normalized.winPackage) return badRequest(req, 'Pacote de vitórias extras não é aceito em MD5')
-        const account = await fetchRiotPuuid(normalized.riotId)
-        if (!account.found || !account.puuid) return badRequest(req, 'Conta Riot não encontrada')
-        if (await hasRankedEntry(account.puuid, normalized.queueType)) {
-          return badRequest(req, 'Conta já possui rank nesta fila — MD5 indisponível')
+        const accountResult = await fetchRiotAccount(normalized.riotId!, RIOT_API_KEY, 'americas')
+        if (!accountResult.ok) {
+          if (accountResult.reason === 'not_found') {
+            return badRequest(req, 'Conta Riot não encontrada')
+          }
+          if (accountResult.reason === 'rate_limited') {
+            return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+          }
+          console.error('Riot account lookup failed', accountResult.status)
+          return errorResponse(req, 'Falha ao consultar conta Riot', 502)
         }
-        const playedCount = await fetchRankedMatchCountThisSplit(account.puuid, normalized.queueType)
-        if (playedCount == null) return errorResponse(req, 'Falha ao verificar partidas restantes da MD5', 502)
-        md5MatchesRemaining = Math.max(0, 5 - (playedCount ?? 0))
+        const leagueResult = await fetchLeagueEntries(accountResult.account.puuid, RIOT_API_KEY, 'br1')
+        if (!leagueResult.ok) {
+          if (leagueResult.reason === 'rate_limited') {
+            return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+          }
+          console.error('Riot league lookup failed', leagueResult.status)
+          return errorResponse(req, 'Falha ao verificar elegibilidade MD5', 502)
+        }
+
+        const { leagueQueue } = RIOT_QUEUE_TYPE[normalized.queueType]
+        const alreadyRanked = leagueResult.entries.some((e) => e.queueType === leagueQueue && RIOT_TIER_MAP[e.tier ?? ''])
+        if (alreadyRanked) {
+          return badRequest(req, 'Esta conta já possui rank na fila selecionada nesta temporada — MD5 não está disponível.')
+        }
+
+        md5MatchesRemaining = 5
+        const splitStart = Number(Deno.env.get('LOL_SPLIT_START_TIMESTAMP') ?? '0')
+        if (splitStart > 0) {
+          const matchResult = await fetchRankedMatchIdsThisSplit(
+            accountResult.account.puuid, RIOT_API_KEY, 'americas', normalized.queueType, splitStart,
+          )
+          if (matchResult.ok) md5MatchesRemaining = Math.max(0, 5 - matchResult.matchIds.length)
+        }
         if (md5MatchesRemaining < 1) return badRequest(req, 'MD5 já foi concluída nesta fila')
         if (normalized.winsPurchased > md5MatchesRemaining) {
           return badRequest(req, `MD5 possui no máximo ${md5MatchesRemaining} partida(s) restante(s) nesta fila`)

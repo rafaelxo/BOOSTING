@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeOrderPrice, type OrderPriceInput } from './pricing'
+import { computeOrderPrice, type OrderPriceInput, type RankTier } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
   return {
@@ -189,5 +189,55 @@ describe('Integridade monetária e entradas hostis', () => {
       currentRank: { tier: 'gold', division: 'II' },
       winsPurchased: -1,
     }))).toThrow(RangeError)
+  })
+})
+
+describe('MD5 — preço por vitória líquida (garantia de win rate nas placements)', () => {
+  it('preço por vitória = tabela oficial ÷ 5, arredondado a 2 casas', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5',
+      currentRank: { tier: 'gold', division: null },
+      winsPurchased: 3,
+    }))
+    // tabela: Gold R$21.90 para as 5 vitórias => 21.90/5 = 4.38/vitória
+    expect(priced.basePrice).toBeCloseTo(4.38 * 3, 2)
+  })
+
+  it('todos os 10 tiers usam os valores exatos da tabela oficial (÷5 do preço fechado)', () => {
+    const cases: [string, number][] = [
+      ['iron', 14.90], ['bronze', 16.90], ['silver', 18.90], ['gold', 21.90],
+      ['platinum', 30.90], ['emerald', 37.90], ['diamond', 41.90],
+      ['master', 59.90], ['grandmaster', 99.90], ['challenger', 179.90],
+    ]
+    for (const [tier, fullPrice] of cases) {
+      const priced = computeOrderPrice(baseInput({
+        serviceType: 'md5', currentRank: { tier: tier as RankTier, division: null }, winsPurchased: 5,
+      }))
+      expect(priced.basePrice).toBeCloseTo(fullPrice, 2)
+    }
+  })
+
+  it('sem winsPurchased ou currentRank, preço fica zero (pedido bloqueado)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'md5', currentRank: null, winsPurchased: null }))
+    expect(priced.basePrice).toBe(0)
+  })
+
+  it('com currentRank válido mas sem winsPurchased (ou vice-versa), preço continua zero', () => {
+    const semWins = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: null,
+    }))
+    expect(semWins.basePrice).toBe(0)
+
+    const semRank = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: null, winsPurchased: 3,
+    }))
+    expect(semRank.basePrice).toBe(0)
+  })
+
+  it('rejeita quantidade de vitórias fora da faixa 1-5 (garantia é só para as placements)', () => {
+    const priced = computeOrderPrice(baseInput({
+      serviceType: 'md5', currentRank: { tier: 'gold', division: null }, winsPurchased: 6,
+    }))
+    expect(priced.basePrice).toBe(0)
   })
 })

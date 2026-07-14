@@ -830,6 +830,7 @@ export type Database = {
           id: string
           idempotency_key: string | null
           losses_played: number
+          md5_matches_remaining: number | null
           mp_payment_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket: string | null
@@ -875,6 +876,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           losses_played?: number
+          md5_matches_remaining?: number | null
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket?: string | null
@@ -920,6 +922,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           losses_played?: number
+          md5_matches_remaining?: number | null
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           pdl_bracket?: string | null
