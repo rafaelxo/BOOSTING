@@ -26,8 +26,11 @@ const PEAK_OPTIONS = [
 
 const MAX_SPECIALTIES = 8
 
+const DISPLAY_NAME_COOLDOWN_DAYS = 30
+
 interface ProfessionalProfileData {
   display_name: string
+  display_name_changed_at: string | null
   bio: string | null
   lanes: string[] | null
   specialties: string[] | null
@@ -60,7 +63,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_profiles')
-        .select('display_name, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max')
+        .select('display_name, display_name_changed_at, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max')
         .eq('user_id', userId)
         .maybeSingle()
       if (error) throw error
@@ -81,6 +84,15 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     setHoursMin(profile.hours_per_day_min != null ? String(profile.hours_per_day_min) : '')
     setHoursMax(profile.hours_per_day_max != null ? String(profile.hours_per_day_max) : '')
   }, [profile])
+
+  // Espelha, só pra UX (desabilitar o campo e mostrar quantos dias faltam),
+  // a mesma janela de 30 dias que o trigger trg_fn_enforce_booster_display_name_cooldown
+  // já impõe de verdade no banco (migration 025) — a fonte da regra é sempre
+  // o backend; isso aqui só evita que o booster tente em vão.
+  const changedAt = profile?.display_name_changed_at ? new Date(profile.display_name_changed_at) : null
+  const cooldownEndsAt = changedAt ? new Date(changedAt.getTime() + DISPLAY_NAME_COOLDOWN_DAYS * 24 * 60 * 60 * 1000) : null
+  const nameChangeLocked = !!cooldownEndsAt && cooldownEndsAt.getTime() > Date.now()
+  const daysRemaining = nameChangeLocked ? Math.ceil((cooldownEndsAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : 0
 
   function toggleLane(key: string) {
     setLanes(prev => (prev.includes(key) ? prev.filter(l => l !== key) : prev.length < 2 ? [...prev, key] : prev))
@@ -104,10 +116,15 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   async function handleSave() {
     setSaving(true)
     setError(null)
+    // Enquanto no cooldown, nunca manda um display_name diferente do já
+    // salvo — mesmo que o campo (desabilitado) tenha algum valor digitado
+    // antes de travar. O backend rejeitaria de qualquer forma (migration
+    // 025), isso só evita barrar o resto do formulário por causa disso.
+    const nextDisplayName = nameChangeLocked ? profile?.display_name : (displayName.trim() || undefined)
     const { error } = await supabase
       .from('booster_profiles')
       .update({
-        display_name: displayName.trim() || undefined,
+        display_name: nextDisplayName,
         bio: bio.trim() || null,
         lanes,
         specialties,
@@ -119,7 +136,13 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
       })
       .eq('user_id', userId)
     setSaving(false)
-    if (error) { setError('Erro ao salvar. Tente novamente.'); return }
+    if (error) {
+      // Mensagem do trigger de cooldown (migration 025) já vem pronta pro
+      // usuário ("...tente novamente em N dia(s)") — mostra ela direto em
+      // vez de um erro genérico quando é esse o motivo da rejeição.
+      setError(error.message?.includes('30 dias') ? error.message : 'Erro ao salvar. Tente novamente.')
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     qc.invalidateQueries({ queryKey: ['booster-professional-profile', userId] })
@@ -156,8 +179,14 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
           onChange={e => setDisplayName(e.target.value.slice(0, 32))}
           maxLength={32}
           placeholder="Nome público"
-          className="input-base w-full text-sm"
+          disabled={nameChangeLocked}
+          className="input-base w-full text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         />
+        {nameChangeLocked && (
+          <p className="text-xs text-ink-muted">
+            Você já alterou seu nome recentemente. Poderá alterar novamente em {daysRemaining} dia{daysRemaining === 1 ? '' : 's'}.
+          </p>
+        )}
       </div>
 
       {/* Bio */}

@@ -175,6 +175,7 @@ export type Database = {
           created_at: string
           current_rank: Json | null
           display_name: string
+          display_name_changed_at: string | null
           email: string | null
           full_name: string | null
           games: string[]
@@ -208,6 +209,7 @@ export type Database = {
           created_at?: string
           current_rank?: Json | null
           display_name: string
+          display_name_changed_at?: string | null
           email?: string | null
           full_name?: string | null
           games?: string[]
@@ -241,6 +243,7 @@ export type Database = {
           created_at?: string
           current_rank?: Json | null
           display_name?: string
+          display_name_changed_at?: string | null
           email?: string | null
           full_name?: string | null
           games?: string[]
@@ -1648,46 +1651,6 @@ export type Database = {
           total_completed: number | null
           updated_at: string | null
           user_id: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          current_rank?: Json | null
-          display_name?: string | null
-          games?: string[] | null
-          id?: string | null
-          is_available?: boolean | null
-          is_top5?: boolean | null
-          lanes?: string[] | null
-          last_active_at?: string | null
-          peak_rank?: Json | null
-          rank_stats?: Json | null
-          rating?: number | null
-          rating_count?: number | null
-          specialties?: string[] | null
-          total_completed?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          current_rank?: Json | null
-          display_name?: string | null
-          games?: string[] | null
-          id?: string | null
-          is_available?: boolean | null
-          is_top5?: boolean | null
-          lanes?: string[] | null
-          last_active_at?: string | null
-          peak_rank?: Json | null
-          rank_stats?: Json | null
-          rating?: number | null
-          rating_count?: number | null
-          specialties?: string[] | null
-          total_completed?: number | null
-          updated_at?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
