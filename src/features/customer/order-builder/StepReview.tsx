@@ -6,6 +6,7 @@ import { getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import { Button } from '@/components/ui'
 import { Shield, Clock, Star, ChevronRight, ChevronLeft } from 'lucide-react'
+import { GuaranteeNotice } from './GuaranteeNotice'
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
@@ -20,13 +21,18 @@ export function StepReview() {
   const {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased, sessionsPurchased, selectedExtraIds, winPackage,
-    currentLp, avgLpGain, avgLpLoss, currentPdl, avgPdlGain, avgPdlLoss,
+    isMd5, md5MatchesRemaining,
+    currentLp, avgLpGain, currentPdl, avgPdlGain,
     basePrice, extrasPrice, estimatedHours, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
-  const flow = serviceType === 'elo_boost' && currentRank ? getBoostFlow(currentRank.tier, boostMode) : null
+  const flow = serviceType === 'elo_boost' && currentRank
+    ? getBoostFlow(currentRank.tier, boostMode)
+    : serviceType === 'win_boost' || serviceType === 'md5'
+      ? 'solo_standard'
+      : null
   // Mesma queryKey usada em StepExtras — já em cache, não refaz a chamada.
   const { data: addonData } = useBoostAddons(flow)
   const addonCatalog = addonData ?? EMPTY_ADDONS
@@ -65,12 +71,12 @@ export function StepReview() {
             {serviceType === 'elo_boost' && !currentIsMasterPlus && (
               <ReviewRow label="Modo" value={boostMode === 'duo' ? 'Duo Boost (+50%)' : 'Solo Boost'} />
             )}
-            {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
+            {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
               <ReviewRow label="Fila" value={queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex'} />
             )}
             {currentRank && (
               <ReviewRow
-                label={serviceType === 'placement_matches' ? 'Rank Final (Temporada Ant.)' : 'Rank Atual'}
+                label={serviceType === 'placement_matches' || isMd5 ? 'Rank Final (Temporada Ant.)' : 'Rank Atual'}
                 value={formatRank(currentRank.tier, currentRank.division)}
               />
             )}
@@ -81,18 +87,20 @@ export function StepReview() {
               currentIsMasterPlus ? (
                 <>
                   <ReviewRow label="PDL Atual" value={`${currentPdl} PDL`} />
-                  <ReviewRow label="Méd. PDL Ganho/Vitória" value={`+${avgPdlGain} PDL`} />
-                  <ReviewRow label="Méd. PDL Perdido/Derrota" value={`−${avgPdlLoss} PDL`} />
+                  <ReviewRow label="Média por Partida" value={`${avgPdlGain} PDL`} />
                 </>
               ) : (
                 <ReviewRow
                   label="PDL"
-                  value={`${currentLp} LP atual · +${avgLpGain} / −${avgLpLoss} médias`}
+                  value={`${currentLp} LP atual · ${avgLpGain} média/partida`}
                 />
               )
             )}
             {winsPurchased && (
               <ReviewRow label="Vitórias" value={`${winsPurchased} vitórias`} />
+            )}
+            {isMd5 && md5MatchesRemaining != null && (
+              <ReviewRow label="Partidas Restantes (Booster)" value={`${md5MatchesRemaining}`} />
             )}
             {sessionsPurchased && (
               <ReviewRow label="Sessão" value={`${sessionsPurchased}h`} />
@@ -129,6 +137,14 @@ export function StepReview() {
               ))}
             </div>
           </div>
+        )}
+
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <GuaranteeNotice title={isMd5 ? 'Garantia de Win Rate MD5' : 'Garantia de Win Rate - Vitórias Extras'}>
+            {isMd5
+              ? 'Asseguramos uma taxa de vitória de 80% ou mais nas suas partidas classificatórias. Caso o desempenho final fique abaixo desse percentual, adicionamos vitórias extras como compensação até atingir o resultado acordado.'
+              : 'Trabalhamos com o sistema de vitórias líquidas, considerando o saldo entre vitórias e derrotas. Se houver alguma derrota durante o serviço, ela será compensada com uma vitória adicional, garantindo que você receba exatamente a quantidade de vitórias contratada. Exemplo: você compra 2 vitórias. Se o resultado for 3 vitórias e 1 derrota, o saldo final será de +2 vitórias líquidas, exatamente como contratado.'}
+          </GuaranteeNotice>
         )}
 
         {/* Price breakdown */}
@@ -200,15 +216,11 @@ export function StepReview() {
             onClick={nextStep}
             size="lg"
             className="flex-1"
-            disabled={totalPrice <= 0 && serviceType !== 'coaching'}
             rightIcon={<ChevronRight className="h-5 w-5" />}
           >
             {serviceType === 'coaching' ? 'Confirmar Pedido' : `Ir para Pagamento — ${currency(totalPrice)}`}
           </Button>
         </div>
-        {totalPrice <= 0 && serviceType !== 'coaching' && (
-          <p className="text-xs text-danger text-center">Configure seu pedido para ver o preço.</p>
-        )}
 
         <p className="text-xs text-ink-muted text-center">
           Pagamento processado pelo Mercado Pago. Seus dados nunca tocam nossos servidores.

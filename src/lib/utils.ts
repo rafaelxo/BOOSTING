@@ -157,8 +157,9 @@ export const TICKET_PRIORITY_COLOR: Record<TicketPriority, string> = {
 const SERVICE_LABEL_MAP: Record<string, string> = {
   elo_boost:         'Solo Boost / Duo Boost',
   win_boost:         'Vitórias',
-  placement_matches: 'MD5',
+  placement_matches: 'MD5 Completo',
   coaching:          'Coaching',
+  md5:               'Vitórias + MD5',
 }
 
 export function getServiceLabel(serviceId: string): string {

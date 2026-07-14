@@ -46,7 +46,9 @@ export function StepPayment() {
 
   const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
-    : null
+    : store.serviceType === 'win_boost' || store.serviceType === 'md5'
+      ? 'solo_standard'
+      : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache. Precisamos
   // do catálogo aqui só para traduzir os ids selecionados em códigos
   // estáveis (addon_codes) — o payload nunca envia o id interno do banco.
@@ -181,16 +183,15 @@ export function StepPayment() {
 
       // O contrato é diferente por fluxo — Master+ não tem PDL alvo, LP,
       // pacote de vitórias nem Duo; o fluxo padrão não tem PDL atual/médias
-      // de PDL; fluxos fora de elo_boost não têm rank alvo, então não levam
-      // riot_id (o schema deles é .strict() e rejeitaria o campo). Nunca
-      // mandamos os dois conjuntos de campos juntos.
+      // de PDL. MD5 tem um contrato próprio: leva Riot ID e vitórias, mas não
+      // campos de LP/addons/pacote.
       const intent = flow === 'master_plus'
         ? {
             ...base,
             boost_mode: 'solo',
             current_pdl: store.currentPdl,
             avg_pdl_gain: store.avgPdlGain,
-            avg_pdl_loss: store.avgPdlLoss,
+            avg_pdl_loss: store.avgPdlGain,
             addon_codes: addonCodes,
             riot_id: store.riotId,
           }
@@ -200,23 +201,30 @@ export function StepPayment() {
               boost_mode: store.boostMode,
               current_lp: store.currentLp,
               avg_lp_gain: store.avgLpGain,
-              avg_lp_loss: store.avgLpLoss,
+              avg_lp_loss: store.avgLpGain,
               addon_codes: addonCodes,
               win_package: store.winPackage,
               riot_id: store.riotId,
             }
-          : {
-              ...base,
-              boost_mode: store.boostMode,
-              current_lp: store.currentLp,
-              avg_lp_gain: store.avgLpGain,
-              avg_lp_loss: store.avgLpLoss,
-              wins_purchased: store.winsPurchased,
-              sessions_purchased: store.sessionsPurchased,
-              addon_codes: [] as string[],
-              win_package: store.winPackage,
-              booster_service_id: store.selectedCoachPackage?.id ?? null,
-            }
+          : store.serviceType === 'md5'
+            ? {
+                ...base,
+                wins_purchased: store.winsPurchased,
+                addon_codes: addonCodes,
+                riot_id: store.riotId,
+              }
+            : {
+                ...base,
+                boost_mode: store.boostMode,
+                current_lp: store.currentLp,
+                avg_lp_gain: store.avgLpGain,
+                avg_lp_loss: store.avgLpGain,
+                wins_purchased: store.winsPurchased,
+                sessions_purchased: store.sessionsPurchased,
+                addon_codes: addonCodes,
+                win_package: store.winPackage,
+                booster_service_id: store.selectedCoachPackage?.id ?? null,
+              }
 
       await invokePix({
         intent,

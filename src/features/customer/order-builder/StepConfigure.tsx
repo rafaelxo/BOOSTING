@@ -5,7 +5,7 @@ import { FormField } from '@/components/ui/FormField'
 import { RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER, RANK_TIER_COLOR } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
+import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier } from '@/lib/pricing'
 import {
   BOOST_CURRENT_RANK_TIERS,
   isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket, tierHasDivisions,
@@ -207,13 +207,15 @@ export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased,
-    currentLp, avgLpGain, avgLpLoss,
-    currentPdl, avgPdlGain, avgPdlLoss,
+    isMd5, md5MatchesRemaining,
+    currentLp, avgLpGain,
+    currentPdl, avgPdlGain,
     riotId,
     setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
-    setCurrentLp, setAvgLpGain, setAvgLpLoss,
-    setCurrentPdl, setAvgPdlGain, setAvgPdlLoss,
+    setIsMd5, setMd5MatchesRemaining, setMd5MatchesRemainingFromApi,
+    setCurrentLp, setAvgLpGain,
+    setCurrentPdl, setAvgPdlGain,
     setBasePrice, setEstimatedHours, setRiotId,
   } = useOrderBuilderStore()
 
@@ -222,16 +224,13 @@ export function StepConfigure() {
   const [riotLookupLoading, setRiotLookupLoading] = useState(false)
   const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
   const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
+  const [md5Message, setMd5Message] = useState<string | null>(null)
 
   async function lookupRiotRank() {
     const trimmed = riotId.trim()
     setRiotLookupMessage(null)
     setRiotLookupError(null)
-
-    if (!trimmed || !trimmed.includes('#')) {
-      setRiotLookupError('Informe no formato Nome#TAG.')
-      return
-    }
+    setMd5Message(null)
 
     setRiotLookupLoading(true)
     const { data, error } = await supabase.functions.invoke('riot-account-rank', {
@@ -268,14 +267,58 @@ export function StepConfigure() {
     if (isMasterPlusCurrentTier(result.tier)) {
       setCurrentPdl(Math.max(0, Math.min(9999, result.league_points ?? 0)))
       if (typeof result.avg_lp_gain === 'number') setAvgPdlGain(Math.max(1, Math.min(200, result.avg_lp_gain)))
-      if (typeof result.avg_lp_loss === 'number') setAvgPdlLoss(Math.max(1, Math.min(200, result.avg_lp_loss)))
     } else {
       setCurrentLp(Math.max(0, Math.min(99, result.league_points ?? 0)))
       if (typeof result.avg_lp_gain === 'number') setAvgLpGain(Math.max(1, Math.min(50, result.avg_lp_gain)))
-      if (typeof result.avg_lp_loss === 'number') setAvgLpLoss(Math.max(1, Math.min(40, result.avg_lp_loss)))
     }
 
     setRiotLookupMessage(result.message ?? 'Rank atual preenchido automaticamente. Você ainda pode alterar os dados.')
+  }
+
+  async function lookupForWinBoost() {
+    const trimmed = riotId.trim()
+    setRiotLookupMessage(null)
+    setRiotLookupError(null)
+    setMd5Message(null)
+
+    setRiotLookupLoading(true)
+    const { data, error } = await supabase.functions.invoke('riot-account-rank', {
+      body: { riot_id: trimmed, queue: queueType },
+    })
+    setRiotLookupLoading(false)
+
+    if (error) {
+      setRiotLookupError(error.message || 'Não foi possível consultar a Riot agora.')
+      return
+    }
+
+    const result = data as {
+      found?: boolean
+      ranked?: boolean
+      md5_eligible?: boolean
+      matches_remaining?: number
+      message?: string
+    } | null
+
+    if (!result?.found) {
+      setRiotLookupError('Conta Riot não encontrada.')
+      return
+    }
+
+    if (result.md5_eligible) {
+      const remaining = result.matches_remaining ?? 5
+      setIsMd5(true)
+      setMd5MatchesRemainingFromApi(remaining)
+      setWinsPurchased(winsPurchased ?? 1)
+      setMd5Message(
+        `Conta ainda não rankeada nesta fila - MD5 ativado automaticamente. `
+        + `Faltam ${remaining} partida(s) de posicionamento.`,
+      )
+    } else {
+      setMd5MatchesRemainingFromApi(0)
+      setIsMd5(false)
+      setRiotLookupMessage(result.message ?? 'Conta já possui rank nesta fila - MD5 indisponível.')
+    }
   }
 
   // Grão-Mestre só tem um destino válido (Challenger) — a interface pode
@@ -326,7 +369,7 @@ export function StepConfigure() {
         currentRank.tier, currentRank.division ?? null,
         targetRank.tier, targetRank.division ?? null,
       )
-      const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss)
+      const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain)
       const finalPrice = boostMode === 'duo'
         ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
         : withLp
@@ -342,12 +385,18 @@ export function StepConfigure() {
       const pricePerWin = getWinBoostPrice(currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
       setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
+    } else if (serviceType === 'md5') {
+      if (!winsPurchased || !currentRank) return
+      const cappedWins = Math.min(5, winsPurchased)
+      const pricePerWin = getMd5WinPrice(currentRank.tier)
+      setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
+      setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
     }
     // coaching: preço vem do pacote escolhido em CoachPackagePicker
     // (setBasePrice chamado lá), não recalculado aqui.
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased,
-    currentLp, avgLpGain, avgLpLoss, currentIsMasterPlus, masterPlusPriceRow,
+    currentLp, avgLpGain, currentIsMasterPlus, masterPlusPriceRow,
     setBasePrice, setEstimatedHours,
   ])
 
@@ -374,6 +423,7 @@ export function StepConfigure() {
                   setRiotId(e.target.value)
                   setRiotLookupMessage(null)
                   setRiotLookupError(null)
+                  setMd5Message(null)
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -438,7 +488,7 @@ export function StepConfigure() {
         )}
 
         {/* Queue type */}
-        {(serviceType === 'elo_boost' || serviceType === 'win_boost') && (
+        {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
           <FormField label="Tipo de Fila" required>
             <div className="flex gap-3">
               {(['solo_duo', 'flex'] as QueueType[]).map(q => (
@@ -457,6 +507,52 @@ export function StepConfigure() {
                 </button>
               ))}
             </div>
+          </FormField>
+        )}
+
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Riot ID" required hint="Informe seu Nome#TAG. Usamos isso para checar automaticamente se sua conta já tem rank nesta fila (MD5).">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={riotId}
+                onChange={e => {
+                  setRiotId(e.target.value)
+                  setRiotLookupMessage(null)
+                  setRiotLookupError(null)
+                  setMd5Message(null)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void lookupForWinBoost()
+                  }
+                }}
+                placeholder="NomeDoInvocador#TAG"
+                className="input-base flex-1"
+                maxLength={32}
+              />
+              <button
+                type="button"
+                onClick={() => void lookupForWinBoost()}
+                disabled={riotLookupLoading}
+                className={cn(
+                  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all',
+                  'bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed',
+                )}
+              >
+                <Search className="h-4 w-4" />
+                {riotLookupLoading ? 'Consultando...' : 'Verificar elo'}
+              </button>
+            </div>
+            {md5Message && <p className="mt-2 text-xs text-success">{md5Message}</p>}
+            {riotLookupMessage && !md5Message && <p className="mt-2 text-xs text-ink-secondary">{riotLookupMessage}</p>}
+            {riotLookupError && (
+              <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-warning">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {riotLookupError}
+              </p>
+            )}
           </FormField>
         )}
 
@@ -487,14 +583,12 @@ export function StepConfigure() {
                       {currentIsMasterPlus ? (
                         <>
                           <LpCounter label="PDL Atual" value={currentPdl} min={0} max={9999} onChange={setCurrentPdl} />
-                          <LpCounter label="Méd. Ganhos" value={avgPdlGain} min={1} max={200} onChange={setAvgPdlGain} />
-                          <LpCounter label="Méd. Perdidos" value={avgPdlLoss} min={1} max={200} onChange={setAvgPdlLoss} />
+                          <LpCounter label="Média/Partida" value={avgPdlGain} min={1} max={200} onChange={setAvgPdlGain} />
                         </>
                       ) : (
                         <>
                           <LpCounter label="LP Atual" value={currentLp} min={0} max={99} onChange={setCurrentLp} />
-                          <LpCounter label="Méd. Ganhos" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
-                          <LpCounter label="Méd. Perdidos" value={avgLpLoss} min={1} max={40} onChange={setAvgLpLoss} />
+                          <LpCounter label="Média/Partida" value={avgLpGain} min={1} max={50} onChange={setAvgLpGain} />
                         </>
                       )}
                     </div>
@@ -556,16 +650,74 @@ export function StepConfigure() {
           </div>
         )}
 
-        {/* Rank — win boost */}
-        {serviceType === 'win_boost' && (
-          <FormField label="Rank Atual" required>
-            <RankPicker
-              tiers={RANK_TIER_ORDER}
-              selectedTier={currentRank?.tier ?? null}
-              selectedDivision={currentRank?.division ?? null}
-              onChange={(tier, division) => setCurrentRank({ tier, division })}
-            />
-          </FormField>
+        {/* Rank — win boost / MD5 */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <>
+            <FormField
+              label={isMd5 ? 'Rank da Última Temporada' : 'Rank Atual'}
+              required
+              hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
+            >
+              <RankPicker
+                tiers={RANK_TIER_ORDER}
+                selectedTier={currentRank?.tier ?? null}
+                selectedDivision={currentRank?.division ?? null}
+                onChange={(tier, division) => setCurrentRank({ tier, division })}
+              />
+            </FormField>
+
+            <FormField label="Extras" hint="MD5: garantimos 80%+ de win rate nas suas partidas de posicionamento restantes, com desconto no preço por vitória.">
+              <button
+                type="button"
+                onClick={() => setIsMd5(!isMd5)}
+                className={cn(
+                  'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
+                  isMd5
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
+                )}
+              >
+                <div>
+                  <p className="text-sm font-bold">MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span></p>
+                  <p className="text-[11px] font-normal mt-0.5 opacity-70">
+                    {md5MatchesRemaining == null && 'Disponível só para contas ainda não rankeadas nesta fila'}
+                  </p>
+                </div>
+                <div className={cn(
+                  'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
+                  isMd5 ? 'border-brand bg-brand' : 'border-bg-overlay',
+                )}>
+                  {isMd5 && <Check className="h-3 w-3 text-white" />}
+                </div>
+              </button>
+            </FormField>
+
+            {isMd5 && md5MatchesRemaining != null && (
+              <FormField label="Partidas Restantes para o Booster" hint="Detectado automaticamente pela Riot. Você pode diminuir se já jogou mais partidas depois da checagem, mas não aumentar.">
+                <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setMd5MatchesRemaining(md5MatchesRemaining - 1)}
+                    disabled={md5MatchesRemaining <= 0}
+                    className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    -
+                  </button>
+                  <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
+                    <p className="text-xl font-extrabold text-ink leading-none">{md5MatchesRemaining}</p>
+                    <p className="text-[10px] text-ink-muted mt-0.5">partida(s)</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMd5MatchesRemaining(md5MatchesRemaining + 1)}
+                    className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    +
+                  </button>
+                </div>
+              </FormField>
+            )}
+          </>
         )}
 
         {/* Rank — placement matches */}
@@ -580,8 +732,8 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Wins counter — win boost */}
-        {serviceType === 'win_boost' && (
+        {/* Wins counter — win boost / MD5 */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
           <FormField label="Número de Vitórias" required>
             <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
               <button
@@ -597,13 +749,13 @@ export function StepConfigure() {
               </div>
               <button
                 type="button"
-                onClick={() => setWinsPurchased(Math.min(50, (winsPurchased ?? 1) + 1))}
+                onClick={() => setWinsPurchased((winsPurchased ?? 1) + 1)}
                 className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all"
               >
                 +
               </button>
             </div>
-            <p className="text-xs text-ink-muted mt-1.5">Mínimo 1 · Máximo 50</p>
+            <p className="text-xs text-ink-muted mt-1.5">{isMd5 ? 'Mínimo 1 - Máximo 5' : 'Mínimo 1 - Máximo 50'}</p>
           </FormField>
         )}
 

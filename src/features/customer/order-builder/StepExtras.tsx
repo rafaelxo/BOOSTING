@@ -34,7 +34,9 @@ export function StepExtras() {
 
   const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
-    : null
+    : serviceType === 'win_boost' || serviceType === 'md5'
+      ? 'solo_standard'
+      : null
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
 
   // Pacote de vitórias não existe no Master+ — o preço lá vem da tabela
@@ -93,7 +95,7 @@ export function StepExtras() {
       </p>
 
       <div className="space-y-6">
-        {serviceType !== 'elo_boost' ? null : !currentRank ? (
+        {!['elo_boost', 'win_boost', 'md5'].includes(serviceType ?? '') ? null : !currentRank ? (
           <p className="text-sm text-ink-muted text-center py-8">
             Selecione o rank atual na etapa anterior para ver os extras disponíveis.
           </p>

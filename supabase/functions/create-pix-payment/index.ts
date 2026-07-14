@@ -20,6 +20,10 @@ import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
+const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
+const SPLIT_START_TIMESTAMP = Number(Deno.env.get('LOL_SPLIT_START_TIMESTAMP') ?? '0')
+const RIOT_REGIONAL_ROUTE = 'americas'
+const RIOT_PLATFORM_ROUTE = 'br1'
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 // O contrato é diferente por fluxo (padrão vs. Master+) — cada um usa
@@ -71,7 +75,7 @@ const genericRankSchema = z.object({
 // Parse leve, só para decidir qual schema estrito aplicar em seguida. Não é
 // usado para nada além de roteamento.
 const routingSchema = z.object({
-  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching']),
+  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching', 'md5']),
   current_rank: genericRankSchema.nullable().optional(),
   boost_mode: z.enum(['solo', 'duo']).optional(),
 }).passthrough()
@@ -145,6 +149,20 @@ const otherServiceIntentSchema = z.object({
   booster_service_id: z.string().uuid().nullable().default(null),
 }).strict()
 
+const md5IntentSchema = z.object({
+  service_type: z.literal('md5'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
+  queue_type: z.enum(['solo_duo', 'flex']),
+  server: z.string().trim().min(2).max(16),
+  current_rank: genericRankSchema,
+  target_rank: genericRankSchema.nullable().default(null),
+  wins_purchased: z.number().int().min(1).max(5),
+  addon_codes: z.array(z.string().min(1)).max(10).default([]),
+  customer_notes: z.string().max(500).nullable().default(null),
+  riot_id: riotIdSchema,
+}).strict()
+
 const bodySchema = z.object({
   order_id: z.string().uuid().optional(),
   intent: z.record(z.unknown()).optional(),
@@ -185,6 +203,57 @@ interface NormalizedIntent {
 
 function badRequest(req: Request, message: string) {
   return errorResponse(req, message, 400)
+}
+
+const RIOT_QUEUE_TYPE = {
+  solo_duo: { leagueQueue: 'RANKED_SOLO_5x5', matchQueueId: 420 },
+  flex: { leagueQueue: 'RANKED_FLEX_SR', matchQueueId: 440 },
+} as const
+
+async function fetchRiotPuuid(riotId: string): Promise<{ found: boolean; puuid?: string }> {
+  const hashIdx = riotId.lastIndexOf('#')
+  const gameName = riotId.slice(0, hashIdx)
+  const tagLine = riotId.slice(hashIdx + 1)
+  const accountResp = await fetchWithTimeout(
+    `https://${RIOT_REGIONAL_ROUTE}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
+  )
+  if (accountResp.status === 404) return { found: false }
+  if (accountResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+  if (!accountResp.ok) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
+  const account = await accountResp.json() as { puuid?: string }
+  if (!account.puuid) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
+  return { found: true, puuid: account.puuid }
+}
+
+async function hasRankedEntry(puuid: string, queue: 'solo_duo' | 'flex'): Promise<boolean> {
+  const leagueResp = await fetchWithTimeout(
+    `https://${RIOT_PLATFORM_ROUTE}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
+    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
+  )
+  if (leagueResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+  if (!leagueResp.ok) throw new HttpError('Falha ao verificar elegibilidade MD5', 502)
+  const entries = await leagueResp.json() as { queueType?: string }[]
+  return Array.isArray(entries) && entries.some((entry) => entry.queueType === RIOT_QUEUE_TYPE[queue].leagueQueue)
+}
+
+async function fetchRankedMatchCountThisSplit(puuid: string, queue: 'solo_duo' | 'flex'): Promise<number | null> {
+  if (!Number.isFinite(SPLIT_START_TIMESTAMP) || SPLIT_START_TIMESTAMP <= 0) return null
+  const params = new URLSearchParams({
+    queue: String(RIOT_QUEUE_TYPE[queue].matchQueueId),
+    type: 'ranked',
+    startTime: String(Math.floor(SPLIT_START_TIMESTAMP)),
+    start: '0',
+    count: '5',
+  })
+  const matchResp = await fetchWithTimeout(
+    `https://${RIOT_REGIONAL_ROUTE}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?${params.toString()}`,
+    { headers: { 'X-Riot-Token': RIOT_API_KEY } },
+  )
+  if (matchResp.status === 429) throw new HttpError('Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+  if (!matchResp.ok) return null
+  const ids = await matchResp.json() as string[]
+  return Array.isArray(ids) ? ids.length : null
 }
 
 serve(async (req) => {
@@ -301,7 +370,9 @@ serve(async (req) => {
         ? masterPlusIntentSchema
         : flow
           ? standardEloIntentSchema
-          : otherServiceIntentSchema
+          : routed.data.service_type === 'md5'
+            ? md5IntentSchema
+            : otherServiceIntentSchema
 
       const parsedIntent = schema.safeParse(body.intent)
       if (!parsedIntent.success) {
@@ -386,8 +457,50 @@ serve(async (req) => {
           riotId: std.riot_id,
           boosterServiceId: null,
         }
+      } else if (routed.data.service_type === 'md5') {
+        const md5 = parsedIntent.data as z.infer<typeof md5IntentSchema>
+        normalized = {
+          serviceType: 'md5',
+          serviceId: md5.service_id,
+          gameId: md5.game_id,
+          queueType: md5.queue_type,
+          boostMode: 'solo',
+          server: md5.server,
+          currentRank: md5.current_rank as RankValue,
+          targetRank: null,
+          currentLp: 0,
+          avgLpGain: 20,
+          avgLpLoss: 15,
+          winsPurchased: md5.wins_purchased,
+          sessionsPurchased: null,
+          addonCodes: md5.addon_codes,
+          winPackage: null,
+          customerNotes: md5.customer_notes,
+          currentPdl: null,
+          avgPdlGain: null,
+          avgPdlLoss: null,
+          riotId: md5.riot_id,
+          boosterServiceId: null,
+        }
       } else {
         const other = parsedIntent.data as z.infer<typeof otherServiceIntentSchema>
+        if (other.service_type === 'win_boost') {
+          if (!other.current_rank) return badRequest(req, 'Rank atual é obrigatório para Vitórias')
+          if (!other.wins_purchased) return badRequest(req, 'Quantidade de vitórias é obrigatória')
+          if (other.win_package) return badRequest(req, 'Pacote de vitórias extras não é aceito em Vitórias')
+          if (other.booster_service_id) return badRequest(req, 'Pacote de coach não é aceito em Vitórias')
+        }
+        if (other.service_type === 'placement_matches') {
+          if (!other.current_rank) return badRequest(req, 'Rank final da última temporada é obrigatório para MD5 Completo')
+          if (other.wins_purchased || other.win_package) return badRequest(req, 'Vitórias não são aceitas em MD5 Completo')
+          if (other.booster_service_id) return badRequest(req, 'Pacote de coach não é aceito em MD5 Completo')
+        }
+        if (other.service_type === 'coaching') {
+          if (!other.booster_service_id) return badRequest(req, 'Selecione um pacote de coach')
+          if (other.current_rank || other.target_rank || other.wins_purchased || other.win_package) {
+            return badRequest(req, 'Ranks e vitórias não são aceitos em Coaching')
+          }
+        }
         normalized = {
           serviceType: other.service_type,
           serviceId: other.service_id,
@@ -421,6 +534,24 @@ serve(async (req) => {
       if (!service || !game || !service.is_active || !game.is_active
           || service.game_id !== game.id || service.type !== normalized.serviceType) {
         return badRequest(req, 'Serviço ou jogo inválido/inativo')
+      }
+
+      let md5MatchesRemaining: number | null = null
+      if (normalized.serviceType === 'md5') {
+        if (!RIOT_API_KEY) return errorResponse(req, 'Server misconfigured', 500)
+        if (!normalized.riotId) return badRequest(req, 'Riot ID é obrigatório para MD5')
+        if (!normalized.currentRank) return badRequest(req, 'Rank da última temporada é obrigatório para MD5')
+        if (!normalized.winsPurchased || normalized.winsPurchased < 1 || normalized.winsPurchased > 5) {
+          return badRequest(req, 'MD5 aceita apenas 1 a 5 vitórias')
+        }
+        if (normalized.winPackage) return badRequest(req, 'Pacote de vitórias extras não é aceito em MD5')
+        const account = await fetchRiotPuuid(normalized.riotId)
+        if (!account.found || !account.puuid) return badRequest(req, 'Conta Riot não encontrada')
+        if (await hasRankedEntry(account.puuid, normalized.queueType)) {
+          return badRequest(req, 'Conta já possui rank nesta fila — MD5 indisponível')
+        }
+        const playedCount = await fetchRankedMatchCountThisSplit(account.puuid, normalized.queueType)
+        md5MatchesRemaining = Math.max(0, 5 - (playedCount ?? 0))
       }
 
       // ── Coaching agora exige um pacote real de um booster (booster_services,
@@ -463,15 +594,19 @@ serve(async (req) => {
 
       if (hasDuplicateAddonCodes(normalized.addonCodes)) return badRequest(req, 'Addon duplicado')
 
-      if (flow) {
+      const addonFlow: BoostFlow | null = flow ?? (
+        normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard' : null
+      )
+
+      if (addonFlow) {
         for (const code of addonCodes) {
-          if (!isAddonCodeValidForFlow(flow, code)) return badRequest(req, `Addon inválido para este fluxo: ${code}`)
+          if (!isAddonCodeValidForFlow(addonFlow, code)) return badRequest(req, `Addon inválido para este fluxo: ${code}`)
         }
         if (addonCodes.length > 0) {
           const { data: rows, error: extraErr } = await serviceClient
             .from('service_extras')
             .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
-            .eq('flow', flow)
+            .eq('flow', addonFlow)
             .eq('is_active', true)
             .in('code', addonCodes)
           if (extraErr) return errorResponse(req, 'Failed to load extras', 500)
@@ -544,6 +679,7 @@ serve(async (req) => {
           preferred_booster_id: preferredBoosterId,
           riot_id: normalized.riotId,
           booster_service_id: normalized.boosterServiceId,
+          md5_matches_remaining: md5MatchesRemaining,
         })
         .select('id, customer_id, total_price, mp_payment_id')
         .single()

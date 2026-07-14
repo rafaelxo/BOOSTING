@@ -12,7 +12,7 @@ const WIN_TIERS: RankTier[] = [
   'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',
 ]
 
-const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emerald','diamond','master']
+const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger']
 
 function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string): string {
   if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
@@ -105,7 +105,17 @@ export function PricingPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-ink-muted mt-2">* Diamante IV→Mestre: 4 divs × R$75 = R$300 mínimo (solo) · R$450 em duo</p>
+          <div className="mt-3 grid sm:grid-cols-2 gap-3">
+            <div className="card p-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-ink">Mestre para Grão-mestre</span>
+              <span className="text-sm font-bold text-brand">{currency(899.90)}</span>
+            </div>
+            <div className="card p-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-ink">Grão-mestre para Challenger</span>
+              <span className="text-sm font-bold text-brand">{currency(1249.90)}</span>
+            </div>
+          </div>
+          <p className="text-xs text-ink-muted mt-2">Abaixo de Mestre: média menor que 20 LP/partida aplica +20%; entre 20 e 25 mantém o preço; acima de 25 aplica -5%.</p>
         </section>
 
         {/* ── Coaching ── */}
@@ -131,9 +141,9 @@ export function PricingPage() {
           </div>
         </section>
 
-        {/* ── MD5 — 5 Placements ── */}
+        {/* ── MD5 Completo — 5 Placements ── */}
         <section>
-          <h2 className="text-xl font-bold text-ink mb-1">MD5 — 5 Partidas de Posicionamento</h2>
+          <h2 className="text-xl font-bold text-ink mb-1">MD5 Completo — 5 Partidas de Posicionamento</h2>
           <p className="text-sm text-ink-secondary mb-4">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
@@ -160,6 +170,20 @@ export function PricingPage() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        {/* ── MD5 — Garantia de Win Rate (dentro de Vitórias) ── */}
+        <section>
+          <h2 className="text-xl font-bold text-ink mb-1">MD5 — Garantia de Win Rate</h2>
+          <p className="text-sm text-ink-secondary mb-4">
+            Ainda não jogou suas partidas de posicionamento? Compre vitórias com garantia de 80%+ de win rate -
+            disponível dentro do fluxo "Vitórias" ao criar seu pedido, com desconto sobre o preço padrão.
+          </p>
+          <Button asChild variant="secondary">
+            <Link to="/orders/new?service=win_boost">
+              Configurar em Vitórias <ChevronRight className="h-4 w-4" />
+            </Link>
+          </Button>
         </section>
 
         {/* ── Vitórias ── */}

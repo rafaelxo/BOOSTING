@@ -21,6 +21,9 @@ interface OrderBuilderState {
   winsPurchased: number | null
   sessionsPurchased: number | null
   customerNotes: string
+  isMd5: boolean
+  md5MatchesRemaining: number | null
+  md5MatchesRemainingCeiling: number | null
   // Ids (service_extras.id) dos addons selecionados — um Set, não um array de
   // clique: a ORDEM de exibição nunca vem daqui, sempre do catálogo (que já
   // chega ordenado por sort_order). Ver shared/boostDomain.ts::sortAddonsBySortOrder.
@@ -70,6 +73,9 @@ interface OrderBuilderState {
   setBoostMode: (mode: BoostMode) => void
   setServer: (server: string) => void
   setWinsPurchased: (wins: number) => void
+  setIsMd5: (isMd5: boolean) => void
+  setMd5MatchesRemaining: (n: number) => void
+  setMd5MatchesRemainingFromApi: (n: number) => void
   setSessionsPurchased: (sessions: number) => void
   setNotes: (notes: string) => void
   toggleExtra: (extraId: string) => void
@@ -106,6 +112,9 @@ const initialState = {
   winsPurchased: null,
   sessionsPurchased: null,
   customerNotes: '',
+  isMd5: false,
+  md5MatchesRemaining: null as number | null,
+  md5MatchesRemainingCeiling: null as number | null,
   selectedExtraIds: new Set<string>(),
   winPackage: null,
   preferredBoosterId: null,
@@ -116,8 +125,8 @@ const initialState = {
   avgLpGain: 20,
   avgLpLoss: 15,
   currentPdl: 0,
-  avgPdlGain: 22,
-  avgPdlLoss: 18,
+  avgPdlGain: 30,
+  avgPdlLoss: 30,
   basePrice: 0,
   extrasPrice: 0,
   estimatedHours: null,
@@ -149,7 +158,13 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   },
 
   setGame: (gameSlug, gameId) => set({ gameSlug, gameId }),
-  setService: (serviceType, serviceId) => set({ serviceType, serviceId }),
+  setService: (serviceType, serviceId) => set({
+    serviceType,
+    serviceId,
+    isMd5: serviceType === 'md5',
+    md5MatchesRemaining: serviceType === 'md5' ? null : null,
+    md5MatchesRemainingCeiling: serviceType === 'md5' ? null : null,
+  }),
 
   setCurrentRank: (currentRank) => set((state) => {
     const forcedMasterPlus = isMasterPlusCurrentTier(currentRank.tier)
@@ -195,6 +210,22 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
 
   setServer: (server) => set({ server }),
   setWinsPurchased: (winsPurchased) => set({ winsPurchased }),
+  setIsMd5: (isMd5) => set((state) => {
+    const serviceType = isMd5 ? 'md5' : 'win_boost'
+    return {
+      isMd5,
+      serviceType,
+      serviceId: serviceType,
+      winsPurchased: state.winsPurchased,
+      md5MatchesRemaining: isMd5 ? state.md5MatchesRemaining : null,
+      md5MatchesRemainingCeiling: isMd5 ? state.md5MatchesRemainingCeiling : null,
+    }
+  }),
+  setMd5MatchesRemaining: (md5MatchesRemaining) => set({ md5MatchesRemaining }),
+  setMd5MatchesRemainingFromApi: (n) => set({
+    md5MatchesRemaining: Math.max(0, Math.min(n, 5)),
+    md5MatchesRemainingCeiling: Math.max(0, Math.min(n, 5)),
+  }),
   setSessionsPurchased: (sessionsPurchased) => set({ sessionsPurchased }),
   setNotes: (customerNotes) => set({ customerNotes }),
 

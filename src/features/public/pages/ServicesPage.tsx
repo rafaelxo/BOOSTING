@@ -64,7 +64,7 @@ const SERVICES = [
   {
     icon: Trophy,
     slug: 'placement_matches',
-    title: 'MD5',
+    title: 'MD5 Completo',
     tagline: 'Comece a temporada no rank que você merece.',
     description:
       'Nossos profissionais jogam suas 5 partidas de posicionamento para garantir que você comece a temporada no rank mais alto possível. Inclui otimização de MMR.',

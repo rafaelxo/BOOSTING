@@ -11,7 +11,7 @@ import type { ServiceType } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
-const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches']
+const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches', 'md5']
 
 // Step components
 import { StepService } from '../order-builder/StepService'
@@ -39,14 +39,18 @@ const STEP_COMPONENTS: Record<OrderBuilderStep, React.ComponentType> = {
 export function OrderBuilderPage() {
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
-    selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType,
+    selectedExtraIds, currentRank, boostMode, gameSlug, gameId, serviceType,
     setGame, setService, setStep, reset, preferredBoosterName, setPreferredBooster,
-    selectedCoachPackage, setSelectedCoachPackage, setBasePrice, winsPurchased, riotId,
+    setSelectedCoachPackage, setBasePrice,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
 
-  const flow = serviceType === 'elo_boost' && currentRank ? getBoostFlow(currentRank.tier, boostMode) : null
+  const flow = serviceType === 'elo_boost' && currentRank
+    ? getBoostFlow(currentRank.tier, boostMode)
+    : serviceType === 'win_boost' || serviceType === 'md5'
+      ? 'solo_standard'
+      : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache.
   const { data: addonData } = useBoostAddons(flow)
   const addonCatalog = addonData ?? EMPTY_ADDONS
@@ -184,14 +188,6 @@ export function OrderBuilderPage() {
                 </Button>
                 <Button
                   onClick={nextStep}
-                  disabled={!isStepComplete(step, {
-                    serviceType,
-                    selectedCoachPackageId: selectedCoachPackage?.id ?? null,
-                    currentRank,
-                    targetRank,
-                    winsPurchased,
-                    riotId,
-                  })}
                   rightIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Continuar
@@ -286,31 +282,4 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <span className="text-ink font-medium">{value}</span>
     </div>
   )
-}
-
-function isValidRiotId(riotId: string): boolean {
-  const trimmed = riotId.trim()
-  const hashIdx = trimmed.lastIndexOf('#')
-  return hashIdx > 0 && hashIdx < trimmed.length - 1
-}
-
-function isStepComplete(
-  step: OrderBuilderStep,
-  state: {
-    serviceType: ServiceType | null
-    selectedCoachPackageId: string | null
-    currentRank: unknown | null
-    targetRank: unknown | null
-    winsPurchased: number | null
-    riotId: string
-  }
-) {
-  if (step === 'service') return !!state.serviceType
-  if (step === 'configure') {
-    if (state.serviceType === 'elo_boost') return !!state.currentRank && !!state.targetRank && isValidRiotId(state.riotId)
-    if (state.serviceType === 'win_boost') return !!state.currentRank && !!state.winsPurchased
-    if (state.serviceType === 'placement_matches') return !!state.currentRank
-    if (state.serviceType === 'coaching') return !!state.selectedCoachPackageId
-  }
-  return true
 }

@@ -20,7 +20,7 @@ export type RankTier =
 
 export type Division = 'I' | 'II' | 'III' | 'IV'
 
-export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching'
+export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
 
 export const RANK_TIER_ORDER: RankTier[] = [
   'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
@@ -115,11 +115,24 @@ export function getWinBoostPrice(tier: RankTier, _div: Division | null): number 
 // Pacotes de vitórias oferecidos no StepExtras (desconto sobre o preço unitário)
 export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
 
+// ── MD5 — garantia de win rate nas placements restantes ───────────────────────
+// Valores oficiais por vitória líquida, fornecidos pela regra comercial.
+export const MD5_WIN_PRICE_PER_TIER: Record<string, number> = {
+  iron: 0.87, bronze: 0.87, silver: 1.17, gold: 1.17,
+  platinum: 2.07, emerald: 2.97,
+  diamond: 4.77,
+  master: 13.47, grandmaster: 17.97, challenger: 29.97,
+}
+
+export function getMd5WinPrice(tier: RankTier): number {
+  return MD5_WIN_PRICE_PER_TIER[tier] ?? 4.38
+}
+
 // ── MD5 — 5 Placement Matches ─────────────────────────────────────────────────
 export const PLACEMENT_PRICE: Record<string, number> = {
   iron: 14.90, bronze: 16.90, silver: 18.90, gold: 21.90,
   platinum: 30.90, emerald: 37.90, diamond: 41.90,
-  master: 59.90, grandmaster: 59.90, challenger: 59.90,
+  master: 59.90, grandmaster: 99.90, challenger: 179.90,
 }
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
@@ -140,20 +153,18 @@ export function applyLpModifier(
   basePrice: number,
   fTier: RankTier,
   currentLp: number,
-  avgLpGain: number,
-  avgLpLoss: number,
+  avgLpPerGame: number,
+  _avgLpLoss?: number,
 ): number {
   if (basePrice <= 0) return 0
-  if (![currentLp, avgLpGain, avgLpLoss].every(Number.isFinite)
-      || currentLp < 0 || currentLp > 100 || avgLpGain <= 0 || avgLpLoss <= 0) {
+  if (![currentLp, avgLpPerGame].every(Number.isFinite)
+      || currentLp < 0 || currentLp > 100 || avgLpPerGame <= 0) {
     throw new RangeError('Invalid LP values')
   }
   const baseCents = moneyToCents(basePrice)
   const divPriceCents = moneyToCents(ELO_DIV_PRICE[fTier] ?? 0)
   const lpDiscountCents = Math.round(currentLp * divPriceCents / 100)
-  const total = avgLpGain + avgLpLoss
-  const winRate = total > 0 ? avgLpGain / total : 0.5
-  const efficiencyMod = 1 + (0.5 - winRate) * 0.15
+  const efficiencyMod = avgLpPerGame < 20 ? 1.2 : avgLpPerGame > 25 ? 0.95 : 1
   return centsToMoney(Math.max(0, Math.round((baseCents - lpDiscountCents) * efficiencyMod)))
 }
 
@@ -254,6 +265,13 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     case 'win_boost': {
       if (!input.winsPurchased || !input.currentRank) break
       const pricePerWin = getWinBoostPrice(input.currentRank.tier, input.currentRank.division)
+      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
+      estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
+      break
+    }
+    case 'md5': {
+      if (!input.winsPurchased || input.winsPurchased < 1 || input.winsPurchased > 5 || !input.currentRank) break
+      const pricePerWin = getMd5WinPrice(input.currentRank.tier)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
       estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
       break
