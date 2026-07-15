@@ -54,3 +54,6 @@ supabase/functions/.env.local
 docs/
 .claude/
 .agents/
+
+.vercel
+.env*
