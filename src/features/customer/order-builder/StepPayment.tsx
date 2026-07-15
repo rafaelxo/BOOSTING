@@ -10,7 +10,7 @@ import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
 import { getCustomerOrderState } from '@/lib/customerOrderState'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw, Plus } from 'lucide-react'
+import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -25,11 +25,12 @@ type PixPaymentResponse = {
   success?: boolean
   order_id: string
   total_price: number
-  payment_id: string | number
+  payment_id?: string | number
   qr_code?: string
   qr_code_base64?: string | null
   expires_at: string
   reused?: boolean
+  saved?: boolean
 }
 
 function pixErrorMessage(err: unknown) {
@@ -79,13 +80,19 @@ export function StepPayment() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
+  const pendingOrderId = searchParams.get('order')
   const currency = useCurrency()
   const [pix, setPix] = useState<PixState>({ phase: 'idle' })
   const [copied, setCopied] = useState(false)
+  const [savedOrderId, setSavedOrderId] = useState<string | null>(pendingOrderId)
+  const [savedTotalPrice, setSavedTotalPrice] = useState<number | null>(null)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
   const restoredOrderRef = useRef<string | null>(null)
-  const pendingOrderId = searchParams.get('order')
+  const autoSaveStartedRef = useRef(false)
+  const expiryHandledRef = useRef(false)
 
   const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
@@ -101,12 +108,13 @@ export function StepPayment() {
     .filter(e => store.selectedExtraIds.has(e.id))
     .map(e => e.code)
     .filter((code): code is string => !!code)
+  const addonsReady = store.selectedExtraIds.size === 0 || addonData !== undefined
 
   // Estimativa exibida antes de gerar o PIX (mesma conta que StepReview já
   // mostrou ao cliente). O valor cobrado de fato é sempre o que a Edge
   // Function retorna, recomputado no servidor a partir de shared/pricing.ts.
   const estimatedTotal = store.basePrice + store.extrasPrice
-  const totalPrice = pix.phase === 'waiting' ? pix.total_price : estimatedTotal
+  const totalPrice = pix.phase === 'waiting' ? pix.total_price : savedTotalPrice ?? estimatedTotal
 
   // OrderBuilder.tsx grava store.gameId/serviceId com o slug/tipo cru
   // ('lol', 'win_boost') até resolver os uuids reais de catálogo em segundo
@@ -119,13 +127,37 @@ export function StepPayment() {
   const expiresAt = pix.phase === 'waiting' ? pix.expires_at : null
   const { remaining, label: countdownLabel } = useCountdown(expiresAt)
 
-  // When countdown hits 0, mark as expired (preserve order_id for retry)
+  // At the provider expiration timestamp, cancel/delete the unpaid checkout
+  // through the authenticated backend and return the configurator to step 1.
   useEffect(() => {
-    if (pix.phase === 'waiting' && remaining === 0) {
+    if (pix.phase === 'waiting' && remaining === 0 && !expiryHandledRef.current) {
+      expiryHandledRef.current = true
       const orderId = pix.order_id
-      idempotencyKeyRef.current = crypto.randomUUID()
       setPix({ phase: 'expired', order_id: orderId })
       stopPolling()
+
+      void invokeEdgeFunction('cancel-pending-order', {
+        body: { order_id: orderId },
+        timeoutMs: 20_000,
+        requireAuth: true,
+      }).catch(async () => {
+        // A confirmation can race the final second of the countdown. Never
+        // discard a payment that the backend already marked as approved.
+        const state = await getCustomerOrderState(orderId).catch(() => null)
+        if (state?.payment_confirmed) {
+          const requiresCredentials = state.requires_credentials === true
+          setPix({ phase: 'confirmed' })
+          store.reset()
+          navigate(`/orders/${orderId}${requiresCredentials ? '#credentials' : ''}`, { replace: true })
+          return true
+        }
+        return false
+      }).then((paymentConfirmed) => {
+        if (paymentConfirmed === true) return
+        queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+        queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
+        startNewOrder()
+      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining, pix.phase])
@@ -155,6 +187,101 @@ export function StepPayment() {
 
 
   useEffect(() => () => stopPolling(), [])
+
+  function buildIntent(): Record<string, unknown> {
+    const base = {
+      service_type: store.serviceType,
+      service_id: store.serviceId!,
+      game_id: store.gameId!,
+      queue_type: store.queueType,
+      server: store.server,
+      current_rank: store.currentRank,
+      customer_notes: store.customerNotes || null,
+    }
+
+    if (store.serviceType === 'elo_boost') {
+      return flow === 'master_plus'
+        ? {
+            ...base,
+            target_rank: store.targetRank,
+            boost_mode: 'solo',
+            addon_codes: addonCodes,
+            riot_id: store.riotId,
+          }
+        : {
+            ...base,
+            target_rank: store.targetRank,
+            boost_mode: store.boostMode,
+            addon_codes: addonCodes,
+            win_package: store.winPackage,
+            riot_id: store.riotId,
+          }
+    }
+
+    if (store.serviceType === 'md5') {
+      return {
+        ...base,
+        wins_purchased: store.winsPurchased,
+        riot_id: store.riotId,
+      }
+    }
+
+    return {
+      ...base,
+      target_rank: store.targetRank,
+      boost_mode: store.boostMode,
+      wins_purchased: store.winsPurchased,
+      sessions_purchased: store.sessionsPurchased,
+      addon_codes: addonCodes,
+      win_package: store.winPackage,
+      booster_service_id: store.selectedCoachPackage?.id ?? null,
+      riot_id: store.serviceType === 'win_boost' ? store.riotId : null,
+    }
+  }
+
+  async function persistPendingOrder(): Promise<string | null> {
+    if (!profile || !catalogReady || !addonsReady) return null
+    if (savedOrderId) return savedOrderId
+
+    setIsSavingOrder(true)
+    setSaveError(null)
+    try {
+      const saved = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
+        body: {
+          intent: buildIntent(),
+          idempotency_key: idempotencyKeyRef.current,
+          preferred_booster_id: store.preferredBoosterId ?? undefined,
+          save_only: true,
+        },
+        timeoutMs: 25_000,
+        requireAuth: true,
+      })
+      restoredOrderRef.current = saved.order_id
+      setSavedOrderId(saved.order_id)
+      setSavedTotalPrice(Number(saved.total_price))
+      setSearchParams({ order: saved.order_id }, { replace: true })
+      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
+      return saved.order_id
+    } catch (err) {
+      setSaveError(pixErrorMessage(err))
+      return null
+    } finally {
+      setIsSavingOrder(false)
+    }
+  }
+
+  // Ao entrar na etapa de pagamento, salva a configuração antes de qualquer
+  // interação com o Mercado Pago. Assim ela aparece imediatamente em Meus
+  // pedidos como "Aguardando pagamento".
+  useEffect(() => {
+    if (!profile || pendingOrderId || !catalogReady || !addonsReady || autoSaveStartedRef.current) return
+    autoSaveStartedRef.current = true
+    void persistPendingOrder()
+  // A configuração já está congelada ao entrar nesta etapa. Evitamos repetir
+  // o insert quando queries de catálogo atualizam o componente.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, pendingOrderId, catalogReady, addonsReady])
 
   // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
@@ -215,23 +342,37 @@ export function StepPayment() {
     startPolling(orderId)
   }
 
-  // Recupera a mesma cobrança quando o usuário volta ao configurador. O id
-  // vem da URL, que por sua vez é restaurada a partir do pedido persistido no
-  // banco por OrderBuilderPage — não dependemos de estado React/localStorage.
+  // Recupera os dados do pedido sem gerar PIX. A cobrança continua dependendo
+  // de clique explícito em "Gerar PIX".
   useEffect(() => {
     if (!profile || !pendingOrderId || restoredOrderRef.current === pendingOrderId) return
     restoredOrderRef.current = pendingOrderId
-    setPix({ phase: 'generating' })
-    void invokePix({ order_id: pendingOrderId })
-  // invokePix usa apenas o id restaurado e o estado estável da sessão nesta
-  // inicialização; incluí-la nas deps recriaria a cobrança a cada render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSavedOrderId(pendingOrderId)
+    setIsSavingOrder(true)
+    void invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
+      body: { order_id: pendingOrderId, save_only: true },
+      timeoutMs: 20_000,
+      requireAuth: true,
+    }).then((saved) => {
+      setSavedTotalPrice(Number(saved.total_price))
+    }).catch((err) => {
+      setSaveError(pixErrorMessage(err))
+    }).finally(() => {
+      setIsSavingOrder(false)
+    })
   }, [pendingOrderId, profile])
 
   function startNewOrder() {
     stopPolling()
     store.reset()
     store.setStep('service')
+    setSavedOrderId(null)
+    setSavedTotalPrice(null)
+    setSaveError(null)
+    setPix({ phase: 'idle' })
+    idempotencyKeyRef.current = crypto.randomUUID()
+    autoSaveStartedRef.current = false
+    expiryHandledRef.current = false
     setSearchParams({ new: '1' }, { replace: true })
   }
 
@@ -244,80 +385,12 @@ export function StepPayment() {
       return
     }
 
-    // Retry an errored attempt by order id. An expired PIX starts a fresh
-    // order because Mercado Pago idempotency is scoped to the previous order.
-    const existingOrderId =
-      pix.phase === 'error' ? pix.order_id :
-      null
-
-    setPix({ phase: 'generating' })
-
     try {
-      if (existingOrderId) {
-        await invokePix({ order_id: existingOrderId })
-        return
-      }
-
-      const base = {
-        service_type: store.serviceType,
-        service_id: store.serviceId!,   // guarded by catalogReady above — never a raw slug here
-        game_id: store.gameId!,
-        queue_type: store.queueType,
-        server: store.server,
-        current_rank: store.currentRank,
-        customer_notes: store.customerNotes || null,
-      }
-
-      // O contrato é diferente por fluxo — Master+ não tem PDL alvo, LP,
-      // pacote de vitórias nem Duo; o fluxo padrão não tem PDL atual/médias
-      // de PDL. MD5 tem um contrato próprio: leva Riot ID e vitórias, mas não
-      // target_rank/addons/LP nenhum. `flow` aqui só serve pra decidir o
-      // catálogo de addons (StepExtras já reaproveita 'solo_standard' para
-      // win_boost/md5) — nunca para decidir o FORMATO do intent: usar `flow`
-      // pra isso já causou um bug real (toda ordem de Vitórias/MD5 caía no
-      // formato de elo_boost padrão, sem wins_purchased, e era rejeitada pelo
-      // backend com 400 em 100% dos casos). O formato do payload é decidido
-      // sempre por `store.serviceType` diretamente.
-      const intent = store.serviceType === 'elo_boost'
-        ? (flow === 'master_plus'
-            ? {
-                ...base,
-                target_rank: store.targetRank,
-                boost_mode: 'solo',
-                addon_codes: addonCodes,
-                riot_id: store.riotId,
-              }
-            : {
-                ...base,
-                target_rank: store.targetRank,
-                boost_mode: store.boostMode,
-                addon_codes: addonCodes,
-                win_package: store.winPackage,
-                riot_id: store.riotId,
-              })
-        : store.serviceType === 'md5'
-          ? {
-              ...base,
-              wins_purchased: store.winsPurchased,
-              riot_id: store.riotId,
-            }
-          : {
-              ...base,
-              target_rank: store.targetRank,
-              boost_mode: store.boostMode,
-              wins_purchased: store.winsPurchased,
-              sessions_purchased: store.sessionsPurchased,
-              addon_codes: addonCodes,
-              win_package: store.winPackage,
-              booster_service_id: store.selectedCoachPackage?.id ?? null,
-              riot_id: store.serviceType === 'win_boost' ? store.riotId : null,
-            }
-
-      await invokePix({
-        intent,
-        idempotency_key: idempotencyKeyRef.current,
-        preferred_booster_id: store.preferredBoosterId ?? undefined,
-      })
+      const erroredOrderId = pix.phase === 'error' ? pix.order_id : undefined
+      const orderId = erroredOrderId ?? savedOrderId ?? pendingOrderId ?? await persistPendingOrder()
+      if (!orderId) return
+      setPix({ phase: 'generating' })
+      await invokePix({ order_id: orderId })
     } catch (err) {
       setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }
@@ -351,13 +424,7 @@ export function StepPayment() {
           <Clock className="h-8 w-8 text-danger" />
         </div>
         <h2 className="text-xl font-bold text-ink">PIX Expirado</h2>
-        <p className="text-sm text-ink-secondary">O tempo de 30 minutos acabou. Gere um novo PIX para continuar.</p>
-        <Button onClick={generatePix} leftIcon={<RefreshCw className="h-4 w-4" />}>
-          Gerar Novo PIX
-        </Button>
-        <Button variant="secondary" onClick={startNewOrder} leftIcon={<Plus className="h-4 w-4" />}>
-          Configurar novo pedido
-        </Button>
+        <p className="text-sm text-ink-secondary">O pedido não foi pago e está sendo cancelado. Reiniciando o configurador…</p>
       </div>
     )
   }
@@ -488,28 +555,39 @@ export function StepPayment() {
       </div>
 
       {pix.phase === 'error' && <ErrorAlert message={pix.message} />}
+      {saveError && pix.phase !== 'error' && <ErrorAlert message={saveError} />}
+
+      {savedOrderId && !saveError && (
+        <p className="text-xs text-success text-center">
+          Pedido salvo em Meus pedidos como Aguardando pagamento.
+        </p>
+      )}
 
       <Button
         size="lg"
         className="w-full"
         loading={pix.phase === 'generating'}
         onClick={generatePix}
-        disabled={totalPrice <= 0 || !catalogReady}
+        disabled={totalPrice <= 0 || !catalogReady || !addonsReady || isSavingOrder}
         leftIcon={<QrCode className="h-5 w-5" />}
       >
-        {!catalogReady ? 'Carregando catálogo…' : pix.phase === 'generating' ? 'Gerando PIX…' : `Gerar PIX — ${currency(totalPrice)}`}
+        {!catalogReady || !addonsReady
+          ? 'Carregando catálogo…'
+          : isSavingOrder
+            ? 'Salvando pedido…'
+            : pix.phase === 'generating'
+              ? 'Gerando PIX…'
+              : `Gerar PIX — ${currency(totalPrice)}`}
       </Button>
 
-      {pendingOrderId && pix.phase === 'error' && (
-        <Button
-          className="w-full"
-          variant="secondary"
-          onClick={startNewOrder}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          Configurar novo pedido
-        </Button>
-      )}
+      <Button
+        className="w-full"
+        variant="secondary"
+        onClick={startNewOrder}
+        leftIcon={<Plus className="h-4 w-4" />}
+      >
+        Configurar novo pedido
+      </Button>
 
       {totalPrice <= 0 && (
         <p className="text-xs text-danger text-center">Configure seu pedido para ver o preço.</p>

@@ -24,7 +24,6 @@ export function OrderHistoryPage() {
     { label: t('customer.history.filters.all'),       value: 'all'        },
     { label: t('customer.history.filters.active'),    value: 'in_progress'},
     { label: t('customer.history.filters.completed'), value: 'completed'  },
-    { label: t('customer.history.filters.canceled'),  value: 'canceled'   },
   ]
 
   const { data: orders, isLoading } = useQuery({
@@ -34,6 +33,7 @@ export function OrderHistoryPage() {
         .from('orders')
         .select(ORDER_SAFE_COLUMNS)
         .eq('customer_id', profile!.id)
+        .neq('status', 'canceled')
         .order('created_at', { ascending: false })
         .limit(100)
       if (error) throw error

@@ -35,6 +35,16 @@ CREATE TYPE "public"."booster_status" AS ENUM (
 ALTER TYPE "public"."booster_status" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."game_slug" AS ENUM (
+    'lol',
+    'valorant',
+    'tft'
+);
+
+
+ALTER TYPE "public"."game_slug" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."order_status" AS ENUM (
     'draft',
     'awaiting_payment',
@@ -100,6 +110,29 @@ CREATE TYPE "public"."service_type" AS ENUM (
 ALTER TYPE "public"."service_type" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."ticket_priority" AS ENUM (
+    'low',
+    'medium',
+    'high',
+    'urgent'
+);
+
+
+ALTER TYPE "public"."ticket_priority" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."ticket_status" AS ENUM (
+    'open',
+    'in_progress',
+    'waiting_customer',
+    'resolved',
+    'closed'
+);
+
+
+ALTER TYPE "public"."ticket_status" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."user_role" AS ENUM (
     'customer',
     'booster',
@@ -112,7 +145,7 @@ ALTER TYPE "public"."user_role" OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_user_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
@@ -180,13 +213,15 @@ ALTER FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_use
 
 
 CREATE OR REPLACE FUNCTION "public"."admin_dashboard_stats"() RETURNS "jsonb"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
 declare
   v_total_revenue numeric;
   v_active_orders integer;
   v_pending_boosters integer;
+  v_open_tickets integer;
+  v_urgent_tickets integer;
   v_recent_orders jsonb;
   v_daily_orders jsonb;
 begin
@@ -202,6 +237,12 @@ begin
 
   select count(*) into v_pending_boosters
   from public.booster_profiles where status in ('pending', 'under_review');
+
+  select count(*) into v_open_tickets
+  from public.support_tickets where status = 'open';
+
+  select count(*) into v_urgent_tickets
+  from public.support_tickets where priority = 'urgent';
 
   select coalesce(jsonb_agg(t), '[]'::jsonb) into v_recent_orders from (
     select id, status, total_price, created_at
@@ -222,6 +263,8 @@ begin
     'total_revenue', v_total_revenue,
     'active_orders_count', v_active_orders,
     'pending_boosters_count', v_pending_boosters,
+    'open_tickets_count', v_open_tickets,
+    'urgent_tickets_count', v_urgent_tickets,
     'recent_orders', v_recent_orders,
     'daily_orders', v_daily_orders
   );
@@ -234,7 +277,7 @@ ALTER FUNCTION "public"."admin_dashboard_stats"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text" DEFAULT 'Admin override'::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
@@ -267,53 +310,9 @@ $$;
 ALTER FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."admin_set_order_chat_lock"("p_order_id" "uuid", "p_locked" boolean) RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-declare
-  v_user_id uuid := auth.uid();
-begin
-  if v_user_id is null then
-    return jsonb_build_object('success', false, 'code', 'not_authenticated', 'message', 'Sessao nao autenticada.');
-  end if;
-
-  if not public.is_admin() then
-    return jsonb_build_object('success', false, 'code', 'forbidden', 'message', 'Apenas administradores podem controlar o chat.');
-  end if;
-
-  update public.orders
-  set chat_locked = p_locked,
-      chat_locked_by = case when p_locked then v_user_id else null end,
-      chat_locked_at = case when p_locked then now() else null end,
-      updated_at = now()
-  where id = p_order_id;
-
-  if not found then
-    return jsonb_build_object('success', false, 'code', 'order_not_found', 'message', 'Pedido nao encontrado.');
-  end if;
-
-  insert into public.audit_logs(actor_id, actor_role, action, entity_type, entity_id, diff)
-  values (
-    v_user_id,
-    'admin'::public.user_role,
-    case when p_locked then 'order_chat_locked' else 'order_chat_unlocked' end,
-    'order',
-    p_order_id,
-    jsonb_build_object('chat_locked', p_locked)
-  );
-
-  return jsonb_build_object('success', true, 'chat_locked', p_locked);
-end;
-$$;
-
-
-ALTER FUNCTION "public"."admin_set_order_chat_lock"("p_order_id" "uuid", "p_locked" boolean) OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_actor record;
@@ -354,9 +353,32 @@ $$;
 ALTER FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."assign_ticket"("p_ticket_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if not public.is_admin() then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  update public.support_tickets
+  set assigned_to = auth.uid(), status = 'in_progress', updated_at = now()
+  where id = p_ticket_id;
+
+  if not found then return jsonb_build_object('success', false, 'error', 'ticket_not_found'); end if;
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."assign_ticket"("p_ticket_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") RETURNS TABLE("solo_count" integer, "duo_count" integer, "total_count" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if auth.uid() is distinct from p_booster_user_id and not public.is_admin() then
@@ -379,23 +401,9 @@ $$;
 ALTER FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."booster_heartbeat"() RETURNS "void"
-    LANGUAGE "sql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
-    AS $$
-  update public.booster_profiles
-     set last_active_at = now()
-   where user_id = auth.uid()
-     and status = 'approved';
-$$;
-
-
-ALTER FUNCTION "public"."booster_heartbeat"() OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if auth.uid() is distinct from p_booster_user_id and not public.is_admin() then
@@ -415,9 +423,23 @@ $$;
 ALTER FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."booster_heartbeat"() RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'extensions'
+    AS $$
+  update public.booster_profiles
+     set last_active_at = now()
+   where user_id = auth.uid()
+     and status = 'approved';
+$$;
+
+
+ALTER FUNCTION "public"."booster_heartbeat"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."booster_payout_summary"("p_booster_user_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_total_earned numeric;
@@ -453,7 +475,7 @@ ALTER FUNCTION "public"."booster_payout_summary"("p_booster_user_id" "uuid") OWN
 
 CREATE OR REPLACE FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "p_boost_mode" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_is_top5         boolean;
@@ -520,7 +542,7 @@ ALTER FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "
 
 CREATE OR REPLACE FUNCTION "public"."check_own_write_rate_limit"("p_scope" "text", "p_limit" integer, "p_window_seconds" integer) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_uid uuid := auth.uid();
@@ -538,28 +560,9 @@ $$;
 ALTER FUNCTION "public"."check_own_write_rate_limit"("p_scope" "text", "p_limit" integer, "p_window_seconds" integer) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."clear_terminal_order_credentials"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
-    AS $$
-begin
-  if new.status in ('completed', 'canceled', 'refunded', 'disputed')
-     or new.payment_status is distinct from 'paid'::public.payment_status then
-    new.game_credentials := null;
-    new.credentials_set := false;
-    new.credential_expires_at := null;
-  end if;
-  return new;
-end;
-$$;
-
-
-ALTER FUNCTION "public"."clear_terminal_order_credentials"() OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."complete_verified_order"("p_order_id" "uuid", "p_fetched_tier" "text", "p_fetched_division" "text", "p_requested_by" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
@@ -616,7 +619,7 @@ ALTER FUNCTION "public"."complete_verified_order"("p_order_id" "uuid", "p_fetche
 
 CREATE OR REPLACE FUNCTION "public"."consume_edge_rate_limit"("p_scope" "text", "p_subject" "text", "p_limit" integer, "p_window_seconds" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $_$
 declare
   v_row public.edge_rate_limits%rowtype;
@@ -656,7 +659,7 @@ ALTER FUNCTION "public"."consume_edge_rate_limit"("p_scope" "text", "p_subject" 
 
 CREATE OR REPLACE FUNCTION "public"."current_user_role"() RETURNS "public"."user_role"
     LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
   select role from public.profiles where id = auth.uid()
 $$;
@@ -667,7 +670,7 @@ ALTER FUNCTION "public"."current_user_role"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."ensure_profile_exists"("p_display_name" "text" DEFAULT NULL::"text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_email      text;
@@ -717,13 +720,29 @@ ALTER FUNCTION "public"."ensure_profile_exists"("p_display_name" "text") OWNER T
 
 CREATE OR REPLACE FUNCTION "public"."expire_stale_pix_orders"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
-  update public.orders
-  set status = 'canceled', updated_at = now()
-  where status = 'awaiting_payment'
-    and created_at < now() - interval '35 minutes';
+  with expired as (
+    update public.orders o
+    set status = 'canceled', updated_at = now()
+    where o.status = 'awaiting_payment'
+      and o.mp_payment_id is not null
+      and exists (
+        select 1
+        from public.payments p
+        where p.order_id = o.id
+          and p.mp_payment_id = o.mp_payment_id
+          and p.status = 'pending'
+          and p.created_at < now() - interval '35 minutes'
+      )
+    returning o.id, o.customer_id
+  )
+  insert into public.order_status_history(order_id, from_status, to_status, changed_by, reason)
+  select
+    id, 'awaiting_payment', 'canceled', customer_id,
+    'PIX expirado sem confirmação de pagamento'
+  from expired;
 end;
 $$;
 
@@ -733,7 +752,7 @@ ALTER FUNCTION "public"."expire_stale_pix_orders"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_account   record;
@@ -800,189 +819,41 @@ $$;
 ALTER FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_order_chat"("p_order_id" "uuid") RETURNS "jsonb"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-declare
-  v_user_id uuid := auth.uid();
-  v_role public.user_role;
-  v_order public.orders%rowtype;
-  v_messages jsonb := '[]'::jsonb;
-begin
-  if v_user_id is null then
-    return jsonb_build_object('success', false, 'code', 'not_authenticated', 'message', 'Sessao nao autenticada.');
-  end if;
-
-  v_role := public.current_user_role();
-  if v_role is null then
-    return jsonb_build_object('success', false, 'code', 'profile_not_found', 'message', 'Perfil de usuario nao encontrado.');
-  end if;
-
-  select * into v_order from public.orders where id = p_order_id;
-
-  if not found or not (
-    v_role = 'admin'::public.user_role
-    or v_order.customer_id = v_user_id
-    or v_order.assigned_booster_id = v_user_id
-  ) then
-    return jsonb_build_object('success', false, 'code', 'order_not_found', 'message', 'Pedido nao encontrado.');
-  end if;
-
-  if v_order.assigned_booster_id is not null then
-    select coalesce(jsonb_agg(row_data order by row_data->>'created_at'), '[]'::jsonb)
-    into v_messages
-    from (
-      select jsonb_build_object(
-        'id', m.id,
-        'order_id', m.order_id,
-        'sender_id', m.sender_id,
-        'sender_role', m.sender_role,
-        'sender_name', case
-          when m.sender_role = 'admin'::public.user_role then coalesce(p.username, 'Administrador')
-          when m.sender_role = 'booster'::public.user_role then coalesce(bp.display_name, p.username, 'Booster')
-          else coalesce(p.username, 'Cliente')
-        end,
-        'sender_avatar_url', p.avatar_url,
-        'content', m.content,
-        'created_at', m.created_at
-      ) as row_data
-      from (
-        select om.*
-        from public.order_messages om
-        where om.order_id = p_order_id
-        order by om.created_at desc
-        limit 300
-      ) m
-      join public.profiles p on p.id = m.sender_id
-      left join public.booster_profiles bp
-        on bp.user_id = m.sender_id
-       and m.sender_role = 'booster'::public.user_role
-    ) messages;
-  end if;
-
-  return jsonb_build_object(
-    'success', true,
-    'chat_available', v_order.assigned_booster_id is not null,
-    'chat_locked', v_order.chat_locked,
-    'chat_locked_at', v_order.chat_locked_at,
-    'can_send',
-      v_order.assigned_booster_id is not null
-      and (v_role = 'admin'::public.user_role or not v_order.chat_locked),
-    'messages', v_messages
-  );
-end;
-$$;
-
-
-ALTER FUNCTION "public"."get_order_chat"("p_order_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid" DEFAULT NULL::"uuid") RETURNS "jsonb"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-declare
-  v_customer_id uuid := auth.uid();
-  v_order record;
-  v_requires_credentials boolean;
-  v_is_active_paid boolean;
-begin
-  if v_customer_id is null then
-    return jsonb_build_object('success', false, 'error', 'unauthorized');
-  end if;
-
-  if p_order_id is null then
-    select id, status, payment_status, service_type, boost_mode, credentials_set
-    into v_order
-    from public.orders
-    where customer_id = v_customer_id and status = 'awaiting_payment'
-    order by created_at desc limit 1;
-    if not found then
-      return jsonb_build_object('success', true, 'order_id', null);
-    end if;
-  else
-    select id, status, payment_status, service_type, boost_mode, credentials_set
-    into v_order
-    from public.orders
-    where id = p_order_id and customer_id = v_customer_id;
-    if not found then
-      return jsonb_build_object('success', false, 'error', 'order_not_found');
-    end if;
-  end if;
-
-  v_requires_credentials := public.order_requires_access_token(v_order.service_type, v_order.boost_mode);
-  v_is_active_paid := v_order.payment_status = 'paid'::public.payment_status
-    and v_order.status in ('awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer');
-
-  return jsonb_build_object(
-    'success', true,
-    'order_id', v_order.id,
-    'status', v_order.status,
-    'payment_status', v_order.payment_status,
-    'can_pay', v_order.status = 'awaiting_payment'
-      and coalesce(v_order.payment_status, 'pending'::public.payment_status) = 'pending'::public.payment_status,
-    'payment_confirmed', v_is_active_paid,
-    'requires_credentials', v_requires_credentials,
-    'credentials_set', v_order.credentials_set,
-    'can_submit_credentials', v_is_active_paid and v_requires_credentials
-  );
-end;
-$$;
-
-
-ALTER FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
-  v_requester uuid := auth.uid();
 begin
-  if v_requester is null then
-    return jsonb_build_object('success', false, 'error', 'unauthorized');
-  end if;
-
-  select id, customer_id, assigned_booster_id, status, payment_status,
-         service_type, boost_mode, game_credentials, credentials_set,
-         credential_expires_at
-  into v_order
-  from public.orders
-  where id = p_order_id;
+  select id, assigned_booster_id, status, service_type, boost_mode, game_credentials, credentials_set
+  into   v_order
+  from   public.orders
+  where  id = p_order_id;
 
   if not found then
     return jsonb_build_object('success', false, 'error', 'order_not_found');
   end if;
 
-  if v_requester is distinct from v_order.customer_id
-     and v_requester is distinct from v_order.assigned_booster_id then
+  if auth.uid() is distinct from v_order.assigned_booster_id and not public.is_admin() then
     return jsonb_build_object('success', false, 'error', 'unauthorized');
-  end if;
-
-  if v_order.payment_status is distinct from 'paid'::public.payment_status
-     or v_order.status not in ('awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer') then
-    return jsonb_build_object('success', false, 'error', 'order_not_paid_or_active');
   end if;
 
   if not public.order_requires_access_token(v_order.service_type, v_order.boost_mode) then
     return jsonb_build_object('success', false, 'error', 'credentials_not_required_for_service');
   end if;
 
+  if v_order.status in ('completed', 'canceled', 'refunded', 'disputed') then
+    return jsonb_build_object('success', false, 'error', 'order_not_active');
+  end if;
+
   if not v_order.credentials_set or v_order.game_credentials is null then
     return jsonb_build_object('success', false, 'error', 'no_credentials');
   end if;
 
-  if v_order.credential_expires_at is null or v_order.credential_expires_at <= now() then
-    return jsonb_build_object('success', false, 'error', 'token_expired');
-  end if;
-
   return jsonb_build_object(
     'success', true,
-    'access_token', encode(v_order.game_credentials::bytea, 'base64'),
-    'expires_at', v_order.credential_expires_at
+    'access_token', encode(v_order.game_credentials::bytea, 'base64')
   );
 end;
 $$;
@@ -993,7 +864,7 @@ ALTER FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") OWNER TO "p
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_role       public.user_role;
@@ -1045,7 +916,7 @@ ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."is_admin"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
   select exists (
     select 1 from public.profiles where id = auth.uid() and role = 'admin'
@@ -1058,7 +929,7 @@ ALTER FUNCTION "public"."is_admin"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."is_approved_booster"() RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
   select exists (
     select 1 from public.booster_profiles
@@ -1072,7 +943,7 @@ ALTER FUNCTION "public"."is_approved_booster"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
@@ -1103,9 +974,58 @@ $$;
 ALTER FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."moderate_review"("p_review_id" "uuid", "p_is_public" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_actor record;
+begin
+  if not public.is_admin() then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  select id, role into v_actor from public.profiles where id = auth.uid();
+
+  update public.reviews set is_public = p_is_public, is_moderated = true where id = p_review_id;
+  if not found then return jsonb_build_object('success', false, 'error', 'review_not_found'); end if;
+
+  insert into public.audit_logs(actor_id, actor_role, action, entity_type, entity_id, diff)
+  values (v_actor.id, v_actor.role, 'review.moderated', 'review', p_review_id::text,
+          jsonb_build_object('is_public', p_is_public));
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."moderate_review"("p_review_id" "uuid", "p_is_public" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."notify_boosters_order_available"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if new.status = 'awaiting_assignment' then
+    if tg_op = 'INSERT' then
+      insert into public.booster_order_events (order_id) values (new.id);
+    elsif old.status is distinct from 'awaiting_assignment' then
+      insert into public.booster_order_events (order_id) values (new.id);
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."notify_boosters_order_available"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text" DEFAULT NULL::"text", "p_hours_per_day_min" integer DEFAULT NULL::integer, "p_hours_per_day_max" integer DEFAULT NULL::integer) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_role user_role;
@@ -1143,7 +1063,7 @@ ALTER FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text
 
 CREATE OR REPLACE FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text" DEFAULT NULL::"text", "p_hours_per_day_min" integer DEFAULT NULL::integer, "p_hours_per_day_max" integer DEFAULT NULL::integer, "p_full_name" "text" DEFAULT NULL::"text", "p_cpf" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_role  public.user_role;
@@ -1211,11 +1131,11 @@ ALTER FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text
 
 CREATE OR REPLACE FUNCTION "public"."order_requires_access_token"("p_service_type" "public"."service_type", "p_boost_mode" "text") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
   select
     (p_service_type = 'elo_boost' and coalesce(p_boost_mode, 'solo') = 'solo')
-    or p_service_type in ('win_boost', 'md5')
+    or p_service_type in ('win_boost', 'placement_matches', 'md5')
 $$;
 
 
@@ -1224,7 +1144,7 @@ ALTER FUNCTION "public"."order_requires_access_token"("p_service_type" "public".
 
 CREATE OR REPLACE FUNCTION "public"."prevent_non_admin_booster_status_change"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if not public.is_admin() and new.status is distinct from old.status then
@@ -1240,7 +1160,7 @@ ALTER FUNCTION "public"."prevent_non_admin_booster_status_change"() OWNER TO "po
 
 CREATE OR REPLACE FUNCTION "public"."process_mp_payment_event"("p_order_id" "uuid", "p_mp_payment_id" "text", "p_provider_status" "text", "p_amount" numeric, "p_currency" "text", "p_event_id" "text", "p_refund_id" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order public.orders%rowtype;
@@ -1319,7 +1239,6 @@ ALTER FUNCTION "public"."process_mp_payment_event"("p_order_id" "uuid", "p_mp_pa
 
 CREATE OR REPLACE FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") RETURNS integer
     LANGUAGE "sql" IMMUTABLE
-    SET "search_path" TO 'public', 'extensions'
     AS $$
   select case
     when p_tier = 'master' then 28
@@ -1337,7 +1256,7 @@ ALTER FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") OWNER 
 
 CREATE OR REPLACE FUNCTION "public"."record_pix_payment"("p_order_id" "uuid", "p_customer_id" "uuid", "p_mp_payment_id" "text", "p_amount" numeric) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order public.orders%rowtype;
@@ -1367,7 +1286,7 @@ ALTER FUNCTION "public"."record_pix_payment"("p_order_id" "uuid", "p_customer_id
 
 CREATE OR REPLACE FUNCTION "public"."refresh_booster_rating"("p_booster_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_avg   numeric(3,2);
@@ -1392,7 +1311,7 @@ ALTER FUNCTION "public"."refresh_booster_rating"("p_booster_id" "uuid") OWNER TO
 
 CREATE OR REPLACE FUNCTION "public"."refresh_top5_boosters"() RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_top5_ids uuid[];
@@ -1427,7 +1346,7 @@ ALTER FUNCTION "public"."refresh_top5_boosters"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."request_booster_role"() RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_role public.user_role;
@@ -1452,27 +1371,18 @@ ALTER FUNCTION "public"."request_booster_role"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
-  v_order record;
+  v_order       record;
   v_penalty_pct integer;
   v_penalty_amt numeric(10,2);
-  v_reason text := trim(p_reason);
+  v_existing    uuid;
 begin
-  if v_reason is null or length(v_reason) < 10 or length(v_reason) > 500 then
-    return jsonb_build_object('success', false, 'error', 'invalid_reason');
-  end if;
-
   select id, status, assigned_booster_id, wins_played, losses_played, total_price
-  into v_order
-  from public.orders
-  where id = p_order_id
-  for update;
+  into   v_order from public.orders where id = p_order_id for update;
 
-  if not found then
-    return jsonb_build_object('success', false, 'error', 'order_not_found');
-  end if;
+  if not found then return jsonb_build_object('success', false, 'error', 'order_not_found'); end if;
   if auth.uid() is distinct from v_order.assigned_booster_id then
     return jsonb_build_object('success', false, 'error', 'unauthorized');
   end if;
@@ -1480,44 +1390,29 @@ begin
     return jsonb_build_object('success', false, 'error', 'order_not_in_progress');
   end if;
 
-  if exists (
-    select 1
-    from public.order_drop_requests
-    where order_id = p_order_id and status = 'pending'
-  ) then
-    return jsonb_build_object('success', false, 'error', 'drop_request_already_pending');
-  end if;
+  select id into v_existing from public.order_drop_requests
+  where  order_id = p_order_id and status = 'pending';
+
+  if found then return jsonb_build_object('success', false, 'error', 'drop_request_already_pending'); end if;
 
   v_penalty_pct := case
-    when v_order.wins_played = 0 then 0
+    when v_order.wins_played = 0            then 0
     when v_order.wins_played between 1 and 2 then 10
     else 20
   end;
   v_penalty_amt := round(v_order.total_price * v_penalty_pct / 100.0, 2);
 
-  insert into public.order_drop_requests(
-    order_id, booster_id, reason, wins_at_request, losses_at_request,
-    penalty_pct, penalty_amount
-  ) values (
-    p_order_id, auth.uid(), v_reason, v_order.wins_played,
-    v_order.losses_played, v_penalty_pct, v_penalty_amt
-  );
+  insert into public.order_drop_requests(order_id, booster_id, reason,
+    wins_at_request, losses_at_request, penalty_pct, penalty_amount)
+  values (p_order_id, auth.uid(), p_reason,
+    v_order.wins_played, v_order.losses_played, v_penalty_pct, v_penalty_amt);
 
-  update public.orders
-  set status = 'drop_requested', updated_at = now()
-  where id = p_order_id;
+  update public.orders set status = 'drop_requested', updated_at = now() where id = p_order_id;
 
-  insert into public.order_status_history(
-    order_id, from_status, to_status, changed_by, reason
-  ) values (
-    p_order_id, 'in_progress', 'drop_requested', auth.uid(), v_reason
-  );
+  insert into public.order_status_history(order_id, from_status, to_status, changed_by, reason)
+  values (p_order_id, 'in_progress', 'drop_requested', auth.uid(), p_reason);
 
-  return jsonb_build_object(
-    'success', true,
-    'penalty_pct', v_penalty_pct,
-    'penalty_amount', v_penalty_amt
-  );
+  return jsonb_build_object('success', true, 'penalty_pct', v_penalty_pct, 'penalty_amount', v_penalty_amt);
 end;
 $$;
 
@@ -1527,7 +1422,7 @@ ALTER FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "te
 
 CREATE OR REPLACE FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_req   record;
@@ -1581,20 +1476,17 @@ $$;
 ALTER FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."resolve_order_access_token"("p_access_token" "text", "p_booster_user_id" "uuid") RETURNS "jsonb"
+CREATE OR REPLACE FUNCTION "public"."resolve_order_access_token"("p_access_token" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_key text;
   v_cipher bytea;
   v_payload jsonb;
-  v_order_id uuid;
-  v_order record;
+  v_order public.orders%rowtype;
 begin
-  if p_booster_user_id is null
-     or nullif(btrim(p_access_token), '') is null
-     or char_length(p_access_token) > 8192 then
+  if nullif(trim(p_access_token), '') is null or length(p_access_token) > 8192 then
     return jsonb_build_object('success', false, 'error', 'invalid_token');
   end if;
 
@@ -1604,36 +1496,24 @@ begin
     return jsonb_build_object('success', false, 'error', 'invalid_token');
   end;
 
-  select decrypted_secret
-  into v_key
-  from vault.decrypted_secrets
-  where name = 'credential_key'
-  limit 1;
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
 
-  if v_key is null or char_length(v_key) < 32 then
+  if v_key is null or length(v_key) < 32 then
     return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
   end if;
 
   begin
     v_payload := pgp_sym_decrypt(v_cipher, v_key)::jsonb;
-    if v_payload->>'v' <> '2'
-       or v_payload->>'kind' <> 'riot_account_access'
-       or nullif(v_payload->>'login', '') is null
-       or nullif(v_payload->>'password', '') is null then
-      return jsonb_build_object('success', false, 'error', 'invalid_token');
-    end if;
-    v_order_id := (v_payload->>'order_id')::uuid;
   exception when others then
     return jsonb_build_object('success', false, 'error', 'invalid_token');
   end;
 
-  select id, customer_id, assigned_booster_id, status, payment_status,
-         service_type, boost_mode, game_credentials, credentials_set,
-         credential_expires_at
-  into v_order
+  select * into v_order
   from public.orders
-  where id = v_order_id
-    and assigned_booster_id = p_booster_user_id
+  where id = (v_payload->>'order_id')::uuid
     and credentials_set = true
     and game_credentials::bytea = v_cipher
   for update;
@@ -1642,29 +1522,12 @@ begin
     return jsonb_build_object('success', false, 'error', 'token_not_found');
   end if;
 
-  if not exists (
-    select 1
-    from public.booster_profiles bp
-    where bp.user_id = p_booster_user_id
-      and bp.status = 'approved'
-  ) then
-    return jsonb_build_object('success', false, 'error', 'booster_not_authorized');
-  end if;
-
-  if v_order.payment_status is distinct from 'paid'::public.payment_status
-     or v_order.status not in ('assigned', 'in_progress', 'paused', 'awaiting_customer') then
-    return jsonb_build_object('success', false, 'error', 'order_not_active');
-  end if;
-
   if not public.order_requires_access_token(v_order.service_type, v_order.boost_mode) then
     return jsonb_build_object('success', false, 'error', 'credentials_not_required_for_service');
   end if;
 
-  if v_order.credential_expires_at is null
-     or v_order.credential_expires_at <= now()
-     or (v_payload->>'expires_at')::timestamptz <= now()
-     or (v_payload->>'customer_id')::uuid is distinct from v_order.customer_id then
-    return jsonb_build_object('success', false, 'error', 'token_expired_or_invalid');
+  if v_order.status in ('completed', 'canceled', 'refunded', 'disputed') then
+    return jsonb_build_object('success', false, 'error', 'order_not_active');
   end if;
 
   return jsonb_build_object(
@@ -1673,76 +1536,16 @@ begin
     'login', v_payload->>'login',
     'password', v_payload->>'password'
   );
-exception when others then
-  return jsonb_build_object('success', false, 'error', 'invalid_token');
 end;
 $$;
 
 
-ALTER FUNCTION "public"."resolve_order_access_token"("p_access_token" "text", "p_booster_user_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."send_order_message"("p_order_id" "uuid", "p_content" "text") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public'
-    AS $$
-declare
-  v_user_id uuid := auth.uid();
-  v_role public.user_role;
-  v_order public.orders%rowtype;
-  v_content text := btrim(coalesce(p_content, ''));
-  v_message_id uuid;
-begin
-  if v_user_id is null then
-    return jsonb_build_object('success', false, 'code', 'not_authenticated', 'message', 'Sessao nao autenticada.');
-  end if;
-
-  v_role := public.current_user_role();
-  if v_role is null then
-    return jsonb_build_object('success', false, 'code', 'profile_not_found', 'message', 'Perfil de usuario nao encontrado.');
-  end if;
-
-  select * into v_order from public.orders where id = p_order_id for update;
-
-  if not found or not (
-    v_role = 'admin'::public.user_role
-    or v_order.customer_id = v_user_id
-    or v_order.assigned_booster_id = v_user_id
-  ) then
-    return jsonb_build_object('success', false, 'code', 'order_not_found', 'message', 'Pedido nao encontrado.');
-  end if;
-
-  if v_order.assigned_booster_id is null then
-    return jsonb_build_object('success', false, 'code', 'chat_unavailable', 'message', 'O chat sera liberado quando um booster for atribuido.');
-  end if;
-
-  if v_order.chat_locked and v_role <> 'admin'::public.user_role then
-    return jsonb_build_object('success', false, 'code', 'chat_locked', 'message', 'O chat foi bloqueado pela administracao.');
-  end if;
-
-  if char_length(v_content) < 1 or char_length(v_content) > 4000 then
-    return jsonb_build_object('success', false, 'code', 'invalid_content', 'message', 'A mensagem deve ter entre 1 e 4000 caracteres.');
-  end if;
-
-  if not public.check_own_write_rate_limit('order_chat:' || p_order_id::text, 20, 60) then
-    return jsonb_build_object('success', false, 'code', 'rate_limited', 'message', 'Muitas mensagens em pouco tempo. Aguarde um minuto.');
-  end if;
-
-  insert into public.order_messages(order_id, sender_id, sender_role, content, is_read)
-  values (p_order_id, v_user_id, v_role, v_content, false)
-  returning id into v_message_id;
-
-  return jsonb_build_object('success', true, 'message_id', v_message_id);
-end;
-$$;
-
-
-ALTER FUNCTION "public"."send_order_message"("p_order_id" "uuid", "p_content" "text") OWNER TO "postgres";
+ALTER FUNCTION "public"."resolve_order_access_token"("p_access_token" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_login" "text", "p_password" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_key text;
@@ -1783,7 +1586,6 @@ ALTER FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_
 
 CREATE OR REPLACE FUNCTION "public"."set_master_plus_pricing_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
     AS $$
 begin
   new.updated_at = now();
@@ -1797,23 +1599,18 @@ ALTER FUNCTION "public"."set_master_plus_pricing_updated_at"() OWNER TO "postgre
 
 CREATE OR REPLACE FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
   v_key text;
   v_payload text;
   v_cipher bytea;
-  v_expires_at timestamptz := now() + interval '30 days';
 begin
-  if auth.uid() is null then
-    return jsonb_build_object('success', false, 'error', 'unauthorized');
-  end if;
-
-  select id, customer_id, status, payment_status, service_type, boost_mode
-  into v_order
-  from public.orders
-  where id = p_order_id
+  select id, customer_id, status, service_type, boost_mode
+  into   v_order
+  from   public.orders
+  where  id = p_order_id
   for update;
 
   if not found then
@@ -1824,61 +1621,52 @@ begin
     return jsonb_build_object('success', false, 'error', 'unauthorized');
   end if;
 
-  if v_order.payment_status is distinct from 'paid'::public.payment_status
-     or v_order.status not in ('awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer') then
-    return jsonb_build_object('success', false, 'error', 'order_not_paid_or_active');
-  end if;
-
   if not public.order_requires_access_token(v_order.service_type, v_order.boost_mode) then
     return jsonb_build_object('success', false, 'error', 'credentials_not_required_for_service');
   end if;
 
-  if nullif(btrim(p_login), '') is null or char_length(btrim(p_login)) > 160 then
+  if v_order.status not in ('awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer') then
+    return jsonb_build_object('success', false, 'error', 'order_not_paid_or_active');
+  end if;
+
+  if nullif(trim(p_login), '') is null or length(trim(p_login)) > 160 then
     return jsonb_build_object('success', false, 'error', 'invalid_login');
   end if;
 
-  if p_password is null or char_length(p_password) < 4 or char_length(p_password) > 256 then
+  if p_password is null or length(p_password) < 4 or length(p_password) > 256 then
     return jsonb_build_object('success', false, 'error', 'invalid_password');
   end if;
 
-  select decrypted_secret
-  into v_key
-  from vault.decrypted_secrets
-  where name = 'credential_key'
-  limit 1;
+  select decrypted_secret into v_key
+  from   vault.decrypted_secrets
+  where  name = 'credential_key'
+  limit  1;
 
-  if v_key is null or char_length(v_key) < 32 then
+  if v_key is null or length(v_key) < 32 then
     return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
   end if;
 
   v_payload := jsonb_build_object(
-    'v', 2,
+    'v', 1,
     'kind', 'riot_account_access',
-    'order_id', v_order.id,
-    'customer_id', v_order.customer_id,
-    'login', btrim(p_login),
+    'order_id', p_order_id,
+    'login', trim(p_login),
     'password', p_password,
-    'issued_at', now(),
-    'expires_at', v_expires_at
+    'issued_at', now()
   )::text;
 
-  v_cipher := pgp_sym_encrypt(
-    v_payload,
-    v_key,
-    'compress-algo=1, cipher-algo=aes256'
-  );
+  v_cipher := pgp_sym_encrypt(v_payload, v_key, 'compress-algo=1, cipher-algo=aes256');
 
   update public.orders
-  set game_credentials = v_cipher::text,
-      credentials_set = true,
-      credential_expires_at = v_expires_at,
-      updated_at = now()
-  where id = v_order.id;
+  set
+    game_credentials = v_cipher::text,
+    credentials_set  = true,
+    updated_at       = now()
+  where id = p_order_id;
 
   return jsonb_build_object(
     'success', true,
-    'access_token', encode(v_cipher, 'base64'),
-    'expires_at', v_expires_at
+    'access_token', encode(v_cipher, 'base64')
   );
 end;
 $$;
@@ -1887,9 +1675,60 @@ $$;
 ALTER FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text", "p_encrypt_key" "text" DEFAULT NULL::"text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_order record;
+  v_key   text;
+begin
+  select id, customer_id, status into v_order
+  from   public.orders
+  where  id = p_order_id for update;
+
+  if not found then
+    return jsonb_build_object('success', false, 'error', 'order_not_found');
+  end if;
+
+  if auth.uid() is distinct from v_order.customer_id then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  -- Aceita definir/atualizar credenciais enquanto o pedido não está concluído/cancelado
+  if v_order.status in ('completed', 'canceled', 'refunded', 'disputed') then
+    return jsonb_build_object('success', false, 'error', 'order_not_active');
+  end if;
+
+  -- Usa a extensão pgcrypto para criptografia simétrica.
+  -- A chave DEVE estar configurada antes de qualquer pedido ser criado:
+  --   ALTER DATABASE postgres SET app.credential_key = '<chave-aleatória-32+-chars>';
+  v_key := current_setting('app.credential_key', true);
+  if v_key is null or length(v_key) < 32 then
+    return jsonb_build_object('success', false, 'error', 'server_key_not_configured');
+  end if;
+
+  update public.orders
+  set
+    game_credentials = pgp_sym_encrypt(
+      p_login || '|' || p_password,
+      v_key
+    ),
+    credentials_set = true,
+    updated_at = now()
+  where id = p_order_id;
+
+  return jsonb_build_object('success', true);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text", "p_encrypt_key" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5" boolean) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_actor record;
@@ -1921,7 +1760,7 @@ ALTER FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5"
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_booster_active_on_accept"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if NEW.assigned_booster_id is not null
@@ -1941,7 +1780,7 @@ ALTER FUNCTION "public"."trg_fn_booster_active_on_accept"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_booster_active_on_message"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if NEW.sender_role = 'booster' then
@@ -1959,7 +1798,7 @@ ALTER FUNCTION "public"."trg_fn_booster_active_on_message"() OWNER TO "postgres"
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_cap_coach_packages"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_count integer;
@@ -1984,7 +1823,7 @@ COMMENT ON FUNCTION "public"."trg_fn_cap_coach_packages"() IS 'Caps booster_serv
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_days_remaining integer;
@@ -2011,7 +1850,7 @@ ALTER FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() OWNER T
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_enforce_message_rate_limit"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if not public.check_own_write_rate_limit('chat_message', 20, 60) then
@@ -2027,7 +1866,7 @@ ALTER FUNCTION "public"."trg_fn_enforce_message_rate_limit"() OWNER TO "postgres
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_enforce_review_rate_limit"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if not public.check_own_write_rate_limit('review_submit', 5, 60) then
@@ -2043,7 +1882,7 @@ ALTER FUNCTION "public"."trg_fn_enforce_review_rate_limit"() OWNER TO "postgres"
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if current_user = 'authenticated' and not public.is_admin() then
@@ -2067,7 +1906,7 @@ ALTER FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() OWNER TO 
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if current_user = 'authenticated' and not public.is_admin() then
@@ -2084,7 +1923,7 @@ ALTER FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() OWNER TO
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_guard_notifications_user_update"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if current_user = 'authenticated' and not public.is_admin() then
@@ -2105,7 +1944,7 @@ ALTER FUNCTION "public"."trg_fn_guard_notifications_user_update"() OWNER TO "pos
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if current_user = 'authenticated' and not public.is_admin() then
@@ -2123,9 +1962,31 @@ $$;
 ALTER FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public'
+    AS $$
+begin
+  if current_user = 'authenticated' and not public.is_admin() then
+    new.status       := old.status;
+    new.priority     := old.priority;
+    new.assigned_to  := old.assigned_to;
+    new.resolved_at  := old.resolved_at;
+    new.customer_id  := old.customer_id;
+    new.order_id     := old.order_id;
+    new.created_at   := old.created_at;
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."trg_fn_order_completed_booster_stats"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_commission_rate   constant numeric(5,4) := 0.25;
@@ -2160,7 +2021,7 @@ ALTER FUNCTION "public"."trg_fn_order_completed_booster_stats"() OWNER TO "postg
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_order_paid_customer_stats"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if NEW.status = 'awaiting_assignment' and OLD.status = 'awaiting_payment' then
@@ -2193,7 +2054,7 @@ ALTER FUNCTION "public"."trg_fn_order_paid_customer_stats"() OWNER TO "postgres"
 
 CREATE OR REPLACE FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if TG_OP = 'DELETE' then
@@ -2219,7 +2080,7 @@ ALTER FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() OWNER TO "post
 
 CREATE OR REPLACE FUNCTION "public"."trg_order_completed_refresh_top5"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 begin
   if new.status = 'completed' and (old.status is distinct from 'completed') then
@@ -2235,7 +2096,6 @@ ALTER FUNCTION "public"."trg_order_completed_refresh_top5"() OWNER TO "postgres"
 
 CREATE OR REPLACE FUNCTION "public"."update_booster_applications_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
     AS $$
 begin
   new.updated_at = now();
@@ -2249,7 +2109,6 @@ ALTER FUNCTION "public"."update_booster_applications_updated_at"() OWNER TO "pos
 
 CREATE OR REPLACE FUNCTION "public"."update_booster_services_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
     AS $$
 begin
   new.updated_at = now();
@@ -2263,7 +2122,6 @@ ALTER FUNCTION "public"."update_booster_services_updated_at"() OWNER TO "postgre
 
 CREATE OR REPLACE FUNCTION "public"."update_duo_accounts_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
-    SET "search_path" TO 'public', 'extensions'
     AS $$
 begin
   new.updated_at = now();
@@ -2277,7 +2135,7 @@ ALTER FUNCTION "public"."update_duo_accounts_updated_at"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."update_my_username"("p_username" "text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $_$
 declare
   v_username text := btrim(p_username);
@@ -2301,7 +2159,7 @@ ALTER FUNCTION "public"."update_my_username"("p_username" "text") OWNER TO "post
 
 CREATE OR REPLACE FUNCTION "public"."update_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text" DEFAULT NULL::"text") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'public', 'extensions'
+    SET "search_path" TO 'public'
     AS $$
 declare
   v_order record;
@@ -2378,7 +2236,7 @@ CREATE TABLE IF NOT EXISTS "public"."duo_accounts" (
 ALTER TABLE "public"."duo_accounts" OWNER TO "postgres";
 
 
-CREATE OR REPLACE VIEW "public"."admin_duo_accounts" WITH ("security_barrier"='true', "security_invoker"='true') AS
+CREATE OR REPLACE VIEW "public"."admin_duo_accounts" WITH ("security_barrier"='true') AS
  SELECT "id",
     "game_id",
     "label",
@@ -2429,7 +2287,7 @@ CREATE TABLE IF NOT EXISTS "public"."orders" (
     "base_price" numeric(10,2) NOT NULL,
     "extras_price" numeric(10,2) DEFAULT 0 NOT NULL,
     "total_price" numeric(10,2) NOT NULL,
-    "estimated_hours" integer,
+    "estimated_hours" numeric(8,2),
     "customer_notes" "text",
     "booster_notes" "text",
     "wins_played" integer DEFAULT 0 NOT NULL,
@@ -2456,20 +2314,12 @@ CREATE TABLE IF NOT EXISTS "public"."orders" (
     "exclusive_until" timestamp with time zone,
     "service_type" "public"."service_type" NOT NULL,
     "md5_matches_remaining" smallint,
-    "chat_locked" boolean DEFAULT false NOT NULL,
-    "chat_locked_by" "uuid",
-    "chat_locked_at" timestamp with time zone,
-    "credential_expires_at" timestamp with time zone,
     CONSTRAINT "orders_avg_pdl_gain_check" CHECK ((("avg_pdl_gain" IS NULL) OR ("avg_pdl_gain" > (0)::numeric))),
     CONSTRAINT "orders_avg_pdl_loss_check" CHECK ((("avg_pdl_loss" IS NULL) OR ("avg_pdl_loss" > (0)::numeric))),
     CONSTRAINT "orders_boost_mode_check" CHECK (("boost_mode" = ANY (ARRAY['solo'::"text", 'duo'::"text"]))),
-    CONSTRAINT "orders_credentials_consistency_check" CHECK (((("credentials_set" = true) AND ("game_credentials" IS NOT NULL) AND ("credential_expires_at" IS NOT NULL)) OR (("credentials_set" = false) AND ("game_credentials" IS NULL) AND ("credential_expires_at" IS NULL)))),
     CONSTRAINT "orders_current_pdl_check" CHECK ((("current_pdl" IS NULL) OR ("current_pdl" >= 0))),
-    CONSTRAINT "orders_match_counters_nonnegative" CHECK ((("wins_played" >= 0) AND ("losses_played" >= 0))),
     CONSTRAINT "orders_md5_matches_remaining_check" CHECK ((("md5_matches_remaining" IS NULL) OR (("md5_matches_remaining" >= 0) AND ("md5_matches_remaining" <= 5)))),
     CONSTRAINT "orders_pdl_bracket_check" CHECK ((("pdl_bracket" IS NULL) OR ("pdl_bracket" = ANY (ARRAY['0_49'::"text", '50_89'::"text", '90_119'::"text", '120_plus'::"text"])))),
-    CONSTRAINT "orders_price_sum" CHECK (("total_price" = "round"(("base_price" + "extras_price"), 2))),
-    CONSTRAINT "orders_prices_nonnegative" CHECK ((("base_price" >= (0)::numeric) AND ("extras_price" >= (0)::numeric) AND ("total_price" >= (0)::numeric))),
     CONSTRAINT "orders_win_package_check" CHECK (("win_package" = ANY (ARRAY[1, 3, 5])))
 );
 
@@ -2541,6 +2391,27 @@ CREATE TABLE IF NOT EXISTS "public"."booster_applications" (
 ALTER TABLE "public"."booster_applications" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."booster_order_events" (
+    "id" bigint NOT NULL,
+    "order_id" "uuid" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."booster_order_events" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."booster_order_events" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."booster_order_events_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."booster_profiles" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "user_id" "uuid" NOT NULL,
@@ -2554,6 +2425,7 @@ CREATE TABLE IF NOT EXISTS "public"."booster_profiles" (
     "region_preferences" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
     "lanes" "text"[],
     "specialties" "text"[],
+    "can_coach" boolean,
     "available_days" "text"[],
     "total_completed" integer DEFAULT 0 NOT NULL,
     "total_earnings" numeric(10,2) DEFAULT 0 NOT NULL,
@@ -2579,6 +2451,10 @@ CREATE TABLE IF NOT EXISTS "public"."booster_profiles" (
 ALTER TABLE "public"."booster_profiles" OWNER TO "postgres";
 
 
+COMMENT ON COLUMN "public"."booster_profiles"."can_coach" IS 'Legado — não lido por nenhuma query. Elegibilidade para aparecer como coach vem de existir uma linha ativa em booster_services com service_type = ''coaching'' (ver CoachPackagePicker.tsx). Mantido só para não quebrar linhas existentes; não editável pela UI desde 2026-07-14.';
+
+
+
 COMMENT ON COLUMN "public"."booster_profiles"."display_name_changed_at" IS 'Quando display_name foi alterado pela última vez -- controla o cooldown de 30 dias (trg_fn_enforce_booster_display_name_cooldown, migration 025). Null = nunca alterado desde que esta coluna existe; próxima troca é sempre permitida nesse caso.';
 
 
@@ -2599,10 +2475,7 @@ CREATE TABLE IF NOT EXISTS "public"."booster_services" (
     "rules" "text",
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "lanes" "text"[],
-    "specialties" "text"[],
-    CONSTRAINT "booster_services_lanes_valid" CHECK ((("lanes" IS NULL) OR (("array_length"("lanes", 1) <= 2) AND ("lanes" <@ ARRAY['top'::"text", 'jungle'::"text", 'mid'::"text", 'bot'::"text", 'support'::"text"])))),
-    CONSTRAINT "booster_services_price_nonnegative" CHECK (("price" >= (0)::numeric)),
-    CONSTRAINT "booster_services_specialties_valid" CHECK ((("specialties" IS NULL) OR ("specialties" <@ ARRAY['macro'::"text", 'micro'::"text", 'wave_control'::"text", 'invades'::"text", 'vision'::"text", 'trades'::"text", 'teamfighting'::"text", 'laning_phase'::"text", 'objectives'::"text", 'itemization'::"text", 'matchups'::"text", 'mindset'::"text"])))
+    "specialties" "text"[]
 );
 
 
@@ -2659,7 +2532,6 @@ CREATE TABLE IF NOT EXISTS "public"."master_plus_pricing" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_by" "uuid",
     "tier" "text" NOT NULL,
-    CONSTRAINT "master_plus_price_positive" CHECK ((("price" IS NULL) OR ("price" > (0)::numeric))),
     CONSTRAINT "master_plus_pricing_tier_check" CHECK (("tier" = ANY (ARRAY['master'::"text", 'grandmaster'::"text", 'challenger'::"text"])))
 );
 
@@ -2719,8 +2591,7 @@ CREATE TABLE IF NOT EXISTS "public"."order_messages" (
     "content" "text" NOT NULL,
     "attachment_url" "text",
     "is_read" boolean DEFAULT false NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "order_messages_content_length" CHECK ((("char_length"("btrim"("content")) >= 1) AND ("char_length"("btrim"("content")) <= 4000)))
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -2772,9 +2643,7 @@ CREATE TABLE IF NOT EXISTS "public"."payments" (
     "refunded_amount" numeric(10,2) DEFAULT 0 NOT NULL,
     "metadata" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "payments_amount_positive" CHECK (("amount" > (0)::numeric)),
-    CONSTRAINT "payments_refund_range" CHECK ((("refunded_amount" >= (0)::numeric) AND ("refunded_amount" <= "amount")))
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -2791,8 +2660,7 @@ CREATE TABLE IF NOT EXISTS "public"."payout_records" (
     "net_amount" numeric(10,2) NOT NULL,
     "status" "public"."payout_status" DEFAULT 'pending'::"public"."payout_status" NOT NULL,
     "paid_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "payout_amounts_nonnegative" CHECK ((("gross_amount" >= (0)::numeric) AND ("commission_amount" >= (0)::numeric) AND ("net_amount" >= (0)::numeric) AND (("commission_rate" >= (0)::numeric) AND ("commission_rate" <= (1)::numeric))))
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -2853,8 +2721,7 @@ CREATE TABLE IF NOT EXISTS "public"."refunds" (
     "reason" "text" NOT NULL,
     "initiated_by" "uuid" NOT NULL,
     "status" "text" DEFAULT 'pending'::"text" NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "refunds_amount_positive" CHECK (("amount" > (0)::numeric))
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
 
@@ -2872,7 +2739,6 @@ CREATE TABLE IF NOT EXISTS "public"."reviews" (
     "is_moderated" boolean DEFAULT false NOT NULL,
     "admin_note" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "reviews_content_length" CHECK ((("content" IS NULL) OR ("char_length"("content") <= 2000))),
     CONSTRAINT "reviews_rating_check" CHECK ((("rating" >= 1) AND ("rating" <= 5)))
 );
 
@@ -2892,8 +2758,7 @@ CREATE TABLE IF NOT EXISTS "public"."service_extras" (
     "icon" "text",
     "flow" "text",
     "code" "text",
-    CONSTRAINT "service_extras_flow_check" CHECK ((("flow" IS NULL) OR ("flow" = ANY (ARRAY['solo_standard'::"text", 'duo_standard'::"text", 'master_plus'::"text"])))),
-    CONSTRAINT "service_extras_modifiers_nonnegative" CHECK ((("price_modifier" >= (0)::numeric) AND (("price_modifier_pct" >= (0)::numeric) AND ("price_modifier_pct" <= (100)::numeric))))
+    CONSTRAINT "service_extras_flow_check" CHECK ((("flow" IS NULL) OR ("flow" = ANY (ARRAY['solo_standard'::"text", 'duo_standard'::"text", 'master_plus'::"text"]))))
 );
 
 
@@ -2915,6 +2780,38 @@ CREATE TABLE IF NOT EXISTS "public"."services" (
 ALTER TABLE "public"."services" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."support_tickets" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "customer_id" "uuid" NOT NULL,
+    "order_id" "uuid",
+    "assigned_to" "uuid",
+    "status" "public"."ticket_status" DEFAULT 'open'::"public"."ticket_status" NOT NULL,
+    "priority" "public"."ticket_priority" DEFAULT 'medium'::"public"."ticket_priority" NOT NULL,
+    "subject" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "resolved_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."support_tickets" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."ticket_messages" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "ticket_id" "uuid" NOT NULL,
+    "sender_id" "uuid" NOT NULL,
+    "sender_role" "public"."user_role" NOT NULL,
+    "content" "text" NOT NULL,
+    "is_internal" boolean DEFAULT false NOT NULL,
+    "attachment_url" "text",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."ticket_messages" OWNER TO "postgres";
+
+
 ALTER TABLE ONLY "public"."audit_logs"
     ADD CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id");
 
@@ -2922,6 +2819,11 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 ALTER TABLE ONLY "public"."booster_applications"
     ADD CONSTRAINT "booster_applications_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."booster_order_events"
+    ADD CONSTRAINT "booster_order_events_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2935,8 +2837,23 @@ ALTER TABLE ONLY "public"."booster_profiles"
 
 
 
+ALTER TABLE "public"."booster_services"
+    ADD CONSTRAINT "booster_services_lanes_valid" CHECK ((("lanes" IS NULL) OR (("array_length"("lanes", 1) <= 2) AND ("lanes" <@ ARRAY['top'::"text", 'jungle'::"text", 'mid'::"text", 'bot'::"text", 'support'::"text"])))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."booster_services"
     ADD CONSTRAINT "booster_services_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE "public"."booster_services"
+    ADD CONSTRAINT "booster_services_price_nonnegative" CHECK (("price" >= (0)::numeric)) NOT VALID;
+
+
+
+ALTER TABLE "public"."booster_services"
+    ADD CONSTRAINT "booster_services_specialties_valid" CHECK ((("specialties" IS NULL) OR ("specialties" <@ ARRAY['macro'::"text", 'micro'::"text", 'wave_control'::"text", 'invades'::"text", 'vision'::"text", 'trades'::"text", 'teamfighting'::"text", 'laning_phase'::"text", 'objectives'::"text", 'itemization'::"text", 'matchups'::"text", 'mindset'::"text"]))) NOT VALID;
 
 
 
@@ -2970,6 +2887,11 @@ ALTER TABLE ONLY "public"."games"
 
 
 
+ALTER TABLE "public"."master_plus_pricing"
+    ADD CONSTRAINT "master_plus_price_positive" CHECK ((("price" IS NULL) OR ("price" > (0)::numeric))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."master_plus_pricing"
     ADD CONSTRAINT "master_plus_pricing_pkey" PRIMARY KEY ("id");
 
@@ -2990,6 +2912,11 @@ ALTER TABLE ONLY "public"."order_drop_requests"
 
 
 
+ALTER TABLE "public"."order_messages"
+    ADD CONSTRAINT "order_messages_content_length" CHECK ((("char_length"("btrim"("content")) >= 1) AND ("char_length"("btrim"("content")) <= 4000))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."order_messages"
     ADD CONSTRAINT "order_messages_pkey" PRIMARY KEY ("id");
 
@@ -3005,6 +2932,11 @@ ALTER TABLE ONLY "public"."order_status_history"
 
 
 
+ALTER TABLE "public"."orders"
+    ADD CONSTRAINT "orders_match_counters_nonnegative" CHECK ((("wins_played" >= 0) AND ("losses_played" >= 0))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."orders"
     ADD CONSTRAINT "orders_mp_payment_id_key" UNIQUE ("mp_payment_id");
 
@@ -3012,6 +2944,21 @@ ALTER TABLE ONLY "public"."orders"
 
 ALTER TABLE ONLY "public"."orders"
     ADD CONSTRAINT "orders_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE "public"."orders"
+    ADD CONSTRAINT "orders_price_sum" CHECK (("total_price" = "round"(("base_price" + "extras_price"), 2))) NOT VALID;
+
+
+
+ALTER TABLE "public"."orders"
+    ADD CONSTRAINT "orders_prices_nonnegative" CHECK ((("base_price" >= (0)::numeric) AND ("extras_price" >= (0)::numeric) AND ("total_price" >= (0)::numeric))) NOT VALID;
+
+
+
+ALTER TABLE "public"."payments"
+    ADD CONSTRAINT "payments_amount_positive" CHECK (("amount" > (0)::numeric)) NOT VALID;
 
 
 
@@ -3025,8 +2972,18 @@ ALTER TABLE ONLY "public"."payments"
 
 
 
+ALTER TABLE "public"."payments"
+    ADD CONSTRAINT "payments_refund_range" CHECK ((("refunded_amount" >= (0)::numeric) AND ("refunded_amount" <= "amount"))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."payments"
     ADD CONSTRAINT "payments_webhook_event_id_key" UNIQUE ("webhook_event_id");
+
+
+
+ALTER TABLE "public"."payout_records"
+    ADD CONSTRAINT "payout_amounts_nonnegative" CHECK ((("gross_amount" >= (0)::numeric) AND ("commission_amount" >= (0)::numeric) AND ("net_amount" >= (0)::numeric) AND (("commission_rate" >= (0)::numeric) AND ("commission_rate" <= (1)::numeric)))) NOT VALID;
 
 
 
@@ -3050,6 +3007,11 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE "public"."refunds"
+    ADD CONSTRAINT "refunds_amount_positive" CHECK (("amount" > (0)::numeric)) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."refunds"
     ADD CONSTRAINT "refunds_mp_refund_id_key" UNIQUE ("mp_refund_id");
 
@@ -3060,6 +3022,11 @@ ALTER TABLE ONLY "public"."refunds"
 
 
 
+ALTER TABLE "public"."reviews"
+    ADD CONSTRAINT "reviews_content_length" CHECK ((("content" IS NULL) OR ("char_length"("content") <= 2000))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."reviews"
     ADD CONSTRAINT "reviews_order_id_key" UNIQUE ("order_id");
 
@@ -3067,6 +3034,11 @@ ALTER TABLE ONLY "public"."reviews"
 
 ALTER TABLE ONLY "public"."reviews"
     ADD CONSTRAINT "reviews_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE "public"."service_extras"
+    ADD CONSTRAINT "service_extras_modifiers_nonnegative" CHECK ((("price_modifier" >= (0)::numeric) AND (("price_modifier_pct" >= (0)::numeric) AND ("price_modifier_pct" <= (100)::numeric)))) NOT VALID;
 
 
 
@@ -3082,6 +3054,26 @@ ALTER TABLE ONLY "public"."services"
 
 ALTER TABLE ONLY "public"."services"
     ADD CONSTRAINT "services_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_subject_length" CHECK ((("char_length"("btrim"("subject")) >= 1) AND ("char_length"("btrim"("subject")) <= 200))) NOT VALID;
+
+
+
+ALTER TABLE "public"."ticket_messages"
+    ADD CONSTRAINT "ticket_messages_content_length" CHECK ((("char_length"("btrim"("content")) >= 1) AND ("char_length"("btrim"("content")) <= 4000))) NOT VALID;
+
+
+
+ALTER TABLE ONLY "public"."ticket_messages"
+    ADD CONSTRAINT "ticket_messages_pkey" PRIMARY KEY ("id");
 
 
 
@@ -3109,10 +3101,6 @@ CREATE INDEX "booster_applications_status_idx" ON "public"."booster_applications
 
 
 
-CREATE INDEX "booster_applications_user_id_idx" ON "public"."booster_applications" USING "btree" ("user_id");
-
-
-
 CREATE INDEX "booster_profiles_available_idx" ON "public"."booster_profiles" USING "btree" ("is_available") WHERE ("is_available" = true);
 
 
@@ -3133,15 +3121,11 @@ CREATE INDEX "booster_services_booster_idx" ON "public"."booster_services" USING
 
 
 
+CREATE INDEX "customer_profiles_user_id_idx" ON "public"."customer_profiles" USING "btree" ("user_id");
+
+
+
 CREATE INDEX "duo_accounts_active_idx" ON "public"."duo_accounts" USING "btree" ("is_active");
-
-
-
-CREATE INDEX "duo_accounts_created_by_idx" ON "public"."duo_accounts" USING "btree" ("created_by");
-
-
-
-CREATE INDEX "master_plus_pricing_updated_by_idx" ON "public"."master_plus_pricing" USING "btree" ("updated_by");
 
 
 
@@ -3150,14 +3134,6 @@ CREATE INDEX "notifications_unread_idx" ON "public"."notifications" USING "btree
 
 
 CREATE INDEX "notifications_user_idx" ON "public"."notifications" USING "btree" ("user_id");
-
-
-
-CREATE INDEX "order_drop_requests_admin_id_idx" ON "public"."order_drop_requests" USING "btree" ("admin_id");
-
-
-
-CREATE INDEX "order_drop_requests_booster_id_idx" ON "public"."order_drop_requests" USING "btree" ("booster_id");
 
 
 
@@ -3177,31 +3153,11 @@ CREATE INDEX "order_rank_verifications_order_idx" ON "public"."order_rank_verifi
 
 
 
-CREATE INDEX "order_rank_verifications_requested_by_idx" ON "public"."order_rank_verifications" USING "btree" ("requested_by");
-
-
-
-CREATE INDEX "order_status_history_changed_by_idx" ON "public"."order_status_history" USING "btree" ("changed_by");
-
-
-
 CREATE INDEX "order_status_history_order_idx" ON "public"."order_status_history" USING "btree" ("order_id");
 
 
 
-CREATE INDEX "orders_booster_completed_at_idx" ON "public"."orders" USING "btree" ("assigned_booster_id", "completed_at") WHERE ("status" = 'completed'::"public"."order_status");
-
-
-
 CREATE INDEX "orders_booster_id_idx" ON "public"."orders" USING "btree" ("assigned_booster_id");
-
-
-
-CREATE INDEX "orders_booster_service_id_idx" ON "public"."orders" USING "btree" ("booster_service_id");
-
-
-
-CREATE INDEX "orders_chat_locked_by_idx" ON "public"."orders" USING "btree" ("chat_locked_by");
 
 
 
@@ -3233,6 +3189,10 @@ CREATE INDEX "payments_customer_idx" ON "public"."payments" USING "btree" ("cust
 
 
 
+CREATE INDEX "payments_order_idx" ON "public"."payments" USING "btree" ("order_id");
+
+
+
 CREATE UNIQUE INDEX "payments_order_unique_idx" ON "public"."payments" USING "btree" ("order_id");
 
 
@@ -3253,27 +3213,15 @@ CREATE INDEX "payout_records_status_idx" ON "public"."payout_records" USING "btr
 
 
 
+CREATE INDEX "profiles_email_idx" ON "public"."profiles" USING "btree" ("email");
+
+
+
 CREATE INDEX "profiles_role_idx" ON "public"."profiles" USING "btree" ("role");
 
 
 
-CREATE INDEX "refunds_initiated_by_idx" ON "public"."refunds" USING "btree" ("initiated_by");
-
-
-
-CREATE INDEX "refunds_order_id_idx" ON "public"."refunds" USING "btree" ("order_id");
-
-
-
-CREATE INDEX "refunds_payment_id_idx" ON "public"."refunds" USING "btree" ("payment_id");
-
-
-
 CREATE INDEX "reviews_booster_idx" ON "public"."reviews" USING "btree" ("booster_id");
-
-
-
-CREATE INDEX "reviews_customer_id_idx" ON "public"."reviews" USING "btree" ("customer_id");
 
 
 
@@ -3285,15 +3233,23 @@ CREATE UNIQUE INDEX "service_extras_flow_code_idx" ON "public"."service_extras" 
 
 
 
-CREATE INDEX "service_extras_service_id_idx" ON "public"."service_extras" USING "btree" ("service_id");
+CREATE INDEX "ticket_messages_ticket_idx" ON "public"."ticket_messages" USING "btree" ("ticket_id");
+
+
+
+CREATE INDEX "tickets_customer_idx" ON "public"."support_tickets" USING "btree" ("customer_id");
+
+
+
+CREATE INDEX "tickets_priority_idx" ON "public"."support_tickets" USING "btree" ("priority");
+
+
+
+CREATE INDEX "tickets_status_idx" ON "public"."support_tickets" USING "btree" ("status");
 
 
 
 CREATE OR REPLACE TRIGGER "booster_profiles_lock_status" BEFORE UPDATE ON "public"."booster_profiles" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_non_admin_booster_status_change"();
-
-
-
-CREATE OR REPLACE TRIGGER "clear_terminal_order_credentials_trigger" BEFORE UPDATE OF "status", "payment_status" ON "public"."orders" FOR EACH ROW EXECUTE FUNCTION "public"."clear_terminal_order_credentials"();
 
 
 
@@ -3353,6 +3309,14 @@ CREATE OR REPLACE TRIGGER "trg_guard_profiles_trust_columns" BEFORE UPDATE ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "trg_guard_support_tickets_trust_columns" BEFORE UPDATE ON "public"."support_tickets" FOR EACH ROW EXECUTE FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_notify_boosters_order_available" AFTER INSERT OR UPDATE OF "status" ON "public"."orders" FOR EACH ROW EXECUTE FUNCTION "public"."notify_boosters_order_available"();
+
+
+
 CREATE OR REPLACE TRIGGER "trg_order_completed_booster_stats" AFTER UPDATE OF "status" ON "public"."orders" FOR EACH ROW EXECUTE FUNCTION "public"."trg_fn_order_completed_booster_stats"();
 
 
@@ -3369,6 +3333,10 @@ CREATE OR REPLACE TRIGGER "trg_reviews_rate_limit" BEFORE INSERT ON "public"."re
 
 
 
+CREATE OR REPLACE TRIGGER "trg_ticket_messages_rate_limit" BEFORE INSERT ON "public"."ticket_messages" FOR EACH ROW EXECUTE FUNCTION "public"."trg_fn_enforce_message_rate_limit"();
+
+
+
 ALTER TABLE ONLY "public"."audit_logs"
     ADD CONSTRAINT "audit_logs_actor_id_fkey" FOREIGN KEY ("actor_id") REFERENCES "public"."profiles"("id");
 
@@ -3376,6 +3344,11 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 ALTER TABLE ONLY "public"."booster_applications"
     ADD CONSTRAINT "booster_applications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."booster_order_events"
+    ADD CONSTRAINT "booster_order_events_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id") ON DELETE CASCADE;
 
 
 
@@ -3465,11 +3438,6 @@ ALTER TABLE ONLY "public"."orders"
 
 
 ALTER TABLE ONLY "public"."orders"
-    ADD CONSTRAINT "orders_chat_locked_by_fkey" FOREIGN KEY ("chat_locked_by") REFERENCES "public"."profiles"("id") ON DELETE SET NULL;
-
-
-
-ALTER TABLE ONLY "public"."orders"
     ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."profiles"("id");
 
 
@@ -3544,7 +3512,40 @@ ALTER TABLE ONLY "public"."services"
 
 
 
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_assigned_to_fkey" FOREIGN KEY ("assigned_to") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."support_tickets"
+    ADD CONSTRAINT "support_tickets_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "public"."orders"("id");
+
+
+
+ALTER TABLE ONLY "public"."ticket_messages"
+    ADD CONSTRAINT "ticket_messages_sender_id_fkey" FOREIGN KEY ("sender_id") REFERENCES "public"."profiles"("id");
+
+
+
+ALTER TABLE ONLY "public"."ticket_messages"
+    ADD CONSTRAINT "ticket_messages_ticket_id_fkey" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("id") ON DELETE CASCADE;
+
+
+
+CREATE POLICY "Admins can manage applications" ON "public"."booster_applications" USING ("public"."is_admin"());
+
+
+
 CREATE POLICY "admins_update_drop_requests" ON "public"."order_drop_requests" FOR UPDATE TO "authenticated" USING ("public"."is_admin"());
+
+
+
+CREATE POLICY "approved_boosters_read_order_events" ON "public"."booster_order_events" FOR SELECT TO "authenticated" USING ("public"."is_approved_booster"());
 
 
 
@@ -3562,20 +3563,7 @@ CREATE POLICY "audit_logs_insert" ON "public"."audit_logs" FOR INSERT WITH CHECK
 ALTER TABLE "public"."booster_applications" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "booster_applications_admin_delete" ON "public"."booster_applications" FOR DELETE USING ("public"."is_admin"());
-
-
-
-CREATE POLICY "booster_applications_admin_select" ON "public"."booster_applications" FOR SELECT USING ("public"."is_admin"());
-
-
-
-CREATE POLICY "booster_applications_admin_update" ON "public"."booster_applications" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "booster_applications_select_own" ON "public"."booster_applications" FOR SELECT TO "authenticated" USING (("user_id" = "auth"."uid"()));
-
+ALTER TABLE "public"."booster_order_events" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."booster_profiles" ENABLE ROW LEVEL SECURITY;
@@ -3592,19 +3580,11 @@ CREATE POLICY "booster_profiles_update_own_or_admin" ON "public"."booster_profil
 ALTER TABLE "public"."booster_services" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "booster_services_owner_delete" ON "public"."booster_services" FOR DELETE USING (("booster_id" = "auth"."uid"()));
+CREATE POLICY "booster_services_owner_all" ON "public"."booster_services" USING (("booster_id" = "auth"."uid"())) WITH CHECK (("booster_id" = "auth"."uid"()));
 
 
 
-CREATE POLICY "booster_services_owner_insert" ON "public"."booster_services" FOR INSERT WITH CHECK (("booster_id" = "auth"."uid"()));
-
-
-
-CREATE POLICY "booster_services_owner_update" ON "public"."booster_services" FOR UPDATE USING (("booster_id" = "auth"."uid"())) WITH CHECK (("booster_id" = "auth"."uid"()));
-
-
-
-CREATE POLICY "booster_services_read" ON "public"."booster_services" FOR SELECT USING ((("booster_id" = "auth"."uid"()) OR (EXISTS ( SELECT 1
+CREATE POLICY "booster_services_public_read" ON "public"."booster_services" FOR SELECT USING ((("is_active" = true) AND (EXISTS ( SELECT 1
    FROM "public"."booster_profiles" "bp"
   WHERE (("bp"."user_id" = "booster_services"."booster_id") AND ("bp"."status" = 'approved'::"public"."booster_status"))))));
 
@@ -3632,15 +3612,7 @@ CREATE POLICY "customer_profiles_update_own" ON "public"."customer_profiles" FOR
 ALTER TABLE "public"."duo_accounts" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "duo_accounts_admin_delete" ON "public"."duo_accounts" FOR DELETE USING ("public"."is_admin"());
-
-
-
-CREATE POLICY "duo_accounts_admin_insert" ON "public"."duo_accounts" FOR INSERT WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "duo_accounts_admin_update" ON "public"."duo_accounts" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
+CREATE POLICY "duo_accounts_admin_write" ON "public"."duo_accounts" USING ("public"."is_admin"());
 
 
 
@@ -3656,38 +3628,30 @@ ALTER TABLE "public"."edge_rate_limits" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."games" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "games_admin_delete" ON "public"."games" FOR DELETE USING ("public"."is_admin"());
+CREATE POLICY "games_admin_read" ON "public"."games" FOR SELECT TO "authenticated" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "games_admin_insert" ON "public"."games" FOR INSERT WITH CHECK ("public"."is_admin"());
+CREATE POLICY "games_admin_write" ON "public"."games" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "games_admin_update" ON "public"."games" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "games_public_read" ON "public"."games" FOR SELECT USING ((("is_active" = true) OR "public"."is_admin"()));
+CREATE POLICY "games_public_read" ON "public"."games" FOR SELECT TO "authenticated", "anon" USING (("is_active" = true));
 
 
 
 ALTER TABLE "public"."master_plus_pricing" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "master_plus_pricing_admin_delete" ON "public"."master_plus_pricing" FOR DELETE USING ("public"."is_admin"());
+CREATE POLICY "master_plus_pricing_admin_read" ON "public"."master_plus_pricing" FOR SELECT TO "authenticated" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "master_plus_pricing_admin_insert" ON "public"."master_plus_pricing" FOR INSERT WITH CHECK ("public"."is_admin"());
+CREATE POLICY "master_plus_pricing_admin_write" ON "public"."master_plus_pricing" USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
 
 
 
-CREATE POLICY "master_plus_pricing_admin_update" ON "public"."master_plus_pricing" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "master_plus_pricing_read" ON "public"."master_plus_pricing" FOR SELECT USING ((("price" IS NOT NULL) OR "public"."is_admin"()));
+CREATE POLICY "master_plus_pricing_read" ON "public"."master_plus_pricing" FOR SELECT TO "authenticated", "anon" USING (("price" IS NOT NULL));
 
 
 
@@ -3708,9 +3672,15 @@ ALTER TABLE "public"."order_drop_requests" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."order_messages" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "order_messages_read" ON "public"."order_messages" FOR SELECT USING ((EXISTS ( SELECT 1
+CREATE POLICY "order_messages_insert" ON "public"."order_messages" FOR INSERT WITH CHECK ((("sender_id" = "auth"."uid"()) AND ("sender_role" = "public"."current_user_role"()) AND (EXISTS ( SELECT 1
    FROM "public"."orders" "o"
-  WHERE (("o"."id" = "order_messages"."order_id") AND ("o"."assigned_booster_id" IS NOT NULL) AND (("o"."customer_id" = "auth"."uid"()) OR ("o"."assigned_booster_id" = "auth"."uid"()) OR "public"."is_admin"())))));
+  WHERE (("o"."id" = "order_messages"."order_id") AND (("o"."customer_id" = "auth"."uid"()) OR ("o"."assigned_booster_id" = "auth"."uid"()) OR "public"."is_admin"()))))));
+
+
+
+CREATE POLICY "order_messages_read" ON "public"."order_messages" FOR SELECT USING (((EXISTS ( SELECT 1
+   FROM "public"."orders" "o"
+  WHERE (("o"."id" = "order_messages"."order_id") AND (("o"."customer_id" = "auth"."uid"()) OR ("o"."assigned_booster_id" = "auth"."uid"()))))) OR "public"."is_admin"()));
 
 
 
@@ -3750,15 +3720,7 @@ CREATE POLICY "orders_update" ON "public"."orders" FOR UPDATE USING ("public"."i
 ALTER TABLE "public"."payments" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "payments_admin_delete" ON "public"."payments" FOR DELETE USING ("public"."is_admin"());
-
-
-
-CREATE POLICY "payments_admin_insert" ON "public"."payments" FOR INSERT WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "payments_admin_update" ON "public"."payments" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
+CREATE POLICY "payments_admin_all" ON "public"."payments" USING ("public"."is_admin"());
 
 
 
@@ -3767,10 +3729,6 @@ CREATE POLICY "payments_read" ON "public"."payments" FOR SELECT USING ((("custom
 
 
 ALTER TABLE "public"."payout_records" ENABLE ROW LEVEL SECURITY;
-
-
-CREATE POLICY "payout_records_admin_update" ON "public"."payout_records" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
-
 
 
 CREATE POLICY "payout_records_read" ON "public"."payout_records" FOR SELECT USING ((("booster_id" = "auth"."uid"()) OR "public"."is_admin"()));
@@ -3815,38 +3773,62 @@ CREATE POLICY "reviews_public_read" ON "public"."reviews" FOR SELECT USING ((("i
 ALTER TABLE "public"."service_extras" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "service_extras_admin_delete" ON "public"."service_extras" FOR DELETE USING ("public"."is_admin"());
+CREATE POLICY "service_extras_admin_read" ON "public"."service_extras" FOR SELECT TO "authenticated" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "service_extras_admin_insert" ON "public"."service_extras" FOR INSERT WITH CHECK ("public"."is_admin"());
+CREATE POLICY "service_extras_admin_write" ON "public"."service_extras" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "service_extras_admin_update" ON "public"."service_extras" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
-
-
-
-CREATE POLICY "service_extras_public_read" ON "public"."service_extras" FOR SELECT USING ((("is_active" = true) OR "public"."is_admin"()));
+CREATE POLICY "service_extras_public_read" ON "public"."service_extras" FOR SELECT TO "authenticated", "anon" USING (("is_active" = true));
 
 
 
 ALTER TABLE "public"."services" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "services_admin_delete" ON "public"."services" FOR DELETE USING ("public"."is_admin"());
+CREATE POLICY "services_admin_read" ON "public"."services" FOR SELECT TO "authenticated" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "services_admin_insert" ON "public"."services" FOR INSERT WITH CHECK ("public"."is_admin"());
+CREATE POLICY "services_admin_write" ON "public"."services" USING ("public"."is_admin"());
 
 
 
-CREATE POLICY "services_admin_update" ON "public"."services" FOR UPDATE USING ("public"."is_admin"()) WITH CHECK ("public"."is_admin"());
+CREATE POLICY "services_public_read" ON "public"."services" FOR SELECT TO "authenticated", "anon" USING (("is_active" = true));
 
 
 
-CREATE POLICY "services_public_read" ON "public"."services" FOR SELECT USING ((("is_active" = true) OR "public"."is_admin"()));
+ALTER TABLE "public"."support_tickets" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."ticket_messages" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "ticket_messages_insert" ON "public"."ticket_messages" FOR INSERT WITH CHECK ((("sender_id" = "auth"."uid"()) AND ("sender_role" = "public"."current_user_role"()) AND (("is_internal" = false) OR "public"."is_admin"()) AND ((EXISTS ( SELECT 1
+   FROM "public"."support_tickets" "t"
+  WHERE (("t"."id" = "ticket_messages"."ticket_id") AND (("t"."customer_id" = "auth"."uid"()) OR ("t"."assigned_to" = "auth"."uid"()))))) OR "public"."is_admin"())));
+
+
+
+CREATE POLICY "ticket_messages_read" ON "public"."ticket_messages" FOR SELECT USING ((((EXISTS ( SELECT 1
+   FROM "public"."support_tickets" "t"
+  WHERE (("t"."id" = "ticket_messages"."ticket_id") AND ("t"."customer_id" = "auth"."uid"())))) AND ("is_internal" = false)) OR "public"."is_admin"()));
+
+
+
+CREATE POLICY "tickets_customer_insert" ON "public"."support_tickets" FOR INSERT WITH CHECK ((("customer_id" = "auth"."uid"()) AND ("status" = 'open'::"public"."ticket_status") AND ("priority" = 'medium'::"public"."ticket_priority") AND ("assigned_to" IS NULL) AND ("resolved_at" IS NULL) AND (("order_id" IS NULL) OR (EXISTS ( SELECT 1
+   FROM "public"."orders" "o"
+  WHERE (("o"."id" = "support_tickets"."order_id") AND ("o"."customer_id" = "auth"."uid"())))))));
+
+
+
+CREATE POLICY "tickets_customer_read" ON "public"."support_tickets" FOR SELECT USING ((("customer_id" = "auth"."uid"()) OR "public"."is_admin"()));
+
+
+
+CREATE POLICY "tickets_update" ON "public"."support_tickets" FOR UPDATE USING ((("customer_id" = "auth"."uid"()) OR "public"."is_admin"())) WITH CHECK ((("customer_id" = "auth"."uid"()) OR "public"."is_admin"()));
 
 
 
@@ -3854,6 +3836,7 @@ CREATE POLICY "users_submit_own_application" ON "public"."booster_applications" 
 
 
 
+REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
@@ -3861,7 +3844,7 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."accept_boost_order"("p_order_id" "uuid", "p_booster_user_id" "uuid") TO "service_role";
 
@@ -3873,33 +3856,27 @@ GRANT ALL ON FUNCTION "public"."admin_dashboard_stats"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."admin_override_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."admin_set_order_chat_lock"("p_order_id" "uuid", "p_locked" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."admin_set_order_chat_lock"("p_order_id" "uuid", "p_locked" boolean) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."admin_set_order_chat_lock"("p_order_id" "uuid", "p_locked" boolean) TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."approve_booster"("p_booster_id" "uuid", "p_new_status" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."assign_ticket"("p_ticket_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."assign_ticket"("p_ticket_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."assign_ticket"("p_ticket_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."booster_heartbeat"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "service_role";
 
 
 
@@ -3909,13 +3886,19 @@ GRANT ALL ON FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_us
 
 
 
+REVOKE ALL ON FUNCTION "public"."booster_heartbeat"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."booster_payout_summary"("p_booster_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."booster_payout_summary"("p_booster_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."booster_payout_summary"("p_booster_user_id" "uuid") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "p_boost_mode" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "p_boost_mode" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "p_boost_mode" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "uuid", "p_boost_mode" "text") TO "service_role";
 
@@ -3924,12 +3907,6 @@ GRANT ALL ON FUNCTION "public"."can_booster_accept_order"("p_booster_user_id" "u
 REVOKE ALL ON FUNCTION "public"."check_own_write_rate_limit"("p_scope" "text", "p_limit" integer, "p_window_seconds" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."check_own_write_rate_limit"("p_scope" "text", "p_limit" integer, "p_window_seconds" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_own_write_rate_limit"("p_scope" "text", "p_limit" integer, "p_window_seconds" integer) TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."clear_terminal_order_credentials"() TO "anon";
-GRANT ALL ON FUNCTION "public"."clear_terminal_order_credentials"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."clear_terminal_order_credentials"() TO "service_role";
 
 
 
@@ -3943,13 +3920,13 @@ GRANT ALL ON FUNCTION "public"."consume_edge_rate_limit"("p_scope" "text", "p_su
 
 
 
-REVOKE ALL ON FUNCTION "public"."current_user_role"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."current_user_role"() TO "anon";
 GRANT ALL ON FUNCTION "public"."current_user_role"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."current_user_role"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."ensure_profile_exists"("p_display_name" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."ensure_profile_exists"("p_display_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."ensure_profile_exists"("p_display_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."ensure_profile_exists"("p_display_name" "text") TO "service_role";
 
@@ -3960,71 +3937,72 @@ GRANT ALL ON FUNCTION "public"."expire_stale_pix_orders"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_duo_account_credentials"("p_account_id" "uuid") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."get_order_chat"("p_order_id" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_order_chat"("p_order_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_order_chat"("p_order_id" "uuid") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") FROM "anon";
-GRANT ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."handle_new_user"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."is_admin"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_admin"() TO "anon";
 GRANT ALL ON FUNCTION "public"."is_admin"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_admin"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."is_approved_booster"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_approved_booster"() TO "anon";
 GRANT ALL ON FUNCTION "public"."is_approved_booster"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_approved_booster"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."log_match_result"("p_order_id" "uuid", "p_wins" integer, "p_losses" integer) TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."moderate_review"("p_review_id" "uuid", "p_is_public" boolean) TO "anon";
+GRANT ALL ON FUNCTION "public"."moderate_review"("p_review_id" "uuid", "p_is_public" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."moderate_review"("p_review_id" "uuid", "p_is_public" boolean) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."notify_boosters_order_available"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."notify_boosters_order_available"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer) TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer, "p_full_name" "text", "p_cpf" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer, "p_full_name" "text", "p_cpf" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer, "p_full_name" "text", "p_cpf" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."onboard_booster"("p_display_name" "text", "p_bio" "text", "p_peak_rank" "jsonb", "p_opgg_link" "text", "p_hours_per_day_min" integer, "p_hours_per_day_max" integer, "p_full_name" "text", "p_cpf" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."order_requires_access_token"("p_service_type" "public"."service_type", "p_boost_mode" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."order_requires_access_token"("p_service_type" "public"."service_type", "p_boost_mode" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."order_requires_access_token"("p_service_type" "public"."service_type", "p_boost_mode" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."order_requires_access_token"("p_service_type" "public"."service_type", "p_boost_mode" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."prevent_non_admin_booster_status_change"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."prevent_non_admin_booster_status_change"() TO "anon";
 GRANT ALL ON FUNCTION "public"."prevent_non_admin_booster_status_change"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."prevent_non_admin_booster_status_change"() TO "service_role";
 
@@ -4035,7 +4013,7 @@ GRANT ALL ON FUNCTION "public"."process_mp_payment_event"("p_order_id" "uuid", "
 
 
 
-REVOKE ALL ON FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."rank_step"("p_tier" "text", "p_division" "text") TO "service_role";
 
@@ -4056,168 +4034,174 @@ GRANT ALL ON FUNCTION "public"."refresh_top5_boosters"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."request_booster_role"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."request_booster_role"() TO "anon";
 GRANT ALL ON FUNCTION "public"."request_booster_role"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."request_booster_role"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."request_order_drop"("p_order_id" "uuid", "p_reason" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."resolve_drop_request"("p_request_id" "uuid", "p_approve" boolean, "p_admin_note" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."resolve_order_access_token"("p_access_token" "text", "p_booster_user_id" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."resolve_order_access_token"("p_access_token" "text", "p_booster_user_id" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."resolve_order_access_token"("p_access_token" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."resolve_order_access_token"("p_access_token" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."send_order_message"("p_order_id" "uuid", "p_content" "text") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."send_order_message"("p_order_id" "uuid", "p_content" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."send_order_message"("p_order_id" "uuid", "p_content" "text") TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_login" "text", "p_password" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_login" "text", "p_password" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_login" "text", "p_password" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."set_duo_account_credentials"("p_account_id" "uuid", "p_login" "text", "p_password" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."set_master_plus_pricing_updated_at"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_master_plus_pricing_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."set_master_plus_pricing_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."set_master_plus_pricing_updated_at"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text", "p_encrypt_key" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text", "p_encrypt_key" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."set_order_credentials"("p_order_id" "uuid", "p_login" "text", "p_password" "text", "p_encrypt_key" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5" boolean) TO "anon";
 GRANT ALL ON FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5" boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."toggle_booster_top5"("p_booster_id" "uuid", "p_is_top5" boolean) TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_booster_active_on_accept"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_accept"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_accept"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_accept"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_booster_active_on_message"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_message"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_message"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_booster_active_on_message"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_cap_coach_packages"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_cap_coach_packages"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_cap_coach_packages"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_cap_coach_packages"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_booster_display_name_cooldown"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_enforce_message_rate_limit"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_enforce_message_rate_limit"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_message_rate_limit"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_message_rate_limit"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_enforce_review_rate_limit"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_enforce_review_rate_limit"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_review_rate_limit"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_enforce_review_rate_limit"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_booster_profile_trust_columns"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_customer_profile_trust_columns"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_guard_notifications_user_update"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_notifications_user_update"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_notifications_user_update"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_notifications_user_update"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_guard_profiles_trust_columns"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_order_completed_booster_stats"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"() TO "anon";
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."trg_fn_guard_support_tickets_trust_columns"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."trg_fn_order_completed_booster_stats"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_order_completed_booster_stats"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_order_completed_booster_stats"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_order_paid_customer_stats"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_order_paid_customer_stats"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_order_paid_customer_stats"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_order_paid_customer_stats"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_fn_reviews_refresh_booster_rating"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."trg_order_completed_refresh_top5"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trg_order_completed_refresh_top5"() TO "anon";
 GRANT ALL ON FUNCTION "public"."trg_order_completed_refresh_top5"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."trg_order_completed_refresh_top5"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."update_booster_applications_updated_at"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_booster_applications_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_booster_applications_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_booster_applications_updated_at"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."update_booster_services_updated_at"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_booster_services_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_booster_services_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_booster_services_updated_at"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."update_duo_accounts_updated_at"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_duo_accounts_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_duo_accounts_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_duo_accounts_updated_at"() TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."update_my_username"("p_username" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_my_username"("p_username" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_my_username"("p_username" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_my_username"("p_username" "text") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."update_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_order_status"("p_order_id" "uuid", "p_new_status" "text", "p_reason" "text") TO "service_role";
 
@@ -4260,197 +4244,9 @@ GRANT ALL ON TABLE "public"."audit_logs" TO "service_role";
 
 
 
-GRANT INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."orders" TO "anon";
-GRANT INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."orders" TO "authenticated";
+GRANT ALL ON TABLE "public"."orders" TO "anon";
+GRANT ALL ON TABLE "public"."orders" TO "authenticated";
 GRANT ALL ON TABLE "public"."orders" TO "service_role";
-
-
-
-GRANT SELECT("id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("customer_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("service_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("game_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("status") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("queue_type") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("boost_mode") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("server") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("current_rank") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("target_rank") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("wins_purchased") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("sessions_purchased") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("win_package") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("extras") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("base_price") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("extras_price") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("total_price") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("estimated_hours") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("customer_notes") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("booster_notes") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("wins_played") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("losses_played") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("assigned_booster_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("mp_payment_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("payment_status") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("credentials_set") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("discord_voice_channel_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("completed_at") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("created_at") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("updated_at") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("current_pdl") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("pdl_bracket") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("avg_pdl_gain") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("avg_pdl_loss") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("pricing_version") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("idempotency_key") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("used_exclusive_slot") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("riot_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("booster_service_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("preferred_booster_id") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("exclusive_until") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("service_type") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("md5_matches_remaining") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("chat_locked") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("chat_locked_by") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("chat_locked_at") ON TABLE "public"."orders" TO "authenticated";
-
-
-
-GRANT SELECT("credential_expires_at") ON TABLE "public"."orders" TO "authenticated";
 
 
 
@@ -4463,6 +4259,17 @@ GRANT ALL ON TABLE "public"."available_boost_orders" TO "service_role";
 GRANT SELECT,REFERENCES,DELETE,TRIGGER,TRUNCATE,MAINTAIN,UPDATE ON TABLE "public"."booster_applications" TO "anon";
 GRANT ALL ON TABLE "public"."booster_applications" TO "authenticated";
 GRANT ALL ON TABLE "public"."booster_applications" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."booster_order_events" TO "service_role";
+GRANT SELECT ON TABLE "public"."booster_order_events" TO "authenticated";
+
+
+
+GRANT ALL ON SEQUENCE "public"."booster_order_events_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."booster_order_events_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."booster_order_events_id_seq" TO "service_role";
 
 
 
@@ -4513,7 +4320,7 @@ GRANT ALL ON TABLE "public"."order_drop_requests" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."order_messages" TO "anon";
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."order_messages" TO "authenticated";
+GRANT ALL ON TABLE "public"."order_messages" TO "authenticated";
 GRANT ALL ON TABLE "public"."order_messages" TO "service_role";
 
 
@@ -4578,13 +4385,22 @@ GRANT ALL ON TABLE "public"."services" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."support_tickets" TO "anon";
+GRANT ALL ON TABLE "public"."support_tickets" TO "authenticated";
+GRANT ALL ON TABLE "public"."support_tickets" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."ticket_messages" TO "anon";
+GRANT ALL ON TABLE "public"."ticket_messages" TO "authenticated";
+GRANT ALL ON TABLE "public"."ticket_messages" TO "service_role";
+
+
+
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES TO "service_role";
-
-
-
 
 
 
@@ -4595,17 +4411,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 
-
-
-
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
-
-
-
-
-
 
 

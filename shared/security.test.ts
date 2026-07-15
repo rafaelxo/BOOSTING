@@ -38,6 +38,18 @@ describe('Edge HTTP hardening', () => {
 })
 
 describe('Database authorization migration', () => {
+  it('não expira pedido salvo antes de existir uma cobrança PIX', async () => {
+    const sql = await readFile(
+      new URL('../supabase/migrations/045_persist_unpaid_orders_before_pix.sql', import.meta.url),
+      'utf8',
+    )
+
+    expect(sql).toContain('o.mp_payment_id is not null')
+    expect(sql).toContain("p.status = 'pending'")
+    expect(sql).toContain("p.created_at < now() - interval '35 minutes'")
+    expect(sql).not.toContain("o.created_at < now() - interval '35 minutes'")
+  })
+
   it('locks trust fields and projects available orders without sensitive columns', async () => {
     const sql = await readFile(
       new URL('../supabase/migrations/007_security_integrity_and_payment_atomicity.sql', import.meta.url),
@@ -154,5 +166,34 @@ describe('Database authorization migration', () => {
     expect(source).not.toContain('p_booster_user_id: parsedBody')
     expect(source).not.toContain('console.log')
     expect(source).not.toMatch(/console\.\w+\([^)]*result\.(login|password)/)
+  })
+
+  it('segura pedidos pagos que exigem credenciais e so os libera depois do envio', async () => {
+    const sql = await readFile(
+      new URL('../supabase/migrations/047_paid_credentials_handoff.sql', import.meta.url),
+      'utf8',
+    )
+
+    expect(sql).toContain("when v_requires_credentials then 'awaiting_customer'::public.order_status")
+    expect(sql).toContain("else 'awaiting_assignment'::public.order_status")
+    expect(sql).toContain("'requires_credentials', v_requires_credentials")
+    expect(sql).toContain('create or replace function public.release_paid_order_after_credentials()')
+    expect(sql).toContain("and new.status = 'awaiting_customer'::public.order_status")
+    expect(sql).toContain("set status = 'awaiting_assignment'")
+    expect(sql).toContain('after update of credentials_set on public.orders')
+    expect(sql).toContain('and new.assigned_booster_id is null')
+  })
+
+  it('cancela PIX vencido no backend e executa a limpeza a cada minuto', async () => {
+    const sql = await readFile(
+      new URL('../supabase/migrations/048_expired_pix_cleanup_schedule.sql', import.meta.url),
+      'utf8',
+    )
+
+    expect(sql).toContain("set status = 'canceled'")
+    expect(sql).toContain("p.created_at < now() - interval '35 minutes'")
+    expect(sql).toContain("'PIX expirado sem confirmação de pagamento'")
+    expect(sql).toContain("'* * * * *'")
+    expect(sql).toContain('perform cron.unschedule')
   })
 })

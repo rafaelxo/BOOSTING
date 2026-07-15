@@ -129,6 +129,8 @@ const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
 }
 
 export const MATCH_DURATION_HOURS = 0.5
+export const DELIVERY_MARGIN_GAMES = 2
+export const DELIVERY_MARGIN_HOURS = DELIVERY_MARGIN_GAMES * MATCH_DURATION_HOURS
 export const EXPECTED_BOOST_WIN_RATE = 0.8
 export const MASTER_PLUS_LP_PER_GAME = 30
 export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenger', number> = {
@@ -445,6 +447,13 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
 
   if (estimatedHours != null && input.winPackage) {
     estimatedHours += input.winPackage * MATCH_DURATION_HOURS
+  }
+
+  // Margem operacional exibida ao cliente: duas partidas adicionais (1h).
+  // Só se aplica a serviços cuja duração é calculada em partidas; coaching
+  // continua usando a duração real do pacote/sessões.
+  if (estimatedHours != null && input.serviceType !== 'coaching') {
+    estimatedHours += DELIVERY_MARGIN_HOURS
   }
 
   const extrasPriceCents = extrasRawCents + moneyToCents(winPackagePrice)

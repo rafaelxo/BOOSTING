@@ -141,11 +141,33 @@ function PendingPaymentSection({ order }: { order: Order }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
       queryClient.removeQueries({ queryKey: ['order', order.id] })
-      navigate('/orders', { replace: true })
+      navigate('/orders/new?new=1', { replace: true })
     },
-    onError: (err) => setError(pixErrorMessage(err)),
+    onError: async () => {
+      // Payment approval may race the last countdown second. If it won, keep
+      // the order and continue to the credential step; otherwise leave the
+      // expired checkout and reset the configurator.
+      const state = await getCustomerOrderState(order.id).catch(() => null)
+      if (state?.payment_confirmed) {
+        queryClient.setQueryData(['customer-order-state', order.id], state)
+        await queryClient.invalidateQueries({ queryKey: ['order', order.id] })
+        navigate(`/orders/${order.id}${state.requires_credentials ? '#credentials' : ''}`, { replace: true })
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
+      navigate('/orders/new?new=1', { replace: true })
+    },
   })
+
+  useEffect(() => {
+    if (!pix || remaining !== 0) return
+    cancelOrder.mutate()
+  // The expiration transition should run once when remaining reaches zero.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, pix])
 
   async function copyPix() {
     if (!pix?.qr_code) return
@@ -159,7 +181,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const expired = remaining === 0
 
   return (
-    <Card id="credentials" padding="md">
+    <Card id="payment" padding="md">
       <div className="flex items-center gap-2 mb-3">
         <QrCode className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
@@ -191,7 +213,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
         </div>
       ) : expired ? (
         <div className="space-y-3">
-          <ErrorAlert message="Este PIX expirou. Cancele este pedido e crie um novo para gerar uma cobrança atualizada." />
+          <ErrorAlert message="Este PIX expirou. O pedido está sendo cancelado e o configurador será reiniciado." />
           <Button
             className="w-full"
             variant="danger"
@@ -300,7 +322,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
   if (!canSet && !state.credentials_set) return null
 
   return (
-    <Card padding="md">
+    <Card id="credentials" padding="md" className="scroll-mt-24 ring-1 ring-brand/20">
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Acesso da Conta</h3>
@@ -382,6 +404,10 @@ export function OrderDetailPage() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [order, customerState?.requires_credentials])
+
+  useEffect(() => {
+    if (order?.status === 'canceled') navigate('/orders/new?new=1', { replace: true })
+  }, [order?.status, navigate])
 
   if (isLoading) return (
     <div className="max-w-4xl space-y-4">

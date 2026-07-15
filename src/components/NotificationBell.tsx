@@ -16,6 +16,7 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   payment_confirmed: CreditCard,
   review_received: Star,
   booster_approved: UserCheck,
+  exclusive_job: Briefcase,
 }
 
 function timeAgo(iso: string): string {
@@ -79,8 +80,14 @@ export function NotificationBell() {
 
   function handleItemClick(n: Notification) {
     if (!n.is_read) markAsRead([n.id])
-    const orderId = (n.data as { order_id?: string })?.order_id
-    if (orderId) navigate(orderPathForRole(profile?.role, orderId))
+    const notificationData = n.data as { order_id?: string; requires_credentials?: boolean }
+    const orderId = notificationData?.order_id
+    if (orderId) {
+      const credentialsHash = profile?.role === 'customer' && notificationData.requires_credentials
+        ? '#credentials'
+        : ''
+      navigate(`${orderPathForRole(profile?.role, orderId)}${credentialsHash}`)
+    }
     setOpen(false)
   }
 

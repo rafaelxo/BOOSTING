@@ -100,7 +100,7 @@ describe('Master+ — preço vem exclusivamente da tabela comercial (seção 14)
       masterPlusPrice: 250,
       currentPdl: 100,
     }))
-    expect(priced.estimatedHours).toBe(35)
+    expect(priced.estimatedHours).toBe(36)
   })
 })
 
@@ -318,7 +318,7 @@ describe('placement_matches (MD5 Completo, legado) — PLACEMENT_PRICE segue com
       currentRank: { tier: 'gold', division: null },
     }))
     expect(priced.basePrice).toBe(PLACEMENT_PRICE.gold)
-    expect(priced.estimatedHours).toBe(2.5)
+    expect(priced.estimatedHours).toBe(3.5)
   })
 
   it('sem currentRank, preço fica zero (pedido bloqueado, mesma regra dos outros serviceTypes)', () => {
@@ -459,5 +459,22 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
       sessionsPurchased: 1,
     }))
     expect(priced.pdlModifierPct).toBeNull()
+    expect(priced.estimatedHours).toBe(1)
+  })
+
+  it('adiciona margem de duas partidas nas estimativas de Vitória e MD5', () => {
+    const wins = computeOrderPrice(baseInput({
+      serviceType: 'win_boost',
+      currentRank: { tier: 'gold', division: 'II' },
+      winsPurchased: 3,
+    }))
+    const md5 = computeOrderPrice(baseInput({
+      serviceType: 'md5',
+      currentRank: { tier: 'gold', division: null },
+      winsPurchased: 3,
+    }))
+
+    expect(wins.estimatedHours).toBe(2.5)
+    expect(md5.estimatedHours).toBe(2.5)
   })
 })

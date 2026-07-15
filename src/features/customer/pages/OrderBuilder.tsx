@@ -174,6 +174,15 @@ export function OrderBuilderPage() {
   useEffect(() => {
     const service = searchParams.get('service') as ServiceType | null
     const boosterId = searchParams.get('booster')
+    const coachPackageId = searchParams.get('coach_package')
+
+    // `?new=1` is also used after an expired PIX. With no catalog entry
+    // parameters it must always discard the previous in-memory configuration
+    // and return to the first step.
+    if (searchParams.get('new') === '1' && !service && !boosterId && !coachPackageId) {
+      reset()
+      setStep('service')
+    }
 
     if (service && VALID_SERVICES.includes(service)) {
       reset()
@@ -195,7 +204,6 @@ export function OrderBuilderPage() {
         })
     }
 
-    const coachPackageId = searchParams.get('coach_package')
     if (coachPackageId) {
       // Mesma lógica defensiva do ?booster= — id inválido/inativo é
       // ignorado silenciosamente; a validação que importa é server-side.

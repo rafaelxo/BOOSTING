@@ -43,6 +43,7 @@ export type NotificationType =
   | 'payment_confirmed'
   | 'review_received'
   | 'booster_approved'
+  | 'exclusive_job'
 
 // ─── Rank / Tier system ───────────────────────────────────────────────────────
 

@@ -16,6 +16,9 @@ const bodySchema = z.object({
   order_id: z.string().uuid().optional(),
   intent: z.record(z.unknown()).optional(),
   idempotency_key: z.string().uuid().optional(),
+  // Persiste/recupera o pedido sem criar cobrança no Mercado Pago. A mesma
+  // rota mantém validação e preço autoritativos para não duplicar regras.
+  save_only: z.boolean().default(false),
   // Booster escolhido pelo cliente no perfil público (opcional, só usado ao
   // criar um pedido novo — ignorado no caminho de retry via order_id).
   preferred_booster_id: z.string().uuid().optional(),
@@ -166,6 +169,15 @@ serve(async (req) => {
             return errorResponse(req, 'Order creation conflict', 409)
           }
         } else {
+          // Keep database details out of the HTTP response, but retain enough
+          // structured context in Edge Function logs to diagnose constraints.
+          console.error('create-pix-payment order insert failed', {
+            code: insertErr?.code ?? 'missing_inserted_row',
+            message: insertErr?.message ?? 'Insert returned no row',
+            details: insertErr?.details ?? null,
+            hint: insertErr?.hint ?? null,
+            serviceType: normalized.serviceType,
+          })
           return errorResponse(req, 'Failed to create order', 500)
         }
       } else {
@@ -180,6 +192,18 @@ serve(async (req) => {
     // recomputed from anything the client sends at this point.
     if (!order.total_price || Number(order.total_price) <= 0) {
       return jsonResponse(req, { error: 'Invalid order amount', order_id: orderId }, 400)
+    }
+
+    // O pedido deve aparecer em "Meus pedidos" assim que a configuração é
+    // concluída. A cobrança PIX só nasce depois, em um segundo request feito
+    // pelo clique explícito do usuário.
+    if (body.save_only) {
+      return jsonResponse(req, {
+        success: true,
+        saved: true,
+        order_id: orderId,
+        total_price: Number(order.total_price),
+      })
     }
 
     // If there is already a pending MP payment for this order, try to reuse it
