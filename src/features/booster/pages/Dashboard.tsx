@@ -4,7 +4,7 @@ import {
   Briefcase, Clock, Swords, Users,
   Wallet, Banknote, PiggyBank, Hourglass, CalendarClock,
 } from 'lucide-react'
-import { Button, Card, Skeleton, EmptyState } from '@/components/ui'
+import { Button, Card, Skeleton, EmptyState, StatCard } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate } from '@/lib/utils'
@@ -183,16 +183,14 @@ export function BoosterDashboard() {
       <div>
         <h2 className="text-base font-semibold text-ink mb-3">Saldo</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {BALANCE_BOXES.map(({ label, value, icon: Icon, color }) => (
-            <Card key={label} padding="md">
-              <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="text-xl font-bold text-ink">
-                {loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}
-              </div>
-              <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
-            </Card>
+          {BALANCE_BOXES.map(({ label, value, icon, color }) => (
+            <StatCard
+              key={label}
+              label={label}
+              icon={icon}
+              color={color}
+              value={loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}
+            />
           ))}
         </div>
       </div>

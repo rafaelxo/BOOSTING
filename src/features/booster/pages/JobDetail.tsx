@@ -2,24 +2,15 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ArrowLeft, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
+import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import type { Division, Order, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
-
-function orderRequiresAccountAccess(order: Order): boolean {
-  return (
-    (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
-    order.service_type === 'win_boost' ||
-    order.service_type === 'placement_matches' ||
-    order.service_type === 'md5'
-  )
-}
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -39,7 +30,7 @@ export function JobDetailPage() {
     { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
   ]
 
-  const { data: order } = useQuery({
+  const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
       const { data: available, error: availableError } = await supabase
@@ -160,6 +151,17 @@ export function JobDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['drop-request', id] })
     },
   })
+
+  if (loadingOrder) return <PageLoader />
+
+  if (orderError) {
+    return (
+      <div className="max-w-4xl space-y-4">
+        <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
+        <Button onClick={() => refetchOrder()}>Tentar novamente</Button>
+      </div>
+    )
+  }
 
   if (!order) return null
 

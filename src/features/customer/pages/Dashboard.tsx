@@ -2,10 +2,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, ShoppingBag, MessageCircle, Zap, Sparkles } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
+import { Button, Skeleton, EmptyState, StatCard } from '@/components/ui'
+import { OrderRow } from '@/components/order/OrderRow'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order } from '@/types'
 
@@ -78,13 +78,6 @@ export function CustomerDashboard() {
 
   const activeCount = stats?.activeCount ?? 0
 
-  const hour = new Date().getHours()
-  const greeting = hour < 12
-    ? t('customer.dashboard.morning')
-    : hour < 18
-      ? t('customer.dashboard.afternoon')
-      : t('customer.dashboard.evening')
-
   const activeMsg = activeCount === 0
     ? t('customer.dashboard.noActive')
     : activeCount === 1
@@ -97,7 +90,7 @@ export function CustomerDashboard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">
-            {greeting}, {profile?.username}
+            {t('customer.dashboard.welcome')}, {profile?.username}
             <Sparkles className="ml-2 inline h-5 w-5 text-accent align-[-2px]" />
           </h1>
           <p className="text-ink-secondary mt-1">{activeMsg}</p>
@@ -117,14 +110,8 @@ export function CustomerDashboard() {
           { label: t('customer.dashboard.stats.total'),     value: stats?.totalOrders ?? 0,             icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
           { label: t('customer.dashboard.stats.completed'), value: stats?.completedCount ?? 0,          icon: ShoppingBag,   color: 'text-success bg-success/10' },
           { label: t('customer.dashboard.stats.spent'),     value: currency(stats?.totalSpent ?? 0),    icon: MessageCircle, color: 'text-info bg-info/10' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} padding="md">
-            <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
-              <Icon className="h-4 w-4" />
-            </div>
-            <p className="text-2xl font-bold text-ink">{value}</p>
-            <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
-          </Card>
+        ].map(({ label, value, icon, color }) => (
+          <StatCard key={label} label={label} value={value} icon={icon} color={color} valueSize="lg" />
         ))}
       </div>
 
@@ -134,7 +121,7 @@ export function CustomerDashboard() {
           <h2 className="text-base font-semibold text-ink mb-3">{t('customer.dashboard.activeTitle')}</h2>
           <div className="space-y-3">
             {activeOrders.map((order) => (
-              <OrderCard key={order.id} order={order} currency={currency} />
+              <OrderRow key={order.id} order={order} currency={currency} />
             ))}
           </div>
         </div>
@@ -165,37 +152,11 @@ export function CustomerDashboard() {
         ) : (
           <div className="space-y-3">
             {orders.slice(0, 5).map((order) => (
-              <OrderCard key={order.id} order={order} currency={currency} />
+              <OrderRow key={order.id} order={order} currency={currency} />
             ))}
           </div>
         )}
       </div>
     </div>
-  )
-}
-
-function OrderCard({ order, currency }: { order: Order; currency: (amount: number) => string }) {
-  return (
-    <Link to={`/orders/${order.id}`}>
-      <Card className="flex items-center justify-between gap-4 hover:border-brand/20 hover:shadow-card-hover transition-all duration-150 cursor-pointer">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="h-10 w-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
-            <Zap className="h-5 w-5 text-brand" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-ink truncate">
-              #{order.id.slice(0, 8).toUpperCase()}
-            </p>
-            <p className="text-xs text-ink-muted mt-0.5">{timeAgo(order.created_at)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 shrink-0">
-          <span className="hidden sm:block text-sm font-semibold text-ink">
-            {currency(order.total_price)}
-          </span>
-          <OrderStatusBadge status={order.status} />
-        </div>
-      </Card>
-    </Link>
   )
 }

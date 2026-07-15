@@ -36,7 +36,6 @@ const JobDetailPage       = lazy(() => import('@/features/booster/pages/JobDetai
 const BoosterOrdersPage   = lazy(() => import('@/features/booster/pages/Orders').then(m => ({ default: m.BoosterOrdersPage })))
 const BoosterAccountsPage = lazy(() => import('@/features/booster/pages/Accounts').then(m => ({ default: m.BoosterAccountsPage })))
 const BoosterServicesPage = lazy(() => import('@/features/booster/pages/Services').then(m => ({ default: m.BoosterServicesPage })))
-const BoosterOnboardingPage = lazy(() => import('@/features/booster/pages/Onboarding').then(m => ({ default: m.BoosterOnboardingPage })))
 
 // Admin pages
 const AdminOverview       = lazy(() => import('@/features/admin/pages/Overview').then(m => ({ default: m.AdminOverview })))
@@ -52,7 +51,6 @@ const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services')
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
 const AdminBoostConfigPage = lazy(() => import('@/features/admin/pages/BoostConfig').then(m => ({ default: m.AdminBoostConfigPage })))
-const ReviewsPage         = lazy(() => import('@/features/public/pages/ReviewsPage').then(m => ({ default: m.ReviewsPage })))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -64,7 +62,6 @@ export const router = createBrowserRouter([
       { path: '/pricing',  element: <SuspensePage><PricingPage /></SuspensePage> },
       { path: '/security', element: <SuspensePage><SecurityPage /></SuspensePage> },
       { path: '/faq',      element: <SuspensePage><FAQPage /></SuspensePage> },
-      { path: '/reviews',  element: <SuspensePage><ReviewsPage /></SuspensePage> },
       { path: '/terms',    element: <SuspensePage><TermsPage /></SuspensePage> },
       { path: '/privacy',  element: <SuspensePage><PrivacyPage /></SuspensePage> },
       { path: '/boosters',     element: <SuspensePage><BoostersPage /></SuspensePage> },
@@ -121,11 +118,11 @@ export const router = createBrowserRouter([
           { path: '/booster/orders',      element: <SuspensePage><BoosterOrdersPage /></SuspensePage> },
           { path: '/booster/accounts',    element: <SuspensePage><BoosterAccountsPage /></SuspensePage> },
           { path: '/booster/services',    element: <SuspensePage><BoosterServicesPage /></SuspensePage> },
-          { path: '/booster/onboarding',  element: <SuspensePage><BoosterOnboardingPage /></SuspensePage> },
           // Rotas antigas — mantidas como redirect para não quebrar links/bookmarks existentes.
           { path: '/booster/completed',   element: <Navigate to="/booster/orders" replace /> },
           { path: '/booster/earnings',    element: <Navigate to="/booster" replace /> },
           { path: '/booster/profile',     element: <Navigate to="/booster/services" replace /> },
+          { path: '/booster/onboarding',  element: <Navigate to="/apply?booster=1" replace /> },
         ],
       },
     ],

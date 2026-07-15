@@ -146,7 +146,11 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     qc.invalidateQueries({ queryKey: ['booster-professional-profile', userId] })
-    qc.invalidateQueries({ queryKey: ['public-booster-profile'] })
+    // Prefix match: cobre ['public-booster', id] (BoosterPublicProfilePage),
+    // ['public-boosters'] (BoostersPage) e ['home-featured-boosters'] (HomePage).
+    qc.invalidateQueries({ queryKey: ['public-booster'] })
+    qc.invalidateQueries({ queryKey: ['public-boosters'] })
+    qc.invalidateQueries({ queryKey: ['home-featured-boosters'] })
   }
 
   if (isLoading) {

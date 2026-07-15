@@ -170,7 +170,6 @@ export type Database = {
         Row: {
           available_days: string[] | null
           bio: string | null
-          can_coach: boolean | null
           cpf: string | null
           created_at: string
           current_rank: Json | null
@@ -204,7 +203,6 @@ export type Database = {
         Insert: {
           available_days?: string[] | null
           bio?: string | null
-          can_coach?: boolean | null
           cpf?: string | null
           created_at?: string
           current_rank?: Json | null
@@ -238,7 +236,6 @@ export type Database = {
         Update: {
           available_days?: string[] | null
           bio?: string | null
-          can_coach?: boolean | null
           cpf?: string | null
           created_at?: string
           current_rank?: Json | null
@@ -1641,10 +1638,6 @@ export type Database = {
         Args: { p_losses: number; p_order_id: string; p_wins: number }
         Returns: Json
       }
-      moderate_review: {
-        Args: { p_is_public: boolean; p_review_id: string }
-        Returns: Json
-      }
       onboard_booster:
         | {
             Args: {
@@ -1755,7 +1748,6 @@ export type Database = {
         | "approved"
         | "suspended"
         | "rejected"
-      game_slug: "lol" | "valorant" | "tft"
       order_status:
         | "draft"
         | "awaiting_payment"
@@ -2373,7 +2365,6 @@ export const Constants = {
         "suspended",
         "rejected",
       ],
-      game_slug: ["lol", "valorant", "tft"],
       order_status: [
         "draft",
         "awaiting_payment",

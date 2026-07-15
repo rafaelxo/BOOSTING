@@ -23,9 +23,6 @@ export function BoosterLayout() {
   ]
 
   const { state } = useBoosterStatus()
-  // /booster/onboarding renders its own form/redirect logic and must always
-  // reach the full panel shell below, regardless of application status.
-  const isOnboardingRoute = pathname === '/booster/onboarding'
 
   // Still loading — wait
   if (state === 'loading') return null
@@ -44,14 +41,12 @@ export function BoosterLayout() {
     </div>
   )
 
-  if (!isOnboardingRoute) {
-    if (state === 'no_application') return shell(<NoApplicationScreen />)
-    if (state === 'pending') return shell(<PendingScreen />)
-    if (state === 'rejected') return shell(<RejectedScreen />)
-    if (state === 'error') return shell(<BoosterStatusErrorScreen />)
-  }
+  if (state === 'no_application') return shell(<NoApplicationScreen />)
+  if (state === 'pending') return shell(<PendingScreen />)
+  if (state === 'rejected') return shell(<RejectedScreen />)
+  if (state === 'error') return shell(<BoosterStatusErrorScreen />)
 
-  // Approved (or /booster/onboarding, which handles its own status logic) — full panel
+  // Approved — full panel
   return (
     <div className="min-h-screen flex bg-bg-base">
       {/* Sidebar */}

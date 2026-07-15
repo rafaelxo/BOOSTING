@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search } from 'lucide-react'
-import { OrderStatusBadge, Skeleton, EmptyState } from '@/components/ui'
+import { OrderStatusBadge, Skeleton, EmptyState, ErrorAlert, Button } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
 import { timeAgo, getServiceLabel } from '@/lib/utils'
@@ -24,7 +24,7 @@ export function AdminOrdersPage() {
     { label: t('admin.orders.filters.completed'), value: 'completed' },
   ]
 
-  const { data: orders, isLoading } = useQuery({
+  const { data: orders, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-orders', status],
     queryFn: async () => {
       let q = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100)
@@ -65,6 +65,11 @@ export function AdminOrdersPage() {
       <div className="card p-0">
         {isLoading ? (
           <div className="p-4"><Skeleton className="h-64 w-full" /></div>
+        ) : isError ? (
+          <div className="p-4 space-y-3">
+            <ErrorAlert message="Não foi possível carregar os pedidos." />
+            <Button size="sm" onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
         ) : !filtered.length ? (
           <EmptyState icon={Search} title={t('admin.orders.empty')} />
         ) : (

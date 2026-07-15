@@ -63,7 +63,7 @@ export function NoApplicationScreen() {
         </p>
       </div>
       <Button asChild size="sm">
-        <Link to="/apply">Preencher formulário</Link>
+        <Link to="/apply?booster=1">Preencher formulário</Link>
       </Button>
     </div>
   )

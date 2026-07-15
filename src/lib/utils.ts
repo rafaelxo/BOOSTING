@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { OrderStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
+import type { Order, OrderStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
 
 export { RANK_TIER_ORDER } from '../../shared/pricing'
 
@@ -130,6 +130,18 @@ const SERVICE_LABEL_MAP: Record<string, string> = {
 
 export function getServiceLabel(serviceId: string): string {
   return SERVICE_LABEL_MAP[serviceId] ?? serviceId.replace(/_/g, ' ')
+}
+
+// Mirrors public.order_requires_access_token(service_type, boost_mode) —
+// mantém a mesma predicate no front pra decidir quando mostrar a seção de
+// credenciais da conta, sem duplicar a regra em cada tela.
+export function orderRequiresAccountAccess(order: Order): boolean {
+  return (
+    (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
+    order.service_type === 'win_boost' ||
+    order.service_type === 'placement_matches' ||
+    order.service_type === 'md5'
+  )
 }
 
 // Share of order.total_price the booster receives before an authoritative

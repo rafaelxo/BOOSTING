@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw, Clock, ShieldCheck } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, ErrorAlert } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
@@ -25,7 +25,7 @@ export function AdminOrderDetailPage() {
   const queryClient = useQueryClient()
   const currency = useCurrency()
 
-  const { data: order } = useQuery({
+  const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: async () => {
       const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
@@ -81,6 +81,17 @@ export function AdminOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-order-history', id] })
     },
   })
+
+  if (loadingOrder) return <PageLoader />
+
+  if (orderError) {
+    return (
+      <div className="max-w-4xl space-y-4">
+        <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
+        <Button onClick={() => refetchOrder()}>Tentar novamente</Button>
+      </div>
+    )
+  }
 
   if (!order) return null
 

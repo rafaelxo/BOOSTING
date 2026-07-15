@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { ShoppingBag, DollarSign, Users } from 'lucide-react'
-import { Card, OrderStatusBadge, Skeleton } from '@/components/ui'
+import { Card, OrderStatusBadge, Skeleton, StatCard } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
 import type { Order } from '@/types'
@@ -68,17 +68,8 @@ export function AdminOverview() {
             { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
             { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10', trend: null },
             { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
-          ].map(({ label, value, icon: Icon, color, trend }) => (
-            <Card key={label} padding="md">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`h-9 w-9 rounded-xl ${color} flex items-center justify-center`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                {trend && <span className="text-xs font-semibold text-success">{trend}</span>}
-              </div>
-              <p className="text-xl font-bold text-ink">{value}</p>
-              <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
-            </Card>
+          ].map(({ label, value, icon, color, trend }) => (
+            <StatCard key={label} label={label} value={value} icon={icon} color={color} trend={trend} iconSize="md" />
           ))}
         </div>
       )}

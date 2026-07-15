@@ -137,9 +137,7 @@
       "role": "Cliente"
     },
     "dashboard": {
-      "morning": "Bom dia",
-      "afternoon": "Boa tarde",
-      "evening": "Boa noite",
+      "welcome": "Bem-vindo",
       "activeCount": "Você tem {{count}} pedido ativo.",
       "activeCountPlural": "Você tem {{count}} pedidos ativos.",
       "noActive": "Nenhum pedido ativo no momento.",

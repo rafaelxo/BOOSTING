@@ -7,18 +7,9 @@ import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert } from '@/componen
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatusHistory } from '@/types'
-
-function orderRequiresAccountAccess(order: Order): boolean {
-  return (
-    (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
-    order.service_type === 'win_boost' ||
-    order.service_type === 'placement_matches' ||
-    order.service_type === 'md5'
-  )
-}
 
 function useOrder(id: string, refetchInterval?: number) {
   return useQuery({
@@ -347,7 +338,7 @@ export function OrderDetailPage() {
   const { t } = useTranslation()
   const currency = useCurrency()
 
-  const { data: order, isLoading } = useOrder(id!)
+  const { data: order, isLoading, isError, refetch } = useOrder(id!)
   const { data: history } = useOrderHistory(id!)
 
   if (isLoading) return (
@@ -356,6 +347,15 @@ export function OrderDetailPage() {
       <Skeleton className="h-64 w-full" />
     </div>
   )
+
+  if (isError) {
+    return (
+      <div className="max-w-4xl space-y-4">
+        <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
+        <Button onClick={() => refetch()}>Tentar novamente</Button>
+      </div>
+    )
+  }
 
   if (!order) {
     return (

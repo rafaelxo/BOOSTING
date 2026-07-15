@@ -1,12 +1,12 @@
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ShoppingBag, Search } from 'lucide-react'
-import { OrderStatusBadge, EmptyState, Skeleton } from '@/components/ui'
+import { EmptyState, Skeleton } from '@/components/ui'
+import { OrderRow } from '@/components/order/OrderRow'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, getServiceLabel } from '@/lib/utils'
+import { getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus } from '@/types'
 
@@ -91,29 +91,13 @@ export function OrderHistoryPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((order) => (
-            <Link
+            <OrderRow
               key={order.id}
-              to={`/orders/${order.id}`}
-              className="card flex items-center justify-between gap-4 hover:border-brand/20 hover:shadow-card-hover transition-all duration-150 cursor-pointer"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-sm font-semibold text-ink">
-                    #{order.id.slice(0, 8).toUpperCase()}
-                  </p>
-                  <span className="hidden sm:block text-xs text-ink-muted">
-                    {getServiceLabel(order.service_id as string)}
-                  </span>
-                </div>
-                <p className="text-xs text-ink-muted">{timeAgo(order.created_at)}</p>
-              </div>
-              <div className="flex items-center gap-4 shrink-0">
-                <span className="hidden sm:block text-sm font-semibold text-ink">
-                  {currency(order.total_price)}
-                </span>
-                <OrderStatusBadge status={order.status} />
-              </div>
-            </Link>
+              order={order}
+              currency={currency}
+              subtitle={getServiceLabel(order.service_id as string)}
+              showIcon={false}
+            />
           ))}
         </div>
       )}
