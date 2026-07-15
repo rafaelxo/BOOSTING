@@ -97,6 +97,25 @@ export function BoosterLayout() {
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </main>
+
+        <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0" aria-label="Navegação do booster">
+          {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+            const active = pathname === href || (href !== '/booster' && pathname.startsWith(href))
+            return (
+              <Link
+                key={href}
+                to={href}
+                className={cn(
+                  'flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-3 text-[10px] font-semibold',
+                  active ? 'text-brand' : 'text-ink-muted',
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="w-full truncate text-center">{label}</span>
+              </Link>
+            )
+          })}
+        </nav>
       </div>
     </div>
   )

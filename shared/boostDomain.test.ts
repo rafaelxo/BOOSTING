@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   BOOST_CURRENT_RANK_TIERS, STANDARD_RANK_TIERS, PRIORITY_ADDON_CODE,
-  BOOST_ADDON_CODES, PDL_BRACKETS, MASTER_PLUS_PROGRESSIONS, NO_DIVISION_TIERS,
+  BOOST_ADDON_CODES, PDL_BRACKETS, NO_DIVISION_TIERS,
   isStandardTier, isMasterPlusCurrentTier, getBoostFlow, tierHasDivisions,
-  getValidMasterPlusTargets, isValidMasterPlusProgression,
   getPdlBracket, isAddonCodeValidForFlow, hasDuplicateAddonCodes,
   sortAddonsBySortOrder, isRankLocked,
 } from './boostDomain'
@@ -55,40 +54,19 @@ describe('getBoostFlow — resolução de fluxo a partir de rank atual + modalid
   })
 })
 
-describe('Progressões válidas do Master+', () => {
-  it('Master pode ir para Grão-Mestre', () => {
-    expect(isValidMasterPlusProgression('master', 'grandmaster')).toBe(true)
+describe('Progressões válidas do Master+ (via isRankLocked/rankStep, sem lista separada)', () => {
+  it('Master pode mirar Grão-Mestre e Challenger, mas não a si mesmo', () => {
+    const current = { tier: 'master' as const, division: null }
+    expect(isRankLocked({ tier: 'grandmaster', division: null }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'challenger', division: null }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'master', division: null }, current)).toBe(true)
   })
 
-  it('Master pode ir direto para Challenger', () => {
-    expect(isValidMasterPlusProgression('master', 'challenger')).toBe(true)
-  })
-
-  it('Grão-Mestre só pode ir para Challenger', () => {
-    expect(isValidMasterPlusProgression('grandmaster', 'challenger')).toBe(true)
-    expect(isValidMasterPlusProgression('grandmaster', 'grandmaster')).toBe(false)
-    expect(isValidMasterPlusProgression('grandmaster', 'master')).toBe(false)
-  })
-
-  it('Challenger nunca é origem válida', () => {
-    expect(isValidMasterPlusProgression('challenger', 'grandmaster')).toBe(false)
-  })
-
-  it('destino inválido para Master é rejeitado', () => {
-    expect(isValidMasterPlusProgression('master', 'master')).toBe(false)
-    expect(isValidMasterPlusProgression('master', 'diamond')).toBe(false)
-  })
-
-  it('getValidMasterPlusTargets: Master → [Grão-Mestre, Challenger]', () => {
-    expect(getValidMasterPlusTargets('master')).toEqual(['grandmaster', 'challenger'])
-  })
-
-  it('getValidMasterPlusTargets: Grão-Mestre → [Challenger] (único destino)', () => {
-    expect(getValidMasterPlusTargets('grandmaster')).toEqual(['challenger'])
-  })
-
-  it('exatamente 3 combinações comerciais existem', () => {
-    expect(MASTER_PLUS_PROGRESSIONS).toHaveLength(3)
+  it('Grão-Mestre só pode mirar Challenger (Master fica bloqueado, é um degrau abaixo)', () => {
+    const current = { tier: 'grandmaster' as const, division: null }
+    expect(isRankLocked({ tier: 'challenger', division: null }, current)).toBe(false)
+    expect(isRankLocked({ tier: 'grandmaster', division: null }, current)).toBe(true)
+    expect(isRankLocked({ tier: 'master', division: null }, current)).toBe(true)
   })
 })
 

@@ -20,7 +20,7 @@ export type RankTier =
 
 export type Division = 'I' | 'II' | 'III' | 'IV'
 
-export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
+type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
 
 export const RANK_TIER_ORDER: RankTier[] = [
   'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
@@ -47,7 +47,7 @@ function percentageOfCents(cents: number, percentage: number): number {
   return Math.round(cents * percentage / 100)
 }
 
-export function isMasterPlus(tier: RankTier): boolean {
+function isMasterPlus(tier: RankTier): boolean {
   return tier === 'master' || tier === 'grandmaster' || tier === 'challenger'
 }
 
@@ -129,28 +129,23 @@ const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
   },
 }
 
+const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
+
 export function getWinBoostPrice(queue: QueueType, tier: RankTier, _div?: Division | null): number {
   return centsToMoney(WIN_PRICE_CENTS[queue][tier] ?? WIN_PRICE_CENTS[queue].diamond)
 }
 
-// Pacotes de vitórias oferecidos no StepExtras (desconto sobre o preço unitário)
-export const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
-
-// ── MD5 — garantia de win rate, preço por vitória líquida, em CENTAVOS ──────
-// Tabela direta por fila — não é mais derivada de PLACEMENT_PRICE ÷ 5.
-const MD5_WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
-  solo_duo: {
-    iron: 1490, bronze: 1690, silver: 1890, gold: 2190, platinum: 3090,
-    emerald: 3790, diamond: 4190, master: 5990, grandmaster: 9990, challenger: 17990,
-  },
-  flex: {
-    iron: 1410, bronze: 1590, silver: 1790, gold: 2080, platinum: 2930,
-    emerald: 3600, diamond: 3990, master: 5990, grandmaster: 9990, challenger: 17990,
-  },
-}
+// ── MD5 — garantia de win rate, preço por vitória líquida ──────────────────
+// Derivado do preço da Vitória Avulsa (mesma fila/tier) com 50% de desconto —
+// não é mais uma tabela independente. O pacote cheio de 5 partidas de
+// placement é só 5× esse preço por vitória; comprar menos vitórias (4, 3...)
+// desconta proporcionalmente, nunca cobra o pacote inteiro (a soma acontece
+// em computeOrderPrice, multiplicando por winsPurchased).
+const MD5_DISCOUNT_PCT = 50
 
 export function getMd5WinPrice(queue: QueueType, tier: RankTier): number {
-  return centsToMoney(MD5_WIN_PRICE_CENTS[queue][tier] ?? MD5_WIN_PRICE_CENTS[queue].diamond)
+  const winPriceCents = moneyToCents(getWinBoostPrice(queue, tier))
+  return centsToMoney(Math.round(winPriceCents * (1 - MD5_DISCOUNT_PCT / 100)))
 }
 
 // ── MD5 Completo (placement_matches) — legado, mantido só para pedidos
@@ -162,14 +157,18 @@ export const PLACEMENT_PRICE: Record<string, number> = {
   master: 59.90, grandmaster: 99.90, challenger: 179.90,
 }
 
-// ── Elo Boost Master+ — transições oficiais (mesmo valor nas duas filas) ────
-// Fonte de referência apenas — o preço autoritativo por faixa de PDL vem da
-// tabela `master_plus_pricing` (ver migration 020), que a Task 3 atualiza
-// para bater com estes valores em todas as 4 faixas de PDL (o negócio não
-// diferenciou por faixa nesta rodada — mesmo valor nas 4).
-export const MASTER_PLUS_TRANSITION_PRICE_CENTS = {
-  master_to_grandmaster: 89990,
-  grandmaster_to_challenger: 124990,
+// ── Elo Boost Master+ — preço fixo por tier alvo (mesmo valor nas duas
+// filas, independente de qual tier o cliente parte) ─────────────────────────
+// Fonte de referência apenas — o preço autoritativo vem da tabela
+// `master_plus_pricing` (ver migration 026), que espelha estes valores.
+// "master" existe aqui só para exibição na página pública de preços — o
+// fluxo Master+ só existe quando o rank ATUAL já é Master/Grão-Mestre
+// (ver shared/boostDomain.ts::isMasterPlusCurrentTier), então ninguém
+// efetivamente "compra" o tier Master através dele.
+export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
+  master: 89990,
+  grandmaster: 124990,
+  challenger: 214980,
 } as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
@@ -224,12 +223,12 @@ export function applyLpModifier(
 // base_price/extras_price/total_price em `orders` — o cliente nunca envia
 // preço, só a intenção (rank, extras selecionados, pacote de vitórias etc).
 
-export interface RankValue {
+interface RankValue {
   tier: RankTier
   division: Division | null
 }
 
-export interface OrderExtraInput {
+interface OrderExtraInput {
   id: string
   priceModifier: number
   priceModifierPct: number

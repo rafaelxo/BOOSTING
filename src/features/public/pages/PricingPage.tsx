@@ -2,16 +2,12 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, ChevronRight, MessageCircle } from 'lucide-react'
 import { Button, Skeleton, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { PLACEMENT_PRICE, getWinBoostPrice, ELO_TIERS } from '@/lib/pricing'
+import { getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney } from '@/lib/pricing'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
-
-const ELO_MASTER_PLUS_ROWS: { label: string; price: number }[] = [
-  { label: 'Mestre → Grão-mestre', price: 899.90 },
-  { label: 'Grão-mestre → Desafiante', price: 1249.90 },
-]
+const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster' | 'challenger'> = ['master', 'grandmaster', 'challenger']
 
 const WIN_TIERS: RankTier[] = [
   'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',
@@ -109,14 +105,21 @@ export function PricingPage() {
                     </tr>
                   )
                 })}
-                {ELO_MASTER_PLUS_ROWS.map(({ label, price }) => (
-                  <tr key={label} className="hover:bg-bg-elevated/40 transition-colors">
+                {ELO_MASTER_PLUS_TIERS.map((tier) => (
+                  <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
                     <td className="py-3 px-5">
-                      <span className="font-semibold text-ink">{label}</span>
+                      <div className="flex items-center gap-3">
+                        <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
+                        <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
+                          {RANK_TIER_LABEL[tier]}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
-                    <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(price)}</td>
+                    <td className="py-3.5 px-5 text-right text-brand font-semibold">
+                      {currency(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier]))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -169,7 +172,7 @@ export function PricingPage() {
           {/* + MD5 sub-row */}
           <div className="mt-8">
             <h3 className="text-sm font-bold text-ink mb-1">+ MD5: garantia de win rate — ative automaticamente se ainda não jogou o posicionamento</h3>
-            <p className="text-xs text-ink-secondary mb-3">Preço fixo por rank desejado. Inclui as 5 partidas de placement.</p>
+            <p className="text-xs text-ink-secondary mb-3">Preço da Vitória Avulsa com 50% de desconto. Valor abaixo já é o pacote completo de 5 vitórias — menos vitórias desconta proporcionalmente.</p>
             <div className="card overflow-hidden p-0">
               <table className="w-full text-sm">
                 <thead className="border-b border-bg-elevated">
@@ -189,7 +192,7 @@ export function PricingPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(PLACEMENT_PRICE[tier])}</td>
+                      <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</td>
                     </tr>
                   ))}
                 </tbody>

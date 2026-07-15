@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Landmark, Plus, Eye, EyeOff } from 'lucide-react'
-import { Button, EmptyState, Skeleton, Modal, RankBadge } from '@/components/ui'
+import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, formatDate } from '@/lib/utils'
@@ -289,7 +289,7 @@ export function AdminDuoAccountsPage() {
             Disponível para boosters
           </label>
 
-          {save.isError && <p className="text-xs text-danger">{(save.error as Error).message}</p>}
+          {save.isError && <ErrorAlert message={(save.error as Error).message} />}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setModal(null)}>Cancelar</Button>

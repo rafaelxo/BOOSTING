@@ -1,10 +1,11 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, ShieldCheck } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Avatar, Skeleton } from '@/components/ui'
+import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw } from 'lucide-react'
+import { Button, Card, OrderStatusBadge, Avatar, Skeleton, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
+import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -62,6 +63,207 @@ function useOrderHistory(orderId: string) {
   })
 }
 
+type PixPaymentResponse = {
+  success?: boolean
+  order_id: string
+  total_price: number
+  payment_id: string | number
+  status?: string
+  qr_code?: string
+  qr_code_base64?: string | null
+  expires_at: string
+  reused?: boolean
+}
+
+function useCountdown(expiresAt: string | null) {
+  const [remaining, setRemaining] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!expiresAt) {
+      setRemaining(null)
+      return
+    }
+    const tick = () => setRemaining(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)))
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+  }, [expiresAt])
+
+  const safeRemaining = remaining ?? 0
+  const mm = String(Math.floor(safeRemaining / 60)).padStart(2, '0')
+  const ss = String(safeRemaining % 60).padStart(2, '0')
+  return { remaining, label: `${mm}:${ss}` }
+}
+
+function pixErrorMessage(err: unknown) {
+  if (!(err instanceof EdgeFunctionError)) return err instanceof Error ? err.message : 'Erro ao carregar PIX'
+  if (err.status === 401) return 'Sua sessão expirou. Entre novamente para continuar.'
+  if (err.status === 403) return 'Você não tem permissão para esse pedido.'
+  if (err.status === 409) return err.message
+  return err.message
+}
+
+function PendingPaymentSection({ order }: { order: Order }) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const currency = useCurrency()
+  const [pix, setPix] = useState<PixPaymentResponse | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { remaining, label } = useCountdown(pix?.expires_at ?? null)
+
+  const loadPix = useMutation({
+    mutationFn: async () => {
+      setError(null)
+      const response = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
+        body: { order_id: order.id },
+        timeoutMs: 25_000,
+        requireAuth: true,
+      })
+      if (!response.qr_code) throw new Error('A função não retornou o código PIX.')
+      return response
+    },
+    onSuccess: (response) => setPix(response),
+    onError: (err) => setError(pixErrorMessage(err)),
+  })
+
+  const cancelOrder = useMutation({
+    mutationFn: async () => {
+      setError(null)
+      await invokeEdgeFunction('cancel-pending-order', {
+        body: { order_id: order.id },
+        timeoutMs: 20_000,
+        requireAuth: true,
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+      queryClient.removeQueries({ queryKey: ['order', order.id] })
+      navigate('/orders', { replace: true })
+    },
+    onError: (err) => setError(pixErrorMessage(err)),
+  })
+
+  async function copyPix() {
+    if (!pix?.qr_code) return
+    await navigator.clipboard.writeText(pix.qr_code)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2500)
+  }
+
+  if (order.status !== 'awaiting_payment') return null
+
+  const expired = remaining === 0
+
+  return (
+    <Card padding="md">
+      <div className="flex items-center gap-2 mb-3">
+        <QrCode className="h-4 w-4 text-brand" />
+        <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
+      </div>
+
+      <p className="text-xs text-ink-muted mb-4">
+        Este pedido ainda não foi pago. Você pode recuperar o PIX enquanto ele estiver válido ou cancelar o pedido.
+      </p>
+
+      {!pix ? (
+        <div className="space-y-3">
+          <Button
+            className="w-full"
+            loading={loadPix.isPending}
+            onClick={() => loadPix.mutate()}
+            leftIcon={<QrCode className="h-4 w-4" />}
+          >
+            Efetuar pagamento
+          </Button>
+          <Button
+            className="w-full"
+            variant="danger"
+            loading={cancelOrder.isPending}
+            onClick={() => cancelOrder.mutate()}
+            leftIcon={<XCircle className="h-4 w-4" />}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      ) : expired ? (
+        <div className="space-y-3">
+          <ErrorAlert message="Este PIX expirou. Cancele este pedido e crie um novo para gerar uma cobrança atualizada." />
+          <Button
+            className="w-full"
+            variant="danger"
+            loading={cancelOrder.isPending}
+            onClick={() => cancelOrder.mutate()}
+            leftIcon={<XCircle className="h-4 w-4" />}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-xl bg-bg-elevated px-4 py-3">
+            <div>
+              <p className="text-xs text-ink-muted">Total</p>
+              <p className="text-lg font-bold text-ink">{currency(Number(pix.total_price))}</p>
+            </div>
+            <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`}>
+              <Clock className="h-4 w-4" />
+              {label}
+            </div>
+          </div>
+
+          {pix.qr_code_base64 && (
+            <div className="flex justify-center">
+              <div className="rounded-2xl border border-bg-elevated bg-white p-3">
+                <img src={`data:image/png;base64,${pix.qr_code_base64}`} alt="QR Code PIX" className="h-48 w-48" />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase text-ink-secondary">Código PIX Copia e Cola</p>
+            <textarea
+              className="input-base min-h-24 w-full resize-none font-mono text-xs"
+              value={pix.qr_code ?? ''}
+              readOnly
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={copied ? 'success' : 'secondary'}
+              onClick={copyPix}
+              leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            >
+              {copied ? 'Copiado' : 'Copiar'}
+            </Button>
+            <Button
+              variant="secondary"
+              loading={loadPix.isPending}
+              onClick={() => loadPix.mutate()}
+              leftIcon={<RefreshCw className="h-4 w-4" />}
+            >
+              Atualizar
+            </Button>
+          </div>
+
+          <Button
+            className="w-full"
+            variant="danger"
+            loading={cancelOrder.isPending}
+            onClick={() => cancelOrder.mutate()}
+            leftIcon={<XCircle className="h-4 w-4" />}
+          >
+            Cancelar pedido
+          </Button>
+        </div>
+      )}
+
+      {error && <div className="mt-3"><ErrorAlert message={error} /></div>}
+    </Card>
+  )
+}
+
 function CredentialsSection({ order }: { order: Order }) {
   const queryClient = useQueryClient()
   const [login, setLogin] = useState('')
@@ -70,8 +272,7 @@ function CredentialsSection({ order }: { order: Order }) {
 
   const saveCredentials = useMutation({
     mutationFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)('set_order_credentials', {
+      const { data, error } = await supabase.rpc('set_order_credentials', {
         p_order_id: order.id,
         p_login: login.trim(),
         p_password: password,
@@ -148,7 +349,7 @@ function CredentialsSection({ order }: { order: Order }) {
             {saved ? 'Pedido concluído!' : (order as Order & { credentials_set?: boolean }).credentials_set ? 'Gerar novo token' : 'Concluir pedido e gerar token'}
           </Button>
           {saveCredentials.isError && (
-            <p className="text-xs text-danger">{saveCredentials.error instanceof Error ? saveCredentials.error.message : 'Erro'}</p>
+            <ErrorAlert message={saveCredentials.error instanceof Error ? saveCredentials.error.message : 'Erro'} />
           )}
         </div>
       )}
@@ -158,6 +359,7 @@ function CredentialsSection({ order }: { order: Order }) {
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { profile } = useAuthStore()
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -197,7 +399,14 @@ export function OrderDetailPage() {
     </div>
   )
 
-  if (!order) return null
+  if (!order) {
+    return (
+      <div className="max-w-4xl space-y-4">
+        <ErrorAlert message="Pedido não encontrado." />
+        <Button onClick={() => navigate('/orders')}>Voltar para meus pedidos</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -345,6 +554,8 @@ export function OrderDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
+          <PendingPaymentSection order={order} />
+
           {/* Credenciais */}
           <CredentialsSection order={order} />
 

@@ -10,6 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
+    // Sessão vive só enquanto a aba/janela estiver aberta: sessionStorage
+    // sobrevive a refresh (F5) dentro da mesma aba, mas é apagado quando a
+    // plataforma é fechada — forçando novo login a cada vez que o usuário
+    // fecha o navegador. O verifier PKCE do OAuth também usa este storage e
+    // sobrevive ao redirect do Discord (mesma aba), então o login continua
+    // funcionando. Fallback pra memória fora do browser (SSR/testes).
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
@@ -21,7 +28,4 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
 })
 
-// Convenience helpers
-export const getUser = () => supabase.auth.getUser()
-export const getSession = () => supabase.auth.getSession()
 export const signOut = () => supabase.auth.signOut()

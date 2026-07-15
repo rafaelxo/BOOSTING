@@ -1,24 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, Check } from 'lucide-react'
-import { Skeleton } from '@/components/ui'
+import { Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { RANK_TIER_LABEL } from '@/lib/utils'
-import { MASTER_PLUS_PROGRESSIONS, PDL_BRACKETS, type PdlBracket } from '@/lib/boostDomain'
 import type { ServiceExtra, MasterPlusPricing, BoostFlow } from '@/types'
 
 const FLOW_GROUPS: { flow: BoostFlow; label: string; hint: string }[] = [
   { flow: 'solo_standard', label: 'Solo Boost (Iron–Diamond)', hint: 'Percentual aplicado sobre o preço base do pedido.' },
   { flow: 'duo_standard', label: 'Duo Boost (Iron–Diamond)', hint: 'Percentual aplicado sobre o preço base do pedido.' },
-  { flow: 'master_plus', label: 'Boost Master+', hint: 'Percentual aplicado sobre o preço vindo da tabela de PDL abaixo.' },
+  { flow: 'master_plus', label: 'Boost Master+', hint: 'Percentual aplicado sobre o preço vindo da tabela abaixo.' },
 ]
 
-const BRACKET_LABEL: Record<PdlBracket, string> = {
-  '0_49': '0–49 PDL',
-  '50_89': '50–89 PDL',
-  '90_119': '90–119 PDL',
-  '120_plus': '120+ PDL',
-}
+const MASTER_PLUS_TIERS: MasterPlusPricing['tier'][] = ['master', 'grandmaster', 'challenger']
 
 function useBoostAddonsAdmin() {
   return useQuery({
@@ -132,40 +126,29 @@ function MasterPlusPricingGrid() {
     },
   })
 
-  if (isLoading) return <Skeleton className="h-48 w-full" />
+  if (isLoading) return <Skeleton className="h-32 w-full" />
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-bg-elevated">
-            <th className="py-2 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Progressão</th>
-            {PDL_BRACKETS.map((b) => (
-              <th key={b} className="py-2 px-3 text-center text-xs font-semibold uppercase tracking-wide text-ink-muted">{BRACKET_LABEL[b]}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {MASTER_PLUS_PROGRESSIONS.map(({ current, target }) => (
-            <tr key={`${current}-${target}`} className="border-b border-bg-elevated last:border-0">
-              <td className="py-2.5 pr-3 font-semibold text-ink whitespace-nowrap">
-                {RANK_TIER_LABEL[current]} → {RANK_TIER_LABEL[target]}
-              </td>
-              {PDL_BRACKETS.map((bracket) => {
-                const row = rows?.find(r => r.current_tier === current && r.target_tier === target && r.pdl_bracket === bracket)
-                if (!row) return <td key={bracket} className="py-2.5 px-3 text-center text-xs text-ink-muted">—</td>
-                return (
-                  <PriceCell
-                    key={bracket}
-                    row={row}
-                    onSaved={() => queryClient.invalidateQueries({ queryKey: ['admin-master-plus-pricing'] })}
-                  />
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-2">
+      {MASTER_PLUS_TIERS.map((tier) => {
+        const row = rows?.find(r => r.tier === tier)
+        return (
+          <div key={tier} className="flex items-center justify-between gap-3 rounded-xl border border-bg-elevated p-3">
+            <div className="flex items-center gap-3">
+              <RankBadge tier={tier} size="xs" showLabel={false} />
+              <span className="font-semibold text-ink">{RANK_TIER_LABEL[tier]}</span>
+            </div>
+            {row ? (
+              <PriceCell
+                row={row}
+                onSaved={() => queryClient.invalidateQueries({ queryKey: ['admin-master-plus-pricing'] })}
+              />
+            ) : (
+              <span className="text-xs text-ink-muted">—</span>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -192,22 +175,20 @@ function PriceCell({ row, onSaved }: { row: MasterPlusPricing; onSaved: () => vo
   const dirty = value !== (row.price != null ? String(row.price) : '')
 
   return (
-    <td className="py-2.5 px-3">
-      <div className="flex items-center justify-center gap-1.5">
-        <span className="text-xs text-ink-muted">R$</span>
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={() => dirty && save.mutate()}
-          placeholder="—"
-          className={`input-base w-20 text-sm text-center ${row.price == null && !dirty ? 'border-warning/40' : ''}`}
-        />
-        {saved && <Check className="h-3.5 w-3.5 text-success shrink-0" />}
-      </div>
-    </td>
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs text-ink-muted">R$</span>
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => dirty && save.mutate()}
+        placeholder="—"
+        className={`input-base w-24 text-sm text-center ${row.price == null && !dirty ? 'border-warning/40' : ''}`}
+      />
+      {saved && <Check className="h-3.5 w-3.5 text-success shrink-0" />}
+    </div>
   )
 }
 
@@ -267,8 +248,8 @@ export function AdminBoostConfigPage() {
           <h2 className="text-sm font-bold text-ink">Tabela de Preços — Boost Master+</h2>
         </div>
         <p className="text-xs text-ink-muted mb-4">
-          Preço fixo por combinação de progressão × faixa de PDL atual. Combinações com preço vazio (—) bloqueiam a
-          criação de pedidos até serem preenchidas — o sistema nunca cobra um valor não configurado aqui.
+          Preço fixo por tier alvo, independente de qual tier o cliente parte ou da faixa de PDL atual. Tier com preço
+          vazio (—) bloqueia a criação de pedidos até ser preenchido — o sistema nunca cobra um valor não configurado aqui.
         </p>
         <MasterPlusPricingGrid />
       </div>

@@ -1,5 +1,6 @@
 import * as RadixAvatar from '@radix-ui/react-avatar'
 import { cn, initials } from '@/lib/utils'
+import { resolveRiotAvatarUrl } from '@/lib/riotAssets'
 
 interface AvatarProps {
   src?: string | null
@@ -26,6 +27,8 @@ const onlineDotMap = {
 }
 
 export function Avatar({ src, name, size = 'md', className, online }: AvatarProps) {
+  const resolvedSrc = resolveRiotAvatarUrl(src)
+
   return (
     <div className="relative inline-block">
       <RadixAvatar.Root
@@ -36,7 +39,7 @@ export function Avatar({ src, name, size = 'md', className, online }: AvatarProp
         )}
       >
         <RadixAvatar.Image
-          src={src ?? undefined}
+          src={resolvedSrc}
           alt={name}
           className="h-full w-full object-cover"
         />

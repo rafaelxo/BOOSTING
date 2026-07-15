@@ -55,6 +55,17 @@ interface OrderBuilderState {
   // Riot ID manualmente.
   riotAutoFilled: boolean
 
+  // Verdadeiro após uma verificação de conta bem-sucedida na fila atual —
+  // porta de entrada do resto do formulário (eloboost/vitórias só liberam
+  // ranks/extras depois disso). Reseta ao mudar Riot ID, fila ou serviço,
+  // forçando nova verificação (a Riot é consultada por fila).
+  riotVerified: boolean
+
+  // Verdadeiro quando a conta consultada JÁ tem rank na fila atual — o toggle
+  // de MD5 fica desabilitado (anti-fraude). O backend também rejeita, isto só
+  // impede a tentativa no cliente. Reseta junto com riotVerified.
+  md5Blocked: boolean
+
   // MD5: garantia de win rate nas partidas de posicionamento — toggle dentro
   // do fluxo "Vitórias" (win_boost), não um serviço separado na tela, mas
   // muda serviceType para 'md5' internamente (ver StepConfigure.tsx).
@@ -93,6 +104,11 @@ interface OrderBuilderState {
   prevStep: () => void
   setGame: (slug: GameSlug, id: string) => void
   setService: (type: ServiceType, id: string) => void
+  // Só troca o uuid do serviço (resolução slug→uuid feita em OrderBuilder),
+  // SEM resetar winsPurchased/MD5 como setService faz — senão a resolução do
+  // uuid apagaria as partidas restantes detectadas pela Riot logo após ativar
+  // o MD5.
+  setServiceId: (id: string) => void
   setCurrentRank: (rank: Rank) => void
   setTargetRank: (rank: Rank | null) => void
   setQueueType: (queue: QueueType) => void
@@ -109,6 +125,12 @@ interface OrderBuilderState {
   setPreferredBooster: (id: string, name: string) => void
   setRiotId: (riotId: string) => void
   setRiotAutoFilled: (v: boolean) => void
+  setRiotVerified: (v: boolean) => void
+  setMd5Blocked: (v: boolean) => void
+  // Limpa qualquer resultado de uma conta consultada antes (rank/LP/PDL/MD5 e
+  // flags de verificação) — chamado no início de cada nova busca pra que os
+  // dados da conta anterior nunca vazem pra conta nova.
+  clearRiotLookup: () => void
   setRiotLookupLoading: (v: boolean) => void
   setStepAttempted: (v: boolean) => void
   setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null } | null) => void
@@ -151,6 +173,8 @@ const initialState = {
   preferredBoosterName: null,
   riotId: '',
   riotAutoFilled: false,
+  riotVerified: false,
+  md5Blocked: false,
   riotLookupLoading: false,
   stepAttempted: false,
   selectedCoachPackage: null,
@@ -164,6 +188,24 @@ const initialState = {
   extrasPrice: 0,
   estimatedHours: null,
   pdlModifierPct: null as number | null,
+}
+
+// Estado "sem consulta Riot": tudo que foi derivado de uma conta consultada
+// (rank atual/última temporada, LP/PDL, detecção de MD5) mais as flags de
+// verificação. Reaproveitado por clearRiotLookup e setQueueType — trocar de
+// fila invalida a verificação porque a Riot é consultada por fila.
+const CLEARED_LOOKUP_STATE = {
+  currentRank: null,
+  targetRank: null,
+  currentLp: 0,
+  avgLpGain: 20,
+  currentPdl: 0,
+  avgPdlGain: 30,
+  riotAutoFilled: false,
+  riotVerified: false,
+  md5Blocked: false,
+  md5MatchesRemaining: null as number | null,
+  md5MatchesRemainingCeiling: null as number | null,
 }
 
 // Fluxo do configurador (solo_standard/duo_standard/master_plus) para o
@@ -192,6 +234,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   },
 
   setGame: (gameSlug, gameId) => set({ gameSlug, gameId }),
+  setServiceId: (serviceId) => set({ serviceId }),
   setService: (serviceType, serviceId) => set({
     serviceType,
     serviceId,
@@ -222,7 +265,9 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   }),
 
   setTargetRank: (targetRank) => set({ targetRank }),
-  setQueueType: (queueType) => set({ queueType }),
+  // Trocar de fila invalida a consulta anterior (rank e elegibilidade de MD5
+  // são por fila) — limpa o resultado e trava o form até nova verificação.
+  setQueueType: (queueType) => set({ ...CLEARED_LOOKUP_STATE, queueType }),
 
   setBoostMode: (boostMode) => set((state) => {
     // Duo nunca é aceito com rank atual Master+ — defesa em profundidade,
@@ -295,8 +340,15 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
 
   setWinPackage: (winPackage) => set({ winPackage }),
   setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
-  setRiotId: (riotId) => set({ riotId, riotAutoFilled: false }),
+  // Editar o Riot ID invalida a verificação (form volta a travar) — mas NÃO
+  // limpa o rank já preenchido a cada tecla; a limpeza completa acontece no
+  // início da próxima busca (clearRiotLookup), pra não apagar dados enquanto
+  // o usuário ainda está digitando.
+  setRiotId: (riotId) => set({ riotId, riotAutoFilled: false, riotVerified: false, md5Blocked: false }),
   setRiotAutoFilled: (riotAutoFilled) => set({ riotAutoFilled }),
+  setRiotVerified: (riotVerified) => set({ riotVerified }),
+  setMd5Blocked: (md5Blocked) => set({ md5Blocked }),
+  clearRiotLookup: () => set({ ...CLEARED_LOOKUP_STATE }),
   setRiotLookupLoading: (riotLookupLoading) => set({ riotLookupLoading }),
   setStepAttempted: (stepAttempted) => set({ stepAttempted }),
   setSelectedCoachPackage: (selectedCoachPackage) => set({ selectedCoachPackage }),

@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRef, useEffect, useState } from 'react'
 import { ArrowLeft, RefreshCw, MessageCircle, Send, Clock, ShieldCheck } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Avatar } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
@@ -320,9 +320,10 @@ export function AdminOrderDetailPage() {
               ))}
             </div>
             {updateStatus.isError && (
-              <p className="text-xs text-danger mt-2">
-                {updateStatus.error instanceof Error ? updateStatus.error.message : 'Erro'}
-              </p>
+              <ErrorAlert
+                message={updateStatus.error instanceof Error ? updateStatus.error.message : 'Erro'}
+                className="mt-2"
+              />
             )}
           </Card>
 

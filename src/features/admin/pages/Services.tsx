@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Settings, Plus } from 'lucide-react'
-import { Button, EmptyState, Skeleton, Modal } from '@/components/ui'
+import { Button, EmptyState, Skeleton, Modal, ErrorAlert } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
 import type { Service, ServiceType } from '@/types'
 
-const SERVICE_TYPES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches', 'md5']
+const SERVICE_TYPES = ['elo_boost', 'win_boost', 'coaching'] as const satisfies readonly ServiceType[]
+type VisibleServiceType = (typeof SERVICE_TYPES)[number]
+type VisibleService = Service & { type: VisibleServiceType }
+
+const SERVICE_TYPE_LABEL: Record<VisibleServiceType, string> = {
+  elo_boost: 'Elo Boost',
+  win_boost: 'Vitórias / MD5',
+  coaching: 'Coaching',
+}
 
 interface ServiceForm {
   game_id: string
@@ -42,7 +50,12 @@ export function AdminServicesPage() {
   const { data: services, isLoading } = useQuery({
     queryKey: ['admin-services'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('services').select('*').order('sort_order')
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .neq('type', 'md5')
+        .neq('type', 'placement_matches')
+        .order('sort_order')
       if (error) throw error
       return data as Service[]
     },
@@ -92,11 +105,17 @@ export function AdminServicesPage() {
 
   const toggleActive = useMutation({
     mutationFn: async (s: Service) => {
-      const { error } = await supabase.from('services').update({ is_active: !s.is_active }).eq('id', s.id)
+      const nextActive = !s.is_active
+      const query = supabase.from('services').update({ is_active: nextActive }).eq('id', s.id)
+      const { error } = await query
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-services'] }),
   })
+
+  const visibleServices = (services ?? []).filter(
+    (service): service is VisibleService => service.type !== 'md5' && service.type !== 'placement_matches',
+  )
 
   return (
     <div className="space-y-5">
@@ -108,7 +127,7 @@ export function AdminServicesPage() {
       </div>
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
-          !services?.length ? <EmptyState icon={Settings} title="Nenhum serviço configurado" description="Adicione serviços para habilitar pedidos." /> : (
+          !visibleServices.length ? <EmptyState icon={Settings} title="Nenhum serviço configurado" description="Adicione serviços para habilitar pedidos." /> : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -120,10 +139,18 @@ export function AdminServicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((s) => (
+              {visibleServices.map((s) => (
                 <TableRow key={s.id}>
-                  <TableCell className="font-medium text-ink">{s.name}</TableCell>
-                  <TableCell className="text-xs font-mono capitalize">{s.type.replace(/_/g, ' ')}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium text-ink">{s.type === 'win_boost' ? 'Vitórias / MD5' : s.name}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-xs font-bold text-ink-secondary">{SERVICE_TYPE_LABEL[s.type]}</p>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <button
                       onClick={() => toggleActive.mutate(s)}
@@ -174,7 +201,7 @@ export function AdminServicesPage() {
                 className="input-base w-full text-sm"
               >
                 <option value="">Selecione…</option>
-                {SERVICE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {SERVICE_TYPES.map((t) => <option key={t} value={t}>{SERVICE_TYPE_LABEL[t]}</option>)}
               </select>
             </div>
           </div>
@@ -230,7 +257,7 @@ export function AdminServicesPage() {
             </label>
           </div>
 
-          {save.isError && <p className="text-xs text-danger">{(save.error as Error).message}</p>}
+          {save.isError && <ErrorAlert message={(save.error as Error).message} />}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setModal(null)}>Cancelar</Button>

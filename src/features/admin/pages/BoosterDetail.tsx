@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, Save } from 'lucide-react'
-import { Button, Card, BoosterStatusBadge, Avatar } from '@/components/ui'
+import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { formatDate, formatRank, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -175,7 +175,7 @@ export function AdminBoosterDetailPage() {
             </Button>
           </div>
           {updateStatus.isError && (
-            <p className="text-danger text-xs mt-2">{(updateStatus.error as Error).message}</p>
+            <ErrorAlert message={(updateStatus.error as Error).message} className="mt-2" />
           )}
           {updateStatus.isSuccess && (
             <p className="text-success text-xs mt-2">Status atualizado com sucesso.</p>

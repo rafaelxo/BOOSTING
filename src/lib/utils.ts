@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { OrderStatus, RankTier, TicketStatus, TicketPriority, BoosterStatus, OrderExtra } from '@/types'
+import type { OrderStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
 
 export { RANK_TIER_ORDER } from '../../shared/pricing'
 
@@ -116,38 +116,6 @@ export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
   approved: 'text-success bg-success/10',
   suspended: 'text-danger bg-danger/10',
   rejected: 'text-ink-muted bg-bg-overlay',
-}
-
-// ─── Ticket status ────────────────────────────────────────────────────────────
-
-export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
-  open: 'Aberto',
-  in_progress: 'Em Andamento',
-  waiting_customer: 'Aguardando Cliente',
-  resolved: 'Resolvido',
-  closed: 'Fechado',
-}
-
-export const TICKET_STATUS_COLOR: Record<TicketStatus, string> = {
-  open: 'text-danger bg-danger/10',
-  in_progress: 'text-brand bg-brand/10',
-  waiting_customer: 'text-accent bg-accent/10',
-  resolved: 'text-success bg-success/10',
-  closed: 'text-ink-muted bg-bg-overlay',
-}
-
-export const TICKET_PRIORITY_LABEL: Record<TicketPriority, string> = {
-  low: 'Baixa',
-  medium: 'Média',
-  high: 'Alta',
-  urgent: 'Urgente',
-}
-
-export const TICKET_PRIORITY_COLOR: Record<TicketPriority, string> = {
-  low: 'text-ink-secondary',
-  medium: 'text-warning',
-  high: 'text-danger',
-  urgent: 'text-danger font-bold',
 }
 
 // ─── Service label ────────────────────────────────────────────────────────────

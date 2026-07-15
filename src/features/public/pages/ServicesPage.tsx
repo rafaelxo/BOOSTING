@@ -34,7 +34,7 @@ const SERVICES = [
       'Perfeito para ganhar LP rápido, completar missões ou subir antes de uma virada de temporada. Escolha quantas vitórias precisa — e se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente no mesmo fluxo.',
     rankRange: RANK_TIER_ORDER,
     highlights: [
-      'Escolha de 3 a 50 vitórias',
+      'Escolha entre 1 a 5 vitórias',
       'Garantia MD5 automática para quem ainda não fez o posicionamento',
       'Solo queue ou flex',
       'Começa em até 30 minutos',

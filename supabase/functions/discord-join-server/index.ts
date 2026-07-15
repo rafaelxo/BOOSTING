@@ -14,6 +14,26 @@ const bodySchema = z.object({
   discord_access_token: z.string().min(1).max(4096),
 }).strict()
 
+async function safeJson(response: Response): Promise<Record<string, unknown> | null> {
+  try {
+    const text = await response.text()
+    if (!text) return null
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+function discordErrorCode(body: Record<string, unknown> | null) {
+  const code = body?.code
+  return typeof code === 'number' ? code : undefined
+}
+
+function discordErrorMessage(body: Record<string, unknown> | null) {
+  const message = body?.message
+  return typeof message === 'string' ? message : undefined
+}
+
 serve(async (req) => {
   const cors = handleCors(req)
   if (cors) return cors
@@ -35,6 +55,8 @@ serve(async (req) => {
     const parsedBody = bodySchema.safeParse(rawBody)
     if (!parsedBody.success) {
       return jsonResponse(req, {
+        success: false,
+        code: 'DISCORD_TOKEN_MISSING',
         error: 'Body inválido',
         issues: parsedBody.error.issues.map((issue) => ({
           path: issue.path.join('.'),
@@ -49,7 +71,20 @@ serve(async (req) => {
     const meRes = await fetchWithTimeout(`${DISCORD_API}/users/@me`, {
       headers: { Authorization: `Bearer ${discord_access_token}` },
     })
-    if (!meRes.ok) return errorResponse(req, 'Invalid Discord token', 400)
+    if (!meRes.ok) {
+      const body = await safeJson(meRes)
+      console.error('Discord /users/@me failed', {
+        status: meRes.status,
+        discord_code: discordErrorCode(body),
+        discord_message: discordErrorMessage(body),
+      })
+      return errorResponse(
+        req,
+        meRes.status === 401 ? 'Discord token expired or invalid' : 'Invalid Discord token',
+        meRes.status === 401 ? 401 : 400,
+        meRes.status === 401 ? 'DISCORD_TOKEN_EXPIRED' : 'DISCORD_TOKEN_INVALID',
+      )
+    }
     const { id: discordUserId } = await meRes.json() as { id: string }
 
     const discordIdentity = auth.user.identities?.find((identity) => identity.provider === 'discord')
@@ -71,12 +106,43 @@ serve(async (req) => {
     })
 
     // 201 = joined, 204 = already a member — both are success
-    if (!joinRes.ok && joinRes.status !== 201 && joinRes.status !== 204) {
-      console.error(`Discord join failed with status ${joinRes.status}`)
-      return errorResponse(req, 'Unable to join Discord server', 502)
+    if (joinRes.status === 201) return jsonResponse(req, { success: true, joined: true })
+    if (joinRes.status === 204) return jsonResponse(req, { success: true, joined: true, already_member: true, code: 'DISCORD_ALREADY_MEMBER' })
+
+    if (!joinRes.ok) {
+      const body = await safeJson(joinRes)
+      const retryAfter = Number(joinRes.headers.get('Retry-After') ?? body?.retry_after ?? 0)
+      console.error('Discord join failed', {
+        status: joinRes.status,
+        discord_code: discordErrorCode(body),
+        discord_message: discordErrorMessage(body),
+        retry_after: Number.isFinite(retryAfter) ? retryAfter : undefined,
+      })
+
+      if (joinRes.status === 429) {
+        const response = rateLimitResponse(req, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 5)
+        response.headers.set('X-Discord-Error-Code', 'DISCORD_RATE_LIMITED')
+        return response
+      }
+
+      const code = discordErrorCode(body)
+      if (joinRes.status === 404 || code === 10004) {
+        return errorResponse(req, 'Discord guild invalid', 502, 'DISCORD_GUILD_INVALID')
+      }
+      if (joinRes.status === 403) {
+        const message = (discordErrorMessage(body) ?? '').toLowerCase()
+        const internalCode = message.includes('missing access') || code === 50001
+          ? 'DISCORD_SCOPE_MISSING'
+          : code === 50013
+            ? 'DISCORD_BOT_NOT_IN_GUILD'
+            : 'DISCORD_JOIN_FORBIDDEN'
+        return errorResponse(req, 'Discord refused to add user to guild', 403, internalCode)
+      }
+
+      return errorResponse(req, 'Unable to join Discord server', 502, 'DISCORD_JOIN_FAILED')
     }
 
-    return jsonResponse(req, { joined: true })
+    return jsonResponse(req, { success: true, joined: true })
   } catch (err) {
     if (err instanceof HttpError) return errorResponse(req, err.message, err.status)
     console.error('discord-join-server error')

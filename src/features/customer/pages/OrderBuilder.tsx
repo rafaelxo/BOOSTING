@@ -11,7 +11,7 @@ import type { ServiceType, Rank } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
-const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'placement_matches', 'md5']
+const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching']
 
 // Step components
 import { StepService } from '../order-builder/StepService'
@@ -57,6 +57,7 @@ function isStepComplete(
     winsPurchased: number | null
     riotId: string
     isMd5: boolean
+    riotVerified: boolean
     riotLookupLoading: boolean
     md5MatchesRemaining: number | null
   },
@@ -64,15 +65,17 @@ function isStepComplete(
   if (state.riotLookupLoading) return false
   if (step === 'service') return !!state.serviceType
   if (step === 'configure') {
+    // Eloboost e Vitórias/MD5 só avançam depois de uma verificação de conta
+    // bem-sucedida na fila atual (mesma trava que esconde os campos).
     if (state.serviceType === 'elo_boost') {
-      return !!state.currentRank && !!state.targetRank && isValidRiotId(state.riotId)
+      return state.riotVerified && !!state.currentRank && !!state.targetRank && isValidRiotId(state.riotId)
     }
     if (state.serviceType === 'win_boost' || state.serviceType === 'md5') {
       const winsOk = !!state.winsPurchased
         && state.winsPurchased >= 1
         && state.winsPurchased <= 5
         && (!state.isMd5 || state.md5MatchesRemaining == null || state.winsPurchased <= state.md5MatchesRemaining)
-      return !!state.currentRank && winsOk && isValidRiotId(state.riotId)
+      return state.riotVerified && !!state.currentRank && winsOk && isValidRiotId(state.riotId)
     }
     if (state.serviceType === 'placement_matches') return !!state.currentRank
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
@@ -83,10 +86,10 @@ function isStepComplete(
 export function OrderBuilderPage() {
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
-    selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType,
-    setGame, setService, setStep, reset, preferredBoosterName, setPreferredBooster,
+    selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType, serviceId,
+    setGame, setService, setServiceId, setStep, reset, preferredBoosterName, setPreferredBooster,
     setSelectedCoachPackage, setBasePrice,
-    winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading,
+    winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading, riotVerified,
     selectedCoachPackage, setStepAttempted,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -123,16 +126,18 @@ export function OrderBuilderPage() {
   const { data: serviceRow } = useQuery({
     queryKey: ['catalog-service', gameRow?.id, serviceType],
     queryFn: async () => {
-      const { data } = await supabase.from('services').select('id').eq('game_id', gameRow!.id).eq('type', serviceType!).maybeSingle()
+      const catalogServiceType = serviceType === 'md5' ? 'win_boost' : serviceType
+      const { data } = await supabase.from('services').select('id').eq('game_id', gameRow!.id).eq('type', catalogServiceType!).maybeSingle()
       return data
     },
     enabled: !!gameRow?.id && !!serviceType,
     staleTime: 1000 * 60 * 30,
   })
   useEffect(() => {
-    if (serviceRow?.id && serviceType) setService(serviceType, serviceRow.id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serviceRow, serviceType])
+    // Só sobe o uuid resolvido — NÃO reaplica setService (que resetaria
+    // winsPurchased/MD5 e apagaria as partidas restantes recém-detectadas).
+    if (serviceRow?.id && serviceRow.id !== serviceId) setServiceId(serviceRow.id)
+  }, [serviceRow, serviceId, setServiceId])
 
   useEffect(() => {
     const service = searchParams.get('service') as ServiceType | null
@@ -195,7 +200,7 @@ export function OrderBuilderPage() {
   const canGoBack = currentIdx > 0 && step !== 'payment'
   const stepComplete = isStepComplete(step, {
     serviceType, selectedCoachPackage, currentRank, targetRank,
-    winsPurchased, riotId, isMd5, riotLookupLoading, md5MatchesRemaining,
+    winsPurchased, riotId, isMd5, riotVerified, riotLookupLoading, md5MatchesRemaining,
   })
 
   return (

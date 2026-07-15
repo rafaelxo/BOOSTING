@@ -8,10 +8,16 @@
     "build": "tsc -b && vite build --configLoader runner",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
+    "supabase:start": "supabase start",
+    "supabase:migrations:list": "supabase migration list --linked",
+    "supabase:schema:dump": "supabase db dump --linked --schema public --file supabase/schema/current_public_schema.sql",
+    "functions:serve": "supabase functions serve --env-file ./supabase/functions/.env.local --no-verify-jwt",
+    "functions:debug": "supabase functions serve --env-file ./supabase/functions/.env.local --no-verify-jwt --debug",
     "test": "vitest run --configLoader runner",
     "typecheck": "tsc -b --pretty false",
     "audit": "npm audit --audit-level=high",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+    "deadcode": "knip --no-progress",
+    "check": "npm run lint && npm run typecheck && npm run deadcode && npm test && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -48,6 +54,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.11.0",
+    "knip": "^5.88.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",

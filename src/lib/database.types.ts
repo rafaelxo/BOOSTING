@@ -482,29 +482,23 @@ export type Database = {
       }
       master_plus_pricing: {
         Row: {
-          current_tier: string
           id: string
-          pdl_bracket: string
           price: number | null
-          target_tier: string
+          tier: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          current_tier: string
           id?: string
-          pdl_bracket: string
           price?: number | null
-          target_tier: string
+          tier: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          current_tier?: string
           id?: string
-          pdl_bracket?: string
           price?: number | null
-          target_tier?: string
+          tier?: string
           updated_at?: string
           updated_by?: string | null
         }
@@ -1827,20 +1821,10 @@ export type Database = {
         Args: { p_account_id: string; p_login: string; p_password: string }
         Returns: Json
       }
-      set_order_credentials:
-        | {
-            Args: { p_login: string; p_order_id: string; p_password: string }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_encrypt_key?: string
-              p_login: string
-              p_order_id: string
-              p_password: string
-            }
-            Returns: Json
-          }
+      set_order_credentials: {
+        Args: { p_login: string; p_order_id: string; p_password: string }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       toggle_booster_top5: {

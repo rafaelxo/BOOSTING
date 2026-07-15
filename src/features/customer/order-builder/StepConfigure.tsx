@@ -2,16 +2,40 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
-import { RankBadge, RankLockGrid, WinCountButtons, PdlFieldRow } from '@/components/ui'
+import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { cn, RANK_TIER_LABEL, RANK_TIER_ORDER } from '@/lib/utils'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
+import { cn, RANK_TIER_ORDER } from '@/lib/utils'
 import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct } from '@/lib/pricing'
-import {
-  isMasterPlusCurrentTier, getValidMasterPlusTargets, getPdlBracket,
-} from '@/lib/boostDomain'
+import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Check, Search, AlertCircle } from 'lucide-react'
+import { Check, Search, Info, Lock } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
+
+// Mesmo formato aceito pelo backend (riot-account-rank bodySchema): 1-16 chars
+// antes do #, 2-5 alfanuméricos depois. Validar no cliente evita um 400
+// "Riot ID inválido" a cada busca com ID incompleto.
+const RIOT_ID_FORMAT = /^[^#]{1,16}#[A-Za-z0-9]{2,5}$/
+
+type RiotRankResponse = {
+  found?: boolean
+  ranked?: boolean
+  tier?: RankTier
+  division?: Division | null
+  league_points?: number
+  avg_lp_gain?: number | null
+  avg_lp_loss?: number | null
+  md5_eligible?: boolean
+  matches_remaining?: number
+  message?: string
+}
+
+function fetchRiotRank(riotId: string, queue: QueueType) {
+  return invokeEdgeFunction<RiotRankResponse>('riot-account-rank', {
+    body: { riot_id: riotId, queue },
+    requireAuth: true,
+  })
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -19,58 +43,73 @@ export function StepConfigure() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased,
-    isMd5, md5MatchesRemaining, md5MatchesRemainingCeiling,
+    isMd5, md5MatchesRemaining,
     currentLp, avgLpGain,
     currentPdl, avgPdlGain,
-    riotId, riotAutoFilled, riotLookupLoading, stepAttempted,
-    setCurrentRank, setTargetRank, setQueueType, setBoostMode,
+    riotId, riotAutoFilled, riotVerified, md5Blocked, riotLookupLoading, stepAttempted,
+    setService, setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
-    setIsMd5, setMd5MatchesRemaining, setMd5MatchesRemainingFromApi,
+    setIsMd5, setMd5MatchesRemainingFromApi,
     setCurrentLp, setAvgLpGain,
     setCurrentPdl, setAvgPdlGain,
-    setBasePrice, setEstimatedHours, setPdlModifierPct, setRiotId, setRiotAutoFilled, setRiotLookupLoading,
+    setBasePrice, setEstimatedHours, setPdlModifierPct,
+    setRiotId, setRiotAutoFilled, setRiotVerified, setMd5Blocked, clearRiotLookup, setRiotLookupLoading,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
-  const pdlBracket = currentIsMasterPlus ? getPdlBracket(currentPdl) : null
   const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
   const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
   const [md5Message, setMd5Message] = useState<string | null>(null)
+  // Oferta de migração pra MD5 quando o eloboost dá unranked na fila — guarda
+  // as partidas restantes detectadas pela Riot; null quando não há oferta.
+  const [unrankedOffer, setUnrankedOffer] = useState<{ matchesRemaining: number } | null>(null)
 
-  async function lookupRiotRank() {
-    const trimmed = riotId.trim()
+  function resetLookupMessages() {
     setRiotLookupMessage(null)
     setRiotLookupError(null)
     setMd5Message(null)
+    setUnrankedOffer(null)
+  }
 
-    setRiotLookupLoading(true)
-    const { data, error } = await supabase.functions.invoke('riot-account-rank', {
-      body: { riot_id: trimmed },
-    })
-    setRiotLookupLoading(false)
-
-    if (error) {
-      setRiotLookupError(error.message || 'Não foi possível consultar a Riot agora.')
+  async function lookupRiotRank() {
+    const trimmed = riotId.trim()
+    resetLookupMessages()
+    if (!RIOT_ID_FORMAT.test(trimmed)) {
+      setRiotLookupError('Riot ID inválido. Use o formato Nome#TAG (ex.: Fulano#BR1).')
       return
     }
+    // Zera qualquer resultado da conta consultada antes — o rank novo (ou a
+    // ausência dele, se unranked) substitui totalmente o anterior.
+    clearRiotLookup()
 
-    const result = data as {
-      found?: boolean
-      ranked?: boolean
-      tier?: RankTier
-      division?: Division | null
-      league_points?: number
-      avg_lp_gain?: number | null
-      avg_lp_loss?: number | null
-      message?: string
-    } | null
+    let result: RiotRankResponse
+    setRiotLookupLoading(true)
+    try {
+      result = await fetchRiotRank(trimmed, queueType)
+    } catch (error) {
+      setRiotLookupError(error instanceof Error ? error.message : 'Não foi possível consultar a Riot agora.')
+      return
+    } finally {
+      setRiotLookupLoading(false)
+    }
 
     if (!result?.found) {
       setRiotLookupError('Conta Riot não encontrada.')
       return
     }
     if (!result.ranked || !result.tier) {
-      setRiotLookupError('Conta encontrada, mas sem rank Solo/Duo atual.')
+      // Sem rank nesta fila — em vez de barrar, oferecemos migrar pra uma MD5
+      // da MESMA fila (mesmo endpoint já devolve md5_eligible/matches_remaining).
+      // O form segue travado (riotVerified false) até o usuário decidir.
+      const remaining = result.matches_remaining ?? 5
+      if (remaining < 1) {
+        // Unranked mas sem partidas de posicionamento restantes — o backend
+        // rejeitaria a MD5, então não oferecemos (evita um beco sem saída).
+        setRiotLookupError('Conta sem rank e sem partidas de posicionamento restantes nesta fila. Confira a fila selecionada.')
+        return
+      }
+      setUnrankedOffer({ matchesRemaining: remaining })
+      setRiotLookupMessage('Conta sem rank nesta fila.')
       return
     }
 
@@ -83,36 +122,46 @@ export function StepConfigure() {
       if (typeof result.avg_lp_gain === 'number') setAvgLpGain(Math.max(1, Math.min(50, result.avg_lp_gain)))
     }
 
-    setRiotLookupMessage(result.message ?? 'Rank atual preenchido automaticamente. Você ainda pode alterar os dados.')
     setRiotAutoFilled(true)
+    setRiotVerified(true)
+    setRiotLookupMessage(result.message ?? 'Rank atual preenchido automaticamente. Você ainda pode alterar os dados.')
+  }
+
+  // Migra o pedido de eloboost unranked pra uma MD5 na mesma fila, já
+  // configurando riot id (mantido), fila (mantida), partidas restantes e
+  // deixando o número editável. Backend revalida a elegibilidade MD5.
+  function migrateToMd5() {
+    if (!unrankedOffer) return
+    setService('md5', 'md5')
+    setMd5MatchesRemainingFromApi(unrankedOffer.matchesRemaining)
+    setMd5Blocked(false)
+    setRiotVerified(true)
+    setUnrankedOffer(null)
+    setRiotLookupMessage(null)
+    setMd5Message(
+      `Pedido migrado para MD5 nesta fila. Faltam ${unrankedOffer.matchesRemaining} partida(s) — ajuste o número se quiser.`,
+    )
   }
 
   async function lookupForWinBoost() {
     const trimmed = riotId.trim()
-    setRiotLookupMessage(null)
-    setRiotLookupError(null)
-    setMd5Message(null)
-
-    setRiotLookupLoading(true)
-    const { data, error } = await supabase.functions.invoke('riot-account-rank', {
-      body: { riot_id: trimmed, queue: queueType },
-    })
-    setRiotLookupLoading(false)
-
-    if (error) {
-      setRiotLookupError(error.message || 'Não foi possível consultar a Riot agora.')
+    resetLookupMessages()
+    if (!RIOT_ID_FORMAT.test(trimmed)) {
+      setRiotLookupError('Riot ID inválido. Use o formato Nome#TAG (ex.: Fulano#BR1).')
       return
     }
+    clearRiotLookup()
 
-    const result = data as {
-      found?: boolean
-      ranked?: boolean
-      tier?: RankTier
-      division?: Division | null
-      md5_eligible?: boolean
-      matches_remaining?: number
-      message?: string
-    } | null
+    let result: RiotRankResponse
+    setRiotLookupLoading(true)
+    try {
+      result = await fetchRiotRank(trimmed, queueType)
+    } catch (error) {
+      setRiotLookupError(error instanceof Error ? error.message : 'Não foi possível consultar a Riot agora.')
+      return
+    } finally {
+      setRiotLookupLoading(false)
+    }
 
     if (!result?.found) {
       setRiotLookupError('Conta Riot não encontrada.')
@@ -125,21 +174,22 @@ export function StepConfigure() {
       // última temporada), então a grade de rank NÃO é travada aqui.
       const remaining = result.matches_remaining ?? 5
       setIsMd5(true)
+      setMd5Blocked(false)
       setMd5MatchesRemainingFromApi(remaining)
       setWinsPurchased(Math.min(remaining, winsPurchased ?? remaining))
+      setRiotVerified(true)
       setMd5Message(
         `Conta ainda não rankeada nesta fila - MD5 ativado automaticamente. `
         + `Faltam ${remaining} partida(s) de posicionamento.`,
       )
     } else {
-      // Conta já rankeada nesta fila — a Riot retorna tier/division junto
-      // com `ranked: true`/`md5_eligible: false`; preenchemos o rank atual
-      // (preço de win_boost/md5 depende só de currentRank.tier — ver
-      // computeOrderPrice em shared/pricing.ts — então LP/PDL não são
-      // preenchidos aqui, seriam estado morto para este fluxo) e só então
-      // travamos a grade.
+      // Conta já rankeada nesta fila — preenchemos o rank atual e BLOQUEAMOS o
+      // MD5 (anti-fraude): não dá pra comprar garantia de placement de uma
+      // conta que já saiu do posicionamento. O backend rejeita de todo jeito.
       setMd5MatchesRemainingFromApi(0)
       setIsMd5(false)
+      setMd5Blocked(true)
+      setRiotVerified(true)
       setRiotLookupMessage(result.message ?? 'Conta já possui rank nesta fila - MD5 indisponível.')
       if (result.tier) {
         setCurrentRank({ tier: result.tier, division: result.division ?? null })
@@ -156,23 +206,21 @@ export function StepConfigure() {
     }
   }, [currentRank, targetRank, setTargetRank])
 
-  // Preço do Master+ vem da tabela comercial (origem × destino × faixa de
-  // PDL atual) — não existe fórmula local. Se a combinação ainda não tem
-  // preço configurado, o preço fica indefinido e o pedido não avança.
+  // Preço do Master+ vem da tabela comercial — preço fixo por tier alvo,
+  // independente de qual tier o cliente parte. Se o tier ainda não tem preço
+  // configurado, o preço fica indefinido e o pedido não avança.
   const { data: masterPlusPriceRow, isFetching: loadingMasterPlusPrice } = useQuery({
-    queryKey: ['master-plus-price', currentRank?.tier, targetRank?.tier, pdlBracket],
+    queryKey: ['master-plus-price', targetRank?.tier],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('master_plus_pricing')
         .select('price')
-        .eq('current_tier', currentRank!.tier)
-        .eq('target_tier', targetRank!.tier)
-        .eq('pdl_bracket', pdlBracket!)
+        .eq('tier', targetRank!.tier)
         .maybeSingle()
       if (error) throw error
       return data as { price: number | null } | null
     },
-    enabled: currentIsMasterPlus && !!currentRank && !!targetRank && !!pdlBracket,
+    enabled: currentIsMasterPlus && !!targetRank,
   })
 
   useEffect(() => {
@@ -238,19 +286,42 @@ export function StepConfigure() {
     setBasePrice, setEstimatedHours, setPdlModifierPct,
   ])
 
-  const masterPlusTargets = currentRank && currentIsMasterPlus
-    ? getValidMasterPlusTargets(currentRank.tier as 'master' | 'grandmaster')
-    : []
-
   return (
     <div>
       <h2 className="text-lg font-bold text-ink mb-1">Configurar Pedido</h2>
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
-        {/* Riot ID first: used to prefill current rank/LP from Riot. The user
-            may still edit everything afterwards; backend validation remains
-            authoritative when creating/completing orders. */}
+        {/* Tipo de fila vem antes do Riot ID — a busca na Riot precisa saber
+            qual fila consultar (Solo/Duo ou Flex) antes de rodar, senão o
+            rank/PDL preenchido pode vir da fila errada. Compartilhado entre
+            elo_boost e win_boost/md5. */}
+        {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Tipo de Fila" required>
+            <div className="flex gap-3">
+              {(['solo_duo', 'flex'] as QueueType[]).map(q => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setQueueType(q)}
+                  className={cn(
+                    'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                    queueType === q
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                  )}
+                >
+                  {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
+                </button>
+              ))}
+            </div>
+          </FormField>
+        )}
+
+        {/* Riot ID: usado pra preencher rank/LP/PDL atual de acordo com a fila
+            marcada acima. O usuário ainda pode editar tudo depois; a
+            validação do backend continua sendo a autoridade na criação do
+            pedido. */}
         {serviceType === 'elo_boost' && (
           <FormField
             label="Riot ID"
@@ -264,9 +335,7 @@ export function StepConfigure() {
                 value={riotId}
                 onChange={e => {
                   setRiotId(e.target.value)
-                  setRiotLookupMessage(null)
-                  setRiotLookupError(null)
-                  setMd5Message(null)
+                  resetLookupMessages()
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -294,17 +363,38 @@ export function StepConfigure() {
             {riotLookupMessage && (
               <p className="mt-2 text-xs text-success">{riotLookupMessage}</p>
             )}
-            {riotLookupError && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-warning">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {riotLookupError}
-              </p>
-            )}
+            {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
           </FormField>
         )}
 
-        {/* Duo Boost toggle — não existe no fluxo Master+ */}
-        {serviceType === 'elo_boost' && !currentIsMasterPlus && (
+        {/* Eloboost sem rank na fila — oferta de migrar o pedido pra MD5 na
+            mesma fila, já configurando tudo. O form segue travado até aqui. */}
+        {serviceType === 'elo_boost' && !riotVerified && unrankedOffer && (
+          <div className="rounded-2xl border-2 border-warning/30 bg-warning/5 p-4 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <Info className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-ink">Conta sem rank nesta fila</p>
+                <p className="text-xs text-ink-secondary mt-0.5">
+                  Sua conta ainda está no posicionamento nesta fila, então não dá pra fazer um Elo Boost.
+                  Você pode migrar este pedido para uma <span className="font-semibold">MD5</span> na mesma
+                  fila — garantimos 80%+ de win rate nas {unrankedOffer.matchesRemaining} partida(s) restantes
+                  (você ajusta o número depois).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={migrateToMd5}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-brand text-white hover:opacity-90 transition-all"
+            >
+              Migrar para MD5
+            </button>
+          </div>
+        )}
+
+        {/* Duo Boost toggle — não existe no fluxo Master+; só após verificar o elo */}
+        {serviceType === 'elo_boost' && riotVerified && !currentIsMasterPlus && (
           <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
             <button
               type="button"
@@ -330,8 +420,9 @@ export function StepConfigure() {
           </FormField>
         )}
 
-        {/* Vitórias/MD5: Riot ID vem primeiro neste fluxo — a checagem de
-            elegibilidade MD5 precisa acontecer antes de qualquer outro campo. */}
+        {/* Vitórias/MD5: Riot ID vem logo após o Tipo de Fila — a consulta
+            usa a fila marcada acima, e a checagem de elegibilidade MD5
+            precisa acontecer antes de qualquer outro campo. */}
         {(serviceType === 'win_boost' || serviceType === 'md5') && (
           <FormField
             label="Riot ID"
@@ -345,9 +436,7 @@ export function StepConfigure() {
                 value={riotId}
                 onChange={e => {
                   setRiotId(e.target.value)
-                  setRiotLookupMessage(null)
-                  setRiotLookupError(null)
-                  setMd5Message(null)
+                  resetLookupMessages()
                 }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
@@ -374,115 +463,76 @@ export function StepConfigure() {
             </div>
             {md5Message && <p className="mt-2 text-xs text-success">{md5Message}</p>}
             {riotLookupMessage && !md5Message && <p className="mt-2 text-xs text-ink-secondary">{riotLookupMessage}</p>}
-            {riotLookupError && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-warning">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {riotLookupError}
-              </p>
-            )}
+            {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
           </FormField>
         )}
 
-        {/* MD5 toggle — logo abaixo do Riot ID, antes da grade de vitórias. */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+        {/* MD5 toggle — só após verificar o elo. Depois da verificação o MD5 é
+            DETERMINADO pela conta, não é escolha livre: se a conta está no
+            posicionamento (unranked na fila) o MD5 é marcado e TRAVADO (serviço
+            = md5); se já tem rank, o MD5 fica travado e desmarcado (anti-fraude).
+            O backend valida os dois casos de qualquer forma. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && riotVerified && (
           <FormField label="Extras" hint="MD5: garantimos 80%+ de win rate nas suas partidas de posicionamento restantes, com desconto no preço por vitória.">
             <button
               type="button"
-              onClick={() => setIsMd5(!isMd5)}
+              // Sempre travado após a verificação: marcado (detectado) ou
+              // desmarcado (conta já rankeada). Nunca é um clique livre.
+              disabled={md5Blocked || isMd5}
+              onClick={() => { if (!md5Blocked && !isMd5) setIsMd5(true) }}
               className={cn(
                 'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
-                isMd5
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
+                md5Blocked
+                  ? 'border-bg-elevated bg-bg-elevated/40 text-ink-muted cursor-not-allowed opacity-70'
+                  : isMd5
+                    ? 'border-brand bg-brand/10 text-brand cursor-not-allowed'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
               )}
             >
               <div>
-                <p className="text-sm font-bold">MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span></p>
+                <p className="text-sm font-bold flex items-center gap-1.5">
+                  MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span>
+                  {(md5Blocked || isMd5) && <Lock className="h-3 w-3 opacity-60" />}
+                </p>
                 <p className="text-[11px] font-normal mt-0.5 opacity-70">
-                  {md5MatchesRemaining == null && 'Disponível só para contas ainda não rankeadas nesta fila'}
+                  {md5Blocked
+                    ? 'Indisponível — sua conta já tem rank nesta fila.'
+                    : isMd5
+                      ? 'Detectado automaticamente — sua conta está no posicionamento. Serviço definido como MD5.'
+                      : 'Garantia de win rate nas suas partidas de posicionamento restantes.'}
                 </p>
               </div>
               <div className={cn(
                 'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
-                isMd5 ? 'border-brand bg-brand' : 'border-bg-overlay',
+                isMd5 && !md5Blocked ? 'border-brand bg-brand' : 'border-bg-overlay',
               )}>
-                {isMd5 && <Check className="h-3 w-3 text-white" />}
+                {isMd5 && !md5Blocked && <Check className="h-3 w-3 text-white" />}
               </div>
             </button>
           </FormField>
         )}
 
-        {/* Partidas restantes — só quando MD5 está ativo e o teto já foi
-            detectado pela Riot. */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && isMd5 && md5MatchesRemaining != null && (
-          <FormField label="Partidas Restantes para o Booster" hint="Detectado automaticamente pela Riot. Você pode diminuir se já jogou mais partidas depois da checagem, mas não aumentar.">
-            <div className="flex items-center gap-0 rounded-xl border-2 border-bg-elevated bg-bg-card overflow-hidden w-fit">
-              <button
-                type="button"
-                onClick={() => setMd5MatchesRemaining(md5MatchesRemaining - 1)}
-                disabled={md5MatchesRemaining <= 0}
-                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                -
-              </button>
-              <div className="px-6 py-3 text-center min-w-[110px] border-x border-bg-elevated">
-                <p className="text-xl font-extrabold text-ink leading-none">{md5MatchesRemaining}</p>
-                <p className="text-[10px] text-ink-muted mt-0.5">partida(s)</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMd5MatchesRemaining(md5MatchesRemaining + 1)}
-                disabled={md5MatchesRemaining >= (md5MatchesRemainingCeiling ?? 5)}
-                className="px-4 py-3 text-lg font-bold text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                +
-              </button>
-            </div>
-          </FormField>
-        )}
-
-        {/* Vitórias — grade de botões 1..5 (ou até o teto de partidas
-            restantes, se MD5). Substitui o antigo stepper -/contagem/+. */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && (
-          <FormField label="Número de Vitórias" required>
+        {/* Número de vitórias/partidas — controle único: grade 1..5, ou até as
+            partidas restantes detectadas pela Riot quando MD5. O rótulo vira
+            "Número de Partidas" no MD5. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && riotVerified && (
+          <FormField label={isMd5 ? 'Número de Partidas' : 'Número de Vitórias'} required>
             <WinCountButtons
               value={winsPurchased}
               max={isMd5 ? Math.max(1, md5MatchesRemaining ?? 5) : 5}
               onChange={setWinsPurchased}
             />
             <p className="text-xs text-ink-muted mt-1.5">
-              {isMd5 ? `Máximo ${Math.max(1, md5MatchesRemaining ?? 5)} (partidas restantes)` : 'Máximo 5'}
+              {isMd5
+                ? `Máximo ${Math.max(1, md5MatchesRemaining ?? 5)} (partidas restantes detectadas pela Riot)`
+                : 'Máximo 5'}
             </p>
           </FormField>
         )}
 
-        {/* Queue type — compartilhado entre elo_boost e win_boost/md5. No
-            fluxo Vitórias/MD5 este campo vem depois de Riot ID/MD5/vitórias
-            (ver bloco acima); no fluxo elo_boost continua logo após Duo Boost. */}
-        {(serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5') && (
-          <FormField label="Tipo de Fila" required>
-            <div className="flex gap-3">
-              {(['solo_duo', 'flex'] as QueueType[]).map(q => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setQueueType(q)}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
-                    queueType === q
-                      ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
-                  )}
-                >
-                  {q === 'solo_duo' ? 'Solo/Duo' : 'Flex'}
-                </button>
-              ))}
-            </div>
-          </FormField>
-        )}
-
-        {/* Rank selection — elo boost (split two-column layout) */}
-        {serviceType === 'elo_boost' && (
+        {/* Rank selection — elo boost (split two-column layout). Só após
+            verificar o elo (o rank atual vem preenchido da Riot). */}
+        {serviceType === 'elo_boost' && riotVerified && (
           <div className="rounded-2xl border border-bg-elevated overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-2">
               {/* ── Current rank column ── */}
@@ -541,40 +591,13 @@ export function StepConfigure() {
 
                 {!currentRank ? (
                   <p className="text-xs text-ink-muted pt-2">Selecione o rank atual primeiro.</p>
-                ) : currentIsMasterPlus ? (
-                  <div className="space-y-2">
-                    {masterPlusTargets.map(tier => (
-                      <button
-                        key={tier}
-                        type="button"
-                        onClick={() => setTargetRank({ tier, division: null })}
-                        disabled={currentRank.tier === 'grandmaster'}
-                        className={cn(
-                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 transition-all text-left',
-                          targetRank?.tier === tier
-                            ? 'border-brand bg-brand/10 text-brand'
-                            : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
-                          currentRank.tier === 'grandmaster' && 'cursor-default',
-                        )}
-                      >
-                        <RankBadge tier={tier} size="xs" showLabel={false} />
-                        <span className="text-sm font-bold">{RANK_TIER_LABEL[tier]}</span>
-                      </button>
-                    ))}
-                    {currentRank.tier === 'grandmaster' && (
-                      <p className="text-[11px] text-ink-muted">Único destino possível a partir de Grão-Mestre.</p>
-                    )}
-                    {loadingMasterPlusPrice && <p className="text-[11px] text-ink-muted">Calculando preço…</p>}
-                    {!loadingMasterPlusPrice && targetRank && masterPlusPriceRow?.price == null && (
-                      <p className="text-[11px] text-warning">Preço ainda não configurado para essa combinação. Fale com o suporte.</p>
-                    )}
-                  </div>
                 ) : (
-                  // Rank alvo do fluxo padrão pode ir além de Diamond — até
-                  // Master/Grão-Mestre/Challenger — usando a mesma progressão
-                  // por degrau (o preço de cada degrau acima de Diamond segue
-                  // a taxa de Diamante). O fluxo Master+ propriamente dito só
-                  // se aplica quando o rank ATUAL já é Master/Grão-Mestre.
+                  // A grade sempre mostra os 10 tiers, travando só os que estão
+                  // no mesmo degrau ou abaixo do rank atual (RankLockGrid usa
+                  // rankStep — Master/Grão-Mestre/Challenger entram na mesma
+                  // regra, sem lista de progressões separada). Vale tanto para
+                  // o fluxo padrão mirando Master+ (Diamond → Master, por
+                  // exemplo) quanto para quem já está em Master+.
                   <RankLockGrid
                     tiers={RANK_TIER_ORDER}
                     current={currentRank}
@@ -582,6 +605,17 @@ export function StepConfigure() {
                     selectedDivision={targetRank?.division ?? null}
                     onChange={(tier, division) => setTargetRank({ tier, division })}
                   />
+                )}
+                {currentIsMasterPlus && (
+                  <>
+                    {currentRank?.tier === 'grandmaster' && (
+                      <p className="text-[11px] text-ink-muted">Único destino possível a partir de Grão-Mestre.</p>
+                    )}
+                    {loadingMasterPlusPrice && <p className="text-[11px] text-ink-muted">Calculando preço…</p>}
+                    {!loadingMasterPlusPrice && targetRank && masterPlusPriceRow?.price == null && (
+                      <p className="text-[11px] text-warning">Preço ainda não configurado para esse tier. Fale com o suporte.</p>
+                    )}
+                  </>
                 )}
                 {stepAttempted && currentRank && !targetRank && (
                   <p className="text-xs text-danger">Selecione o rank alvo</p>
@@ -591,8 +625,8 @@ export function StepConfigure() {
           </div>
         )}
 
-        {/* Rank — win boost / MD5 */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+        {/* Rank — win boost / MD5. Só após verificar o elo. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && riotVerified && (
           <FormField
             label={isMd5 ? 'Rank da Última Temporada' : 'Rank Atual'}
             required

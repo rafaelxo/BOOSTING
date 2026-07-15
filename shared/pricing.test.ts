@@ -210,8 +210,8 @@ describe('Integridade monetária e entradas hostis', () => {
       winsPurchased: 3,
     }))
 
-    // Tabela nova (direta, não mais ÷5): grandmaster = 99.90/vitória (igual nas duas filas)
-    expect(priced.basePrice).toBe(299.70)
+    // grandmaster: Vitória Avulsa R$59,90/vitória com 50% de desconto = R$29,95/vitória
+    expect(priced.basePrice).toBe(89.85)
   })
 
   it('recusa quantidade negativa (basePrice zerado, mesma faixa 1-5 do MD5)', () => {
@@ -225,21 +225,21 @@ describe('Integridade monetária e entradas hostis', () => {
 })
 
 describe('MD5 — preço por vitória líquida (garantia de win rate nas placements)', () => {
-  it('preço por vitória = tabela direta por fila (não mais ÷5), arredondado a 2 casas', () => {
+  it('preço por vitória = preço da Vitória Avulsa com 50% de desconto, arredondado a 2 casas', () => {
     const priced = computeOrderPrice(baseInput({
       serviceType: 'md5',
       currentRank: { tier: 'gold', division: null },
       winsPurchased: 3,
     }))
-    // tabela solo_duo: Gold = 21.90/vitória (tabela direta, não derivada mais)
-    expect(priced.basePrice).toBeCloseTo(21.90 * 3, 2)
+    // Gold solo_duo: Vitória Avulsa R$3,90/vitória com 50% de desconto = R$1,95/vitória
+    expect(priced.basePrice).toBeCloseTo(1.95 * 3, 2)
   })
 
-  it('todos os 10 tiers usam os valores exatos da nova tabela direta por vitória (solo_duo)', () => {
+  it('todos os 10 tiers derivam de getWinBoostPrice com 50% de desconto (solo_duo)', () => {
     const cases: [string, number][] = [
-      ['iron', 14.90], ['bronze', 16.90], ['silver', 18.90], ['gold', 21.90],
-      ['platinum', 30.90], ['emerald', 37.90], ['diamond', 41.90],
-      ['master', 59.90], ['grandmaster', 99.90], ['challenger', 179.90],
+      ['iron', 1.45], ['bronze', 1.45], ['silver', 1.95], ['gold', 1.95],
+      ['platinum', 3.45], ['emerald', 4.95], ['diamond', 7.95],
+      ['master', 22.45], ['grandmaster', 29.95], ['challenger', 49.95],
     ]
     for (const [tier, perWinPrice] of cases) {
       const priced = computeOrderPrice(baseInput({
@@ -307,14 +307,14 @@ describe('Preços por fila — Vitória Avulsa', () => {
   })
 })
 
-describe('Preços por fila — MD5 (garantia de win rate, por vitória)', () => {
+describe('Preços por fila — MD5 (garantia de win rate, por vitória — Vitória Avulsa com 50% de desconto)', () => {
   const soloDuo: [RankTier, number][] = [
-    ['iron', 1490], ['bronze', 1690], ['silver', 1890], ['gold', 2190], ['platinum', 3090],
-    ['emerald', 3790], ['diamond', 4190], ['master', 5990], ['grandmaster', 9990], ['challenger', 17990],
+    ['iron', 145], ['bronze', 145], ['silver', 195], ['gold', 195], ['platinum', 345],
+    ['emerald', 495], ['diamond', 795], ['master', 2245], ['grandmaster', 2995], ['challenger', 4995],
   ]
   const flex: [RankTier, number][] = [
-    ['iron', 1410], ['bronze', 1590], ['silver', 1790], ['gold', 2080], ['platinum', 2930],
-    ['emerald', 3600], ['diamond', 3990], ['master', 5990], ['grandmaster', 9990], ['challenger', 17990],
+    ['iron', 133], ['bronze', 133], ['silver', 185], ['gold', 185], ['platinum', 325],
+    ['emerald', 470], ['diamond', 755], ['master', 2245], ['grandmaster', 2995], ['challenger', 4995],
   ]
   it.each(soloDuo)('solo_duo %s = %i centavos', (tier, cents) => {
     expect(moneyToCents(getMd5WinPrice('solo_duo', tier))).toBe(cents)

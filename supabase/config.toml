@@ -18,7 +18,7 @@ enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 
@@ -60,4 +60,11 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.discord-init-channels]
+verify_jwt = false
+
+# Endpoint público e somente leitura. As demais funções chamadas pelo navegador
+# mantêm a verificação JWT padrão do gateway em produção. Para desenvolvimento
+# com uma sessão do projeto remoto, use o script functions:serve, que passa
+# --no-verify-jwt e deixa a validação explícita de cada função ativa.
+[functions.riot-profile-icons]
 verify_jwt = false

@@ -2,8 +2,9 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useRef, useEffect } from 'react'
 import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, RankBadge, Modal } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
 import type { Division, Order, OrderMessage, OrderStatus, OrderDropRequest, RankTier } from '@/types'
@@ -122,18 +123,17 @@ export function JobDetailPage() {
 
   const verifyRank = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('verify-order-rank', {
-        body: { order_id: id! },
-      })
-      if (error) throw new Error(data?.error ?? error.message ?? 'Erro ao verificar rank')
-      return data as {
+      return invokeEdgeFunction<{
         passed: boolean
         reason?: string
         fetched_tier?: RankTier
         fetched_division?: Division | null
         target_tier?: RankTier
         target_division?: Division | null
-      }
+      }>('verify-order-rank', {
+        body: { order_id: id! },
+        requireAuth: true,
+      })
     },
     onSuccess: (result) => {
       if (result.passed) queryClient.invalidateQueries({ queryKey: ['order', id] })
@@ -370,9 +370,10 @@ export function JobDetailPage() {
               )}
 
               {revealAccessToken.isError && (
-                <p className="text-xs text-danger mt-2">
-                  {revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'}
-                </p>
+                <ErrorAlert
+                  message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'}
+                  className="mt-2"
+                />
               )}
             </Card>
           )}
@@ -439,9 +440,10 @@ export function JobDetailPage() {
                 Verificar Rank e Concluir
               </Button>
               {verifyRank.isError && (
-                <p className="text-xs text-danger mt-2">
-                  {verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'}
-                </p>
+                <ErrorAlert
+                  message={verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'}
+                  className="mt-2"
+                />
               )}
               {verifyRank.data && !verifyRank.data.passed && (
                 <div className="text-xs text-warning mt-2 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">

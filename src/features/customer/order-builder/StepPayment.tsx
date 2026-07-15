@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui'
+import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
+import { Button, ErrorAlert } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
@@ -19,19 +20,55 @@ type PixState =
   | { phase: 'expired'; order_id: string }
   | { phase: 'error'; message: string; order_id?: string }
 
+type PixPaymentResponse = {
+  success?: boolean
+  order_id: string
+  total_price: number
+  payment_id: string | number
+  qr_code?: string
+  qr_code_base64?: string | null
+  expires_at: string
+  reused?: boolean
+}
+
+function pixErrorMessage(err: unknown) {
+  if (!(err instanceof EdgeFunctionError)) {
+    return err instanceof Error ? err.message : 'Erro ao gerar PIX'
+  }
+
+  if (err.code === 'NETWORK_ERROR') {
+    return 'Não foi possível conectar à função de PIX. Verifique se o Vite foi reiniciado e se VITE_SUPABASE_URL está configurada.'
+  }
+  if (err.status === 401) {
+    return 'Sua sessão expirou. Entre novamente para gerar o PIX.'
+  }
+  if (err.status === 403) {
+    return `A função recusou a operação${err.code ? ` (${err.code})` : ''}. Entre novamente e tente outra vez.`
+  }
+  if (err.status >= 500) {
+    return `A função de PIX falhou no servidor${err.code ? ` (${err.code})` : ''}: ${err.message}`
+  }
+
+  return err.message
+}
+
 function useCountdown(expiresAt: string | null) {
-  const [remaining, setRemaining] = useState(0)
+  const [remaining, setRemaining] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!expiresAt) return
+    if (!expiresAt) {
+      setRemaining(null)
+      return
+    }
     const tick = () => setRemaining(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)))
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [expiresAt])
 
-  const mm = String(Math.floor(remaining / 60)).padStart(2, '0')
-  const ss = String(remaining % 60).padStart(2, '0')
+  const safeRemaining = remaining ?? 0
+  const mm = String(Math.floor(safeRemaining / 60)).padStart(2, '0')
+  const ss = String(safeRemaining % 60).padStart(2, '0')
   return { remaining, label: `${mm}:${ss}` }
 }
 
@@ -121,16 +158,24 @@ export function StepPayment() {
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
   // partir da intenção (rank, extras selecionados, pacote de vitórias etc).
   async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown>; idempotency_key: string; preferred_booster_id?: string }) {
-    const { data: pixData, error: pixError } = await supabase.functions.invoke('create-pix-payment', {
-      body: payload,
-    })
+    let pixData: PixPaymentResponse
 
-    if (pixError || !pixData?.qr_code) {
-      setPix({
-        phase: 'error',
-        message: pixData?.error ?? pixError?.message ?? 'Erro ao gerar PIX',
-        order_id: pixData?.order_id,
+    try {
+      pixData = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
+        body: payload,
+        timeoutMs: 25_000,
+        requireAuth: true,
       })
+    } catch (err) {
+      const orderId = err instanceof EdgeFunctionError && err.body && typeof err.body !== 'string'
+        ? typeof err.body.order_id === 'string' ? err.body.order_id : undefined
+        : undefined
+      setPix({ phase: 'error', message: pixErrorMessage(err), order_id: orderId })
+      return
+    }
+
+    if (!pixData.qr_code) {
+      setPix({ phase: 'error', message: 'A função não retornou o código PIX. Tente novamente.', order_id: pixData.order_id })
       return
     }
 
@@ -149,12 +194,14 @@ export function StepPayment() {
     // If MP didn't return base64 yet, retry once after 3s to get it
     if (!pixData.qr_code_base64) {
       setTimeout(async () => {
-        const { data: retry } = await supabase.functions.invoke('create-pix-payment', {
+        const retry = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
           body: { order_id: orderId },
-        })
+          timeoutMs: 20_000,
+          requireAuth: true,
+        }).catch(() => null)
         if (retry?.qr_code_base64) {
           setPix((prev) =>
-            prev.phase === 'waiting' ? { ...prev, qr_base64: retry.qr_code_base64 } : prev,
+            prev.phase === 'waiting' ? { ...prev, qr_base64: retry.qr_code_base64 ?? null } : prev,
           )
         }
       }, 3000)
@@ -165,6 +212,7 @@ export function StepPayment() {
 
   async function generatePix() {
     if (!profile) return
+    if (pix.phase === 'generating') return
 
     if (!catalogReady) {
       setPix({ phase: 'error', message: 'Ainda carregando o catálogo — aguarde um instante e tente novamente.' })
@@ -312,7 +360,7 @@ export function StepPayment() {
             <p className="text-xs text-ink-muted">Total a pagar</p>
             <p className="text-2xl font-extrabold text-brand mt-0.5">{currency(totalPrice)}</p>
           </div>
-          <div className={`flex items-center gap-1.5 text-sm font-bold ${remaining < 120 ? 'text-danger' : 'text-ink-secondary'}`}>
+          <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`}>
             <Clock className="h-4 w-4" />
             {countdownLabel}
           </div>
@@ -407,9 +455,7 @@ export function StepPayment() {
         ))}
       </div>
 
-      {pix.phase === 'error' && (
-        <p className="text-sm text-danger bg-danger/10 rounded-xl px-4 py-3">{pix.message}</p>
-      )}
+      {pix.phase === 'error' && <ErrorAlert message={pix.message} />}
 
       <Button
         size="lg"

@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
-  Settings, Shield, Star,
+  Settings, Shield,
   RefreshCw, Eye, AlertTriangle, Landmark, Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,7 +23,6 @@ export function AdminLayout() {
         { href: '/admin/customers', icon: Users,           label: t('admin.nav.customers')  },
         { href: '/admin/drops',     icon: AlertTriangle,   label: 'Drops'                   },
         { href: '/admin/duo-accounts', icon: Landmark,     label: 'Contas Duo'              },
-        { href: '/admin/reviews',   icon: Star,            label: t('admin.nav.reviews')    },
       ],
     },
     {
@@ -42,6 +41,8 @@ export function AdminLayout() {
       ],
     },
   ]
+  const navItems = NAV_SECTIONS.flatMap(section => section.items)
+  const isActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`))
 
   return (
     <div className="min-h-screen flex bg-bg-base">
@@ -67,7 +68,7 @@ export function AdminLayout() {
               <p className="section-label px-3 mb-2">{label}</p>
               <div className="space-y-0.5">
                 {items.map(({ href, icon: Icon, label: itemLabel }) => {
-                  const active = pathname === href
+                  const active = isActive(href)
                   return (
                     <Link
                       key={href}
@@ -96,6 +97,24 @@ export function AdminLayout() {
           <p className="text-sm text-ink-muted font-medium">{t('admin.nav.panel')}</p>
           <UserAccountBadge />
         </header>
+
+        <nav className="lg:hidden overflow-x-auto border-b border-bg-elevated bg-bg-surface shrink-0" aria-label="Navegação administrativa">
+          <div className="flex min-w-max gap-1 px-3 py-2">
+            {navItems.map(({ href, icon: Icon, label }) => (
+              <Link
+                key={href}
+                to={href}
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium',
+                  isActive(href) ? 'bg-brand/15 text-brand' : 'text-ink-secondary hover:bg-bg-elevated hover:text-ink',
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </nav>
 
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />

@@ -188,7 +188,9 @@ export function BoosterDashboard() {
               <div className={`h-8 w-8 rounded-lg ${color} flex items-center justify-center mb-3`}>
                 <Icon className="h-4 w-4" />
               </div>
-              <p className="text-xl font-bold text-ink">{loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}</p>
+              <div className="text-xl font-bold text-ink">
+                {loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}
+              </div>
               <p className="text-xs text-ink-secondary mt-0.5">{label}</p>
             </Card>
           ))}

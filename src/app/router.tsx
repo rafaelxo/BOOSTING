@@ -49,7 +49,6 @@ const AdminPaymentsPage   = lazy(() => import('@/features/admin/pages/Payments')
 const AdminRefundsPage    = lazy(() => import('@/features/admin/pages/Refunds').then(m => ({ default: m.AdminRefundsPage })))
 const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs').then(m => ({ default: m.AdminAuditPage })))
 const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services').then(m => ({ default: m.AdminServicesPage })))
-const AdminReviewsPage    = lazy(() => import('@/features/admin/pages/Reviews').then(m => ({ default: m.AdminReviewsPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
 const AdminBoostConfigPage = lazy(() => import('@/features/admin/pages/BoostConfig').then(m => ({ default: m.AdminBoostConfigPage })))
@@ -150,7 +149,7 @@ export const router = createBrowserRouter([
           { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
           { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
           { path: '/admin/boost-config', element: <SuspensePage><AdminBoostConfigPage /></SuspensePage> },
-          { path: '/admin/reviews',      element: <SuspensePage><AdminReviewsPage /></SuspensePage> },
+          { path: '/admin/reviews',      element: <Navigate to="/admin" replace /> },
           { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
           { path: '/admin/duo-accounts', element: <SuspensePage><AdminDuoAccountsPage /></SuspensePage> },
           // Rota antiga — mantida como redirect para não quebrar links/bookmarks existentes.

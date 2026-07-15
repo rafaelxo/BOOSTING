@@ -150,6 +150,10 @@ serve(async (req) => {
     })
     const result = processed as { success?: boolean; error?: string } | null
     if (error || !result?.success) {
+      if (result?.error === 'payment_order_mismatch' || result?.error === 'payment_not_found') {
+        console.warn('MP webhook for missing local pending order/payment', result.error)
+        return new Response('ok', { status: 200 })
+      }
       console.error('MP webhook reconciliation failed', result?.error ?? 'database error')
       return new Response('reconciliation failed', { status: 409 })
     }

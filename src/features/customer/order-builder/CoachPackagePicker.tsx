@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, Clock, DollarSign, CheckCircle2, Star } from 'lucide-react'
+import { Search, Clock, DollarSign, CheckCircle2, Star, SlidersHorizontal, Check, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { LANES, LANE_LABEL, COACH_SPECIALTIES, SPECIALTY_LABEL } from '@/lib/lolTaxonomy'
+import { matchesCoachPackageFilters, activeFilterCount } from '@/lib/coachFilters'
 import type { BoosterService } from '@/types'
 
 interface CoachBoosterInfo {
@@ -19,8 +20,26 @@ export function CoachPackagePicker() {
   const currency = useCurrency()
   const { selectedCoachPackage, setSelectedCoachPackage, setPreferredBooster, setBasePrice } = useOrderBuilderStore()
   const [search, setSearch] = useState('')
-  const [laneFilter, setLaneFilter] = useState<string | null>(null)
-  const [specialtyFilter, setSpecialtyFilter] = useState<string | null>(null)
+  const [laneFilters, setLaneFilters] = useState<Set<string>>(new Set())
+  const [specialtyFilters, setSpecialtyFilters] = useState<Set<string>>(new Set())
+
+  function toggleIn(setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) {
+    setter((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function clearFilters() {
+    setSearch('')
+    setLaneFilters(new Set())
+    setSpecialtyFilters(new Set())
+  }
+
+  const activeCount = activeFilterCount({ lanes: laneFilters, specialties: specialtyFilters })
+  const hasAnyFilter = activeCount > 0 || search.trim().length > 0
 
   const { data: packages = [], isLoading } = useQuery({
     queryKey: ['coach-packages'],
@@ -57,19 +76,13 @@ export function CoachPackagePicker() {
     [boosters],
   )
 
-  const filtered = packages.filter(p => {
-    const boosterName = boosterMap[p.booster_id]?.display_name ?? ''
-    if (search) {
-      const q = search.toLowerCase()
-      const matches = p.title.toLowerCase().includes(q)
-        || (p.description ?? '').toLowerCase().includes(q)
-        || boosterName.toLowerCase().includes(q)
-      if (!matches) return false
-    }
-    if (laneFilter && !p.lanes?.includes(laneFilter)) return false
-    if (specialtyFilter && !p.specialties?.includes(specialtyFilter)) return false
-    return true
-  })
+  const filtered = packages.filter(p =>
+    matchesCoachPackageFilters(
+      p,
+      boosterMap[p.booster_id]?.display_name ?? '',
+      { search, lanes: laneFilters, specialties: specialtyFilters },
+    ),
+  )
 
   function selectPackage(p: BoosterService) {
     const boosterName = boosterMap[p.booster_id]?.display_name ?? 'Booster'
@@ -85,53 +98,94 @@ export function CoachPackagePicker() {
         <p className="text-sm text-ink-secondary">Busque e filtre entre os pacotes de todos os coaches disponíveis.</p>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por título, descrição ou nome do coach..."
-          className="input-base pl-9 w-full text-sm"
-        />
-      </div>
-
-      {/* Filters */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {LANES.map(({ key, label }) => (
+      {/* Caixa de filtros */}
+      <div className="rounded-2xl border border-bg-elevated bg-bg-card/40 p-4 space-y-3.5">
+        {/* Cabeçalho: título + contador + limpar */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-brand" />
+            <span className="text-sm font-bold text-ink">Filtros</span>
+            {activeCount > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand/15 text-brand">
+                {activeCount} {activeCount === 1 ? 'ativo' : 'ativos'}
+              </span>
+            )}
+          </div>
+          {hasAnyFilter && (
             <button
-              key={key}
               type="button"
-              onClick={() => setLaneFilter(f => f === key ? null : key)}
-              className={cn(
-                'px-3 py-1 rounded-lg text-xs font-bold border transition-all',
-                laneFilter === key
-                  ? 'bg-brand/15 border-brand text-brand'
-                  : 'border-bg-elevated text-ink-secondary hover:border-brand/40',
-              )}
+              onClick={clearFilters}
+              className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink transition-colors"
             >
-              {label}
+              <X className="h-3 w-3" /> Limpar
             </button>
-          ))}
+          )}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {COACH_SPECIALTIES.map(({ key, label }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSpecialtyFilter(f => f === key ? null : key)}
-              className={cn(
-                'px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all',
-                specialtyFilter === key
-                  ? 'bg-brand/15 border-brand text-brand'
-                  : 'border-bg-elevated text-ink-muted hover:border-brand/40',
-              )}
-            >
-              {label}
-            </button>
-          ))}
+
+        {/* Busca por nome */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nome do coach, título ou descrição..."
+            className="input-base pl-9 w-full text-sm"
+          />
+        </div>
+
+        {/* Rotas — multi-seleção (OU): mostra coaches de qualquer rota marcada */}
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-ink-secondary uppercase tracking-wide">Rotas</p>
+          <div className="flex flex-wrap gap-1.5">
+            {LANES.map(({ key, label }) => {
+              const on = laneFilters.has(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(setLaneFilters, key)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold border transition-all',
+                    on
+                      ? 'bg-brand/15 border-brand text-brand'
+                      : 'border-bg-elevated text-ink-secondary hover:border-brand/40',
+                  )}
+                >
+                  {on && <Check className="h-3 w-3" />}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Especialidades — multi-seleção (OU) */}
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-ink-secondary uppercase tracking-wide">Especialidades</p>
+          <div className="flex flex-wrap gap-1.5">
+            {COACH_SPECIALTIES.map(({ key, label }) => {
+              const on = specialtyFilters.has(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleIn(setSpecialtyFilters, key)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all',
+                    on
+                      ? 'bg-brand/15 border-brand text-brand'
+                      : 'border-bg-elevated text-ink-muted hover:border-brand/40',
+                  )}
+                >
+                  {on && <Check className="h-3 w-3" />}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 

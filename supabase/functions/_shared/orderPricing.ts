@@ -5,7 +5,6 @@ import {
   isAddonCodeValidForFlow,
   isMasterPlusCurrentTier,
   isStandardTier,
-  isValidMasterPlusProgression,
   hasDuplicateAddonCodes,
   getPdlBracket,
   NO_DIVISION_TIERS,
@@ -171,13 +170,7 @@ const md5IntentSchema = z.object({
   server: z.string().trim().min(2).max(16),
   // "Rank da última temporada" — no LP/PDL, no target. Iron–Challenger valid;
   // division required except Master+.
-  current_rank: genericRankSchema.strict().superRefine((val, ctx) => {
-    if (NO_DIVISION_TIERS.includes(val.tier) && val.division) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Master, Grão-Mestre e Challenger não têm divisão', path: ['division'] })
-    } else if (!NO_DIVISION_TIERS.includes(val.tier) && !val.division) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Divisão é obrigatória para este rank', path: ['division'] })
-    }
-  }),
+  current_rank: genericRankSchema,
   wins_purchased: z.number().int().min(1).max(5),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
@@ -312,21 +305,24 @@ export async function validateAndPriceIntent(
 
   if (flow === 'master_plus') {
     const mp = parsedIntent.data as z.infer<typeof masterPlusIntentSchema>
-    if (!isValidMasterPlusProgression(mp.current_rank.tier, mp.target_rank.tier)) {
-      return { ok: false, response: badRequest(req, 'Progressão de rank inválida para Master+') }
+    // Mesma regra de bloqueio de rank do fluxo padrão (rankStep) — Master+ não
+    // precisa de uma lista de progressões separada, o degrau alvo só precisa
+    // ser maior que o degrau atual (Master=28, Grão-Mestre=29, Challenger=30).
+    if (rankStep(mp.target_rank.tier, null) <= rankStep(mp.current_rank.tier, null)) {
+      return { ok: false, response: badRequest(req, 'Rank de destino precisa ser maior que o rank atual') }
     }
+    // pdlBracket é só informativo (gravado em orders.pdl_bracket) — não entra
+    // mais na chave de preço, que agora é um valor fixo por tier alvo.
     pdlBracket = getPdlBracket(mp.current_pdl)
 
     const { data: priceRow, error: priceErr } = await serviceClient
       .from('master_plus_pricing')
       .select('price')
-      .eq('current_tier', mp.current_rank.tier)
-      .eq('target_tier', mp.target_rank.tier)
-      .eq('pdl_bracket', pdlBracket)
+      .eq('tier', mp.target_rank.tier)
       .maybeSingle()
     if (priceErr) return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
     if (!priceRow || priceRow.price == null) {
-      return { ok: false, response: badRequest(req, 'Faixa de preço ainda não configurada para esta combinação. Fale com o suporte.') }
+      return { ok: false, response: badRequest(req, 'Preço ainda não configurado para este tier. Fale com o suporte.') }
     }
     masterPlusPrice = Number(priceRow.price)
 
@@ -458,8 +454,12 @@ export async function validateAndPriceIntent(
     serviceClient.from('games').select('id, is_active').eq('id', normalized.gameId).maybeSingle(),
   ])
   if (serviceError || gameError) return { ok: false, response: errorResponse(req, 'Failed to validate catalog', 500) }
+  const serviceTypeMatchesCatalog =
+    service.type === normalized.serviceType
+    || (normalized.serviceType === 'md5' && service.type === 'win_boost')
+
   if (!service || !game || !service.is_active || !game.is_active
-      || service.game_id !== game.id || service.type !== normalized.serviceType) {
+      || service.game_id !== game.id || !serviceTypeMatchesCatalog) {
     return { ok: false, response: badRequest(req, 'Serviço ou jogo inválido/inativo') }
   }
 

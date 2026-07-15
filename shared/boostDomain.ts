@@ -13,7 +13,7 @@
 // funções para validar e rejeitar qualquer combinação inválida — não confie
 // em nenhuma decisão de fluxo/addon recalculada apenas no cliente.
 
-import { rankStep, type Division, type RankTier } from './pricing'
+import { rankStep, type Division, type RankTier } from './pricing.ts'
 
 export type BoostMode = 'solo' | 'duo'
 export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
@@ -49,25 +49,6 @@ export const NO_DIVISION_TIERS: readonly RankTier[] = ['master', 'grandmaster', 
 
 export function tierHasDivisions(tier: RankTier): boolean {
   return !NO_DIVISION_TIERS.includes(tier)
-}
-
-// Progressões válidas no Master+: Master pode ir para Grão-Mestre ou direto
-// para Challenger; Grão-Mestre só pode ir para Challenger.
-export const MASTER_PLUS_PROGRESSIONS: ReadonlyArray<{
-  current: 'master' | 'grandmaster'
-  target: 'grandmaster' | 'challenger'
-}> = [
-  { current: 'master', target: 'grandmaster' },
-  { current: 'master', target: 'challenger' },
-  { current: 'grandmaster', target: 'challenger' },
-]
-
-export function getValidMasterPlusTargets(currentTier: 'master' | 'grandmaster'): Array<'grandmaster' | 'challenger'> {
-  return MASTER_PLUS_PROGRESSIONS.filter((p) => p.current === currentTier).map((p) => p.target)
-}
-
-export function isValidMasterPlusProgression(currentTier: RankTier, targetTier: RankTier): boolean {
-  return MASTER_PLUS_PROGRESSIONS.some((p) => p.current === currentTier && p.target === targetTier)
 }
 
 // Determina o fluxo aplicável a partir do rank atual e da modalidade pedida.

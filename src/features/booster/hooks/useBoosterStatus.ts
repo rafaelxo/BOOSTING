@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 
-export type BoosterAccessState =
+type BoosterAccessState =
   | 'loading'
   | 'no_application'
   | 'pending'

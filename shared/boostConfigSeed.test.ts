@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney } from './pricing'
 
 // Os percentuais/ordem "de verdade" dos addons vivem em service_extras
 // (editável pelo admin), semeados por esta migration — não em código. Este
@@ -102,4 +103,42 @@ describe('Tabela master_plus_pricing — 12 combinações válidas, sem preço f
     // Nenhum valor numérico de preço na seed — confirma que nada foi inventado.
     expect(block).not.toMatch(/,\s*\d+(\.\d+)?\s*\)/)
   })
+})
+
+// A partir da migration 028 o Master+ passou a ter preço fixo por tier alvo.
+// O preço EXIBIDO na página pública vem do código (MASTER_PLUS_TIER_PRICE_CENTS)
+// enquanto o preço COBRADO vem da tabela master_plus_pricing no banco (lida em
+// StepConfigure e revalidada em orderPricing.ts). São duas fontes de verdade
+// para o mesmo valor monetário: se divergirem, o cliente vê um preço e é
+// cobrado outro. Este teste amarra a seed da migration ao constante do código.
+describe('master_plus_pricing (028) — seed do banco bate com o preço exibido na página pública', () => {
+  const migration028 = readFileSync(
+    join(__dirname, '..', 'supabase', 'migrations', '028_master_plus_pricing_flat_tiers.sql'),
+    'utf-8',
+  )
+
+  function parseTierPrices(source: string): Record<string, number> {
+    const insertBlock = source.match(/insert into public\.master_plus_pricing[\s\S]*?;/)
+    expect(insertBlock).not.toBeNull()
+    const out: Record<string, number> = {}
+    const rowRegex = /\('([a-z]+)',\s*(\d+\.\d+)\)/g
+    let match: RegExpExecArray | null
+    while ((match = rowRegex.exec(insertBlock![0]))) {
+      out[match[1]] = Number(match[2])
+    }
+    return out
+  }
+
+  const seeded = parseTierPrices(migration028)
+
+  it('semeia exatamente os 3 tiers (master, grandmaster, challenger)', () => {
+    expect(Object.keys(seeded).sort()).toEqual(['challenger', 'grandmaster', 'master'])
+  })
+
+  it.each(['master', 'grandmaster', 'challenger'] as const)(
+    'preço cobrado (banco) == preço exibido (código) para %s',
+    (tier) => {
+      expect(seeded[tier]).toBe(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier]))
+    },
+  )
 })

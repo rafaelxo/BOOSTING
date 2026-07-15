@@ -32,10 +32,7 @@ export type OrderStatus =
 
 export type BoosterStatus = 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
-
-export type TicketStatus = 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
-export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent'
+type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
 
 export type NotificationType =
   | 'order_status_changed'
@@ -85,17 +82,6 @@ export interface Profile {
   updated_at: string
 }
 
-export interface CustomerProfile {
-  id: string
-  user_id: string
-  display_name: string | null
-  country: string | null
-  preferred_language: string | null
-  total_orders: number
-  total_spent: number
-  created_at: string
-}
-
 export interface BoosterProfile {
   id: string
   user_id: string
@@ -136,15 +122,6 @@ export interface BoosterProfile {
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
-export interface Game {
-  id: string
-  slug: GameSlug
-  name: string
-  icon_url: string | null
-  is_active: boolean
-  sort_order: number
-}
-
 export interface Service {
   id: string
   game_id: string
@@ -177,10 +154,8 @@ export interface ServiceExtra {
 
 export interface MasterPlusPricing {
   id: string
-  current_tier: 'master' | 'grandmaster'
-  target_tier: 'grandmaster' | 'challenger'
-  pdl_bracket: '0_49' | '50_89' | '90_119' | '120_plus'
-  price: number | null   // null = faixa ainda sem preço comercial definido
+  tier: 'master' | 'grandmaster' | 'challenger'
+  price: number | null   // null = tier ainda sem preço comercial definido
   updated_at: string
   updated_by: string | null
 }
@@ -334,32 +309,6 @@ export interface Refund {
   created_at: string
 }
 
-// ─── Support ──────────────────────────────────────────────────────────────────
-
-export interface SupportTicket {
-  id: string
-  customer_id: string
-  order_id: string | null
-  assigned_to: string | null
-  status: TicketStatus
-  priority: TicketPriority
-  subject: string
-  created_at: string
-  updated_at: string
-  resolved_at: string | null
-}
-
-export interface TicketMessage {
-  id: string
-  ticket_id: string
-  sender_id: string
-  sender_role: UserRole
-  content: string
-  is_internal: boolean  // internal admin note
-  attachment_url: string | null
-  created_at: string
-}
-
 // ─── Reviews ──────────────────────────────────────────────────────────────────
 
 export interface Review {
@@ -453,38 +402,4 @@ export interface BoosterService {
   specialties: string[] | null
   created_at: string
   updated_at: string
-}
-
-// ─── UI helpers ───────────────────────────────────────────────────────────────
-
-export interface SelectOption<T = string> {
-  label: string
-  value: T
-  description?: string
-  disabled?: boolean
-  icon?: React.ReactNode
-}
-
-export interface TableColumn<T> {
-  key: keyof T | string
-  header: string
-  render?: (row: T) => React.ReactNode
-  sortable?: boolean
-  width?: string
-  align?: 'left' | 'center' | 'right'
-}
-
-export type SortDirection = 'asc' | 'desc'
-
-export interface PaginationMeta {
-  page: number
-  pageSize: number
-  total: number
-  totalPages: number
-}
-
-export interface ApiError {
-  message: string
-  code?: string
-  status?: number
 }

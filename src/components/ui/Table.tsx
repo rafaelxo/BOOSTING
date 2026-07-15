@@ -43,9 +43,3 @@ export function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTa
 export function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return <td className={cn('py-3.5 px-4 text-ink-secondary', className)} {...props} />
 }
-
-export function TableFooter({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return (
-    <tfoot className={cn('border-t border-bg-elevated text-ink-secondary', className)} {...props} />
-  )
-}
