@@ -202,9 +202,13 @@ export interface Order {
   wins_played: number
   losses_played: number
   assigned_booster_id: string | null
+  chat_locked: boolean
+  chat_locked_by: string | null
+  chat_locked_at: string | null
   mp_payment_id: string | null
   payment_status: PaymentStatus | null
   credentials_set: boolean
+  credential_expires_at: string | null
   completed_at: string | null
   created_at: string
   updated_at: string
@@ -268,14 +272,14 @@ export interface OrderDropRequest {
   resolved_at: string | null
 }
 
-export interface OrderMessage {
+export interface OrderChatMessage {
   id: string
   order_id: string
   sender_id: string
   sender_role: UserRole
+  sender_name: string
+  sender_avatar_url: string | null
   content: string
-  attachment_url: string | null
-  is_read: boolean
   created_at: string
 }
 

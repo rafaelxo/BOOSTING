@@ -1,13 +1,12 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRef, useEffect, useState } from 'react'
-import { ArrowLeft, RefreshCw, MessageCircle, Send, Clock, ShieldCheck } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
+import { ArrowLeft, RefreshCw, Clock, ShieldCheck } from 'lucide-react'
+import { Button, Card, OrderStatusBadge, ErrorAlert } from '@/components/ui'
+import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Order, OrderStatus, OrderMessage, OrderStatusHistory, OrderRankVerification } from '@/types'
+import type { Order, OrderStatus, OrderStatusHistory, OrderRankVerification } from '@/types'
 
 const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'awaiting_assignment', label: 'Esperando Booster' },
@@ -21,15 +20,10 @@ const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'canceled',           label: 'Cancelado' },
 ]
 
-const CLOSED_STATUSES: OrderStatus[] = ['completed', 'canceled', 'refunded', 'disputed']
-
 export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { profile } = useAuthStore()
   const queryClient = useQueryClient()
   const currency = useCurrency()
-  const [message, setMessage] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { data: order } = useQuery({
     queryKey: ['admin-order', id],
@@ -40,21 +34,6 @@ export function AdminOrderDetailPage() {
     },
     enabled: !!id,
     refetchInterval: 15000,
-  })
-
-  const { data: messages } = useQuery({
-    queryKey: ['admin-order-messages', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_messages')
-        .select('*')
-        .eq('order_id', id!)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as OrderMessage[]
-    },
-    enabled: !!id,
-    refetchInterval: 5000,
   })
 
   const { data: history } = useQuery({
@@ -87,10 +66,6 @@ export function AdminOrderDetailPage() {
     enabled: !!id,
   })
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
       const { data, error } = await supabase.rpc('admin_override_order_status', {
@@ -107,26 +82,7 @@ export function AdminOrderDetailPage() {
     },
   })
 
-  const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase.from('order_messages').insert({
-        order_id: id!,
-        sender_id: profile!.id,
-        sender_role: profile!.role,
-        content,
-        is_read: false,
-      })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      setMessage('')
-      queryClient.invalidateQueries({ queryKey: ['admin-order-messages', id] })
-    },
-  })
-
   if (!order) return null
-
-  const isClosed = CLOSED_STATUSES.includes(order.status)
 
   return (
     <div className="max-w-5xl space-y-5">
@@ -198,101 +154,7 @@ export function AdminOrderDetailPage() {
             )}
           </Card>
 
-          {/* Chat ao vivo (pedidos ativos) ou Transcript (pedidos encerrados) */}
-          <Card padding="none" className="flex flex-col">
-            <div className="flex items-center gap-2 p-4 border-b border-bg-elevated">
-              <MessageCircle className="h-4 w-4 text-brand" />
-              <h3 className="text-sm font-semibold text-ink">
-                {isClosed ? 'Transcript do Pedido' : 'Chat ao Vivo'}
-              </h3>
-              <span className="ml-auto text-[10px] text-ink-muted">
-                {messages?.length ?? 0} mensagens
-              </span>
-              {!isClosed && (
-                <div className="flex items-center gap-1 text-[10px] text-success">
-                  <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                  ao vivo
-                </div>
-              )}
-            </div>
-
-            {/* Mensagens */}
-            <div className={`overflow-y-auto p-4 space-y-3 ${isClosed ? 'max-h-[500px]' : 'min-h-[280px] max-h-[380px]'}`}>
-              {!messages?.length ? (
-                <p className="text-xs text-ink-muted text-center py-8">Sem mensagens neste pedido.</p>
-              ) : isClosed ? (
-                /* Transcript: lista compacta para pedidos encerrados */
-                messages.map((msg) => {
-                  const senderLabel =
-                    msg.sender_role === 'admin' ? '[Admin]' :
-                    msg.sender_role === 'booster' ? '[Booster]' : '[Cliente]'
-                  return (
-                    <div key={msg.id} className="flex gap-3 text-xs border-b border-bg-elevated pb-2 last:border-0">
-                      <span className="text-ink-muted shrink-0 w-24">{timeAgo(msg.created_at)}</span>
-                      <span className={`font-bold shrink-0 w-14 ${
-                        msg.sender_role === 'admin' ? 'text-accent' :
-                        msg.sender_role === 'booster' ? 'text-brand' : 'text-ink-secondary'
-                      }`}>{senderLabel}</span>
-                      <span className="text-ink flex-1">{msg.content}</span>
-                    </div>
-                  )
-                })
-              ) : (
-                /* Chat ao vivo: bolhas para pedidos ativos */
-                messages.map((msg) => {
-                  const isMe = msg.sender_id === profile?.id
-                  const senderLabel =
-                    msg.sender_role === 'admin' ? 'Admin' :
-                    msg.sender_role === 'booster' ? 'Booster' : 'Cliente'
-                  return (
-                    <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <Avatar name={senderLabel} size="xs" />
-                      <div className={`max-w-[75%] flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
-                        <span className="text-[10px] text-ink-muted px-1">{senderLabel}</span>
-                        <div className={`px-3 py-2 rounded-2xl text-sm ${
-                          isMe
-                            ? 'bg-brand text-white rounded-tr-sm'
-                            : msg.sender_role === 'admin'
-                              ? 'bg-accent/20 text-ink rounded-tl-sm border border-accent/30'
-                              : 'bg-bg-elevated text-ink rounded-tl-sm'
-                        }`}>
-                          {msg.content}
-                        </div>
-                        <span className="text-[10px] text-ink-muted">{timeAgo(msg.created_at)}</span>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input — só em pedidos ativos */}
-            {!isClosed && (
-              <div className="border-t border-bg-elevated p-3 flex gap-2">
-                <input
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && message.trim()) {
-                      e.preventDefault()
-                      sendMessage.mutate(message.trim())
-                    }
-                  }}
-                  placeholder="Mensagem como admin (visível para cliente e booster)..."
-                  className="input-base flex-1 py-2 text-sm"
-                />
-                <Button
-                  size="icon"
-                  onClick={() => message.trim() && sendMessage.mutate(message.trim())}
-                  loading={sendMessage.isPending}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </Card>
+          <OrderChat orderId={order.id} viewerRole="admin" />
         </div>
 
         {/* Sidebar — controles + histórico */}

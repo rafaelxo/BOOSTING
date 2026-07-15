@@ -1,15 +1,15 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, ArrowLeft, Clock, MessageCircle, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Avatar, Skeleton, ErrorAlert } from '@/components/ui'
+import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw } from 'lucide-react'
+import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert } from '@/components/ui'
+import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
-import { useAuthStore } from '@/stores/authStore'
 import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Order, OrderMessage, OrderStatusHistory } from '@/types'
+import type { Order, OrderStatusHistory } from '@/types'
 
 function orderRequiresAccountAccess(order: Order): boolean {
   return (
@@ -29,22 +29,6 @@ function useOrder(id: string, refetchInterval?: number) {
       return data as unknown as Order
     },
     refetchInterval,
-  })
-}
-
-function useOrderMessages(orderId: string) {
-  return useQuery({
-    queryKey: ['order-messages', orderId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_messages')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as OrderMessage[]
-    },
-    refetchInterval: 5000,
   })
 }
 
@@ -360,37 +344,11 @@ function CredentialsSection({ order }: { order: Order }) {
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { profile } = useAuthStore()
   const { t } = useTranslation()
   const currency = useCurrency()
-  const queryClient = useQueryClient()
-  const [message, setMessage] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { data: order, isLoading } = useOrder(id!)
-  const { data: messages } = useOrderMessages(id!)
   const { data: history } = useOrderHistory(id!)
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase.from('order_messages').insert({
-        order_id: id!,
-        sender_id: profile!.id,
-        sender_role: profile!.role,
-        content,
-        is_read: false,
-      })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      setMessage('')
-      queryClient.invalidateQueries({ queryKey: ['order-messages', id] })
-    },
-  })
 
   if (isLoading) return (
     <div className="max-w-4xl space-y-4">
@@ -491,65 +449,7 @@ export function OrderDetailPage() {
             )}
           </Card>
 
-          {/* Chat */}
-          <Card padding="none" className="flex flex-col">
-            <div className="flex items-center gap-2 p-4 border-b border-bg-elevated">
-              <MessageCircle className="h-4 w-4 text-brand" />
-              <h3 className="text-sm font-semibold text-ink">{t('customer.order.chat')}</h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px] max-h-[400px]">
-              {!messages?.length ? (
-                <p className="text-xs text-ink-muted text-center py-8">
-                  {t('customer.order.noMessages')}
-                </p>
-              ) : (
-                messages.map((msg) => {
-                  const isMe = msg.sender_id === profile?.id
-                  return (
-                    <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <Avatar name={msg.sender_role} size="xs" />
-                      <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-                        <div className={`px-3 py-2 rounded-2xl text-sm ${
-                          isMe
-                            ? 'bg-brand text-white rounded-tr-sm'
-                            : 'bg-bg-elevated text-ink rounded-tl-sm'
-                        }`}>
-                          {msg.content}
-                        </div>
-                        <span className="text-[10px] text-ink-muted">{timeAgo(msg.created_at)}</span>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Message input */}
-            <div className="border-t border-bg-elevated p-3 flex gap-2">
-              <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && message.trim()) {
-                    e.preventDefault()
-                    sendMessage.mutate(message.trim())
-                  }
-                }}
-                placeholder={t('customer.order.messagePlaceholder')}
-                className="input-base flex-1 py-2 text-sm"
-              />
-              <Button
-                size="icon"
-                onClick={() => message.trim() && sendMessage.mutate(message.trim())}
-                loading={sendMessage.isPending}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
+          <OrderChat orderId={order.id} viewerRole="customer" />
         </div>
 
         {/* Sidebar */}

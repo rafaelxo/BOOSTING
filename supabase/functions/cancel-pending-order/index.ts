@@ -111,11 +111,6 @@ serve(async (req) => {
 
     if (deletePaymentsError) return errorResponse(req, 'Failed to delete payment record', 500, 'PAYMENT_DELETE_FAILED')
 
-    await admin
-      .from('support_tickets')
-      .update({ order_id: null })
-      .eq('order_id', order.id)
-
     const { error: deleteOrderError } = await admin
       .from('orders')
       .delete()

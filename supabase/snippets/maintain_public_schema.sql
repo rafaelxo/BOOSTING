@@ -31,5 +31,3 @@ analyze public.refunds;
 analyze public.reviews;
 analyze public.service_extras;
 analyze public.services;
-analyze public.support_tickets;
-analyze public.ticket_messages;

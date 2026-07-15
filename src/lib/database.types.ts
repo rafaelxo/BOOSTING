@@ -810,8 +810,12 @@ export type Database = {
           boost_mode: string
           booster_notes: string | null
           booster_service_id: string | null
+          chat_locked: boolean
+          chat_locked_at: string | null
+          chat_locked_by: string | null
           completed_at: string | null
           created_at: string
+          credential_expires_at: string | null
           credentials_set: boolean
           current_pdl: number | null
           current_rank: Json
@@ -856,8 +860,12 @@ export type Database = {
           boost_mode?: string
           booster_notes?: string | null
           booster_service_id?: string | null
+          chat_locked?: boolean
+          chat_locked_at?: string | null
+          chat_locked_by?: string | null
           completed_at?: string | null
           created_at?: string
+          credential_expires_at?: string | null
           credentials_set?: boolean
           current_pdl?: number | null
           current_rank: Json
@@ -902,8 +910,12 @@ export type Database = {
           boost_mode?: string
           booster_notes?: string | null
           booster_service_id?: string | null
+          chat_locked?: boolean
+          chat_locked_at?: string | null
+          chat_locked_by?: string | null
           completed_at?: string | null
           created_at?: string
+          credential_expires_at?: string | null
           credentials_set?: boolean
           current_pdl?: number | null
           current_rank?: Json
@@ -944,6 +956,13 @@ export type Database = {
           {
             foreignKeyName: "orders_assigned_booster_id_fkey"
             columns: ["assigned_booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_chat_locked_by_fkey"
+            columns: ["chat_locked_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1368,122 +1387,6 @@ export type Database = {
           },
         ]
       }
-      support_tickets: {
-        Row: {
-          assigned_to: string | null
-          created_at: string
-          customer_id: string
-          id: string
-          order_id: string | null
-          priority: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at: string | null
-          status: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          updated_at: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          created_at?: string
-          customer_id: string
-          id?: string
-          order_id?: string | null
-          priority?: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject: string
-          updated_at?: string
-        }
-        Update: {
-          assigned_to?: string | null
-          created_at?: string
-          customer_id?: string
-          id?: string
-          order_id?: string | null
-          priority?: Database["public"]["Enums"]["ticket_priority"]
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["ticket_status"]
-          subject?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "support_tickets_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_tickets_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_tickets_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "available_boost_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "support_tickets_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ticket_messages: {
-        Row: {
-          attachment_url: string | null
-          content: string
-          created_at: string
-          id: string
-          is_internal: boolean
-          sender_id: string
-          sender_role: Database["public"]["Enums"]["user_role"]
-          ticket_id: string
-        }
-        Insert: {
-          attachment_url?: string | null
-          content: string
-          created_at?: string
-          id?: string
-          is_internal?: boolean
-          sender_id: string
-          sender_role: Database["public"]["Enums"]["user_role"]
-          ticket_id: string
-        }
-        Update: {
-          attachment_url?: string | null
-          content?: string
-          created_at?: string
-          id?: string
-          is_internal?: boolean
-          sender_id?: string
-          sender_role?: Database["public"]["Enums"]["user_role"]
-          ticket_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ticket_messages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ticket_messages_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "support_tickets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       admin_duo_accounts: {
@@ -1662,6 +1565,10 @@ export type Database = {
         Args: { p_booster_user_id: string; p_order_id: string }
         Returns: Json
       }
+      admin_set_order_chat_lock: {
+        Args: { p_locked: boolean; p_order_id: string }
+        Returns: Json
+      }
       admin_dashboard_stats: { Args: never; Returns: Json }
       admin_override_order_status: {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
@@ -1671,7 +1578,6 @@ export type Database = {
         Args: { p_booster_id: string; p_new_status: string }
         Returns: Json
       }
-      assign_ticket: { Args: { p_ticket_id: string }; Returns: Json }
       booster_active_slot_counts: {
         Args: { p_booster_user_id: string }
         Returns: {
@@ -1728,6 +1634,7 @@ export type Database = {
         Returns: Json
       }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
+      get_order_chat: { Args: { p_order_id: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       is_approved_booster: { Args: never; Returns: boolean }
       log_match_result: {
@@ -1814,7 +1721,7 @@ export type Database = {
         Returns: Json
       }
       resolve_order_access_token: {
-        Args: { p_access_token: string }
+        Args: { p_access_token: string; p_booster_user_id: string }
         Returns: Json
       }
       set_duo_account_credentials: {
@@ -1823,6 +1730,10 @@ export type Database = {
       }
       set_order_credentials: {
         Args: { p_login: string; p_order_id: string; p_password: string }
+        Returns: Json
+      }
+      send_order_message: {
+        Args: { p_content: string; p_order_id: string }
         Returns: Json
       }
       show_limit: { Args: never; Returns: number }
@@ -1874,13 +1785,6 @@ export type Database = {
         | "coaching"
         | "placement_matches"
         | "md5"
-      ticket_priority: "low" | "medium" | "high" | "urgent"
-      ticket_status:
-        | "open"
-        | "in_progress"
-        | "waiting_customer"
-        | "resolved"
-        | "closed"
       user_role: "customer" | "booster" | "admin"
     }
     CompositeTypes: {
@@ -2501,14 +2405,6 @@ export const Constants = {
         "coaching",
         "placement_matches",
         "md5",
-      ],
-      ticket_priority: ["low", "medium", "high", "urgent"],
-      ticket_status: [
-        "open",
-        "in_progress",
-        "waiting_customer",
-        "resolved",
-        "closed",
       ],
       user_role: ["customer", "booster", "admin"],
     },

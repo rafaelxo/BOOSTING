@@ -33,6 +33,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
 function actionError(result: ChatActionResponse, fallback: string) {
   const messages: Record<string, string> = {
     not_authenticated: 'Sua sessao expirou. Entre novamente.',
+    profile_not_found: 'Seu perfil nao foi encontrado. Entre novamente.',
     order_not_found: 'Pedido nao encontrado ou sem permissao de acesso.',
     chat_unavailable: 'O chat sera liberado quando um booster for atribuido.',
     chat_locked: 'O chat foi bloqueado pela administracao.',

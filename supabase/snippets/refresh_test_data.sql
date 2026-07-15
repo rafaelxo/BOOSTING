@@ -4,7 +4,7 @@
 -- public.games, public.services, public.service_extras, public.master_plus_pricing
 --
 -- Clears volatile/test data:
--- auth users, profiles, orders, payments, payouts, tickets, reviews,
+-- auth users, profiles, orders, payments, payouts, reviews,
 -- notifications, logs, booster/customer data, Discord/duo runtime data,
 -- rank verification records and rate-limit rows.
 --
@@ -16,8 +16,6 @@ truncate table
   public.audit_logs,
   public.notifications,
   public.reviews,
-  public.ticket_messages,
-  public.support_tickets,
   public.refunds,
   public.payments,
   public.payout_records,

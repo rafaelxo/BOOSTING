@@ -1,13 +1,14 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState, useRef, useEffect } from 'react'
-import { ArrowLeft, Send, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert } from '@/components/ui'
+import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
-import type { Division, Order, OrderMessage, OrderStatus, OrderDropRequest, RankTier } from '@/types'
+import type { Division, Order, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -24,8 +25,6 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuthStore()
   const queryClient = useQueryClient()
-  const [message, setMessage] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const [dropReason, setDropReason] = useState('')
   const [showDropModal, setShowDropModal] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -72,25 +71,6 @@ export function JobDetailPage() {
     },
     enabled: !!id,
   })
-
-  const { data: messages } = useQuery({
-    queryKey: ['order-messages', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_messages')
-        .select('*')
-        .eq('order_id', id!)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as OrderMessage[]
-    },
-    enabled: !!id,
-    refetchInterval: 5000,
-  })
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
 
   const updateStatus = useMutation({
     mutationFn: async (newStatus: OrderStatus) => {
@@ -181,23 +161,6 @@ export function JobDetailPage() {
     },
   })
 
-  const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase.from('order_messages').insert({
-        order_id: id!,
-        sender_id: profile!.id,
-        sender_role: profile!.role,
-        content,
-        is_read: false,
-      })
-      if (error) throw error
-    },
-    onSuccess: () => {
-      setMessage('')
-      queryClient.invalidateQueries({ queryKey: ['order-messages', id] })
-    },
-  })
-
   if (!order) return null
 
   const availableActions = STATUS_ACTIONS.filter(a => a.from.includes(order.status))
@@ -285,36 +248,7 @@ export function JobDetailPage() {
             )}
           </Card>
 
-          {/* Chat */}
-          <Card padding="none" className="flex flex-col">
-            <div className="p-4 border-b border-bg-elevated text-sm font-semibold text-ink">{t('booster.job.chat')}</div>
-            <div className="overflow-y-auto p-4 space-y-3 min-h-[250px] max-h-[350px]">
-              {messages?.map((msg) => {
-                const isMe = msg.sender_id === profile?.id
-                return (
-                  <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${isMe ? 'bg-brand text-white rounded-tr-sm' : 'bg-bg-elevated text-ink rounded-tl-sm'}`}>
-                      {msg.content}
-                    </div>
-                  </div>
-                )
-              })}
-              <div ref={messagesEndRef} />
-            </div>
-            <div className="border-t border-bg-elevated p-3 flex gap-2">
-              <input
-                type="text"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && message.trim()) { e.preventDefault(); sendMessage.mutate(message.trim()) } }}
-                placeholder={t('booster.job.messagePlaceholder')}
-                className="input-base flex-1 py-2 text-sm"
-              />
-              <Button size="icon" onClick={() => message.trim() && sendMessage.mutate(message.trim())} loading={sendMessage.isPending}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </Card>
+          <OrderChat orderId={order.id} viewerRole="booster" />
         </div>
 
         {/* Actions panel */}

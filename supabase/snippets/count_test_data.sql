@@ -12,8 +12,6 @@ union all select 'public.order_rank_verifications', count(*) from public.order_r
 union all select 'public.payments', count(*) from public.payments
 union all select 'public.payout_records', count(*) from public.payout_records
 union all select 'public.refunds', count(*) from public.refunds
-union all select 'public.support_tickets', count(*) from public.support_tickets
-union all select 'public.ticket_messages', count(*) from public.ticket_messages
 union all select 'public.reviews', count(*) from public.reviews
 union all select 'public.notifications', count(*) from public.notifications
 union all select 'public.audit_logs', count(*) from public.audit_logs
