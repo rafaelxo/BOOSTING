@@ -5,9 +5,10 @@ import { errorResponse, jsonResponse, rateLimitResponse } from '../_shared/respo
 import { getAuthUser } from '../_shared/authUser.ts'
 import { HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
-import type { RankTier } from '../../../shared/pricing.ts'
 import {
+  estimateLpAverages,
   fetchLeagueEntries,
+  fetchRecentRankedRecord,
   fetchRankedMatchIdsThisSplit,
   fetchRiotAccount,
   NO_DIVISION_TIERS,
@@ -28,16 +29,6 @@ const bodySchema = z.object({
 
 function badRequest(req: Request, message: string) {
   return errorResponse(req, message, 400)
-}
-
-function estimateAverageLpPerGame(tier: RankTier, wins: number, losses: number): number {
-  if (NO_DIVISION_TIERS.includes(tier)) return 30
-  const total = wins + losses
-  if (total <= 0) return 22
-  const winRate = wins / total
-  if (winRate < 0.48) return 19
-  if (winRate > 0.55) return 26
-  return 22
 }
 
 serve(async (req) => {
@@ -111,9 +102,15 @@ serve(async (req) => {
     const division = NO_DIVISION_TIERS.includes(tier)
       ? null
       : queueEntry.rank ? RIOT_DIVISION_MAP[queueEntry.rank] ?? null : null
-    const wins = Number(queueEntry.wins ?? 0)
-    const losses = Number(queueEntry.losses ?? 0)
-    const averageLp = estimateAverageLpPerGame(tier, wins, losses)
+    const recentRecord = await fetchRecentRankedRecord(account.puuid, RIOT_API_KEY, REGIONAL_ROUTE, queue)
+    if (!recentRecord.ok) {
+      if (recentRecord.reason === 'rate_limited') {
+        return errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503)
+      }
+      console.error('Riot recent matches lookup failed', recentRecord.status)
+      return errorResponse(req, 'Falha ao consultar as últimas partidas na Riot', 502)
+    }
+    const averageLp = estimateLpAverages(tier, recentRecord.wins, recentRecord.losses)
 
     return jsonResponse(req, {
       found: true,
@@ -123,12 +120,15 @@ serve(async (req) => {
       tier,
       division,
       league_points: Math.max(0, Number(queueEntry.leaguePoints ?? 0)),
-      wins,
-      losses,
+      wins: Number(queueEntry.wins ?? 0),
+      losses: Number(queueEntry.losses ?? 0),
+      recent_matches: recentRecord.matches,
+      recent_wins: recentRecord.wins,
+      recent_losses: recentRecord.losses,
       md5_eligible: false,
-      avg_lp_gain: averageLp,
-      avg_lp_loss: averageLp,
-      message: 'Elo, LP atual e média por partida preenchidos pela Riot.',
+      avg_lp_gain: averageLp.gain,
+      avg_lp_loss: averageLp.loss,
+      message: `Elo e LP consultados na Riot. Estimativa baseada nas últimas ${recentRecord.matches} partidas ranqueadas.`,
     })
   } catch (err) {
     console.error('riot-account-rank error', err instanceof Error ? err.name : 'unknown')

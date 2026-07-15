@@ -4,6 +4,7 @@ import { ArrowLeft, RefreshCw, Clock, ShieldCheck } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus, OrderStatusHistory, OrderRankVerification } from '@/types'
@@ -28,7 +29,7 @@ export function AdminOrderDetailPage() {
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
+      const { data, error } = await supabase.from('orders').select(ORDER_SAFE_COLUMNS).eq('id', id!).single()
       if (error) throw error
       return data as unknown as Order
     },

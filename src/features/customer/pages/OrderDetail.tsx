@@ -7,15 +7,17 @@ import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert } from '@/componen
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
+import { getCustomerOrderState, type CustomerOrderState } from '@/lib/customerOrderState'
 import type { Order, OrderStatusHistory } from '@/types'
 
 function useOrder(id: string, refetchInterval?: number) {
   return useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id).single()
+      const { data, error } = await supabase.from('orders').select(ORDER_SAFE_COLUMNS).eq('id', id).single()
       if (error) throw error
       return data as unknown as Order
     },
@@ -87,6 +89,32 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const [error, setError] = useState<string | null>(null)
   const { remaining, label } = useCountdown(pix?.expires_at ?? null)
 
+  // Depois que o cliente abre a cobrança por "Meus pedidos", acompanhe a
+  // confirmação do webhook da mesma forma que a etapa original do checkout.
+  // Sem isso o pagamento era aceito, mas a tela continuava indefinidamente
+  // como "Aguardando pagamento" até um reload manual.
+  useEffect(() => {
+    if (!pix || order.status !== 'awaiting_payment') return
+
+    const interval = window.setInterval(async () => {
+      const state = await getCustomerOrderState(order.id).catch(() => null)
+
+      if (state?.payment_confirmed) {
+        window.clearInterval(interval)
+        queryClient.setQueryData(['customer-order-state', order.id], state)
+        if (state.requires_credentials) {
+          navigate(`/orders/${order.id}#credentials`, { replace: true })
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['order', order.id] }),
+          queryClient.invalidateQueries({ queryKey: ['customer-orders'] }),
+        ])
+      }
+    }, 5000)
+
+    return () => window.clearInterval(interval)
+  }, [pix, order.id, order.status, queryClient, navigate])
+
   const loadPix = useMutation({
     mutationFn: async () => {
       setError(null)
@@ -131,7 +159,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const expired = remaining === 0
 
   return (
-    <Card padding="md">
+    <Card id="credentials" padding="md">
       <div className="flex items-center gap-2 mb-3">
         <QrCode className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
@@ -239,7 +267,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   )
 }
 
-function CredentialsSection({ order }: { order: Order }) {
+function CredentialsSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
   const queryClient = useQueryClient()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
@@ -261,21 +289,22 @@ function CredentialsSection({ order }: { order: Order }) {
       setLogin('')
       setPassword('')
       queryClient.invalidateQueries({ queryKey: ['order', order.id] })
+      queryClient.invalidateQueries({ queryKey: ['customer-order-state', order.id] })
       setTimeout(() => setSaved(false), 3000)
     },
   })
 
-  if (!orderRequiresAccountAccess(order)) return null
+  if (!state?.requires_credentials) return null
 
-  const canSet = ['awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status)
-  if (!canSet && !(order as Order & { credentials_set?: boolean }).credentials_set) return null
+  const canSet = state.can_submit_credentials === true
+  if (!canSet && !state.credentials_set) return null
 
   return (
     <Card padding="md">
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Acesso da Conta</h3>
-        {(order as Order & { credentials_set?: boolean }).credentials_set && (
+        {state.credentials_set && (
           <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-lg">
             <ShieldCheck className="h-3 w-3" /> Salvas
           </span>
@@ -321,7 +350,7 @@ function CredentialsSection({ order }: { order: Order }) {
             onClick={() => saveCredentials.mutate()}
             variant={saved ? 'success' : 'primary'}
           >
-            {saved ? 'Pedido concluído!' : (order as Order & { credentials_set?: boolean }).credentials_set ? 'Gerar novo token' : 'Concluir pedido e gerar token'}
+            {saved ? 'Credenciais salvas!' : state.credentials_set ? 'Atualizar credenciais' : 'Salvar credenciais'}
           </Button>
           {saveCredentials.isError && (
             <ErrorAlert message={saveCredentials.error instanceof Error ? saveCredentials.error.message : 'Erro'} />
@@ -340,6 +369,19 @@ export function OrderDetailPage() {
 
   const { data: order, isLoading, isError, refetch } = useOrder(id!)
   const { data: history } = useOrderHistory(id!)
+  const { data: customerState } = useQuery({
+    queryKey: ['customer-order-state', id],
+    queryFn: () => getCustomerOrderState(id!),
+    enabled: !!id,
+  })
+
+  useEffect(() => {
+    if (!order || window.location.hash !== '#credentials' || !customerState?.requires_credentials) return
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('credentials')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [order, customerState?.requires_credentials])
 
   if (isLoading) return (
     <div className="max-w-4xl space-y-4">
@@ -457,7 +499,7 @@ export function OrderDetailPage() {
           <PendingPaymentSection order={order} />
 
           {/* Credenciais */}
-          <CredentialsSection order={order} />
+          <CredentialsSection order={order} state={customerState} />
 
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.timeline')}</h3>

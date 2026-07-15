@@ -4,12 +4,12 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
   Shield, Zap, Clock, Users, ChevronRight,
-  TrendingUp, MessageCircle, CheckCircle2,
+  TrendingUp, MessageCircle,
   ArrowRight, Lock, Star,
 } from 'lucide-react'
 import { Avatar, Button, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatRank, RANK_TIER_ORDER } from '@/lib/utils'
+import { formatRank } from '@/lib/utils'
 import type { BoosterProfile, RankTier } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
 
@@ -35,7 +35,6 @@ export function HomePage() {
       const { data, error } = await (supabase as any)
         .from('public_booster_profiles')
         .select('*')
-        .eq('is_available', true)
         .order('is_top5', { ascending: false })
         .order('rating', { ascending: false })
         .limit(4)
@@ -47,10 +46,10 @@ export function HomePage() {
   })
 
   const STATS = [
-    { value: '48.200+', label: t('home.stats.ordersCompleted') },
-    { value: '4,94/5',  label: t('home.stats.avgRating')       },
-    { value: '88%',     label: t('home.stats.winRate')          },
-    { value: '340+',    label: t('home.stats.activeBoosters')   },
+    { value: '1.200+', label: t('home.stats.ordersCompleted') },
+    { value: '4,9/5',  label: t('home.stats.avgRating')       },
+    { value: '88%',    label: t('home.stats.winRate')          },
+    { value: '20+',    label: t('home.stats.activeBoosters')   },
   ]
 
   const SERVICES = [
@@ -87,127 +86,61 @@ export function HomePage() {
     { icon: Clock,         label: 'Início rápido',                 desc: 'Seu pedido é atribuído em até 30 minutos após o pagamento.' },
   ]
 
-  const INCLUDED = [
-    'Boosters Grão-mestre ou Desafiante',
-    'VPN ativado em cada partida',
-    'Conta offline durante todo o serviço',
-    'Chat em PT-BR com o booster',
-    'Início garantido em até 30 minutos',
-    'Garantia 100% de conclusão',
-  ]
-
   return (
     <div>
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[92vh] flex items-center bg-bg-base overflow-hidden">
+      <section className="relative bg-bg-base overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
         <div className="absolute inset-0 bg-grid pointer-events-none opacity-60" />
         <div className="absolute -top-60 right-0 w-[700px] h-[700px] rounded-full bg-brand/6 blur-[140px] pointer-events-none" />
 
-        <div className="max-w-screen-xl mx-auto px-5 sm:px-8 w-full py-20">
-          <div className="grid lg:grid-cols-2 gap-14 lg:gap-20 items-center">
+        <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-20 lg:py-24 relative">
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55 }}
+            className="max-w-4xl mx-auto text-center"
+          >
+            <h1 className="text-5xl sm:text-6xl xl:text-7xl font-black tracking-tight text-ink leading-[1.02]">
+              {t('home.heroTitle')}{' '}
+              <span className="text-gradient-brand">{t('home.heroTitleHighlight')}</span>
+            </h1>
 
-            {/* Left — copy */}
-            <motion.div
-              initial={{ opacity: 0, x: -32 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.55 }}
-            >
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-success/10 border border-success/25 text-success text-xs font-bold mb-8">
-                <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                {t('home.badge')}
-              </div>
+            <p className="mt-6 text-lg sm:text-xl text-ink-secondary leading-relaxed max-w-2xl mx-auto">
+              {t('home.heroDesc')}{' '}
+              <span className="text-ink font-semibold">{t('home.heroDescBold')}</span>{t('home.heroDescPost')}
+            </p>
 
-              <h1 className="text-5xl sm:text-6xl xl:text-7xl font-black tracking-tight text-ink leading-[1.0] mb-6">
-                {t('home.heroTitle')}<br />
-                <span className="text-gradient-brand">{t('home.heroTitleHighlight')}</span>
-              </h1>
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
+              <Button asChild size="lg">
+                <Link to="/orders/new">
+                  Começar Agora <ArrowRight className="h-5 w-5" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link to="/apply?booster=1">Seja Booster</Link>
+              </Button>
+            </div>
 
-              <p className="text-xl text-ink-secondary leading-relaxed mb-10 max-w-lg">
-                {t('home.heroDesc')}{' '}
-                <span className="text-ink font-semibold">{t('home.heroDescBold')}</span>{t('home.heroDescPost')}
-              </p>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-10">
-                {STATS.map(({ value, label }) => (
-                  <div key={label}>
-                    <p className="text-2xl font-extrabold text-ink">{value}</p>
-                    <p className="text-xs text-ink-muted mt-0.5">{label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTAs */}
-              <div className="flex flex-wrap gap-3">
-                <Button asChild size="lg">
-                  <Link to="/orders/new">
-                    Começar Agora <ArrowRight className="h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="secondary">
-                  <Link to="/apply?booster=1">Seja Booster</Link>
-                </Button>
-              </div>
-            </motion.div>
-
-            {/* Right — features card */}
-            <motion.div
-              initial={{ opacity: 0, y: 32 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.15 }}
-              className="card p-7 space-y-6 border-brand/15 shadow-glow"
-            >
-              {/* Live indicator */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                  <span className="text-xs font-bold text-success">340+ boosters disponíveis</span>
+            <div className="grid grid-cols-2 lg:grid-cols-4 mt-12 overflow-hidden rounded-2xl border border-bg-elevated bg-bg-elevated/70 gap-px shadow-card">
+              {STATS.map(({ value, label }) => (
+                <div key={label} className="bg-bg-card/90 px-4 py-5 sm:px-6">
+                  <p className="text-2xl font-extrabold text-ink">{value}</p>
+                  <p className="text-xs text-ink-muted mt-1">{label}</p>
                 </div>
-                <span className="text-[10px] font-semibold text-ink-muted bg-bg-elevated px-2 py-1 rounded-lg">
-                  League of Legends
-                </span>
-              </div>
-
-              {/* Included features */}
-              <div>
-                <p className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest mb-4">
-                  Incluso em todo pedido
-                </p>
-                <div className="space-y-3">
-                  {INCLUDED.map(item => (
-                    <div key={item} className="flex items-center gap-3">
-                      <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                      <span className="text-sm text-ink-secondary">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Rank strip */}
-              <div className="border-t border-bg-elevated pt-5">
-                <p className="text-[10px] font-bold text-ink-secondary uppercase tracking-widest mb-3">
-                  Atendemos todos os ranks
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {RANK_TIER_ORDER.map(tier => (
-                    <RankBadge key={tier} tier={tier} size="xs" showDivision={false} showLabel={false} />
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-          </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ── SERVICES ─────────────────────────────────────────────────────── */}
-      <section id="services" className="py-20 bg-bg-surface scroll-mt-20">
+      <section id="services" className="py-16 lg:py-20 bg-bg-surface scroll-mt-20">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-10"
           >
             <p className="section-label mb-3">{t('home.services.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.services.title')}</h2>
@@ -259,13 +192,13 @@ export function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-      <section className="py-20 bg-bg-base relative overflow-hidden">
+      <section className="py-16 lg:py-20 bg-bg-base relative overflow-hidden">
         <div className="absolute inset-0 bg-grid pointer-events-none opacity-40" />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-10"
           >
             <p className="section-label mb-3">{t('home.howItWorks.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.howItWorks.title')}</h2>
@@ -291,24 +224,13 @@ export function HomePage() {
             ))}
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }} transition={{ duration: 0.4, delay: 0.4 }}
-            className="mt-14 text-center"
-          >
-            <Button asChild size="lg">
-              <Link to="/orders/new">
-                Começar agora <ArrowRight className="h-5 w-5" />
-              </Link>
-            </Button>
-          </motion.div>
         </div>
       </section>
 
       {/* ── TRUST & SECURITY ─────────────────────────────────────────────── */}
-      <section className="py-20 bg-bg-surface">
+      <section className="py-16 lg:py-20 bg-bg-surface">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
 
             <motion.div
               initial={{ opacity: 0, x: -24 }} whileInView={{ opacity: 1, x: 0 }}
@@ -318,22 +240,12 @@ export function HomePage() {
               <h2 className="text-4xl md:text-5xl font-black text-ink mb-6 leading-tight">
                 {t('home.trust.title')}
               </h2>
-              <p className="text-ink-secondary text-lg mb-8 leading-relaxed">
+              <p className="text-ink-secondary text-lg mb-7 leading-relaxed">
                 {t('home.trust.desc')}
               </p>
-              <div className="space-y-3 mb-8">
-                {[
-                  t('home.trust.point1'),
-                  t('home.trust.point2'),
-                  t('home.trust.point3'),
-                  t('home.trust.point4'),
-                ].map(item => (
-                  <div key={item} className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-                    <span className="text-ink-secondary">{item}</span>
-                  </div>
-                ))}
-              </div>
+              <Button asChild size="lg" variant="secondary">
+                <Link to="/security">{t('home.trust.policy')}</Link>
+              </Button>
             </motion.div>
 
             <div>
@@ -354,16 +266,6 @@ export function HomePage() {
                   </motion.div>
                 ))}
               </div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }} transition={{ duration: 0.4, delay: 0.32 }}
-                className="mt-6"
-              >
-                <Button asChild size="lg" variant="secondary">
-                  <Link to="/security">{t('home.trust.policy')}</Link>
-                </Button>
-              </motion.div>
             </div>
 
           </div>
@@ -372,12 +274,12 @@ export function HomePage() {
 
       {/* ── BOOSTERS ─────────────────────────────────────────────────────── */}
       {featuredBoosters.length > 0 && (
-        <section className="py-20 bg-bg-base">
+        <section className="py-16 lg:py-20 bg-bg-base">
           <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }} transition={{ duration: 0.5 }}
-              className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-12"
+              className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-10"
             >
               <div>
                 <p className="section-label mb-3">Boosters</p>
@@ -410,7 +312,9 @@ export function HomePage() {
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
-                          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
+                          {booster.is_available && (
+                            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-ink truncate">{booster.display_name}</p>
@@ -452,12 +356,12 @@ export function HomePage() {
       )}
 
       {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
-      <section className="py-20 bg-bg-base overflow-hidden">
+      <section className={`py-16 lg:py-20 overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-surface' : 'bg-bg-base'}`}>
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }} transition={{ duration: 0.5 }}
-            className="text-center mb-12"
+            className="text-center mb-10"
           >
             <p className="section-label mb-3">{t('home.reviewsSection.sectionLabel')}</p>
             <h2 className="text-4xl md:text-5xl font-black text-ink">{t('home.reviewsSection.title')}</h2>
@@ -468,7 +372,7 @@ export function HomePage() {
       </section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-bg-surface relative overflow-hidden">
+      <section className={`py-16 lg:py-20 relative overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-base' : 'bg-bg-surface'}`}>
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
         <div className="absolute inset-0 bg-grid opacity-40 pointer-events-none" />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">

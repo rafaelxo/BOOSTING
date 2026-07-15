@@ -47,7 +47,7 @@ function percentageOfCents(cents: number, percentage: number): number {
   return Math.round(cents * percentage / 100)
 }
 
-function isMasterPlus(tier: RankTier): boolean {
+function isMasterPlus(tier: RankTier): tier is 'master' | 'grandmaster' | 'challenger' {
   return tier === 'master' || tier === 'grandmaster' || tier === 'challenger'
 }
 
@@ -105,16 +105,15 @@ export function calcEloPrice(
   queue: QueueType,
   fTier: RankTier, fDiv: Division | null,
   tTier: RankTier, tDiv: Division | null,
-): { price: number; hours: number } {
+): { price: number } {
   const from = rankStep(fTier, fDiv)
   const to = rankStep(tTier, tDiv)
-  if (to <= from) return { price: 0, hours: 0 }
+  if (to <= from) return { price: 0 }
 
   let priceCents = 0
   for (let s = from + 1; s <= to; s++) priceCents += divPriceCentsForStep(queue, s)
 
-  const hours = Math.max(1, Math.round((to - from) * 1.5))
-  return { price: centsToMoney(priceCents), hours }
+  return { price: centsToMoney(priceCents) }
 }
 
 // ── Vitória Avulsa (Win Boost) — preço por vitória, em CENTAVOS ─────────────
@@ -127,6 +126,70 @@ const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
     iron: 265, bronze: 265, silver: 370, gold: 370, platinum: 650,
     emerald: 940, diamond: 1510, master: 4490, grandmaster: 5990, challenger: 9990,
   },
+}
+
+export const MATCH_DURATION_HOURS = 0.5
+export const EXPECTED_BOOST_WIN_RATE = 0.8
+export const MASTER_PLUS_LP_PER_GAME = 30
+export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenger', number> = {
+  master: 0,
+  grandmaster: 1_200,
+  challenger: 2_200,
+}
+
+const MASTER_START_ABSOLUTE_LP = 28 * 100
+
+/**
+ * Estima somente tempo efetivo de jogo. Abaixo de Master, percorre os 100 LP
+ * de cada divisão e considera ganho/perda esperados com 80% de win rate do
+ * serviço. Em Master+, usa a progressão fixa de 30 PDL por partida definida
+ * pelo produto, até 1.200 (GM) ou 2.200 (Challenger).
+ */
+export function estimateEloBoostHours(input: {
+  currentRank: { tier: RankTier; division: Division | null }
+  targetRank: { tier: RankTier; division: Division | null }
+  currentLp: number
+  avgLpGain: number
+  avgLpLoss: number
+  currentPdl: number | null
+}): number | null {
+  const { currentRank, targetRank, currentLp, avgLpGain, avgLpLoss } = input
+  const fromStep = rankStep(currentRank.tier, currentRank.division)
+  const toStep = rankStep(targetRank.tier, targetRank.division)
+  if (toStep <= fromStep) return null
+
+  if (![currentLp, avgLpGain, avgLpLoss].every(Number.isFinite)
+      || currentLp < 0 || currentLp > 100 || avgLpGain <= 0 || avgLpLoss <= 0) {
+    throw new RangeError('Invalid LP values for delivery estimate')
+  }
+
+  let standardGames = 0
+  let masterPlusGames = 0
+
+  if (!isMasterPlus(currentRank.tier)) {
+    const currentAbsoluteLp = fromStep * 100 + currentLp
+    const standardTargetLp = isMasterPlus(targetRank.tier)
+      ? MASTER_START_ABSOLUTE_LP
+      : toStep * 100
+    const requiredStandardLp = Math.max(0, standardTargetLp - currentAbsoluteLp)
+    const expectedNetLpPerGame = Math.max(
+      1,
+      avgLpGain * EXPECTED_BOOST_WIN_RATE - avgLpLoss * (1 - EXPECTED_BOOST_WIN_RATE),
+    )
+    standardGames = Math.ceil(requiredStandardLp / expectedNetLpPerGame)
+
+    if (isMasterPlus(targetRank.tier)) {
+      masterPlusGames = Math.ceil(MASTER_PLUS_TARGET_LP[targetRank.tier] / MASTER_PLUS_LP_PER_GAME)
+    }
+  } else {
+    if (!isMasterPlus(targetRank.tier)) return null
+    const currentMasterPlusLp = Math.max(0, input.currentPdl ?? 0)
+    const requiredMasterPlusLp = Math.max(0, MASTER_PLUS_TARGET_LP[targetRank.tier] - currentMasterPlusLp)
+    masterPlusGames = Math.max(1, Math.ceil(requiredMasterPlusLp / MASTER_PLUS_LP_PER_GAME))
+  }
+
+  const games = standardGames + masterPlusGames
+  return games > 0 ? games * MATCH_DURATION_HOURS : null
 }
 
 const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
@@ -243,6 +306,7 @@ export interface OrderPriceInput {
   currentLp: number
   avgLpGain: number
   avgLpLoss: number
+  currentPdl: number | null
   // Preço já consultado em `master_plus_pricing` para a combinação
   // (origem, destino, faixa de PDL atual) — null quando a faixa ainda não
   // tem preço configurado (pedido deve ser bloqueado, nunca com valor
@@ -297,10 +361,19 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
         // permanece null.
         if (boostMode === 'duo' || input.masterPlusPrice == null) break
         basePrice = centsToMoney(moneyToCents(input.masterPlusPrice))
-        estimatedHours = null
+        if (targetRank) {
+          estimatedHours = estimateEloBoostHours({
+            currentRank,
+            targetRank,
+            currentLp: 0,
+            avgLpGain: MASTER_PLUS_LP_PER_GAME,
+            avgLpLoss: MASTER_PLUS_LP_PER_GAME,
+            currentPdl: input.currentPdl,
+          })
+        }
       } else {
         if (!targetRank) break
-        const { price, hours } = calcEloPrice(
+        const { price } = calcEloPrice(
           input.queueType,
           currentRank.tier, currentRank.division,
           targetRank.tier, targetRank.division,
@@ -309,7 +382,14 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
         basePrice = boostMode === 'duo'
           ? centsToMoney(moneyToCents(withLp) + percentageOfCents(moneyToCents(withLp), DUO_BOOST_PCT))
           : centsToMoney(moneyToCents(withLp))
-        estimatedHours = hours || null
+        estimatedHours = estimateEloBoostHours({
+          currentRank,
+          targetRank,
+          currentLp,
+          avgLpGain,
+          avgLpLoss,
+          currentPdl: null,
+        })
         pdlModifierPct = lpModifierPct(avgLpGain)
       }
       break
@@ -317,7 +397,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     case 'placement_matches': {
       if (!input.currentRank) break
       basePrice = PLACEMENT_PRICE[input.currentRank.tier] ?? 15
-      estimatedHours = 3
+      estimatedHours = 5 * MATCH_DURATION_HOURS
       break
     }
     case 'win_boost': {
@@ -325,7 +405,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
-      estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
+      estimatedHours = input.winsPurchased * MATCH_DURATION_HOURS
       break
     }
     case 'md5': {
@@ -333,7 +413,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getMd5WinPrice(input.queueType, input.currentRank.tier)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
-      estimatedHours = Math.max(1, Math.round(input.winsPurchased * 0.4))
+      estimatedHours = input.winsPurchased * MATCH_DURATION_HOURS
       break
     }
     case 'coaching': {
@@ -361,6 +441,10 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     const discountPct = WIN_PACKAGE_DISCOUNTS[input.winPackage] ?? 0
     const undiscountedCents = moneyToCents(pricePerWin) * input.winPackage
     winPackagePrice = centsToMoney(undiscountedCents - percentageOfCents(undiscountedCents, discountPct))
+  }
+
+  if (estimatedHours != null && input.winPackage) {
+    estimatedHours += input.winPackage * MATCH_DURATION_HOURS
   }
 
   const extrasPriceCents = extrasRawCents + moneyToCents(winPackagePrice)

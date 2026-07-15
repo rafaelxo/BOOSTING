@@ -5,6 +5,7 @@ import { Plus, ShoppingBag, MessageCircle, Zap, Sparkles } from 'lucide-react'
 import { Button, Skeleton, EmptyState, StatCard } from '@/components/ui'
 import { OrderRow } from '@/components/order/OrderRow'
 import { supabase } from '@/lib/supabase'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order } from '@/types'
@@ -17,7 +18,7 @@ function useRecentOrders(customerId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(ORDER_SAFE_COLUMNS)
         .eq('customer_id', customerId)
         .neq('status', 'canceled')
         .order('created_at', { ascending: false })

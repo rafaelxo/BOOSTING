@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShoppingBag, Search } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
@@ -8,9 +9,11 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import type { Order, OrderStatus } from '@/types'
 
 export function OrderHistoryPage() {
+  const navigate = useNavigate()
   const { profile } = useAuthStore()
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -29,7 +32,7 @@ export function OrderHistoryPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(ORDER_SAFE_COLUMNS)
         .eq('customer_id', profile!.id)
         .order('created_at', { ascending: false })
         .limit(100)
@@ -86,7 +89,7 @@ export function OrderHistoryPage() {
           icon={ShoppingBag}
           title={t('customer.history.empty')}
           description={filter !== 'all' ? t('customer.history.emptyFilter') : t('customer.history.emptyAll')}
-          action={filter === 'all' ? { label: t('customer.history.startBoost'), onClick: () => {} } : undefined}
+          action={filter === 'all' ? { label: t('customer.history.startBoost'), onClick: () => navigate('/orders/new?new=1') } : undefined}
         />
       ) : (
         <div className="space-y-3">

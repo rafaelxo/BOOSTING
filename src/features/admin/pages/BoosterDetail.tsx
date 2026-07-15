@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, Save } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatRank, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
+import { formatDate, formatRank, isBoosterOnline, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { BoosterProfile, RankTier, Division } from '@/types'
 
@@ -217,7 +217,7 @@ export function AdminBoosterDetailPage() {
         {/* Profile overview */}
         <Card padding="md">
           <div className="flex items-start gap-4 mb-4">
-            <Avatar name={booster.display_name} size="lg" online={booster.is_available} />
+            <Avatar name={booster.display_name} size="lg" online={isBoosterOnline(booster.last_active_at)} />
             <div>
               <p className="font-bold text-ink">{booster.display_name}</p>
               <p className="text-sm text-ink-secondary">

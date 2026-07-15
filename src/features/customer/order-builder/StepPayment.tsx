@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { useAuthStore } from '@/stores/authStore'
-import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { Button, ErrorAlert } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw } from 'lucide-react'
+import { getCustomerOrderState } from '@/lib/customerOrderState'
+import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, RefreshCw, Plus } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -76,11 +77,15 @@ export function StepPayment() {
   const { profile } = useAuthStore()
   const store = useOrderBuilderStore()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
   const [pix, setPix] = useState<PixState>({ phase: 'idle' })
   const [copied, setCopied] = useState(false)
   const pollRef = useRef<number | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
+  const restoredOrderRef = useRef<string | null>(null)
+  const pendingOrderId = searchParams.get('order')
 
   const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
@@ -136,17 +141,14 @@ export function StepPayment() {
   function startPolling(orderId: string) {
     stopPolling()
     pollRef.current = window.setInterval(async () => {
-      const { data } = await supabase
-        .from('orders')
-        .select('status')
-        .eq('id', orderId)
-        .single()
+      const state = await getCustomerOrderState(orderId).catch(() => null)
 
-      if (data?.status === 'awaiting_assignment' || data?.status === 'paid') {
+      if (state?.payment_confirmed) {
+        const requiresCredentials = state.requires_credentials === true
         stopPolling()
         setPix({ phase: 'confirmed' })
         store.reset()
-        setTimeout(() => navigate(`/orders/${orderId}`), 2500)
+        setTimeout(() => navigate(`/orders/${orderId}${requiresCredentials ? '#credentials' : ''}`), 2500)
       }
     }, 5000)
   }
@@ -190,6 +192,9 @@ export function StepPayment() {
       order_id: orderId,
       total_price: Number(pixData.total_price),
     })
+    setSearchParams({ order: orderId }, { replace: true })
+    queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+    queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
 
     // If MP didn't return base64 yet, retry once after 3s to get it
     if (!pixData.qr_code_base64) {
@@ -208,6 +213,26 @@ export function StepPayment() {
     }
 
     startPolling(orderId)
+  }
+
+  // Recupera a mesma cobrança quando o usuário volta ao configurador. O id
+  // vem da URL, que por sua vez é restaurada a partir do pedido persistido no
+  // banco por OrderBuilderPage — não dependemos de estado React/localStorage.
+  useEffect(() => {
+    if (!profile || !pendingOrderId || restoredOrderRef.current === pendingOrderId) return
+    restoredOrderRef.current = pendingOrderId
+    setPix({ phase: 'generating' })
+    void invokePix({ order_id: pendingOrderId })
+  // invokePix usa apenas o id restaurado e o estado estável da sessão nesta
+  // inicialização; incluí-la nas deps recriaria a cobrança a cada render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOrderId, profile])
+
+  function startNewOrder() {
+    stopPolling()
+    store.reset()
+    store.setStep('service')
+    setSearchParams({ new: '1' }, { replace: true })
   }
 
   async function generatePix() {
@@ -259,9 +284,6 @@ export function StepPayment() {
                 ...base,
                 target_rank: store.targetRank,
                 boost_mode: 'solo',
-                current_pdl: store.currentPdl,
-                avg_pdl_gain: store.avgPdlGain,
-                avg_pdl_loss: store.avgPdlLoss,
                 addon_codes: addonCodes,
                 riot_id: store.riotId,
               }
@@ -269,9 +291,6 @@ export function StepPayment() {
                 ...base,
                 target_rank: store.targetRank,
                 boost_mode: store.boostMode,
-                current_lp: store.currentLp,
-                avg_lp_gain: store.avgLpGain,
-                avg_lp_loss: store.avgLpLoss,
                 addon_codes: addonCodes,
                 win_package: store.winPackage,
                 riot_id: store.riotId,
@@ -286,9 +305,6 @@ export function StepPayment() {
               ...base,
               target_rank: store.targetRank,
               boost_mode: store.boostMode,
-              current_lp: store.currentLp,
-              avg_lp_gain: store.avgLpGain,
-              avg_lp_loss: store.avgLpLoss,
               wins_purchased: store.winsPurchased,
               sessions_purchased: store.sessionsPurchased,
               addon_codes: addonCodes,
@@ -338,6 +354,9 @@ export function StepPayment() {
         <p className="text-sm text-ink-secondary">O tempo de 30 minutos acabou. Gere um novo PIX para continuar.</p>
         <Button onClick={generatePix} leftIcon={<RefreshCw className="h-4 w-4" />}>
           Gerar Novo PIX
+        </Button>
+        <Button variant="secondary" onClick={startNewOrder} leftIcon={<Plus className="h-4 w-4" />}>
+          Configurar novo pedido
         </Button>
       </div>
     )
@@ -411,6 +430,19 @@ export function StepPayment() {
           Aguardando confirmação do pagamento…
         </div>
 
+        <Button
+          className="w-full"
+          variant="secondary"
+          onClick={startNewOrder}
+          leftIcon={<Plus className="h-4 w-4" />}
+        >
+          Configurar novo pedido
+        </Button>
+
+        <p className="text-[11px] text-center text-ink-muted">
+          Este pedido continuará salvo em Meus pedidos para você pagar depois.
+        </p>
+
         {/* Security */}
         <div className="flex items-start gap-2.5 text-xs text-ink-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
@@ -467,6 +499,17 @@ export function StepPayment() {
       >
         {!catalogReady ? 'Carregando catálogo…' : pix.phase === 'generating' ? 'Gerando PIX…' : `Gerar PIX — ${currency(totalPrice)}`}
       </Button>
+
+      {pendingOrderId && pix.phase === 'error' && (
+        <Button
+          className="w-full"
+          variant="secondary"
+          onClick={startNewOrder}
+          leftIcon={<Plus className="h-4 w-4" />}
+        >
+          Configurar novo pedido
+        </Button>
+      )}
 
       {totalPrice <= 0 && (
         <p className="text-xs text-danger text-center">Configure seu pedido para ver o preço.</p>

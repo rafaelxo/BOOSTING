@@ -81,7 +81,7 @@ function PdlField({ label, value, min, max, onChange, disabled }: PdlFieldProps)
 
 export function PdlFieldRow({ fields }: { fields: PdlFieldProps[] }) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
+    <div className="flex flex-col sm:flex-row gap-4">
       {fields.map((f) => <PdlField key={f.label} {...f} />)}
     </div>
   )

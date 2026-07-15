@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
-  moneyToCents, PLACEMENT_PRICE, type OrderPriceInput, type RankTier,
+  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, type OrderPriceInput, type RankTier,
 } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
@@ -14,6 +14,7 @@ function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
     currentLp: 0,
     avgLpGain: 20,
     avgLpLoss: 20, // ganho == perda => efficiencyMod neutro (1.0), preço previsível para os testes
+    currentPdl: null,
     masterPlusPrice: null,
     winsPurchased: null,
     sessionsPurchased: null,
@@ -92,13 +93,49 @@ describe('Master+ — preço vem exclusivamente da tabela comercial (seção 14)
     expect(priced.basePrice).toBe(0) // bloqueado, não "250 * 1.5"
   })
 
-  it('não estima horas a partir de um PDL alvo — não existe mais esse conceito', () => {
+  it('estima Master até Challenger usando 30 PDL por partida e alvo de 2200', () => {
     const priced = computeOrderPrice(baseInput({
       currentRank: { tier: 'master', division: null },
       targetRank: { tier: 'challenger', division: null },
       masterPlusPrice: 250,
+      currentPdl: 100,
     }))
-    expect(priced.estimatedHours).toBeNull()
+    expect(priced.estimatedHours).toBe(35)
+  })
+})
+
+describe('Estimativa dinâmica de entrega', () => {
+  it('considera LP atual, ganho, perda, 80% de win rate e 30 minutos por partida', () => {
+    expect(estimateEloBoostHours({
+      currentRank: { tier: 'iron', division: 'IV' },
+      targetRank: { tier: 'iron', division: 'III' },
+      currentLp: 50,
+      avgLpGain: 20,
+      avgLpLoss: 10,
+      currentPdl: null,
+    })).toBe(2)
+  })
+
+  it('soma a subida padrão com o trecho Master+ ao mirar Grão-Mestre', () => {
+    expect(estimateEloBoostHours({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'grandmaster', division: null },
+      currentLp: 50,
+      avgLpGain: 25,
+      avgLpLoss: 15,
+      currentPdl: null,
+    })).toBe(21.5)
+  })
+
+  it('usa o PDL atual em Master+ e a referência de 1200 para Grão-Mestre', () => {
+    expect(estimateEloBoostHours({
+      currentRank: { tier: 'master', division: null },
+      targetRank: { tier: 'grandmaster', division: null },
+      currentLp: 0,
+      avgLpGain: 30,
+      avgLpLoss: 30,
+      currentPdl: 900,
+    })).toBe(5)
   })
 })
 
@@ -281,7 +318,7 @@ describe('placement_matches (MD5 Completo, legado) — PLACEMENT_PRICE segue com
       currentRank: { tier: 'gold', division: null },
     }))
     expect(priced.basePrice).toBe(PLACEMENT_PRICE.gold)
-    expect(priced.estimatedHours).toBe(3)
+    expect(priced.estimatedHours).toBe(2.5)
   })
 
   it('sem currentRank, preço fica zero (pedido bloqueado, mesma regra dos outros serviceTypes)', () => {

@@ -24,6 +24,17 @@ export function timeAgo(date: string | Date) {
   return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ptBR })
 }
 
+// ─── Booster presence ─────────────────────────────────────────────────────────
+
+// Janela de presença — deve permanecer igual à derivação de is_available na
+// view public_booster_profiles (migration 043).
+export const BOOSTER_PRESENCE_WINDOW_MS = 5 * 60_000
+
+export function isBoosterOnline(lastActiveAt: string | null | undefined): boolean {
+  if (!lastActiveAt) return false
+  return Date.now() - new Date(lastActiveAt).getTime() < BOOSTER_PRESENCE_WINDOW_MS
+}
+
 // ─── Order status display ─────────────────────────────────────────────────────
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
@@ -139,7 +150,6 @@ export function orderRequiresAccountAccess(order: Order): boolean {
   return (
     (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
     order.service_type === 'win_boost' ||
-    order.service_type === 'placement_matches' ||
     order.service_type === 'md5'
   )
 }

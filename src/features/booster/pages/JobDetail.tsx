@@ -5,6 +5,7 @@ import { ArrowLeft, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, S
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
 import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
@@ -41,7 +42,7 @@ export function JobDetailPage() {
       if (availableError) throw availableError
       if (available) return available as unknown as Order
 
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id!).single()
+      const { data, error } = await supabase.from('orders').select(ORDER_SAFE_COLUMNS).eq('id', id!).single()
       if (error) throw error
       return data as unknown as Order
     },

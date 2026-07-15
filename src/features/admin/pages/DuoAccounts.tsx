@@ -4,11 +4,26 @@ import { Landmark, Plus, Eye, EyeOff } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
-import { RANK_TIER_ORDER, RANK_TIER_LABEL, formatDate } from '@/lib/utils'
+import { RANK_TIER_LABEL, formatDate } from '@/lib/utils'
 import type { DuoAccount, Division, RankTier } from '@/types'
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
+const DUO_RANK_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
+type AdminDuoAccount = DuoAccount & { has_credentials?: boolean }
+
+function duoAccountError(code?: string): string {
+  const messages: Record<string, string> = {
+    unauthorized: 'Somente administradores podem gerenciar contas Duo.',
+    invalid_label: 'Informe um identificador válido para a conta.',
+    rank_out_of_supported_range: 'Contas Duo devem estar entre Ferro IV e Diamante I.',
+    login_and_password_required_together: 'Preencha login e senha juntos.',
+    credentials_required: 'Uma conta ativa precisa ter login e senha cadastrados.',
+    invalid_credentials: 'Login ou senha inválidos.',
+    account_not_found: 'Conta Duo não encontrada.',
+    server_key_not_configured: 'A chave de criptografia do servidor não está configurada.',
+  }
+  return messages[code ?? ''] ?? 'Não foi possível salvar a conta Duo.'
+}
 
 interface AccountForm {
   label: string
@@ -24,7 +39,7 @@ const EMPTY_FORM: AccountForm = {
   label: '', tier: 'gold', division: 'IV', notes: '', is_active: true, login: '', password: '',
 }
 
-function accountToForm(a: DuoAccount): AccountForm {
+function accountToForm(a: AdminDuoAccount): AccountForm {
   return {
     label: a.label,
     tier: a.current_rank?.tier ?? 'gold',
@@ -38,16 +53,18 @@ function accountToForm(a: DuoAccount): AccountForm {
 
 export function AdminDuoAccountsPage() {
   const queryClient = useQueryClient()
-  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; account?: DuoAccount } | null>(null)
+  const [modal, setModal] = useState<{ mode: 'create' | 'edit'; account?: AdminDuoAccount } | null>(null)
   const [form, setForm] = useState<AccountForm>(EMPTY_FORM)
   const [revealed, setRevealed] = useState<Record<string, { login: string; password: string } | 'loading' | 'error'>>({})
 
-  const { data: accounts, isLoading } = useQuery({
+  const { data: accounts, isLoading, isError, error: accountsError } = useQuery({
     queryKey: ['admin-duo-accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('admin_duo_accounts').select('*').order('created_at', { ascending: false }).limit(100)
+      const { data, error } = await supabase.rpc('list_duo_accounts')
       if (error) throw error
-      return data as unknown as DuoAccount[]
+      const result = data as { success?: boolean; accounts?: AdminDuoAccount[]; error?: string } | null
+      if (!result?.success) throw new Error(duoAccountError(result?.error))
+      return result.accounts ?? []
     },
   })
 
@@ -63,34 +80,19 @@ export function AdminDuoAccountsPage() {
         throw new Error('Login e senha são obrigatórios ao criar uma conta')
       }
 
-      const metaPayload = {
-        label: form.label.trim(),
-        current_rank: { tier: form.tier, division: MASTER_PLUS.includes(form.tier) ? null : form.division },
-        notes: form.notes.trim() || null,
-        is_active: form.is_active,
-      }
-
-      let accountId = modal?.account?.id
-
-      if (modal?.mode === 'edit' && accountId) {
-        const { error } = await supabase.from('duo_accounts').update(metaPayload).eq('id', accountId)
-        if (error) throw error
-      } else {
-        const { data, error } = await supabase.from('duo_accounts').insert(metaPayload).select('id').single()
-        if (error) throw error
-        accountId = data.id
-      }
-
-      if (form.login.trim() && form.password.trim() && accountId) {
-        const { data: result, error } = await supabase.rpc('set_duo_account_credentials', {
-          p_account_id: accountId,
-          p_login: form.login.trim(),
-          p_password: form.password,
-        })
-        if (error) throw error
-        const res = result as { success: boolean; error?: string }
-        if (!res.success) throw new Error(res.error ?? 'Falha ao salvar credenciais')
-      }
+      const { data, error } = await supabase.rpc('save_duo_account', {
+        p_account_id: modal?.mode === 'edit' ? modal.account?.id ?? null : null,
+        p_label: form.label.trim(),
+        p_tier: form.tier,
+        p_division: form.division,
+        p_notes: form.notes.trim() || null,
+        p_is_active: form.is_active,
+        p_login: form.login.trim() || null,
+        p_password: form.password || null,
+      })
+      if (error) throw error
+      const result = data as { success?: boolean; error?: string } | null
+      if (!result?.success) throw new Error(duoAccountError(result?.error))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] })
@@ -99,14 +101,16 @@ export function AdminDuoAccountsPage() {
   })
 
   const toggleActive = useMutation({
-    mutationFn: async (a: DuoAccount) => {
-      const { error } = await supabase.from('duo_accounts').update({ is_active: !a.is_active }).eq('id', a.id)
+    mutationFn: async (a: AdminDuoAccount) => {
+      const { data, error } = await supabase.rpc('set_duo_account_active', { p_account_id: a.id, p_is_active: !a.is_active })
       if (error) throw error
+      const result = data as { success?: boolean; error?: string } | null
+      if (!result?.success) throw new Error(duoAccountError(result?.error))
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] }),
   })
 
-  async function toggleReveal(a: DuoAccount) {
+  async function toggleReveal(a: AdminDuoAccount) {
     if (revealed[a.id] && revealed[a.id] !== 'error') {
       setRevealed((r) => { const next = { ...r }; delete next[a.id]; return next })
       return
@@ -135,6 +139,7 @@ export function AdminDuoAccountsPage() {
 
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
+          isError ? <div className="p-4"><ErrorAlert message={accountsError instanceof Error ? accountsError.message : 'Não foi possível carregar as contas Duo.'} /></div> :
           !accounts?.length ? <EmptyState icon={Landmark} title="Nenhuma conta cadastrada" description="Adicione contas para que boosters possam usá-las em Duo Boost." /> : (
           <Table>
             <TableHeader>
@@ -227,7 +232,7 @@ export function AdminDuoAccountsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as RankTier }))}
                 className="input-base w-full text-sm"
               >
-                {RANK_TIER_ORDER.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
+                {DUO_RANK_TIERS.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
               </select>
             </div>
             <div className="space-y-1">
@@ -235,8 +240,7 @@ export function AdminDuoAccountsPage() {
               <select
                 value={form.division}
                 onChange={(e) => setForm((f) => ({ ...f, division: e.target.value as Division }))}
-                disabled={MASTER_PLUS.includes(form.tier)}
-                className="input-base w-full text-sm disabled:opacity-40"
+                className="input-base w-full text-sm"
               >
                 {DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>

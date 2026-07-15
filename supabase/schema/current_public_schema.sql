@@ -379,6 +379,20 @@ $$;
 ALTER FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."booster_heartbeat"() RETURNS "void"
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'extensions'
+    AS $$
+  update public.booster_profiles
+     set last_active_at = now()
+   where user_id = auth.uid()
+     and status = 'approved';
+$$;
+
+
+ALTER FUNCTION "public"."booster_heartbeat"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public', 'extensions'
@@ -864,6 +878,62 @@ $$;
 ALTER FUNCTION "public"."get_order_chat"("p_order_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid" DEFAULT NULL::"uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+declare
+  v_customer_id uuid := auth.uid();
+  v_order record;
+  v_requires_credentials boolean;
+  v_is_active_paid boolean;
+begin
+  if v_customer_id is null then
+    return jsonb_build_object('success', false, 'error', 'unauthorized');
+  end if;
+
+  if p_order_id is null then
+    select id, status, payment_status, service_type, boost_mode, credentials_set
+    into v_order
+    from public.orders
+    where customer_id = v_customer_id and status = 'awaiting_payment'
+    order by created_at desc limit 1;
+    if not found then
+      return jsonb_build_object('success', true, 'order_id', null);
+    end if;
+  else
+    select id, status, payment_status, service_type, boost_mode, credentials_set
+    into v_order
+    from public.orders
+    where id = p_order_id and customer_id = v_customer_id;
+    if not found then
+      return jsonb_build_object('success', false, 'error', 'order_not_found');
+    end if;
+  end if;
+
+  v_requires_credentials := public.order_requires_access_token(v_order.service_type, v_order.boost_mode);
+  v_is_active_paid := v_order.payment_status = 'paid'::public.payment_status
+    and v_order.status in ('awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer');
+
+  return jsonb_build_object(
+    'success', true,
+    'order_id', v_order.id,
+    'status', v_order.status,
+    'payment_status', v_order.payment_status,
+    'can_pay', v_order.status = 'awaiting_payment'
+      and coalesce(v_order.payment_status, 'pending'::public.payment_status) = 'pending'::public.payment_status,
+    'payment_confirmed', v_is_active_paid,
+    'requires_credentials', v_requires_credentials,
+    'credentials_set', v_order.credentials_set,
+    'can_submit_credentials', v_is_active_paid and v_requires_credentials
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'extensions'
@@ -1145,7 +1215,7 @@ CREATE OR REPLACE FUNCTION "public"."order_requires_access_token"("p_service_typ
     AS $$
   select
     (p_service_type = 'elo_boost' and coalesce(p_boost_mode, 'solo') = 'solo')
-    or p_service_type in ('win_boost', 'placement_matches', 'md5')
+    or p_service_type in ('win_boost', 'md5')
 $$;
 
 
@@ -2758,7 +2828,7 @@ CREATE OR REPLACE VIEW "public"."public_booster_profiles" WITH ("security_barrie
     "bp"."rating",
     "bp"."rating_count",
     "bp"."total_completed",
-    "bp"."is_available",
+    (("bp"."last_active_at" IS NOT NULL) AND ("bp"."last_active_at" > ("now"() - '00:05:00'::interval))) AS "is_available",
     "bp"."is_top5",
     "bp"."rank_stats",
     "bp"."last_active_at",
@@ -3827,6 +3897,12 @@ GRANT ALL ON FUNCTION "public"."booster_active_slot_counts"("p_booster_user_id" 
 
 
 
+REVOKE ALL ON FUNCTION "public"."booster_heartbeat"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."booster_heartbeat"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."booster_has_active_exclusive_slot"("p_booster_user_id" "uuid") TO "service_role";
@@ -3897,6 +3973,10 @@ GRANT ALL ON FUNCTION "public"."get_order_chat"("p_order_id" "uuid") TO "service
 
 
 REVOKE ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") FROM "anon";
+GRANT ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_customer_order_state"("p_order_id" "uuid") TO "service_role";
 GRANT ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_order_credentials"("p_order_id" "uuid") TO "service_role";
 

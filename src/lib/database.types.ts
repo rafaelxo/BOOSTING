@@ -1583,6 +1583,7 @@ export type Database = {
           total_count: number
         }[]
       }
+      booster_heartbeat: { Args: never; Returns: undefined }
       booster_has_active_exclusive_slot: {
         Args: { p_booster_user_id: string }
         Returns: boolean
@@ -1630,7 +1631,12 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: Json
       }
+      list_duo_accounts: { Args: never; Returns: Json }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
+      get_customer_order_state: {
+        Args: { p_order_id?: string }
+        Returns: Json
+      }
       get_order_chat: { Args: { p_order_id: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       is_approved_booster: { Args: never; Returns: boolean }
@@ -1719,6 +1725,23 @@ export type Database = {
       }
       set_duo_account_credentials: {
         Args: { p_account_id: string; p_login: string; p_password: string }
+        Returns: Json
+      }
+      save_duo_account: {
+        Args: {
+          p_account_id: string | null
+          p_division: string
+          p_is_active: boolean
+          p_label: string
+          p_login?: string | null
+          p_notes: string | null
+          p_password?: string | null
+          p_tier: string
+        }
+        Returns: Json
+      }
+      set_duo_account_active: {
+        Args: { p_account_id: string; p_is_active: boolean }
         Returns: Json
       }
       set_order_credentials: {

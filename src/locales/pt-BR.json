@@ -9,8 +9,7 @@
     "signIn": "Entrar",
     "boostNow": "Boostar Agora",
     "applyBooster": "Seja um Booster",
-    "announcement": "Boosting profissional — 98,7% de conclusão · Suporte 24/7",
-    "boostersOnline": "{{count}} boosters online",
+    "announcement": "Boosting profissional · Garantia de conclusão · Suporte 24/7",
     "boosters": "Boosters"
   },
   "footer": {
@@ -33,7 +32,6 @@
     "available247": "Serviço disponível 24/7"
   },
   "home": {
-    "badge": "340+ boosters verificados · 88% de taxa de vitória",
     "heroTitle": "SUBA DE",
     "heroTitleHighlight": "ELO.",
     "heroDesc": "Solo boost, duo boost, coaching e MD5 profissionais — com transparência total, chat ao vivo e",

@@ -1,27 +1,10 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Menu, X } from 'lucide-react'
 import { Button, ThemeToggle, LogoMark } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-
-function LiveIndicator() {
-  const { t } = useTranslation()
-  const [count, setCount] = useState(11)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCount(c => c + (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.7 ? 1 : 0))
-    }, 4000)
-    return () => clearInterval(timer)
-  }, [])
-  return (
-    <div className="hidden lg:flex items-center gap-2 text-xs font-semibold text-success bg-success/10 border border-success/20 px-3 py-1.5 rounded-full">
-      <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-      {t('nav.boostersOnline', { count })}
-    </div>
-  )
-}
 
 export function PublicLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -93,7 +76,6 @@ export function PublicLayout() {
 
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3 ml-auto">
-            <LiveIndicator />
             <ThemeToggle />
             {isAuthenticated() ? (
               <Button asChild size="sm">

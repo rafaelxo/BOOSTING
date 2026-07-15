@@ -6,7 +6,7 @@ import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/compon
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct } from '@/lib/pricing'
+import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS } from '@/lib/pricing'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Check, Search, Info, Lock } from 'lucide-react'
@@ -44,14 +44,14 @@ export function StepConfigure() {
     serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased,
     isMd5, md5MatchesRemaining,
-    currentLp, avgLpGain,
-    currentPdl, avgPdlGain,
+    currentLp, avgLpGain, avgLpLoss,
+    currentPdl,
     riotId, riotAutoFilled, riotVerified, md5Blocked, riotLookupLoading, stepAttempted,
     setService, setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
     setIsMd5, setMd5MatchesRemainingFromApi,
-    setCurrentLp, setAvgLpGain,
-    setCurrentPdl, setAvgPdlGain,
+    setCurrentLp, setAvgLpGain, setAvgLpLoss,
+    setCurrentPdl, setAvgPdlGain, setAvgPdlLoss,
     setBasePrice, setEstimatedHours, setPdlModifierPct,
     setRiotId, setRiotAutoFilled, setRiotVerified, setMd5Blocked, clearRiotLookup, setRiotLookupLoading,
   } = useOrderBuilderStore()
@@ -116,10 +116,12 @@ export function StepConfigure() {
     setCurrentRank({ tier: result.tier, division: result.division ?? null })
     if (isMasterPlusCurrentTier(result.tier)) {
       setCurrentPdl(Math.max(0, Math.min(9999, result.league_points ?? 0)))
-      if (typeof result.avg_lp_gain === 'number') setAvgPdlGain(Math.max(1, Math.min(200, result.avg_lp_gain)))
+      setAvgPdlGain(30)
+      setAvgPdlLoss(30)
     } else {
       setCurrentLp(Math.max(0, Math.min(99, result.league_points ?? 0)))
       if (typeof result.avg_lp_gain === 'number') setAvgLpGain(Math.max(1, Math.min(50, result.avg_lp_gain)))
+      if (typeof result.avg_lp_loss === 'number') setAvgLpLoss(Math.max(1, Math.min(50, result.avg_lp_loss)))
     }
 
     setRiotAutoFilled(true)
@@ -237,12 +239,19 @@ export function StepConfigure() {
           return
         }
         setBasePrice(price)
-        setEstimatedHours(null)
+        setEstimatedHours(estimateEloBoostHours({
+          currentRank,
+          targetRank,
+          currentLp: 0,
+          avgLpGain: 30,
+          avgLpLoss: 30,
+          currentPdl,
+        }))
         return
       }
 
       if (!targetRank) return
-      const { price, hours } = calcEloPrice(
+      const { price } = calcEloPrice(
         queueType,
         currentRank.tier, currentRank.division ?? null,
         targetRank.tier, targetRank.division ?? null,
@@ -252,26 +261,33 @@ export function StepConfigure() {
         ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
         : withLp
       setBasePrice(finalPrice)
-      setEstimatedHours(hours || null)
+      setEstimatedHours(estimateEloBoostHours({
+        currentRank,
+        targetRank,
+        currentLp,
+        avgLpGain,
+        avgLpLoss,
+        currentPdl: null,
+      }))
       setPdlModifierPct(lpModifierPct(avgLpGain))
 
     } else if (serviceType === 'placement_matches') {
       if (!currentRank) return
       setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
-      setEstimatedHours(3)
+      setEstimatedHours(5 * MATCH_DURATION_HOURS)
       setPdlModifierPct(null)
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
-      setEstimatedHours(Math.max(1, Math.round(winsPurchased * 0.4)))
+      setEstimatedHours(winsPurchased * MATCH_DURATION_HOURS)
       setPdlModifierPct(null)
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
       const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
-      setEstimatedHours(Math.max(1, Math.round(cappedWins * 0.4)))
+      setEstimatedHours(cappedWins * MATCH_DURATION_HOURS)
       setPdlModifierPct(null)
     } else if (serviceType === 'coaching') {
       // Preço vem do pacote escolhido em CoachPackagePicker (setBasePrice
@@ -282,7 +298,7 @@ export function StepConfigure() {
     }
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
-    currentLp, avgLpGain, currentIsMasterPlus, masterPlusPriceRow,
+    currentLp, avgLpGain, avgLpLoss, currentPdl, currentIsMasterPlus, masterPlusPriceRow,
     setBasePrice, setEstimatedHours, setPdlModifierPct,
   ])
 
@@ -462,7 +478,7 @@ export function StepConfigure() {
               </button>
             </div>
             {md5Message && <p className="mt-2 text-xs text-success">{md5Message}</p>}
-            {riotLookupMessage && !md5Message && <p className="mt-2 text-xs text-ink-secondary">{riotLookupMessage}</p>}
+            {riotLookupMessage && !md5Message && <p className="mt-2 text-xs text-success">{riotLookupMessage}</p>}
             {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
           </FormField>
         )}
@@ -539,11 +555,6 @@ export function StepConfigure() {
               <div className="p-4 space-y-4 border-b border-bg-elevated md:border-b-0 md:border-r">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</p>
-                  {riotAutoFilled && (
-                    <button type="button" onClick={() => setRiotAutoFilled(false)} className="text-[10px] font-bold text-brand hover:underline">
-                      Editar
-                    </button>
-                  )}
                 </div>
 
                 <RankLockGrid
@@ -552,7 +563,7 @@ export function StepConfigure() {
                   selectedTier={currentRank?.tier ?? null}
                   selectedDivision={currentRank?.division ?? null}
                   onChange={(tier, division) => setCurrentRank({ tier, division })}
-                  disabled={riotAutoFilled}
+                  disabled
                 />
                 {stepAttempted && !currentRank && (
                   <p className="text-xs text-danger">Selecione um rank</p>
@@ -564,23 +575,20 @@ export function StepConfigure() {
                     não de um alvo informado pelo cliente. */}
                 {currentRank && (
                   <div className="rounded-xl border border-bg-elevated bg-bg-elevated/20 p-3 space-y-2.5">
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-ink-muted">PDL Atual</p>
                     {currentIsMasterPlus ? (
                       <PdlFieldRow fields={[
-                        { label: 'PDL Atual', value: currentPdl, min: 0, max: 9999, onChange: setCurrentPdl, disabled: riotAutoFilled },
-                        { label: 'Média/Partida', value: avgPdlGain, min: 1, max: 200, onChange: setAvgPdlGain, disabled: riotAutoFilled },
+                        { label: 'PDL Atual', value: currentPdl, min: 0, max: 9999, onChange: setCurrentPdl, disabled: true },
+                        { label: 'Média PDL', value: 30, min: 30, max: 30, onChange: setAvgPdlGain, disabled: true },
                       ]} />
                     ) : (
                       <PdlFieldRow fields={[
-                        { label: 'LP Atual', value: currentLp, min: 0, max: 99, onChange: setCurrentLp, disabled: riotAutoFilled },
-                        { label: 'Média/Partida', value: avgLpGain, min: 1, max: 50, onChange: setAvgLpGain, disabled: riotAutoFilled },
+                        { label: 'PDL Atual', value: currentLp, min: 0, max: 99, onChange: setCurrentLp, disabled: true },
+                        { label: 'Média PDL', value: avgLpGain, min: 1, max: 50, onChange: setAvgLpGain, disabled: true },
                       ]} />
                     )}
-                    {riotAutoFilled && (
-                      <p className="text-[10px] text-ink-muted">
-                        Preenchido automaticamente pela Riot. Para editar, refaça a busca com outro Riot ID.
-                      </p>
-                    )}
+                    <p className="text-[10px] text-ink-muted">
+                      Consultado na Riot. A estimativa usa as últimas 10 partidas ranqueadas e é recalculada pelo servidor no pagamento.
+                    </p>
                   </div>
                 )}
               </div>
@@ -632,11 +640,6 @@ export function StepConfigure() {
             required
             hint={isMd5 ? 'Sem LP - apenas o rank final da temporada passada.' : undefined}
             error={stepAttempted && !currentRank ? 'Selecione um rank' : undefined}
-            labelAction={riotAutoFilled && (
-              <button type="button" onClick={() => setRiotAutoFilled(false)} className="text-[10px] font-bold text-brand hover:underline">
-                Editar
-              </button>
-            )}
           >
             <RankLockGrid
               tiers={RANK_TIER_ORDER}
@@ -644,7 +647,7 @@ export function StepConfigure() {
               selectedTier={currentRank?.tier ?? null}
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
-              disabled={riotAutoFilled}
+              disabled={serviceType === 'win_boost' || riotAutoFilled}
             />
           </FormField>
         )}

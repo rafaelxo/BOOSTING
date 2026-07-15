@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Landmark, Eye, EyeOff, Copy, Check } from 'lucide-react'
-import { Card, EmptyState, Skeleton, RankBadge, Button } from '@/components/ui'
+import { Card, EmptyState, Skeleton, RankBadge, Button, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { RANK_TIER_LABEL } from '@/lib/utils'
 import type { DuoAccount } from '@/types'
@@ -29,16 +29,14 @@ function CopyButton({ value }: { value: string }) {
 export function BoosterAccountsPage() {
   const [revealed, setRevealed] = useState<Record<string, RevealState>>({})
 
-  const { data: accounts, isLoading } = useQuery({
+  const { data: accounts, isLoading, isError, error: accountsError } = useQuery({
     queryKey: ['booster-duo-accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('duo_accounts')
-        .select('id, label, current_rank, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+      const { data, error } = await supabase.rpc('list_duo_accounts')
       if (error) throw error
-      return data as unknown as BoosterVisibleDuoAccount[]
+      const result = data as { success?: boolean; accounts?: BoosterVisibleDuoAccount[]; error?: string } | null
+      if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
+      return result.accounts ?? []
     },
   })
 
@@ -69,6 +67,8 @@ export function BoosterAccountsPage() {
 
       {isLoading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-2xl" />)}</div>
+      ) : isError ? (
+        <ErrorAlert message={accountsError instanceof Error ? accountsError.message : 'Não foi possível carregar as contas Duo.'} />
       ) : !accounts?.length ? (
         <EmptyState icon={Landmark} title="Nenhuma conta disponível no momento" description="Fale com a equipe se precisar de uma conta duo para um pedido." />
       ) : (

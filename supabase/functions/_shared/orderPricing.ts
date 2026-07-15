@@ -12,9 +12,12 @@ import {
 import { errorResponse, jsonResponse } from './responses.ts'
 import type { supabaseAdmin } from './supabaseAdmin.ts'
 import {
+  estimateLpAverages,
   fetchLeagueEntries,
+  fetchRecentRankedRecord,
   fetchRankedMatchIdsThisSplit,
   fetchRiotAccount,
+  RIOT_DIVISION_MAP,
   RIOT_QUEUE_TYPE,
   RIOT_TIER_MAP,
 } from './riotLookup.ts'
@@ -99,8 +102,9 @@ const standardEloIntentSchema = z.object({
   current_rank: standardRankSchema,
   target_rank: standardTargetRankSchema,
   current_lp: z.number().int().min(0).max(100).default(0),
-  avg_lp_gain: z.number().int().min(1).max(50).default(20),
-  avg_lp_loss: z.number().int().min(1).max(50).default(15),
+  // Compatibilidade com clientes antigos: aceitos, mas nunca usados.
+  avg_lp_gain: z.number().int().min(1).max(50).optional(),
+  avg_lp_loss: z.number().int().min(1).max(50).optional(),
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),
   customer_notes: z.string().max(500).nullable().default(null),
@@ -120,9 +124,9 @@ const masterPlusIntentSchema = z.object({
   server: z.string().trim().min(2).max(16),
   current_rank: masterPlusCurrentRankSchema,
   target_rank: masterPlusTargetRankSchema,
-  current_pdl: z.number().int().min(0),
-  avg_pdl_gain: z.number().positive(),
-  avg_pdl_loss: z.number().positive(),
+  current_pdl: z.number().int().min(0).default(0),
+  avg_pdl_gain: z.number().positive().optional(),
+  avg_pdl_loss: z.number().positive().optional(),
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
@@ -140,8 +144,8 @@ const otherServiceIntentSchema = z.object({
   current_rank: genericRankSchema.nullable(),
   target_rank: genericRankSchema.nullable(),
   current_lp: z.number().int().min(0).max(9999).default(0),
-  avg_lp_gain: z.number().int().min(1).max(50).default(20),
-  avg_lp_loss: z.number().int().min(1).max(50).default(15),
+  avg_lp_gain: z.number().int().min(1).max(50).optional(),
+  avg_lp_loss: z.number().int().min(1).max(50).optional(),
   // Vitórias — só win_boost usa este campo (1-5, mesmo cap do MD5, ver seção
   // 14-bis); placement_matches/coaching sempre mandam null aqui (reforçado
   // pelas checagens de negócio abaixo), então apertar o max não os afeta.
@@ -344,8 +348,10 @@ export async function validateAndPriceIntent(
       winPackage: null,
       customerNotes: mp.customer_notes,
       currentPdl: mp.current_pdl,
-      avgPdlGain: mp.avg_pdl_gain,
-      avgPdlLoss: mp.avg_pdl_loss,
+      // Regra comercial da estimativa Master+: progressão fixa de 30 PDL
+      // por partida. Valores enviados pelo cliente não viram autoridade.
+      avgPdlGain: 30,
+      avgPdlLoss: 30,
       riotId: mp.riot_id,
       boosterServiceId: null,
     }
@@ -364,8 +370,8 @@ export async function validateAndPriceIntent(
       currentRank: { tier: std.current_rank.tier, division: std.current_rank.division ?? null },
       targetRank: { tier: std.target_rank.tier, division: std.target_rank.division ?? null },
       currentLp: std.current_lp,
-      avgLpGain: std.avg_lp_gain,
-      avgLpLoss: std.avg_lp_loss,
+      avgLpGain: 22,
+      avgLpLoss: 22,
       winsPurchased: null,
       sessionsPurchased: null,
       addonCodes: std.addon_codes,
@@ -434,8 +440,8 @@ export async function validateAndPriceIntent(
       currentRank: other.current_rank as RankValue,
       targetRank: other.target_rank as RankValue | null,
       currentLp: other.current_lp,
-      avgLpGain: other.avg_lp_gain,
-      avgLpLoss: other.avg_lp_loss,
+      avgLpGain: 22,
+      avgLpLoss: 22,
       winsPurchased: other.wins_purchased,
       sessionsPurchased: other.sessions_purchased,
       addonCodes: other.addon_codes,
@@ -446,6 +452,81 @@ export async function validateAndPriceIntent(
       avgPdlLoss: null,
       riotId: other.riot_id,
       boosterServiceId: other.booster_service_id,
+    }
+  }
+
+  // A consulta do navegador é somente uma prévia. No fechamento, Elo Boost
+  // e Vitórias são consultados novamente e os dados sensíveis são
+  // substituídos pelos valores derivados server-side.
+  if (normalized.serviceType === 'elo_boost' || normalized.serviceType === 'win_boost') {
+    if (!riotApiKey || !normalized.riotId) {
+      return { ok: false, response: errorResponse(req, 'Server misconfigured', 500) }
+    }
+
+    const accountResult = await fetchRiotAccount(normalized.riotId, riotApiKey, 'americas')
+    if (!accountResult.ok) {
+      if (accountResult.reason === 'not_found') return { ok: false, response: badRequest(req, 'Conta Riot não encontrada') }
+      if (accountResult.reason === 'rate_limited') {
+        return { ok: false, response: errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503) }
+      }
+      console.error('Riot account lookup failed', accountResult.status)
+      return { ok: false, response: errorResponse(req, 'Falha ao consultar conta Riot', 502) }
+    }
+
+    const leagueResult = await fetchLeagueEntries(accountResult.account.puuid, riotApiKey, 'br1')
+    if (!leagueResult.ok) {
+      if (leagueResult.reason === 'rate_limited') {
+        return { ok: false, response: errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503) }
+      }
+      console.error('Riot league lookup failed', leagueResult.status)
+      return { ok: false, response: errorResponse(req, 'Falha ao consultar elo na Riot', 502) }
+    }
+
+    const { leagueQueue } = RIOT_QUEUE_TYPE[normalized.queueType]
+    const entry = leagueResult.entries.find((candidate) => candidate.queueType === leagueQueue)
+    const verifiedTier = entry?.tier ? RIOT_TIER_MAP[entry.tier] ?? null : null
+    if (!entry || !verifiedTier) {
+      return { ok: false, response: badRequest(req, 'A conta não possui rank na fila selecionada') }
+    }
+
+    const verifiedDivision = NO_DIVISION_TIERS.includes(verifiedTier)
+      ? null
+      : entry.rank ? RIOT_DIVISION_MAP[entry.rank] ?? null : null
+    if (!NO_DIVISION_TIERS.includes(verifiedTier) && !verifiedDivision) {
+      return { ok: false, response: errorResponse(req, 'A Riot retornou uma divisão inválida', 502) }
+    }
+
+    const verifiedMasterPlus = isMasterPlusCurrentTier(verifiedTier)
+    if (normalized.serviceType === 'elo_boost' && verifiedMasterPlus !== (flow === 'master_plus')) {
+      return { ok: false, response: badRequest(req, 'Seu elo mudou desde a consulta. Verifique a conta novamente antes de pagar.') }
+    }
+
+    normalized.currentRank = { tier: verifiedTier, division: verifiedDivision }
+    const leaguePoints = Math.max(0, Number(entry.leaguePoints ?? 0))
+    const recentRecord = await fetchRecentRankedRecord(
+      accountResult.account.puuid, riotApiKey, 'americas', normalized.queueType,
+    )
+    if (!recentRecord.ok) {
+      if (recentRecord.reason === 'rate_limited') {
+        return { ok: false, response: errorResponse(req, 'Consulta temporariamente limitada pela Riot. Tente novamente em instantes.', 503) }
+      }
+      console.error('Riot recent matches lookup failed', recentRecord.status)
+      return { ok: false, response: errorResponse(req, 'Falha ao consultar as últimas partidas na Riot', 502) }
+    }
+    const averages = estimateLpAverages(verifiedTier, recentRecord.wins, recentRecord.losses)
+    normalized.currentLp = verifiedMasterPlus ? 0 : Math.min(100, leaguePoints)
+    normalized.currentPdl = verifiedMasterPlus ? leaguePoints : null
+    normalized.avgLpGain = verifiedMasterPlus ? 30 : averages.gain
+    normalized.avgLpLoss = verifiedMasterPlus ? 30 : averages.loss
+    normalized.avgPdlGain = verifiedMasterPlus ? 30 : null
+    normalized.avgPdlLoss = verifiedMasterPlus ? 30 : null
+
+    if (normalized.serviceType === 'elo_boost') {
+      if (!normalized.targetRank
+          || rankStep(normalized.targetRank.tier, normalized.targetRank.division) <= rankStep(verifiedTier, verifiedDivision)) {
+        return { ok: false, response: badRequest(req, 'Rank de destino precisa ser maior que o rank atual verificado na Riot') }
+      }
+      if (verifiedMasterPlus) pdlBracket = getPdlBracket(leaguePoints)
     }
   }
 
@@ -585,6 +666,7 @@ export async function validateAndPriceIntent(
     currentLp: normalized.currentLp,
     avgLpGain: normalized.avgLpGain,
     avgLpLoss: normalized.avgLpLoss,
+    currentPdl: normalized.currentPdl,
     masterPlusPrice,
     winsPurchased: normalized.winsPurchased,
     sessionsPurchased: normalized.sessionsPurchased,

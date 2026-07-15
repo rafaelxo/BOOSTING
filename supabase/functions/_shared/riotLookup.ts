@@ -9,6 +9,19 @@ export const RIOT_TIER_MAP: Record<string, RankTier> = {
 export const RIOT_DIVISION_MAP: Record<string, Division> = { I: 'I', II: 'II', III: 'III', IV: 'IV' }
 export const NO_DIVISION_TIERS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
+// League-V4 informa LP atual e totais de vitórias/derrotas, mas não expõe o
+// LP ganho/perdido por partida. Esta estimativa única é usada pela prévia e
+// pela cobrança, sempre no servidor e sem confiar em médias do navegador.
+export function estimateLpAverages(tier: RankTier, wins: number, losses: number): { gain: number; loss: number } {
+  if (NO_DIVISION_TIERS.includes(tier)) return { gain: 30, loss: 30 }
+  const total = wins + losses
+  if (total <= 0) return { gain: 22, loss: 22 }
+  const winRate = wins / total
+  if (winRate < 0.48) return { gain: 19, loss: 25 }
+  if (winRate > 0.55) return { gain: 26, loss: 18 }
+  return { gain: 22, loss: 22 }
+}
+
 export interface RiotAccount {
   puuid: string
   gameName: string
@@ -82,6 +95,51 @@ export const RIOT_QUEUE_TYPE: Record<'solo_duo' | 'flex', { leagueQueue: string;
 export type MatchIdsResult =
   | { ok: true; matchIds: string[] }
   | { ok: false; reason: 'rate_limited' | 'upstream_error'; status: number }
+
+export type RecentRankedRecordResult =
+  | { ok: true; wins: number; losses: number; matches: number }
+  | { ok: false; reason: 'rate_limited' | 'upstream_error'; status: number }
+
+// Match-V5 não traz delta de LP, mas permite usar o desempenho real das dez
+// partidas ranqueadas mais recentes como base da estimativa de ganho/perda.
+export async function fetchRecentRankedRecord(
+  puuid: string,
+  apiKey: string,
+  regionalRoute: string,
+  queue: 'solo_duo' | 'flex',
+): Promise<RecentRankedRecordResult> {
+  const { matchQueueId } = RIOT_QUEUE_TYPE[queue]
+  const idsResp = await fetchWithTimeout(
+    `https://${regionalRoute}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids`
+    + `?queue=${matchQueueId}&start=0&count=10`,
+    { headers: { 'X-Riot-Token': apiKey } },
+  )
+  if (idsResp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
+  if (!idsResp.ok) return { ok: false, reason: 'upstream_error', status: idsResp.status }
+
+  const matchIds = await idsResp.json() as string[]
+  if (!Array.isArray(matchIds) || matchIds.length === 0) return { ok: true, wins: 0, losses: 0, matches: 0 }
+
+  const details = await Promise.all(matchIds.map(async (matchId) => {
+    const resp = await fetchWithTimeout(
+      `https://${regionalRoute}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`,
+      { headers: { 'X-Riot-Token': apiKey } },
+    )
+    if (resp.status === 429) return { ok: false as const, reason: 'rate_limited' as const, status: 429 }
+    if (!resp.ok) return { ok: false as const, reason: 'upstream_error' as const, status: resp.status }
+    const body = await resp.json() as { info?: { participants?: Array<{ puuid?: string; win?: boolean }> } }
+    const participant = body.info?.participants?.find((candidate) => candidate.puuid === puuid)
+    if (!participant || typeof participant.win !== 'boolean') {
+      return { ok: false as const, reason: 'upstream_error' as const, status: 502 }
+    }
+    return { ok: true as const, win: participant.win }
+  }))
+
+  const failed = details.find((detail) => !detail.ok)
+  if (failed && !failed.ok) return failed
+  const wins = details.filter((detail) => detail.ok && detail.win).length
+  return { ok: true, wins, losses: details.length - wins, matches: details.length }
+}
 
 // Placement-matches-remaining has no direct League-V4 field — Match-V5 is the
 // only way to count ranked games played this split. `splitStartEpochSeconds`

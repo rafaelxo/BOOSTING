@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { ClipboardList } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { Order, OrderStatus } from '@/types'
@@ -45,7 +46,7 @@ export function BoosterOrdersPage() {
       const to = from + pageSize - 1
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(ORDER_SAFE_COLUMNS)
         .eq('assigned_booster_id', profile!.id)
         .in('status', activeTab.statuses)
         .order('created_at', { ascending: false })

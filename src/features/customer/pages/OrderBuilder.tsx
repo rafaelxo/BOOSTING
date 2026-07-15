@@ -10,6 +10,8 @@ import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck } from 'lucid
 import type { ServiceType, Rank } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/authStore'
+import { getCustomerOrderState } from '@/lib/customerOrderState'
 
 const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching']
 
@@ -84,6 +86,7 @@ function isStepComplete(
 }
 
 export function OrderBuilderPage() {
+  const { profile } = useAuthStore()
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
     selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType, serviceId,
@@ -94,6 +97,35 @@ export function OrderBuilderPage() {
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const currency = useCurrency()
+  const pendingOrderId = searchParams.get('order')
+  const explicitlyStartingNewOrder = searchParams.get('new') === '1'
+  const hasCatalogEntryIntent = Boolean(
+    searchParams.get('service') || searchParams.get('booster') || searchParams.get('coach_package'),
+  )
+
+  // A cobrança é persistida no banco antes de o QR ser exibido. Ao voltar
+  // para /orders/new (inclusive depois de reload/fechar o navegador), procure
+  // o pedido pendente mais recente e restaure diretamente a etapa de PIX.
+  // `?new=1` é a escolha explícita do usuário de configurar outro pedido; o
+  // anterior continua intacto e pagável em "Meus pedidos".
+  const { data: resumableOrder } = useQuery({
+    queryKey: ['resumable-customer-order', profile?.id],
+    queryFn: async () => {
+      const state = await getCustomerOrderState()
+      return state.order_id ? { id: state.order_id } : null
+    },
+    enabled: !!profile?.id && !pendingOrderId && !explicitlyStartingNewOrder && !hasCatalogEntryIntent,
+    staleTime: 0,
+  })
+
+  useEffect(() => {
+    if (!resumableOrder?.id || pendingOrderId || explicitlyStartingNewOrder || hasCatalogEntryIntent) return
+    setStep('payment')
+    setSearchParams({ order: resumableOrder.id }, { replace: true })
+  }, [
+    resumableOrder?.id, pendingOrderId, explicitlyStartingNewOrder, hasCatalogEntryIntent,
+    setStep, setSearchParams,
+  ])
 
   const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
@@ -189,7 +221,10 @@ export function OrderBuilderPage() {
         })
     }
 
-    if (service || boosterId || coachPackageId) setSearchParams({}, { replace: true })
+    // Mantém um marcador após consumir os parâmetros de entrada. Sem ele, a
+    // query de retomada poderia encontrar um pedido antigo pendente no render
+    // seguinte e tirar o usuário deste novo fluxo que ele acabou de escolher.
+    if (service || boosterId || coachPackageId) setSearchParams({ new: '1' }, { replace: true })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -22,7 +22,7 @@ export function StepReview() {
     gameSlug, serviceType, currentRank, targetRank, queueType, boostMode,
     winsPurchased, sessionsPurchased, selectedExtraIds, winPackage,
     isMd5, md5MatchesRemaining, riotId,
-    currentLp, avgLpGain, currentPdl, avgPdlGain,
+    currentLp, currentPdl,
     basePrice, extrasPrice, estimatedHours, pdlModifierPct, customerNotes,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
@@ -92,15 +92,9 @@ export function StepReview() {
             )}
             {serviceType === 'elo_boost' && currentRank && (
               currentIsMasterPlus ? (
-                <>
-                  <ReviewRow label="PDL Atual" value={`${currentPdl} PDL`} />
-                  <ReviewRow label="Média por Partida" value={`${avgPdlGain} PDL`} />
-                </>
+                <ReviewRow label="PDL Atual" value={`${currentPdl} PDL`} />
               ) : (
-                <ReviewRow
-                  label="PDL"
-                  value={`${currentLp} LP atual · ${avgLpGain} média/partida`}
-                />
+                <ReviewRow label="LP Atual" value={`${currentLp} LP`} />
               )
             )}
             {winsPurchased && (

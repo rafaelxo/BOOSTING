@@ -22,7 +22,7 @@ function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string):
 }
 
 function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_standard' | 'duo_standard' | 'master_plus'; currency: (n: number) => string }) {
-  const { data, isLoading } = useBoostAddons(flow)
+  const { data, isLoading, isError } = useBoostAddons(flow)
   const extras = data ?? EMPTY_ADDONS
 
   if (isLoading) {
@@ -33,11 +33,27 @@ function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_stan
     )
   }
 
+  if (isError) {
+    return (
+      <div>
+        <h3 className="text-sm font-bold text-ink-secondary uppercase tracking-wide mb-3">{title}</h3>
+        <div className="rounded-2xl border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
+          Não foi possível carregar estes extras. Tente novamente em instantes.
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <h3 className="text-sm font-bold text-ink-secondary uppercase tracking-wide mb-3">{title}</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {extras.map((extra) => (
+      {extras.length === 0 ? (
+        <p className="rounded-2xl border border-bg-elevated px-4 py-3 text-sm text-ink-muted">
+          Nenhum extra ativo nesta modalidade.
+        </p>
+      ) : (
+        <div className="grid sm:grid-cols-2 gap-3">
+          {extras.map((extra) => (
           <div key={extra.id} className="card p-4 flex items-start gap-3">
             <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
             <div className="flex-1">
@@ -48,8 +64,9 @@ function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_stan
               <p className="text-xs text-ink-secondary">{extra.description}</p>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

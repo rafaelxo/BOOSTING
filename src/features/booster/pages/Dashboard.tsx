@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { Button, Card, Skeleton, EmptyState, StatCard } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
+import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDate } from '@/lib/utils'
 import type { Order, BoosterProfile, PayoutRecord } from '@/types'
@@ -39,7 +40,7 @@ function useAssignedOrders(boosterUserId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(ORDER_SAFE_COLUMNS)
         .eq('assigned_booster_id', boosterUserId!)
         .in('status', ['assigned', 'in_progress', 'paused', 'awaiting_customer'])
         .order('created_at', { ascending: false })
@@ -115,7 +116,7 @@ export function BoosterDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(ORDER_SAFE_COLUMNS)
         .eq('assigned_booster_id', profile!.id)
         .eq('status', 'completed')
         .gte('completed_at', monthStart)
