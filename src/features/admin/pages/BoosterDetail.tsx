@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, Save } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatRank, isBoosterOnline, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
+import { formatDate, formatRank, formatLastSeen, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { BoosterProfile, RankTier, Division } from '@/types'
 
@@ -69,7 +69,7 @@ export function AdminBoosterDetailPage() {
         p_booster_user_id: booster!.user_id,
         p_boost_mode: 'solo',
       })
-      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top5: boolean } | null
+      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean } | null
     },
     enabled: !!booster?.user_id && booster?.status === 'approved',
   })
@@ -135,7 +135,7 @@ export function AdminBoosterDetailPage() {
   const isPending = booster.status === 'pending' || booster.status === 'under_review'
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="max-w-6xl space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button asChild variant="ghost" size="icon">
@@ -143,9 +143,9 @@ export function AdminBoosterDetailPage() {
         </Button>
         <h1 className="text-xl font-bold text-ink">{booster.display_name}</h1>
         <BoosterStatusBadge status={booster.status} />
-        {booster.is_top5 && (
+        {booster.is_top3 && (
           <span className="flex items-center gap-1 text-xs font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2.5 py-1 uppercase tracking-wide">
-            <Trophy className="h-3 w-3" /> TOP 5
+            <Trophy className="h-3 w-3" /> TOP 3
           </span>
         )}
       </div>
@@ -217,12 +217,13 @@ export function AdminBoosterDetailPage() {
         {/* Profile overview */}
         <Card padding="md">
           <div className="flex items-start gap-4 mb-4">
-            <Avatar name={booster.display_name} size="lg" online={isBoosterOnline(booster.last_active_at)} />
+            <Avatar name={booster.display_name} size="lg" />
             <div>
               <p className="font-bold text-ink">{booster.display_name}</p>
               <p className="text-sm text-ink-secondary">
                 {booster.peak_rank ? formatRank(booster.peak_rank.tier, booster.peak_rank.division) : 'Sem rank de pico'}
               </p>
+              <p className="text-xs text-ink-muted mt-0.5">{formatLastSeen(booster.last_active_at)}</p>
               {safeOpggUrl(booster.opgg_link) && (
                 <a
                   href={safeOpggUrl(booster.opgg_link)}
@@ -239,7 +240,7 @@ export function AdminBoosterDetailPage() {
             {[
               ['Entrou em',   formatDate(booster.created_at)],
               ['Verificado',  booster.verified_at ? formatDate(booster.verified_at) : 'Ainda não'],
-              ['Disponível',  booster.hours_per_day_min || booster.hours_per_day_max
+              ['Carga horária', booster.hours_per_day_min || booster.hours_per_day_max
                 ? `${booster.hours_per_day_min ?? '?'}–${booster.hours_per_day_max ?? '?'} h/dia`
                 : 'Não informado'],
             ].map(([l, v]) => (
@@ -370,7 +371,7 @@ export function AdminBoosterDetailPage() {
           <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
             Uso de Slots
             <span className="text-[10px] font-normal text-ink-muted">
-              ({slotInfo.is_top5 ? 'Top5: máx 3 / 2 duo' : 'Normal: máx 3 / 1 duo'})
+              ({slotInfo.is_top3 ? 'Top3: máx 3 / 2 duo' : 'Normal: máx 3 / 1 duo'})
             </span>
           </h3>
           <div className="grid grid-cols-3 gap-4">

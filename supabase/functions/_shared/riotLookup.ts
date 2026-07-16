@@ -163,3 +163,94 @@ export async function fetchRankedMatchIdsThisSplit(
   const matchIds = await resp.json() as string[]
   return { ok: true, matchIds: Array.isArray(matchIds) ? matchIds : [] }
 }
+
+// ── Sincronização automática de partidas de um pedido (sync-order-matches) ──
+
+// Mais recentes primeiro (ordem nativa da Match-V5) — startTime em epoch
+// segundos, sempre orders.match_sync_started_at, nunca partidas anteriores
+// ao início do boost.
+export async function fetchMatchIdsSince(
+  puuid: string,
+  apiKey: string,
+  regionalRoute: string,
+  matchQueueId: number,
+  startTimeEpochSeconds: number,
+  count = 20,
+): Promise<MatchIdsResult> {
+  const resp = await fetchWithTimeout(
+    `https://${regionalRoute}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids`
+    + `?queue=${matchQueueId}&startTime=${startTimeEpochSeconds}&count=${count}`,
+    { headers: { 'X-Riot-Token': apiKey } },
+  )
+  if (resp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
+  if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
+  const matchIds = await resp.json() as string[]
+  return { ok: true, matchIds: Array.isArray(matchIds) ? matchIds : [] }
+}
+
+export interface MatchDetail {
+  externalMatchId: string
+  result: 'win' | 'loss'
+  champion: string | null
+  kills: number
+  deaths: number
+  assists: number
+  queueId: number | null
+  durationSeconds: number | null
+  playedAt: string
+}
+
+export type MatchDetailResult =
+  | { ok: true; detail: MatchDetail }
+  | { ok: false; reason: 'rate_limited' | 'upstream_error' | 'participant_not_found'; status: number }
+
+// Uma partida por vez (Match-V5 não expõe um endpoint em lote) — o
+// participante é localizado pelo puuid, nunca por posição/index.
+export async function fetchMatchDetail(
+  matchId: string,
+  puuid: string,
+  apiKey: string,
+  regionalRoute: string,
+): Promise<MatchDetailResult> {
+  const resp = await fetchWithTimeout(
+    `https://${regionalRoute}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`,
+    { headers: { 'X-Riot-Token': apiKey } },
+  )
+  if (resp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
+  if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
+
+  const body = await resp.json() as {
+    info?: {
+      queueId?: number
+      gameDuration?: number
+      gameEndTimestamp?: number
+      participants?: Array<{
+        puuid?: string
+        win?: boolean
+        championName?: string
+        kills?: number
+        deaths?: number
+        assists?: number
+      }>
+    }
+  }
+  const participant = body.info?.participants?.find((candidate) => candidate.puuid === puuid)
+  if (!participant || typeof participant.win !== 'boolean') {
+    return { ok: false, reason: 'participant_not_found', status: 502 }
+  }
+
+  return {
+    ok: true,
+    detail: {
+      externalMatchId: matchId,
+      result: participant.win ? 'win' : 'loss',
+      champion: participant.championName ?? null,
+      kills: participant.kills ?? 0,
+      deaths: participant.deaths ?? 0,
+      assists: participant.assists ?? 0,
+      queueId: body.info?.queueId ?? null,
+      durationSeconds: body.info?.gameDuration ?? null,
+      playedAt: new Date((body.info?.gameEndTimestamp ?? Date.now())).toISOString(),
+    },
+  }
+}

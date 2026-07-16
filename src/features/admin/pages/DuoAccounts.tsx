@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Landmark, Plus, Eye, EyeOff } from 'lucide-react'
+import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2 } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { RANK_TIER_LABEL, formatDate } from '@/lib/utils'
 import type { DuoAccount, Division, RankTier } from '@/types'
+import type { Database } from '@/lib/database.types'
+
+const RIOT_ID_FORMAT = /^[^#]{1,16}#[A-Za-z0-9]{2,5}$/
+
+type RiotRankResponse = {
+  found?: boolean
+  ranked?: boolean
+  tier?: RankTier
+  division?: Division | null
+  message?: string
+}
 
 const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 const DUO_RANK_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
@@ -27,6 +39,7 @@ function duoAccountError(code?: string): string {
 
 interface AccountForm {
   label: string
+  riot_id: string
   tier: RankTier
   division: Division
   notes: string
@@ -36,12 +49,13 @@ interface AccountForm {
 }
 
 const EMPTY_FORM: AccountForm = {
-  label: '', tier: 'gold', division: 'IV', notes: '', is_active: true, login: '', password: '',
+  label: '', riot_id: '', tier: 'gold', division: 'IV', notes: '', is_active: true, login: '', password: '',
 }
 
 function accountToForm(a: AdminDuoAccount): AccountForm {
   return {
     label: a.label,
+    riot_id: a.riot_id ?? '',
     tier: a.current_rank?.tier ?? 'gold',
     division: a.current_rank?.division ?? 'IV',
     notes: a.notes ?? '',
@@ -56,6 +70,40 @@ export function AdminDuoAccountsPage() {
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; account?: AdminDuoAccount } | null>(null)
   const [form, setForm] = useState<AccountForm>(EMPTY_FORM)
   const [revealed, setRevealed] = useState<Record<string, { login: string; password: string } | 'loading' | 'error'>>({})
+  const [riotVerified, setRiotVerified] = useState(false)
+  const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
+  const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
+
+  const lookupRiot = useMutation({
+    mutationFn: async () => {
+      const trimmed = form.riot_id.trim()
+      if (!RIOT_ID_FORMAT.test(trimmed)) throw new Error('Riot ID inválido. Use o formato Nome#TAG (ex.: Fulano#BR1).')
+      return invokeEdgeFunction<RiotRankResponse>('riot-account-rank', {
+        body: { riot_id: trimmed, queue: 'solo_duo' },
+        requireAuth: true,
+      })
+    },
+    onSuccess: (result) => {
+      setRiotLookupError(null)
+      if (!result.found) {
+        setRiotLookupMessage(null)
+        setRiotLookupError('Conta Riot não encontrada.')
+        return
+      }
+      if (result.ranked && result.tier) {
+        setForm((f) => ({ ...f, tier: result.tier!, division: result.division ?? 'IV' }))
+        setRiotLookupMessage(result.message ?? 'Rank preenchido automaticamente a partir da Riot.')
+      } else {
+        setRiotLookupMessage('Conta sem rank nesta fila — preencha o rank manualmente abaixo.')
+      }
+      setRiotVerified(true)
+    },
+    onError: (err) => {
+      setRiotVerified(false)
+      setRiotLookupMessage(null)
+      setRiotLookupError(err instanceof Error ? err.message : 'Não foi possível consultar a Riot agora.')
+    },
+  })
 
   const { data: accounts, isLoading, isError, error: accountsError } = useQuery({
     queryKey: ['admin-duo-accounts'],
@@ -71,6 +119,11 @@ export function AdminDuoAccountsPage() {
   useEffect(() => {
     if (!modal) return
     setForm(modal.mode === 'edit' && modal.account ? accountToForm(modal.account) : EMPTY_FORM)
+    // Contas já existentes já passaram pela verificação em algum momento —
+    // só uma nova conta exige rodar o lookup antes de liberar as credenciais.
+    setRiotVerified(modal.mode === 'edit')
+    setRiotLookupError(null)
+    setRiotLookupMessage(null)
   }, [modal])
 
   const save = useMutation({
@@ -80,8 +133,13 @@ export function AdminDuoAccountsPage() {
         throw new Error('Login e senha são obrigatórios ao criar uma conta')
       }
 
+      // save_duo_account aceita NULL em p_account_id/p_notes/p_login/p_password
+      // (criação vs. edição, campos opcionais) — o tipo gerado pelo Supabase
+      // não modela isso para parâmetros escalares de RPC, daí o cast pontual
+      // para a assinatura real da função em vez de usar `any`.
       const { data, error } = await supabase.rpc('save_duo_account', {
         p_account_id: modal?.mode === 'edit' ? modal.account?.id ?? null : null,
+        p_riot_id: form.riot_id.trim() || null,
         p_label: form.label.trim(),
         p_tier: form.tier,
         p_division: form.division,
@@ -89,7 +147,7 @@ export function AdminDuoAccountsPage() {
         p_is_active: form.is_active,
         p_login: form.login.trim() || null,
         p_password: form.password || null,
-      })
+      } as Database['public']['Functions']['save_duo_account']['Args'])
       if (error) throw error
       const result = data as { success?: boolean; error?: string } | null
       if (!result?.success) throw new Error(duoAccountError(result?.error))
@@ -103,6 +161,16 @@ export function AdminDuoAccountsPage() {
   const toggleActive = useMutation({
     mutationFn: async (a: AdminDuoAccount) => {
       const { data, error } = await supabase.rpc('set_duo_account_active', { p_account_id: a.id, p_is_active: !a.is_active })
+      if (error) throw error
+      const result = data as { success?: boolean; error?: string } | null
+      if (!result?.success) throw new Error(duoAccountError(result?.error))
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] }),
+  })
+
+  const releaseReservation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const { data, error } = await supabase.rpc('admin_release_duo_account', { p_account_id: accountId })
       if (error) throw error
       const result = data as { success?: boolean; error?: string } | null
       if (!result?.success) throw new Error(duoAccountError(result?.error))
@@ -148,6 +216,7 @@ export function AdminDuoAccountsPage() {
                 <TableHead>Rank</TableHead>
                 <TableHead>Credenciais</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Reserva</TableHead>
                 <TableHead>Criada em</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -188,6 +257,18 @@ export function AdminDuoAccountsPage() {
                         {a.is_active ? 'Ativa' : 'Inativa'}
                       </button>
                     </TableCell>
+                    <TableCell>
+                      {a.reserved_by ? (
+                        <div className="flex items-center gap-2">
+                          <span className="badge text-xs text-warning bg-warning/10">Reservada</span>
+                          <Button size="xs" variant="ghost" loading={releaseReservation.isPending} onClick={() => releaseReservation.mutate(a.id)}>
+                            Liberar
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="badge text-xs text-ink-muted bg-bg-overlay">Livre</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-ink-muted">{formatDate(a.created_at)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -224,6 +305,42 @@ export function AdminDuoAccountsPage() {
             />
           </div>
 
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Riot ID</label>
+            <div className="flex gap-2">
+              <input
+                value={form.riot_id}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, riot_id: e.target.value }))
+                  setRiotVerified(false)
+                  setRiotLookupMessage(null)
+                  setRiotLookupError(null)
+                }}
+                className="input-base w-full text-sm"
+                placeholder="Ex: NomeDaConta#BR1"
+                autoComplete="off"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                loading={lookupRiot.isPending}
+                disabled={!form.riot_id.trim()}
+                onClick={() => lookupRiot.mutate()}
+                leftIcon={<Search className="h-3.5 w-3.5" />}
+              >
+                Verificar
+              </Button>
+            </div>
+            <p className="text-[10px] text-ink-muted">
+              Consulta rank e PDL atuais na Riot antes de liberar login/senha abaixo.
+            </p>
+            {riotLookupMessage && (
+              <p className="text-xs text-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {riotLookupMessage}</p>
+            )}
+            {riotLookupError && <ErrorAlert message={riotLookupError} />}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank atual</label>
@@ -247,6 +364,11 @@ export function AdminDuoAccountsPage() {
             </div>
           </div>
 
+          {!riotVerified ? (
+            <p className="text-xs text-ink-muted rounded-xl border border-bg-elevated bg-bg-elevated/40 px-3 py-2.5">
+              Verifique o Riot ID acima para liberar os campos de login e senha.
+            </p>
+          ) : (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
@@ -272,6 +394,7 @@ export function AdminDuoAccountsPage() {
               />
             </div>
           </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Notas internas</label>

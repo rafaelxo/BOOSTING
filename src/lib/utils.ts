@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { Order, OrderStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
+import type { Order, OrderStatus, PaymentStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
 
 export { RANK_TIER_ORDER } from '../../shared/pricing'
 
@@ -24,15 +24,23 @@ export function timeAgo(date: string | Date) {
   return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ptBR })
 }
 
+// Prazo de entrega já vem dobrado do backend (DELIVERY_ESTIMATE_MULTIPLIER
+// em shared/pricing.ts) — só formata pra dias+horas quando passa de 24h.
+export function formatEstimatedDelivery(hours: number): string {
+  if (hours < 24) return `~${hours} hora${hours === 1 ? '' : 's'}`
+  const days = Math.floor(hours / 24)
+  const remainingHours = Math.round(hours % 24)
+  const daysLabel = `${days} dia${days === 1 ? '' : 's'}`
+  return remainingHours > 0 ? `~${daysLabel} e ${remainingHours}h` : `~${daysLabel}`
+}
+
 // ─── Booster presence ─────────────────────────────────────────────────────────
 
-// Janela de presença — deve permanecer igual à derivação de is_available na
-// view public_booster_profiles (migration 043).
-export const BOOSTER_PRESENCE_WINDOW_MS = 5 * 60_000
-
-export function isBoosterOnline(lastActiveAt: string | null | undefined): boolean {
-  if (!lastActiveAt) return false
-  return Date.now() - new Date(lastActiveAt).getTime() < BOOSTER_PRESENCE_WINDOW_MS
+// Não há mais conceito de "disponível/indisponível" — apenas quando o booster
+// foi visto pela última vez, derivado de booster_profiles.last_active_at.
+export function formatLastSeen(lastActiveAt: string | null | undefined): string {
+  if (!lastActiveAt) return 'Sem atividade registrada'
+  return `Visto ${timeAgo(lastActiveAt)}`
 }
 
 // ─── Order status display ─────────────────────────────────────────────────────
@@ -67,6 +75,24 @@ export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
   disputed: 'text-danger bg-danger/10',
   refunded: 'text-ink-secondary bg-bg-overlay',
   canceled: 'text-ink-muted bg-bg-overlay',
+}
+
+export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
+  pending: 'Pendente',
+  paid: 'Pago',
+  failed: 'Falhou',
+  refunded: 'Reembolsado',
+  partially_refunded: 'Parcialmente reembolsado',
+  disputed: 'Em disputa',
+}
+
+export const PAYMENT_STATUS_COLOR: Record<PaymentStatus, string> = {
+  pending: 'text-warning bg-warning/10 border-warning/20',
+  paid: 'text-success bg-success/10 border-success/20',
+  failed: 'text-danger bg-danger/10 border-danger/20',
+  refunded: 'text-ink-secondary bg-bg-elevated border-bg-overlay',
+  partially_refunded: 'text-ink-secondary bg-bg-elevated border-bg-overlay',
+  disputed: 'text-danger bg-danger/10 border-danger/20',
 }
 
 // ─── Rank display ─────────────────────────────────────────────────────────────

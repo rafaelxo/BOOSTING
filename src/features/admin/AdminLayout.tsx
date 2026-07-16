@@ -1,8 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
-  Settings, Shield,
-  RefreshCw, Eye, AlertTriangle, Landmark, Sparkles,
+  Shield,
+  RefreshCw, Eye, AlertTriangle, Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
@@ -35,9 +35,7 @@ export function AdminLayout() {
     {
       label: t('admin.nav.system'),
       items: [
-        { href: '/admin/services',     icon: Settings,  label: t('admin.nav.services')  },
-        { href: '/admin/boost-config', icon: Sparkles,  label: 'Config. de Boost'        },
-        { href: '/admin/audit',        icon: Eye,       label: t('admin.nav.audit') },
+        { href: '/admin/audit', icon: Eye, label: t('admin.nav.audit') },
       ],
     },
   ]

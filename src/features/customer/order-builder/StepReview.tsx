@@ -1,5 +1,5 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatRank, getServiceLabel } from '@/lib/utils'
+import { formatRank, getServiceLabel, formatEstimatedDelivery } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getWinBoostPrice } from '@/lib/pricing'
@@ -110,7 +110,7 @@ export function StepReview() {
               <ReviewRow label="Sessão" value={`${sessionsPurchased}h`} />
             )}
             {estimatedHours && (
-              <ReviewRow label="Entrega Estimada" value={`~${estimatedHours} horas`} />
+              <ReviewRow label="Entrega Estimada" value={formatEstimatedDelivery(estimatedHours)} />
             )}
           </div>
         </div>

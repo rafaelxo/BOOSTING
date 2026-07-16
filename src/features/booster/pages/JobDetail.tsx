@@ -1,16 +1,191 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ArrowLeft, Play, Pause, CheckCircle2, Trophy, XCircle, AlertTriangle, ShieldCheck, KeyRound, Copy } from 'lucide-react'
+import { ArrowLeft, Play, Pause, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, RefreshCw, Landmark, RefreshCcw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderProgress } from '@/components/order/OrderProgress'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
+import { formatRank, RANK_TIER_LABEL, BOOSTER_EARNINGS_SHARE, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import type { Division, Order, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
+
+type BoosterVisibleDuoAccount = {
+  id: string
+  label: string
+  current_rank: { tier: RankTier; division: Division } | null
+  is_active: boolean
+  reserved_by: string | null
+  reserved_order_id: string | null
+}
+
+function DuoAccountSection({ order }: { order: Order }) {
+  const queryClient = useQueryClient()
+  const { profile } = useAuthStore()
+  const [selectedAccountId, setSelectedAccountId] = useState('')
+  const [switching, setSwitching] = useState(false)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [tokenCopied, setTokenCopied] = useState(false)
+
+  const { data: accounts, isLoading } = useQuery({
+    queryKey: ['booster-duo-accounts', order.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_duo_accounts')
+      if (error) throw error
+      const result = data as { success?: boolean; accounts?: BoosterVisibleDuoAccount[]; error?: string } | null
+      if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
+      return result.accounts ?? []
+    },
+  })
+
+  const reserved = accounts?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
+  const available = accounts?.filter(a => a.reserved_by === null) ?? []
+
+  const reserve = useMutation({
+    mutationFn: async (accountId: string) => {
+      const { data, error } = await supabase.rpc('reserve_duo_account', {
+        p_order_id: order.id,
+        p_account_id: accountId,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao reservar conta')
+    },
+    onSuccess: () => {
+      setSwitching(false)
+      setAccessToken(null)
+      queryClient.invalidateQueries({ queryKey: ['booster-duo-accounts', order.id] })
+    },
+  })
+
+  const getToken = useMutation({
+    mutationFn: async () => {
+      if (!reserved) throw new Error('Nenhuma conta reservada')
+      const { data, error } = await supabase.rpc('get_duo_account_access_token', { p_account_id: reserved.id })
+      if (error) throw error
+      const result = data as { success: boolean; access_token?: string; error?: string } | null
+      if (!result?.success || !result.access_token) throw new Error(result?.error ?? 'Token indisponível')
+      return result.access_token
+    },
+    onSuccess: (token) => setAccessToken(token),
+  })
+
+  async function copyToken() {
+    if (!accessToken) return
+    await navigator.clipboard.writeText(accessToken)
+    setTokenCopied(true)
+    setTimeout(() => setTokenCopied(false), 1500)
+  }
+
+  const reserveErrorMessage = (msg: string) =>
+    msg === 'account_unavailable' ? 'Essa conta acabou de ser reservada por outro booster. Escolha outra.' : msg
+
+  return (
+    <Card padding="md">
+      <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+        <Landmark className="h-4 w-4 text-brand" />
+        Conta Duo
+      </h3>
+
+      {isLoading ? (
+        <p className="text-xs text-ink-muted">Carregando contas...</p>
+      ) : reserved && !switching ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between bg-bg-elevated rounded-xl px-3 py-2.5">
+            <div>
+              <p className="text-sm font-semibold text-ink">{reserved.label}</p>
+              {reserved.current_rank && (
+                <p className="text-xs text-ink-muted">
+                  {RANK_TIER_LABEL[reserved.current_rank.tier]} {reserved.current_rank.division}
+                </p>
+              )}
+            </div>
+            <Button size="sm" variant="secondary" leftIcon={<RefreshCcw className="h-3.5 w-3.5" />} onClick={() => setSwitching(true)}>
+              Trocar
+            </Button>
+          </div>
+
+          {accessToken ? (
+            <div className="space-y-2">
+              <textarea
+                readOnly
+                value={accessToken}
+                className="input-base w-full min-h-[80px] text-[11px] font-mono resize-none"
+                spellCheck={false}
+              />
+              <Button
+                size="sm"
+                className="w-full"
+                variant={tokenCopied ? 'success' : 'secondary'}
+                leftIcon={<Copy className="h-3.5 w-3.5" />}
+                onClick={() => void copyToken()}
+              >
+                {tokenCopied ? 'Copiado' : 'Copiar token'}
+              </Button>
+              <p className="text-[10px] text-ink-muted">Use este token apenas no aplicativo autorizado — login e senha não são exibidos.</p>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full"
+              leftIcon={<KeyRound className="h-3.5 w-3.5" />}
+              loading={getToken.isPending}
+              onClick={() => getToken.mutate()}
+            >
+              Obter token de acesso
+            </Button>
+          )}
+          {getToken.isError && (
+            <ErrorAlert message={getToken.error instanceof Error ? getToken.error.message : 'Erro ao obter token'} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {available.length === 0 ? (
+            <p className="text-xs text-ink-muted">Nenhuma conta Duo disponível no momento.</p>
+          ) : (
+            <>
+              <select
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                className="input-base w-full text-sm"
+              >
+                <option value="">Selecione uma conta...</option>
+                {available.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}{a.current_rank ? ` — ${RANK_TIER_LABEL[a.current_rank.tier]} ${a.current_rank.division}` : ''}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                className="w-full"
+                disabled={!selectedAccountId}
+                loading={reserve.isPending}
+                onClick={() => reserve.mutate(selectedAccountId)}
+              >
+                Reservar esta conta
+              </Button>
+              {switching && (
+                <Button size="sm" variant="ghost" className="w-full" onClick={() => setSwitching(false)}>
+                  Cancelar
+                </Button>
+              )}
+            </>
+          )}
+          {reserve.isError && (
+            <ErrorAlert message={reserve.error instanceof Error ? reserveErrorMessage(reserve.error.message) : 'Erro ao reservar conta'} />
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
 import { useCurrency } from '@/hooks/useCurrency'
 
 export function JobDetailPage() {
@@ -79,18 +254,18 @@ export function JobDetailPage() {
     },
   })
 
-  const logMatchResult = useMutation({
-    mutationFn: async ({ wins, losses }: { wins: number; losses: number }) => {
-      const { data, error } = await supabase.rpc('log_match_result', {
-        p_order_id: id!,
-        p_wins: wins,
-        p_losses: losses,
+  const syncMatches = useMutation({
+    mutationFn: async () => {
+      return invokeEdgeFunction<{ synced: boolean; reason?: string; new_matches?: number }>('sync-order-matches', {
+        body: { order_id: id! },
+        timeoutMs: 25_000,
+        requireAuth: true,
       })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao registrar resultado')
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order', id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      queryClient.invalidateQueries({ queryKey: ['order-matches', id] })
+    },
   })
 
   const verifyRank = useMutation({
@@ -166,7 +341,10 @@ export function JobDetailPage() {
 
   if (!order) return null
 
-  const availableActions = STATUS_ACTIONS.filter(a => a.from.includes(order.status))
+  const objectiveReached = order.wins_purchased == null || order.wins_played >= order.wins_purchased
+  const availableActions = STATUS_ACTIONS.filter(a =>
+    a.from.includes(order.status) && (a.to !== 'awaiting_customer' || objectiveReached)
+  )
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -180,6 +358,9 @@ export function JobDetailPage() {
             <OrderStatusBadge status={order.status} />
           </div>
         </div>
+        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
@@ -262,6 +443,33 @@ export function JobDetailPage() {
             <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
           </Card>
 
+          {order.status === 'awaiting_customer' && (
+            <Card padding="md" className="ring-1 ring-accent/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
+                <p className="text-sm text-ink-secondary">
+                  Objetivo alcançado! Aguardando a confirmação final do cliente.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {order.status === 'completed' && (
+            <Card padding="md" className="ring-1 ring-success/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                <p className="text-sm text-ink-secondary">
+                  Serviço concluído! O cliente confirmou a entrega e seus ganhos foram liberados.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
+            && ['assigned', 'in_progress', 'paused'].includes(order.status) && (
+            <DuoAccountSection order={order} />
+          )}
+
           {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
@@ -315,43 +523,44 @@ export function JobDetailPage() {
             </Card>
           )}
 
-          {/* Match result counters */}
+          <OrderProgress order={order} />
+
+          {/* Sincronização automática de partidas */}
           {(order.status === 'in_progress' || order.status === 'paused') && (
             <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3">Resultados da partida</h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="text-center">
-                  <p className="text-xs text-ink-muted mb-1">Vitórias</p>
-                  <p className="text-2xl font-bold text-success">{order.wins_played}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-ink-muted mb-1">Derrotas</p>
-                  <p className="text-2xl font-bold text-danger">{order.losses_played}</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="success"
-                  className="flex-1"
-                  leftIcon={<Trophy className="h-3.5 w-3.5" />}
-                  loading={logMatchResult.isPending}
-                  onClick={() => logMatchResult.mutate({ wins: order.wins_played + 1, losses: order.losses_played })}
-                >
-                  +1 Win
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  className="flex-1"
-                  leftIcon={<XCircle className="h-3.5 w-3.5" />}
-                  loading={logMatchResult.isPending}
-                  onClick={() => logMatchResult.mutate({ wins: order.wins_played, losses: order.losses_played + 1 })}
-                >
-                  +1 Loss
-                </Button>
-              </div>
+              <h3 className="text-sm font-semibold text-ink mb-3">Sincronizar partidas</h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Os resultados são identificados automaticamente pela Riot Games — não é possível editar manualmente.
+              </p>
+              <Button
+                className="w-full"
+                variant="secondary"
+                leftIcon={<RefreshCw className="h-4 w-4" />}
+                loading={syncMatches.isPending}
+                onClick={() => syncMatches.mutate()}
+              >
+                Sincronizar partidas
+              </Button>
+              {syncMatches.isError && (
+                <ErrorAlert
+                  className="mt-2"
+                  message={syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas'}
+                />
+              )}
+              {syncMatches.data && (
+                <p className="text-xs text-ink-muted mt-2 text-center">
+                  {syncMatches.data.synced
+                    ? syncMatches.data.new_matches
+                      ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).`
+                      : 'Nenhuma partida nova encontrada.'
+                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.'}
+                </p>
+              )}
             </Card>
+          )}
+
+          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <OrderMatchHistory orderId={order.id} />
           )}
 
           {/* Verificação de rank — só pra pedidos com rank alvo + Riot ID
@@ -414,6 +623,16 @@ export function JobDetailPage() {
                   </Button>
                 ))}
               </div>
+              {updateStatus.isError && (
+                <ErrorAlert
+                  className="mt-2"
+                  message={
+                    updateStatus.error instanceof Error && updateStatus.error.message === 'objective_not_reached'
+                      ? 'Ainda faltam vitórias contratadas para marcar como concluído.'
+                      : updateStatus.error instanceof Error ? updateStatus.error.message : 'Erro ao atualizar status'
+                  }
+                />
+              )}
             </Card>
           )}
 

@@ -12,4 +12,5 @@ export const ORDER_SAFE_COLUMNS = [
   'avg_pdl_loss', 'pricing_version', 'mp_payment_id', 'riot_id',
   'preferred_booster_id', 'exclusive_until', 'md5_matches_remaining',
   'chat_locked', 'chat_locked_at', 'chat_locked_by',
+  'match_sync_started_at', 'last_match_synced_at',
 ].join(',')

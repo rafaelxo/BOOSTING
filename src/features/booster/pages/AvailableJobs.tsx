@@ -16,21 +16,21 @@ interface SlotInfo {
   total_count: number
   max_total: number
   max_duo: number
-  is_top5: boolean
+  is_top3: boolean
   exclusive_slot_used: boolean
   max_exclusive: number
 }
 
 function SlotIndicator({ slots }: { slots: SlotInfo }) {
-  const { solo_count, duo_count, total_count, max_total, max_duo, is_top5, exclusive_slot_used } = slots
+  const { solo_count, duo_count, total_count, max_total, max_duo, is_top3, exclusive_slot_used } = slots
   const remaining = max_total - total_count
   const color = remaining === 0 ? 'text-danger' : remaining === 1 ? 'text-warning' : 'text-success'
 
   return (
     <div className="flex items-center gap-3 bg-bg-surface border border-bg-elevated rounded-xl px-4 py-2.5">
-      {is_top5 && (
+      {is_top3 && (
         <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2 py-0.5 uppercase tracking-wide">
-          TOP 5
+          TOP 3
         </span>
       )}
       <div className="flex items-center gap-1.5 text-xs">
@@ -86,7 +86,7 @@ export function AvailableJobsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('booster_profiles')
-        .select('status, is_top5, user_id')
+        .select('status, is_top3, user_id')
         .eq('user_id', profile!.id)
         .maybeSingle()
       return data
@@ -111,7 +111,7 @@ export function AvailableJobsPage() {
         total_count: result.total_count ?? 0,
         max_total: result.max_total ?? 3,
         max_duo: result.max_duo ?? 1,
-        is_top5: result.is_top5 ?? false,
+        is_top3: result.is_top3 ?? false,
         exclusive_slot_used: result.exclusive_slot_used ?? false,
         max_exclusive: result.max_exclusive ?? 1,
       } as SlotInfo

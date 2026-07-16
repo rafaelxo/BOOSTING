@@ -5,9 +5,20 @@ import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader } from '@/compon
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
-import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Order, OrderStatus, OrderStatusHistory, OrderRankVerification } from '@/types'
+
+type BoosterRef = { id: string; user_id: string; display_name: string } | undefined
+
+function BoosterLink({ userId, booster }: { userId: string; booster: BoosterRef }) {
+  if (!booster) return <span className="font-mono text-xs">{userId.slice(0, 8)}…</span>
+  return (
+    <Link to={`/admin/boosters/${booster.id}`} className="text-brand hover:underline">
+      {booster.display_name}
+    </Link>
+  )
+}
 
 const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'awaiting_assignment', label: 'Esperando Booster' },
@@ -49,6 +60,29 @@ export function AdminOrderDetailPage() {
       return data as OrderStatusHistory[]
     },
     enabled: !!id,
+  })
+
+  // Nomes legíveis pro cliente e pros boosters do pedido — trocamos os UUIDs
+  // crus (que só um dev consegue ler) por username/display_name.
+  const { data: parties } = useQuery({
+    queryKey: ['admin-order-parties', order?.customer_id, order?.assigned_booster_id, order?.preferred_booster_id],
+    queryFn: async () => {
+      const boosterUserIds = [order!.assigned_booster_id, order!.preferred_booster_id]
+        .filter((v): v is string => !!v)
+
+      const [{ data: customer }, { data: boosters }] = await Promise.all([
+        supabase.from('profiles').select('username').eq('id', order!.customer_id).maybeSingle(),
+        boosterUserIds.length
+          ? supabase.from('booster_profiles').select('id, user_id, display_name').in('user_id', boosterUserIds)
+          : Promise.resolve({ data: [] as { id: string; user_id: string; display_name: string }[] }),
+      ])
+
+      return {
+        customerUsername: customer?.username ?? null,
+        boosterByUserId: new Map((boosters ?? []).map((b) => [b.user_id, b])),
+      }
+    },
+    enabled: !!order,
   })
 
   const { data: rankVerifications } = useQuery({
@@ -119,34 +153,43 @@ export function AdminOrderDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">Detalhes do Pedido</h3>
             <div className="grid grid-cols-2 gap-3">
-              {[
-                ['Cliente', order.customer_id.slice(0, 12) + '...'],
-                ['Serviço', getServiceLabel(order.service_id as string)],
-                ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
-                ...(!order.pdl_bracket ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']] : []),
-                ['Rank Atual', order.current_rank ? formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division) : '—'],
-                ['Rank Alvo', order.target_rank ? formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division) : '—'],
-                ...(order.pdl_bracket ? [
-                  ['PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
-                  ['Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
-                  ['Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
-                ] : []),
-                ['Base', currency(order.base_price)],
-                ['Extras', currency(order.extras_price)],
-                ['Total', currency(order.total_price)],
-                ['Booster', order.assigned_booster_id ? order.assigned_booster_id.slice(0, 12) + '...' : 'Não atribuído'],
-                ...(order.preferred_booster_id ? [
-                  ['Pedido direto', order.preferred_booster_id.slice(0, 12) + '...' + (
-                    order.exclusive_until && new Date(order.exclusive_until) > new Date()
-                      ? ` (exclusivo até ${new Date(order.exclusive_until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`
-                      : ' (exclusividade expirada)'
-                  )],
-                ] : []),
-                ['Pag.', order.payment_status ?? '—'],
-              ].map(([l, v]) => (
+              {(
+                [
+                  ['Cliente', parties?.customerUsername ?? '…'],
+                  ['Serviço', getServiceLabel(order.service_id as string)],
+                  ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
+                  ...(!order.pdl_bracket ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']] : []),
+                  ['Rank Atual', order.current_rank ? formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division) : '—'],
+                  ['Rank Alvo', order.target_rank ? formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division) : '—'],
+                  ...(order.pdl_bracket ? [
+                    ['PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
+                    ['Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
+                    ['Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
+                  ] : []),
+                  ['Base', currency(order.base_price)],
+                  ['Extras', currency(order.extras_price)],
+                  ['Total', currency(order.total_price)],
+                  [
+                    'Booster',
+                    order.assigned_booster_id
+                      ? <BoosterLink userId={order.assigned_booster_id} booster={parties?.boosterByUserId.get(order.assigned_booster_id)} />
+                      : 'Não atribuído',
+                  ],
+                  ...(order.preferred_booster_id ? [[
+                    'Pedido direto',
+                    <span key="preferred-booster" className="inline-flex items-center gap-1">
+                      <BoosterLink userId={order.preferred_booster_id} booster={parties?.boosterByUserId.get(order.preferred_booster_id)} />
+                      {order.exclusive_until && new Date(order.exclusive_until) > new Date()
+                        ? ` (exclusivo até ${new Date(order.exclusive_until).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`
+                        : ' (exclusividade expirada)'}
+                    </span>,
+                  ]] : []),
+                  ['Pag.', order.payment_status ? PAYMENT_STATUS_LABEL[order.payment_status] : '—'],
+                ] as [string, React.ReactNode][]
+              ).map(([l, v]) => (
                 <div key={l as string}>
                   <p className="text-xs text-ink-muted">{l as string}</p>
-                  <p className="text-sm font-semibold text-ink">{v as string}</p>
+                  <p className="text-sm font-semibold text-ink">{v}</p>
                 </div>
               ))}
             </div>
@@ -260,7 +303,7 @@ export function AdminOrderDetailPage() {
             <h3 className="text-sm font-semibold text-ink mb-2">Booster</h3>
             <p className="text-xs text-ink-secondary">
               {order.assigned_booster_id
-                ? order.assigned_booster_id.slice(0, 16) + '…'
+                ? <BoosterLink userId={order.assigned_booster_id} booster={parties?.boosterByUserId.get(order.assigned_booster_id)} />
                 : 'Nenhum booster atribuído.'}
             </p>
           </Card>

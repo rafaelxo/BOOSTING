@@ -23,6 +23,18 @@ export function AdminAuditPage() {
     },
   })
 
+  // Nome de quem realizou a ação em vez do UUID cru.
+  const actorIds = [...new Set((logs ?? []).map((l) => l.actor_id))]
+  const { data: actorNames } = useQuery({
+    queryKey: ['audit-log-actors', actorIds],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('id, username').in('id', actorIds)
+      if (error) throw error
+      return new Map(data.map((p) => [p.id, p.username]))
+    },
+    enabled: actorIds.length > 0,
+  })
+
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.audit.title')}</h1>
@@ -44,7 +56,9 @@ export function AdminAuditPage() {
                 <TableRow key={log.id}>
                   <TableCell>
                     <div>
-                      <p className="text-xs font-mono text-ink">{log.actor_id.slice(0, 8)}...</p>
+                      <p className="text-xs font-semibold text-ink">
+                        {actorNames?.get(log.actor_id) ?? `${log.actor_id.slice(0, 8)}…`}
+                      </p>
                       <p className="text-[10px] text-ink-muted capitalize">{log.actor_role}</p>
                     </div>
                   </TableCell>

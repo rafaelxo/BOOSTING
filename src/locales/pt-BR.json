@@ -74,7 +74,7 @@
       "step3Desc": "Acompanhe o progresso ao vivo. Converse direto com seu booster. Pause quando quiser. Receba notificação quando seu rank alvo for atingido."
     },
     "trust": {
-      "sectionLabel": "Por que mais de 48.000 jogadores confiam em nós",
+      "sectionLabel": "Por que mais de 1.800 jogadores confiam em nós",
       "title": "Sua conta está em boas mãos.",
       "desc": "As credenciais enviadas pela plataforma são criptografadas antes de serem armazenadas e ficam disponíveis apenas para o booster atribuído e para a equipe autorizada quando necessário. Cada sessão roda através de VPN. Você tem um histórico completo no histórico de pedidos ao vivo.",
       "point1": "Acesso restrito às credenciais",
@@ -122,7 +122,7 @@
     },
     "cta": {
       "title": "Pronto para alcançar seu rank objetivo?",
-      "desc": "Junte-se a mais de 48.000 jogadores. Configure seu boost acima e comece em minutos.",
+      "desc": "Junte-se a mais de 1.800 jogadores. Configure seu boost acima e comece em minutos.",
       "button": "Começar Seu Boost"
     }
   },
@@ -239,6 +239,7 @@
       "orders": "Pedidos",
       "services": "Serviços",
       "accounts": "Contas",
+      "payments": "Pagamentos",
       "signOut": "Sair",
       "role": "Booster",
       "pendingBanner": "Candidatura pendente",
@@ -343,7 +344,6 @@
       "payments": "Pagamentos",
       "refunds": "Reembolsos",
       "reviews": "Avaliações",
-      "services": "Serviços",
       "audit": "Auditoria",
       "signOut": "Sair",
       "role": "Admin",
@@ -528,7 +528,7 @@
     "title": "Perguntas Frequentes",
     "sectionLabel": "FAQ",
     "q1": "O Solo Boost / Duo Boost é seguro?",
-    "a1": "Usamos VPN em todas as sessões, modo aparecer offline e nunca armazenamos suas credenciais além do pedido ativo. Nossos boosters têm histórico de IP limpo e seguem protocolos rigorosos de segurança de conta. Completamos mais de 48.000 pedidos sem nenhum banimento permanente pelos nossos métodos.",
+    "a1": "Usamos VPN em todas as sessões, modo aparecer offline e nunca armazenamos suas credenciais além do pedido ativo. Nossos boosters têm histórico de IP limpo e seguem protocolos rigorosos de segurança de conta. Completamos mais de 1.800 pedidos sem nenhum banimento permanente pelos nossos métodos.",
     "q2": "Quanto tempo leva meu pedido?",
     "a2": "A maioria dos pedidos começa dentro de 30 minutos após a confirmação do pagamento. O tempo estimado de entrega é mostrado antes do checkout e depende da diferença de rank e tipo de fila. O adicional de Prioridade garante atribuição imediata a um booster top.",
     "q3": "Posso assistir meu booster jogar?",

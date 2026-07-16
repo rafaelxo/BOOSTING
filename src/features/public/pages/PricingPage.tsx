@@ -116,9 +116,9 @@ export function PricingPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(perDiv)}</td>
+                      <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(perDiv)}</td>
                       <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(duoDiv)}</td>
-                      <td className="py-3.5 px-5 text-right text-ink-secondary font-medium">{currency(perDiv * 4)}</td>
+                      <td className="py-3.5 px-5 text-right text-ink font-medium">{currency(perDiv * 4)}</td>
                     </tr>
                   )
                 })}
@@ -134,7 +134,7 @@ export function PricingPage() {
                     </td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
-                    <td className="py-3.5 px-5 text-right text-brand font-semibold">
+                    <td className="py-3.5 px-5 text-right text-ink font-semibold">
                       {currency(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier]))}
                     </td>
                   </tr>
@@ -154,9 +154,9 @@ export function PricingPage() {
             <div className="flex-1">
               <h2 className="text-lg font-bold text-ink mb-1">Coaching</h2>
               <p className="text-sm text-ink-secondary mb-3">
-                Sessões individuais com um booster Grão-mestre ou Desafiante. O valor é combinado diretamente com o booster — não há cobrança antecipada.
+                Sessões individuais com um booster Grão-mestre ou Desafiante. Selecione o pacote que mais combina com seus objetivos.
               </p>
-              <div className="flex flex-wrap gap-3 text-sm mb-3">
+              <div className="flex flex-col gap-2 text-sm mb-3">
                 {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
                   <span key={item} className="flex items-center gap-1.5 text-xs text-ink-secondary">
                     <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
@@ -209,7 +209,7 @@ export function PricingPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-5 text-right text-brand font-semibold">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</td>
+                      <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</td>
                     </tr>
                   ))}
                 </tbody>

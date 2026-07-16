@@ -1,6 +1,7 @@
 // src/features/admin/pages/Drops.tsx
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
@@ -27,6 +28,21 @@ export function AdminDropsPage() {
       return data as OrderDropRequest[]
     },
     refetchInterval: 15000,
+  })
+
+  // Nome do booster em vez do UUID cru — mesma ideia do admin/pages/OrderDetail.tsx.
+  const boosterIds = [...new Set((requests ?? []).map((r) => r.booster_id))]
+  const { data: boosterNames } = useQuery({
+    queryKey: ['admin-drop-boosters', boosterIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_profiles')
+        .select('id, user_id, display_name')
+        .in('user_id', boosterIds)
+      if (error) throw error
+      return new Map(data.map((b) => [b.user_id, b]))
+    },
+    enabled: boosterIds.length > 0,
   })
 
   const resolve = useMutation({
@@ -79,7 +95,15 @@ export function AdminDropsPage() {
                 {pendingRequests.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">#{r.order_id.slice(0, 8).toUpperCase()}</TableCell>
-                    <TableCell className="font-mono text-xs">{r.booster_id.slice(0, 8)}…</TableCell>
+                    <TableCell className="text-xs">
+                      {boosterNames?.get(r.booster_id) ? (
+                        <Link to={`/admin/boosters/${boosterNames.get(r.booster_id)!.id}`} className="text-brand hover:underline font-medium">
+                          {boosterNames.get(r.booster_id)!.display_name}
+                        </Link>
+                      ) : (
+                        <span className="font-mono">{r.booster_id.slice(0, 8)}…</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <p className="text-xs text-ink-secondary max-w-xs truncate">{r.reason}</p>
                     </TableCell>

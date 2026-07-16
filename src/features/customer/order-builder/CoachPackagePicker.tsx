@@ -13,7 +13,7 @@ interface CoachBoosterInfo {
   user_id: string
   display_name: string
   rating: number | null
-  is_top5: boolean | null
+  is_top3: boolean | null
 }
 
 export function CoachPackagePicker() {
@@ -63,7 +63,7 @@ export function CoachPackagePicker() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('public_booster_profiles')
-        .select('user_id, display_name, rating, is_top5')
+        .select('user_id, display_name, rating, is_top3')
         .in('user_id', boosterIds)
       if (error) throw error
       return data as unknown as CoachBoosterInfo[]
@@ -224,8 +224,8 @@ export function CoachPackagePicker() {
                         {booster.rating.toFixed(1)}
                       </span>
                     )}
-                    {booster.is_top5 && (
-                      <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded px-1.5 py-0.5 uppercase">Top 5</span>
+                    {booster.is_top3 && (
+                      <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded px-1.5 py-0.5 uppercase">Top 3</span>
                     )}
                   </div>
                 )}

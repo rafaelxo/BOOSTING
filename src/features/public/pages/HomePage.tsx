@@ -7,46 +7,55 @@ import {
   TrendingUp, MessageCircle,
   ArrowRight, Lock, Star,
 } from 'lucide-react'
-import { Avatar, Button, RankBadge } from '@/components/ui'
+import { Avatar, Button, RankBadge, HexGridBackground } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { formatRank } from '@/lib/utils'
-import type { BoosterProfile, RankTier } from '@/types'
+import type { RankTier, Division } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-function overallWinRate(booster: BoosterProfile): number {
-  const stats = booster.rank_stats
-  if (!stats) return 0
-
-  const values = [stats.gold_minus?.winrate, stats.plat_diamond?.winrate, stats.master_plus?.winrate]
-    .filter((value): value is number => value !== undefined)
-
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
-}
-
 export function HomePage() {
   const { t } = useTranslation()
 
+  // Mesma seleção sistemática do Top 3 da página /boosters (ver
+  // get_top_boosters) — só pede 1 posição a mais para preencher o teaser de
+  // 4 colunas da home; não é uma lista fixa/manual.
   const { data: featuredBoosters = [] } = useQuery({
     queryKey: ['home-featured-boosters'],
     queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('public_booster_profiles')
-        .select('*')
-        .order('is_top5', { ascending: false })
-        .order('rating', { ascending: false })
-        .limit(4)
-
+      const { data, error } = await supabase.rpc('get_top_boosters', {
+        p_service_type: '__all__',
+        p_rank_bucket: '__all__',
+        p_limit: 4,
+      })
       if (error) throw error
-      return data as BoosterProfile[]
+      const result = data as { success: boolean; boosters: Array<{
+        booster_id: string
+        display_name: string
+        avatar_url: string | null
+        current_rank: { tier: RankTier; division: Division | null } | null
+        review_count: number
+        average_rating: number | null
+        win_rate_pct: number
+        total_matches: number
+      }> } | null
+      return (result?.boosters ?? []).map((b) => ({
+        id: b.booster_id,
+        display_name: b.display_name,
+        avatar_url: b.avatar_url,
+        current_rank: b.current_rank,
+        rating: b.average_rating ?? 0,
+        rating_count: b.review_count,
+        win_rate_pct: b.win_rate_pct,
+        total_matches: b.total_matches,
+      }))
     },
     staleTime: 60_000,
   })
 
   const STATS = [
-    { value: '1.200+', label: t('home.stats.ordersCompleted') },
+    { value: '1.800+', label: t('home.stats.ordersCompleted') },
     { value: '4,9/5',  label: t('home.stats.avgRating')       },
     { value: '88%',    label: t('home.stats.winRate')          },
     { value: '20+',    label: t('home.stats.activeBoosters')   },
@@ -91,7 +100,7 @@ export function HomePage() {
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative bg-bg-base overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
-        <div className="absolute inset-0 bg-grid pointer-events-none opacity-60" />
+        <HexGridBackground />
         <div className="absolute -top-60 right-0 w-[700px] h-[700px] rounded-full bg-brand/6 blur-[140px] pointer-events-none" />
 
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-20 lg:py-24 relative">
@@ -193,7 +202,6 @@ export function HomePage() {
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
       <section className="py-16 lg:py-20 bg-bg-base relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid pointer-events-none opacity-40" />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -296,60 +304,51 @@ export function HomePage() {
             </motion.div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {featuredBoosters.map((booster, index) => {
-                const winRate = overallWinRate(booster)
-
-                return (
-                  <motion.div
-                    key={booster.id}
-                    initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }} transition={{ duration: 0.4, delay: index * 0.08 }}
+              {featuredBoosters.map((booster, index) => (
+                <motion.div
+                  key={booster.id}
+                  initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }} transition={{ duration: 0.4, delay: index * 0.08 }}
+                >
+                  <Link
+                    to={`/boosters/${booster.id}`}
+                    className="card p-5 flex flex-col gap-4 h-full hover:shadow-card-hover hover:-translate-y-1 hover:border-brand/25 transition-all"
                   >
-                    <Link
-                      to={`/boosters/${booster.id}`}
-                      className="card p-5 flex flex-col gap-4 h-full hover:shadow-card-hover hover:-translate-y-1 hover:border-brand/25 transition-all"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                          <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
-                          {booster.is_available && (
-                            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-ink truncate">{booster.display_name}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Star className="h-3 w-3 text-warning fill-warning" />
-                            <span className="text-xs font-semibold text-ink-secondary">
-                              {booster.rating_count > 0 ? booster.rating.toFixed(1) : 'Novo'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {booster.current_rank && (
-                        <div className="flex items-center gap-2">
-                          <RankBadge tier={booster.current_rank.tier as RankTier} division={booster.current_rank.division} size="sm" showLabel={false} />
+                    <div className="flex items-center gap-3">
+                      <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
+                      <div className="min-w-0">
+                        <p className="font-bold text-ink truncate">{booster.display_name}</p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Star className="h-3 w-3 text-warning fill-warning" />
                           <span className="text-xs font-semibold text-ink-secondary">
-                            {formatRank(booster.current_rank.tier as RankTier, booster.current_rank.division)}
+                            {booster.rating_count > 0 ? booster.rating.toFixed(1) : 'Novo'}
                           </span>
                         </div>
-                      )}
-
-                      <div className="mt-auto grid grid-cols-2 gap-3 pt-3 border-t border-bg-elevated">
-                        <div>
-                          <p className="text-[10px] text-ink-muted">Winrate</p>
-                          <p className="text-sm font-extrabold text-brand">{winRate > 0 ? `${winRate.toFixed(1)}%` : '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-ink-muted">Pedidos</p>
-                          <p className="text-sm font-extrabold text-ink">{booster.total_completed}</p>
-                        </div>
                       </div>
-                    </Link>
-                  </motion.div>
-                )
-              })}
+                    </div>
+
+                    {booster.current_rank && (
+                      <div className="flex items-center gap-2">
+                        <RankBadge tier={booster.current_rank.tier as RankTier} division={booster.current_rank.division} size="sm" showLabel={false} />
+                        <span className="text-xs font-semibold text-ink-secondary">
+                          {formatRank(booster.current_rank.tier as RankTier, booster.current_rank.division)}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="mt-auto grid grid-cols-2 gap-3 pt-3 border-t border-bg-elevated">
+                      <div>
+                        <p className="text-[10px] text-ink-muted">Winrate</p>
+                        <p className="text-sm font-extrabold text-brand">{booster.win_rate_pct > 0 ? `${booster.win_rate_pct}%` : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-ink-muted">Partidas</p>
+                        <p className="text-sm font-extrabold text-ink">{booster.total_matches}</p>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
           </div>
         </section>
@@ -374,7 +373,7 @@ export function HomePage() {
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
       <section className={`py-16 lg:py-20 relative overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-base' : 'bg-bg-surface'}`}>
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
-        <div className="absolute inset-0 bg-grid opacity-40 pointer-events-none" />
+        <HexGridBackground />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
           <motion.div
             initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}

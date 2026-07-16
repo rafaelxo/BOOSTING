@@ -8,7 +8,6 @@ interface UserAccountBadgeProps {
   /** Esconde o sino de notificações — usado nas telas restritas (pendente/rejeitado/erro). */
   showNotifications?: boolean
   avatarSize?: 'sm' | 'md'
-  online?: boolean
 }
 
 /**
@@ -16,7 +15,7 @@ interface UserAccountBadgeProps {
  * de conta pessoal. Reaproveitado por BoosterLayout, CustomerLayout e
  * AdminLayout — antes duplicado em cada um.
  */
-export function UserAccountBadge({ showNotifications = true, avatarSize = 'sm', online = false }: UserAccountBadgeProps) {
+export function UserAccountBadge({ showNotifications = true, avatarSize = 'sm' }: UserAccountBadgeProps) {
   const { profile } = useAuthStore()
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -28,7 +27,7 @@ export function UserAccountBadge({ showNotifications = true, avatarSize = 'sm', 
         onClick={() => setPanelOpen(true)}
         className="rounded-full hover:ring-2 hover:ring-brand/40 transition-all"
       >
-        <Avatar src={profile?.avatar_url} name={profile?.username} size={avatarSize} online={online} />
+        <Avatar src={profile?.avatar_url} name={profile?.username} size={avatarSize} />
       </button>
       <UserProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>

@@ -3,6 +3,7 @@ import { Shield, Star, Gem, Diamond, Crown, Flame, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Division, RankTier } from '@/types'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
+import { riotRankEmblemUrl } from '@/lib/riotAssets'
 
 const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
 
@@ -72,24 +73,29 @@ const SIZE_MAP: Record<BadgeSize, {
   },
 }
 
+// live (Community Dragon, sempre atualizado com o emblema hextech mais
+// recente) -> local (public/ranks/*.webp, empacotado no build) -> ícone
+// lucide como último recurso. Cada estágio só é tentado se o anterior falhar.
+type ImageStage = 'live' | 'local' | 'icon'
+
 function RankIcon({ tier, imgClass, iconClass }: { tier: RankTier; imgClass: string; iconClass: string }) {
-  const [imgError, setImgError] = useState(false)
+  const [stage, setStage] = useState<ImageStage>('live')
   const FallbackIcon = RANK_ICON_FALLBACK[tier]
   const color        = RANK_TIER_COLOR[tier]
 
-  if (!imgError) {
-    return (
-      <img
-        src={RANK_IMAGE[tier]}
-        alt={RANK_TIER_LABEL[tier]}
-        className={cn(imgClass, 'object-contain')}
-        onError={() => setImgError(true)}
-        draggable={false}
-      />
-    )
+  if (stage === 'icon') {
+    return <FallbackIcon className={cn(iconClass, color)} />
   }
 
-  return <FallbackIcon className={cn(iconClass, color)} />
+  return (
+    <img
+      src={stage === 'live' ? riotRankEmblemUrl(tier) : RANK_IMAGE[tier]}
+      alt={RANK_TIER_LABEL[tier]}
+      className={cn(imgClass, 'object-contain')}
+      onError={() => setStage((s) => s === 'live' ? 'local' : 'icon')}
+      draggable={false}
+    />
+  )
 }
 
 export function RankBadge({

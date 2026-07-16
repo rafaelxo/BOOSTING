@@ -35,6 +35,7 @@ const AvailableJobsPage   = lazy(() => import('@/features/booster/pages/Availabl
 const JobDetailPage       = lazy(() => import('@/features/booster/pages/JobDetail').then(m => ({ default: m.JobDetailPage })))
 const BoosterOrdersPage   = lazy(() => import('@/features/booster/pages/Orders').then(m => ({ default: m.BoosterOrdersPage })))
 const BoosterAccountsPage = lazy(() => import('@/features/booster/pages/Accounts').then(m => ({ default: m.BoosterAccountsPage })))
+const BoosterPaymentsPage = lazy(() => import('@/features/booster/pages/Payments').then(m => ({ default: m.BoosterPaymentsPage })))
 const BoosterServicesPage = lazy(() => import('@/features/booster/pages/Services').then(m => ({ default: m.BoosterServicesPage })))
 
 // Admin pages
@@ -47,10 +48,8 @@ const AdminCustomersPage  = lazy(() => import('@/features/admin/pages/Customers'
 const AdminPaymentsPage   = lazy(() => import('@/features/admin/pages/Payments').then(m => ({ default: m.AdminPaymentsPage })))
 const AdminRefundsPage    = lazy(() => import('@/features/admin/pages/Refunds').then(m => ({ default: m.AdminRefundsPage })))
 const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs').then(m => ({ default: m.AdminAuditPage })))
-const AdminServicesPage   = lazy(() => import('@/features/admin/pages/Services').then(m => ({ default: m.AdminServicesPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
-const AdminBoostConfigPage = lazy(() => import('@/features/admin/pages/BoostConfig').then(m => ({ default: m.AdminBoostConfigPage })))
 
 export const router = createBrowserRouter([
   // Public routes
@@ -97,6 +96,8 @@ export const router = createBrowserRouter([
           { path: '/orders/:id',   element: <SuspensePage><OrderDetailPage /></SuspensePage> },
           { path: '/orders',       element: <SuspensePage><OrderHistoryPage /></SuspensePage> },
           // Rotas antigas — mantidas como redirect para não quebrar links/bookmarks existentes.
+          // /payments foi removida: detalhes de pagamento agora vivem em /orders/:id (ver pedido).
+          { path: '/payments',     element: <Navigate to="/orders" replace /> },
           { path: '/support',      element: <Navigate to="/dashboard" replace /> },
           { path: '/support/:id',  element: <Navigate to="/dashboard" replace /> },
           { path: '/profile',      element: <Navigate to="/dashboard" replace /> },
@@ -118,9 +119,10 @@ export const router = createBrowserRouter([
           { path: '/booster/orders',      element: <SuspensePage><BoosterOrdersPage /></SuspensePage> },
           { path: '/booster/accounts',    element: <SuspensePage><BoosterAccountsPage /></SuspensePage> },
           { path: '/booster/services',    element: <SuspensePage><BoosterServicesPage /></SuspensePage> },
+          { path: '/booster/payments',    element: <SuspensePage><BoosterPaymentsPage /></SuspensePage> },
           // Rotas antigas — mantidas como redirect para não quebrar links/bookmarks existentes.
           { path: '/booster/completed',   element: <Navigate to="/booster/orders" replace /> },
-          { path: '/booster/earnings',    element: <Navigate to="/booster" replace /> },
+          { path: '/booster/earnings',    element: <Navigate to="/booster/payments" replace /> },
           { path: '/booster/profile',     element: <Navigate to="/booster/services" replace /> },
           { path: '/booster/onboarding',  element: <Navigate to="/apply?booster=1" replace /> },
         ],
@@ -144,9 +146,11 @@ export const router = createBrowserRouter([
           { path: '/admin/payments',     element: <SuspensePage><AdminPaymentsPage /></SuspensePage> },
           { path: '/admin/refunds',      element: <SuspensePage><AdminRefundsPage /></SuspensePage> },
           { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
-          { path: '/admin/services',     element: <SuspensePage><AdminServicesPage /></SuspensePage> },
-          { path: '/admin/boost-config', element: <SuspensePage><AdminBoostConfigPage /></SuspensePage> },
           { path: '/admin/reviews',      element: <Navigate to="/admin" replace /> },
+          // Catálogo de serviços/preços passou a ser gerido só pelo sistema (fórmulas
+          // em shared/pricing.ts + migrations) — sem UI de admin dedicada.
+          { path: '/admin/services',     element: <Navigate to="/admin" replace /> },
+          { path: '/admin/boost-config', element: <Navigate to="/admin" replace /> },
           { path: '/admin/drops',        element: <SuspensePage><AdminDropsPage /></SuspensePage> },
           { path: '/admin/duo-accounts', element: <SuspensePage><AdminDuoAccountsPage /></SuspensePage> },
           // Rota antiga — mantida como redirect para não quebrar links/bookmarks existentes.

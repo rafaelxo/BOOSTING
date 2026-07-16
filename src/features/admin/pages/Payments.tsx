@@ -7,7 +7,7 @@ import {
 import { Button, Card, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR } from '@/lib/utils'
 import type { Payment, PayoutRecord } from '@/types'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -23,6 +23,7 @@ interface PayoutRow extends PayoutRecord {
   orders?: {
     id: string
     customer_id: string
+    profiles?: { username: string | null } | null
   } | null
 }
 
@@ -38,15 +39,6 @@ const payoutStatusColor: Record<PayoutStatus, string> = {
   processing: 'text-brand bg-brand/10 border-brand/20',
   paid: 'text-success bg-success/10 border-success/20',
   failed: 'text-danger bg-danger/10 border-danger/20',
-}
-
-const paymentStatusColor: Record<string, string> = {
-  paid: 'text-success bg-success/10 border-success/20',
-  pending: 'text-warning bg-warning/10 border-warning/20',
-  failed: 'text-danger bg-danger/10 border-danger/20',
-  refunded: 'text-ink-secondary bg-bg-elevated border-bg-overlay',
-  partially_refunded: 'text-ink-secondary bg-bg-elevated border-bg-overlay',
-  disputed: 'text-danger bg-danger/10 border-danger/20',
 }
 
 function StatusBadge({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -100,7 +92,7 @@ export function AdminPaymentsPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from('payout_records')
-        .select('*, profiles:booster_id(username, avatar_url), orders:order_id(id, customer_id)')
+        .select('*, profiles:booster_id(username, avatar_url), orders:order_id(id, customer_id, profiles:customer_id(username))')
         .order('created_at', { ascending: false })
         .limit(300)
       if (error) throw error
@@ -298,7 +290,9 @@ export function AdminPaymentsPage() {
                         <span className="font-mono text-xs font-bold text-brand">{row.order_id.slice(0, 8).toUpperCase()}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-xs text-ink-muted">{row.orders?.customer_id?.slice(0, 8).toUpperCase() ?? '—'}</span>
+                        <span className="text-xs text-ink-secondary">
+                          {row.orders?.profiles?.username ?? (row.orders?.customer_id ? `${row.orders.customer_id.slice(0, 8).toUpperCase()}…` : '—')}
+                        </span>
                       </TableCell>
                       <TableCell className="font-semibold text-ink">{currency(row.gross_amount)}</TableCell>
                       <TableCell>
@@ -397,8 +391,8 @@ export function AdminPaymentsPage() {
                       <TableCell className="font-semibold text-ink">{currency(payment.amount)}</TableCell>
                       <TableCell className="capitalize">{payment.payment_method_type ?? '—'}</TableCell>
                       <TableCell>
-                        <StatusBadge className={paymentStatusColor[payment.status] ?? 'border-bg-overlay bg-bg-elevated text-ink-muted'}>
-                          {payment.status}
+                        <StatusBadge className={PAYMENT_STATUS_COLOR[payment.status] ?? 'border-bg-overlay bg-bg-elevated text-ink-muted'}>
+                          {PAYMENT_STATUS_LABEL[payment.status] ?? payment.status}
                         </StatusBadge>
                       </TableCell>
                       <TableCell>{formatDateTime(payment.created_at)}</TableCell>

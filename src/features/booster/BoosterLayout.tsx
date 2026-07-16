@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, ClipboardList, Wrench, Landmark } from 'lucide-react'
+import { LayoutDashboard, Briefcase, ClipboardList, Wrench, Landmark, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +21,7 @@ function ApprovedBoosterPanel() {
     { href: '/booster/orders',   icon: ClipboardList,    label: t('booster.nav.orders')    },
     { href: '/booster/services', icon: Wrench,           label: t('booster.nav.services')  },
     { href: '/booster/accounts', icon: Landmark,         label: t('booster.nav.accounts')  },
+    { href: '/booster/payments', icon: Wallet,           label: t('booster.nav.payments')  },
   ]
 
   return (
@@ -62,7 +63,7 @@ function ApprovedBoosterPanel() {
         <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
           <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Peak</span></div>
           <div className="hidden md:block" />
-          <UserAccountBadge online />
+          <UserAccountBadge />
         </header>
         <main className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
@@ -91,7 +92,7 @@ function ApprovedBoosterPanel() {
   )
 }
 
-// Ordem fixa exigida pelo produto: Painel, Jobs, Pedidos, Serviços, Contas.
+// Ordem fixa exigida pelo produto: Painel, Jobs, Pedidos, Serviços, Contas, Pagamentos.
 // Não existe item de "Meu Perfil" — dados pessoais ficam só no popover do
 // UserAccountBadge, dados profissionais ficam em Serviços.
 export function BoosterLayout() {

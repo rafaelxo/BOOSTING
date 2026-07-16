@@ -129,8 +129,14 @@ const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
 }
 
 export const MATCH_DURATION_HOURS = 0.5
-export const DELIVERY_MARGIN_GAMES = 2
-export const DELIVERY_MARGIN_HOURS = DELIVERY_MARGIN_GAMES * MATCH_DURATION_HOURS
+// Fonte única de verdade do prazo de entrega mostrado ao cliente. A
+// estimativa de horas de jogo puro (estimateEloBoostHours / partidas * 0.5h)
+// nunca reflete a realidade — booster também dorme, tem outros pedidos, faz
+// pausas. Multiplicamos por 2 aqui, uma única vez, no fechamento de
+// computeOrderPrice() — nunca no frontend, nunca em cada serviceType
+// separadamente. Substitui a antiga margem fixa de 2 partidas (que era
+// pequena demais pra refletir prazo real de entrega).
+export const DELIVERY_ESTIMATE_MULTIPLIER = 2
 export const EXPECTED_BOOST_WIN_RATE = 0.8
 export const MASTER_PLUS_LP_PER_GAME = 30
 export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenger', number> = {
@@ -449,11 +455,11 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
     estimatedHours += input.winPackage * MATCH_DURATION_HOURS
   }
 
-  // Margem operacional exibida ao cliente: duas partidas adicionais (1h).
-  // Só se aplica a serviços cuja duração é calculada em partidas; coaching
-  // continua usando a duração real do pacote/sessões.
+  // Prazo real de entrega: dobra a estimativa de horas de jogo puro. Só se
+  // aplica a serviços cuja duração é calculada em partidas; coaching continua
+  // usando a duração real do pacote/sessões (não é jogo ranqueado).
   if (estimatedHours != null && input.serviceType !== 'coaching') {
-    estimatedHours += DELIVERY_MARGIN_HOURS
+    estimatedHours *= DELIVERY_ESTIMATE_MULTIPLIER
   }
 
   const extrasPriceCents = extrasRawCents + moneyToCents(winPackagePrice)

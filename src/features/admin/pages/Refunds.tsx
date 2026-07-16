@@ -8,6 +8,12 @@ import type { Refund } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 
+const REFUND_STATUS_LABEL: Record<Refund['status'], string> = {
+  pending: 'Pendente',
+  succeeded: 'Concluído',
+  failed: 'Falhou',
+}
+
 export function AdminRefundsPage() {
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -47,7 +53,7 @@ export function AdminRefundsPage() {
                   <TableCell>{r.reason}</TableCell>
                   <TableCell>
                     <span className={`badge capitalize ${r.status === 'succeeded' ? 'text-success bg-success/10' : r.status === 'failed' ? 'text-danger bg-danger/10' : 'text-warning bg-warning/10'}`}>
-                      {r.status}
+                      {REFUND_STATUS_LABEL[r.status]}
                     </span>
                   </TableCell>
                   <TableCell>{formatDateTime(r.created_at)}</TableCell>

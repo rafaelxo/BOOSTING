@@ -16,7 +16,7 @@ const SERVICES = [
     rankRange: RANK_TIER_ORDER,
     highlights: [
       'Solo boost ou duo boost — você escolhe',
-      'Qualquer rank — do Ferro ao Desafiante',
+      'Qualquer rank — do Ferro ao Grão-Mestre',
       'Seleção de mesma divisão (ex: Bronze IV → Bronze I)',
       'Proteção VPN + conta offline em cada partida',
       'Começa em até 30 minutos',

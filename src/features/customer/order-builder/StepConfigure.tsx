@@ -6,7 +6,7 @@ import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/compon
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS } from '@/lib/pricing'
+import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER } from '@/lib/pricing'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Check, Search, Info, Lock } from 'lucide-react'
@@ -239,14 +239,15 @@ export function StepConfigure() {
           return
         }
         setBasePrice(price)
-        setEstimatedHours(estimateEloBoostHours({
+        const masterPlusHours = estimateEloBoostHours({
           currentRank,
           targetRank,
           currentLp: 0,
           avgLpGain: 30,
           avgLpLoss: 30,
           currentPdl,
-        }))
+        })
+        setEstimatedHours(masterPlusHours == null ? null : masterPlusHours * DELIVERY_ESTIMATE_MULTIPLIER)
         return
       }
 
@@ -261,33 +262,34 @@ export function StepConfigure() {
         ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
         : withLp
       setBasePrice(finalPrice)
-      setEstimatedHours(estimateEloBoostHours({
+      const eloHours = estimateEloBoostHours({
         currentRank,
         targetRank,
         currentLp,
         avgLpGain,
         avgLpLoss,
         currentPdl: null,
-      }))
+      })
+      setEstimatedHours(eloHours == null ? null : eloHours * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(lpModifierPct(avgLpGain))
 
     } else if (serviceType === 'placement_matches') {
       if (!currentRank) return
       setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
-      setEstimatedHours(5 * MATCH_DURATION_HOURS)
+      setEstimatedHours(5 * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
-      setEstimatedHours(winsPurchased * MATCH_DURATION_HOURS)
+      setEstimatedHours(winsPurchased * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
       const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
-      setEstimatedHours(cappedWins * MATCH_DURATION_HOURS)
+      setEstimatedHours(cappedWins * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'coaching') {
       // Preço vem do pacote escolhido em CoachPackagePicker (setBasePrice

@@ -7,7 +7,6 @@ interface AvatarProps {
   name?: string
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
-  online?: boolean
 }
 
 const sizeMap = {
@@ -18,47 +17,28 @@ const sizeMap = {
   xl: 'h-14 w-14 text-lg',
 }
 
-const onlineDotMap = {
-  xs: 'h-1.5 w-1.5 -bottom-px -right-px',
-  sm: 'h-2 w-2 bottom-0 right-0',
-  md: 'h-2.5 w-2.5 bottom-0 right-0',
-  lg: 'h-3 w-3 bottom-0 right-0',
-  xl: 'h-3.5 w-3.5 bottom-0.5 right-0.5',
-}
-
-export function Avatar({ src, name, size = 'md', className, online }: AvatarProps) {
+export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
   const resolvedSrc = resolveRiotAvatarUrl(src)
 
   return (
-    <div className="relative inline-block">
-      <RadixAvatar.Root
-        className={cn(
-          'relative flex shrink-0 overflow-hidden rounded-full bg-bg-elevated',
-          sizeMap[size],
-          className
-        )}
-      >
-        <RadixAvatar.Image
-          src={resolvedSrc}
-          alt={name}
-          className="h-full w-full object-cover"
-        />
-        <RadixAvatar.Fallback
-          className="flex h-full w-full items-center justify-center bg-gradient-brand text-white font-semibold"
-          delayMs={400}
-        >
-          {name ? initials(name) : '?'}
-        </RadixAvatar.Fallback>
-      </RadixAvatar.Root>
-      {online !== undefined && (
-        <span
-          className={cn(
-            'absolute rounded-full border-2 border-bg-base',
-            onlineDotMap[size],
-            online ? 'bg-success' : 'bg-ink-muted'
-          )}
-        />
+    <RadixAvatar.Root
+      className={cn(
+        'relative flex shrink-0 overflow-hidden rounded-full bg-bg-elevated',
+        sizeMap[size],
+        className
       )}
-    </div>
+    >
+      <RadixAvatar.Image
+        src={resolvedSrc}
+        alt={name}
+        className="h-full w-full object-cover"
+      />
+      <RadixAvatar.Fallback
+        className="flex h-full w-full items-center justify-center bg-gradient-brand text-white font-semibold"
+        delayMs={400}
+      >
+        {name ? initials(name) : '?'}
+      </RadixAvatar.Fallback>
+    </RadixAvatar.Root>
   )
 }

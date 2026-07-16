@@ -12,6 +12,7 @@ export type CustomerOrderState = {
   requires_credentials?: boolean
   credentials_set?: boolean
   can_submit_credentials?: boolean
+  can_confirm_completion?: boolean
 }
 
 export async function getCustomerOrderState(orderId?: string): Promise<CustomerOrderState> {

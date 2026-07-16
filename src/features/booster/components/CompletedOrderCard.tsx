@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Clock, ArrowRight } from 'lucide-react'
 import { Card, OrderStatusBadge, RankBadge } from '@/components/ui'
-import { formatRank, formatDate, getServiceLabel, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
+import { formatRank, formatDate, getServiceLabel, formatEstimatedDelivery, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Division, Order, RankTier } from '@/types'
 
@@ -57,7 +57,7 @@ export function CompletedOrderCard({ order }: CompletedOrderCardProps) {
           {order.estimated_hours != null && (
             <div className="flex items-center gap-1.5 text-xs text-ink-muted">
               <Clock className="h-3.5 w-3.5" />
-              {order.estimated_hours}h estimadas
+              {formatEstimatedDelivery(order.estimated_hours)} estimadas
             </div>
           )}
         </div>

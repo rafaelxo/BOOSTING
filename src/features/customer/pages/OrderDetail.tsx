@@ -2,16 +2,112 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert } from '@/components/ui'
+import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw, CheckCircle2, AlertTriangle, Receipt } from 'lucide-react'
+import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderProgress } from '@/components/order/OrderProgress'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, timeAgo, formatRank, getServiceLabel, ORDER_STATUS_LABEL, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, timeAgo, formatRank, formatLastSeen, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { getCustomerOrderState, type CustomerOrderState } from '@/lib/customerOrderState'
-import type { Order, OrderStatusHistory } from '@/types'
+import type { Order, OrderStatusHistory, BoosterProfile, Payment } from '@/types'
+
+function PaymentSummarySection({ orderId }: { orderId: string }) {
+  const currency = useCurrency()
+  const { data: payments } = useQuery({
+    queryKey: ['order-payments', orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as Payment[]
+    },
+  })
+
+  if (!payments?.length) return null
+
+  return (
+    <Card padding="md">
+      <div className="flex items-center gap-2 mb-4">
+        <Receipt className="h-4 w-4 text-brand" />
+        <h3 className="text-sm font-semibold text-ink">Pagamento</h3>
+      </div>
+      <div className="space-y-3">
+        {payments.map((p) => (
+          <div key={p.id} className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">{currency(p.amount)}</p>
+              <p className="text-[11px] text-ink-muted mt-0.5">
+                {formatDateTime(p.created_at)}
+                {p.payment_method_type === 'pix' && ' · Pix'}
+              </p>
+              {p.refunded_amount > 0 && (
+                <p className="text-[11px] text-ink-secondary mt-0.5">
+                  Reembolsado: {currency(p.refunded_amount)}
+                </p>
+              )}
+            </div>
+            <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${PAYMENT_STATUS_COLOR[p.status] ?? ''}`}>
+              {PAYMENT_STATUS_LABEL[p.status] ?? p.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+function useAssignedBooster(boosterId: string | null) {
+  return useQuery({
+    queryKey: ['order-assigned-booster', boosterId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('public_booster_profiles')
+        .select('id, user_id, display_name, avatar_url, last_active_at, rating, rating_count')
+        .eq('user_id', boosterId!)
+        .maybeSingle()
+      if (error) throw error
+      return data as Pick<BoosterProfile, 'id' | 'user_id' | 'display_name' | 'avatar_url' | 'last_active_at' | 'rating' | 'rating_count'> | null
+    },
+    enabled: !!boosterId,
+  })
+}
+
+function AssignedBoosterCard({ order }: { order: Order }) {
+  const { data: booster, isLoading } = useAssignedBooster(order.assigned_booster_id)
+
+  if (!order.assigned_booster_id) return null
+  if (isLoading) return <Card padding="md"><Skeleton className="h-14 w-full" /></Card>
+  if (!booster) return null
+
+  return (
+    <Card padding="md">
+      <h3 className="text-sm font-semibold text-ink mb-3">Seu booster</h3>
+      <Link to={`/boosters/${booster.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-ink truncate">{booster.display_name}</p>
+          <p className="text-xs text-ink-muted">{formatLastSeen(booster.last_active_at)}</p>
+        </div>
+        {booster.rating_count > 0 && (
+          <span className="text-xs font-semibold text-ink shrink-0">★ {booster.rating.toFixed(1)}</span>
+        )}
+      </Link>
+      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+        <div className="mt-3">
+          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+        </div>
+      )}
+    </Card>
+  )
+}
 
 function useOrder(id: string, refetchInterval?: number) {
   return useQuery({
@@ -383,6 +479,120 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
   )
 }
 
+function CompletionConfirmationSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
+  const queryClient = useQueryClient()
+  const [showDisputeModal, setShowDisputeModal] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['order', order.id] })
+    queryClient.invalidateQueries({ queryKey: ['order-history', order.id] })
+    queryClient.invalidateQueries({ queryKey: ['customer-order-state', order.id] })
+  }
+
+  const confirm = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('confirm_order_completion', { p_order_id: order.id })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao confirmar conclusão')
+    },
+    onSuccess: invalidate,
+  })
+
+  const dispute = useMutation({
+    mutationFn: async (reason: string) => {
+      const { data, error } = await supabase.rpc('dispute_order_completion', {
+        p_order_id: order.id,
+        p_reason: reason,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao abrir disputa')
+    },
+    onSuccess: () => {
+      setShowDisputeModal(false)
+      setDisputeReason('')
+      invalidate()
+    },
+  })
+
+  if (!state?.can_confirm_completion) return null
+
+  return (
+    <Card padding="md" className="ring-1 ring-success/20">
+      <div className="flex items-center gap-2 mb-2">
+        <CheckCircle2 className="h-4 w-4 text-success" />
+        <h3 className="text-sm font-semibold text-ink">Confirmação necessária</h3>
+      </div>
+      <p className="text-xs text-ink-secondary mb-4">
+        Serviço concluído! O booster finalizou o pedido. Confirme a conclusão após revisar o resultado.
+      </p>
+      <div className="space-y-2">
+        <Button
+          className="w-full"
+          variant="success"
+          leftIcon={<CheckCircle2 className="h-4 w-4" />}
+          loading={confirm.isPending}
+          onClick={() => confirm.mutate()}
+        >
+          Confirmar conclusão
+        </Button>
+        <Button
+          className="w-full"
+          variant="danger-ghost"
+          leftIcon={<AlertTriangle className="h-4 w-4" />}
+          onClick={() => setShowDisputeModal(true)}
+        >
+          Não recebi o que contratei
+        </Button>
+      </div>
+      {(confirm.isError || dispute.isError) && (
+        <ErrorAlert
+          className="mt-2"
+          message={
+            (confirm.error instanceof Error && confirm.error.message) ||
+            (dispute.error instanceof Error && dispute.error.message) ||
+            'Erro ao processar sua solicitação'
+          }
+        />
+      )}
+
+      <Modal
+        open={showDisputeModal}
+        onOpenChange={(open) => { if (!open) { setShowDisputeModal(false); setDisputeReason('') } }}
+        title="Abrir disputa"
+        description="Conte o que não foi entregue conforme contratado. Um administrador vai revisar o pedido."
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo <span className="text-danger">*</span>
+          </label>
+          <textarea
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            placeholder="Descreva o que aconteceu..."
+            className="input-base w-full min-h-[100px] resize-none text-sm"
+          />
+        </div>
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setShowDisputeModal(false); setDisputeReason('') }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={dispute.isPending}
+            disabled={disputeReason.trim().length < 10}
+            onClick={() => dispute.mutate(disputeReason.trim())}
+          >
+            Enviar disputa
+          </Button>
+        </div>
+      </Modal>
+    </Card>
+  )
+}
+
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -410,7 +620,7 @@ export function OrderDetailPage() {
   }, [order?.status, navigate])
 
   if (isLoading) return (
-    <div className="max-w-4xl space-y-4">
+    <div className="max-w-7xl space-y-4">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -418,7 +628,7 @@ export function OrderDetailPage() {
 
   if (isError) {
     return (
-      <div className="max-w-4xl space-y-4">
+      <div className="max-w-7xl space-y-4">
         <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
         <Button onClick={() => refetch()}>Tentar novamente</Button>
       </div>
@@ -427,7 +637,7 @@ export function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="max-w-4xl space-y-4">
+      <div className="max-w-7xl space-y-4">
         <ErrorAlert message="Pedido não encontrado." />
         <Button onClick={() => navigate('/orders')}>Voltar para meus pedidos</Button>
       </div>
@@ -435,7 +645,7 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-7xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
@@ -517,12 +727,38 @@ export function OrderDetailPage() {
             )}
           </Card>
 
+          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <OrderProgress order={order} />
+          )}
+
+          {order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <OrderMatchHistory orderId={order.id} />
+          )}
+
           <OrderChat orderId={order.id} viewerRole="customer" />
         </div>
 
         {/* Sidebar */}
         <div className="space-y-4">
           <PendingPaymentSection order={order} />
+
+          <PaymentSummarySection orderId={order.id} />
+
+          <AssignedBoosterCard order={order} />
+
+          {order.status === 'completed' && (
+            <Card padding="md" className="ring-1 ring-success/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                <p className="text-sm text-ink-secondary">
+                  Serviço concluído! Seu pedido foi finalizado com sucesso.
+                </p>
+              </div>
+            </Card>
+          )}
+
+          {/* Confirmação de conclusão */}
+          <CompletionConfirmationSection order={order} state={customerState} />
 
           {/* Credenciais */}
           <CredentialsSection order={order} state={customerState} />

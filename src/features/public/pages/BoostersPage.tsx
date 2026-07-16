@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Zap, Star, Trophy } from 'lucide-react'
+import { Zap, Star, Trophy, Swords, Sparkles } from 'lucide-react'
 import { Avatar, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { cn, formatRank } from '@/lib/utils'
-import type { BoosterProfile, RankTier } from '@/types'
+import { cn, formatRank, formatLastSeen } from '@/lib/utils'
+import type { BoosterProfile, RankTier, Division } from '@/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -17,82 +17,78 @@ function overallWinRate(b: BoosterProfile): number {
   return values.length ? values.reduce((a, c) => a + c, 0) / values.length : 0
 }
 
+interface TopBoosterEntry {
+  booster_id: string
+  display_name: string
+  avatar_url: string | null
+  current_rank: { tier: RankTier; division: Division | null } | null
+  total_matches: number
+  wins: number
+  losses: number
+  win_rate_pct: number
+  average_kda: number | null
+  review_count: number
+  average_rating: number | null
+  performance_score: number
+}
+
 const MEDAL: Record<number, { border: string; badge: string; text: string }> = {
   1: { border: 'border-yellow-400/60', badge: 'bg-yellow-400 text-bg-base', text: 'text-yellow-400' },
   2: { border: 'border-slate-300/50',  badge: 'bg-slate-300 text-bg-base',  text: 'text-slate-300'  },
   3: { border: 'border-amber-500/50',  badge: 'bg-amber-500 text-white',     text: 'text-amber-500'  },
 }
 
-// DOM order: 4th | 2nd | 1st | 3rd | 5th (classic podium staircase)
-const PODIUM_SLOTS = [
-  { arrIdx: 3, pos: 4, pt: 'pt-20', w: 'w-28' },
-  { arrIdx: 1, pos: 2, pt: 'pt-10', w: 'w-36' },
-  { arrIdx: 0, pos: 1, pt: 'pt-0',  w: 'w-44' },
-  { arrIdx: 2, pos: 3, pt: 'pt-10', w: 'w-36' },
-  { arrIdx: 4, pos: 5, pt: 'pt-20', w: 'w-28' },
-]
+// ── TopBoosterCard ───────────────────────────────────────────────────────────
+// Seleção sistemática (get_top_boosters) — nunca uma lista fixa/manual.
+// Ver supabase/migrations/054_booster_performance_segments.sql e
+// 055_top_boosters_selection.sql para a fórmula, o fallback e o desempate.
 
-// ── PodiumCard ────────────────────────────────────────────────────────────────
-
-function PodiumCard({ booster, position }: { booster: BoosterProfile; position: number }) {
-  const winRate = overallWinRate(booster)
+function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position: number }) {
   const medal = MEDAL[position]
-  const isFirst = position === 1
 
   return (
     <Link
-      to={`/boosters/${booster.id}`}
+      to={`/boosters/${entry.booster_id}`}
       className={cn(
-        'flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all hover:-translate-y-1 hover:shadow-card-hover bg-bg-card w-full',
-        medal ? medal.border : 'border-bg-elevated',
+        'card flex flex-col gap-3 p-5 border-2 transition-all hover:-translate-y-1 hover:shadow-card-hover',
+        medal.border,
       )}
     >
-      {/* Position badge */}
-      {medal ? (
-        <span className={cn('h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-black shrink-0', medal.badge)}>
+      <div className="flex items-center gap-3">
+        <span className={cn('h-7 w-7 rounded-full flex items-center justify-center text-xs font-black shrink-0', medal.badge)}>
           {position}
         </span>
-      ) : (
-        <span className="text-[10px] font-bold text-ink-muted">#{position}</span>
-      )}
-
-      {/* Avatar */}
-      <div className="relative">
-        <Avatar src={booster.avatar_url} name={booster.display_name} size={isFirst ? 'lg' : 'md'} />
-        {booster.is_available && (
-          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-success border-2 border-bg-card" />
-        )}
-      </div>
-
-      {/* Name */}
-      <p className={cn('font-bold text-ink text-center w-full truncate', isFirst ? 'text-sm' : 'text-xs')}>
-        {booster.display_name}
-      </p>
-
-      {/* Win rate */}
-      <div className="text-center">
-        <p className={cn(
-          'font-extrabold leading-none',
-          isFirst ? 'text-2xl' : position <= 3 ? 'text-xl' : 'text-lg',
-          medal ? medal.text : 'text-brand',
-        )}>
-          {winRate > 0 ? `${winRate.toFixed(1)}%` : '—'}
-        </p>
-        <p className="text-[9px] text-ink-muted mt-0.5">winrate</p>
-      </div>
-
-      {/* Rating */}
-      {booster.rating_count > 0 && (
-        <div className="flex items-center gap-0.5">
-          <Star className="h-3 w-3 text-warning fill-warning" />
-          <span className="text-[10px] font-semibold text-ink">{booster.rating.toFixed(1)}</span>
+        <Avatar src={entry.avatar_url} name={entry.display_name} size="md" />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-ink truncate">{entry.display_name}</p>
+          {entry.current_rank && (
+            <p className="text-[11px] text-ink-secondary">{formatRank(entry.current_rank.tier, entry.current_rank.division)}</p>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Orders */}
-      {booster.total_completed > 0 && (
-        <p className="text-[9px] text-ink-muted">{booster.total_completed} pedidos</p>
-      )}
+      <div className="grid grid-cols-3 gap-2 text-center bg-bg-elevated rounded-xl py-2.5">
+        <div>
+          <p className={cn('text-base font-extrabold', medal.text)}>{entry.win_rate_pct}%</p>
+          <p className="text-[9px] text-ink-muted uppercase tracking-wide">Win rate</p>
+        </div>
+        <div>
+          <p className="text-base font-extrabold text-ink">{entry.average_kda != null ? entry.average_kda.toFixed(1) : '—'}</p>
+          <p className="text-[9px] text-ink-muted uppercase tracking-wide">KDA</p>
+        </div>
+        <div>
+          <p className="text-base font-extrabold text-ink flex items-center justify-center gap-1">
+            {entry.average_rating != null ? entry.average_rating.toFixed(1) : '—'}
+            <Star className="h-3 w-3 text-warning fill-warning" />
+          </p>
+          <p className="text-[9px] text-ink-muted uppercase tracking-wide">{entry.review_count} avaliações</p>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-ink-muted flex items-center gap-1.5">
+        <Swords className="h-3 w-3 shrink-0" />
+        {entry.total_matches} partida{entry.total_matches === 1 ? '' : 's'} analisada{entry.total_matches === 1 ? '' : 's'}
+      </p>
     </Link>
   )
 }
@@ -105,14 +101,10 @@ function BoosterCard({ booster }: { booster: BoosterProfile }) {
   return (
     <Link to={`/boosters/${booster.id}`}>
       <div className="card flex flex-col items-center text-center gap-3 p-4 hover:border-brand/30 hover:shadow-card-hover transition-all cursor-pointer h-full">
-        <div className="relative">
-          <Avatar src={booster.avatar_url} name={booster.display_name} size="lg" />
-          {booster.is_available && (
-            <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-success border-2 border-bg-surface" />
-          )}
-        </div>
+        <Avatar src={booster.avatar_url} name={booster.display_name} size="lg" />
 
         <p className="text-sm font-bold text-ink truncate w-full">{booster.display_name}</p>
+        <p className="text-[10px] text-ink-muted -mt-2">{formatLastSeen(booster.last_active_at)}</p>
 
         {winRate > 0 && (
           <div className="text-center">
@@ -177,18 +169,24 @@ export function BoostersPage() {
     staleTime: 60_000,
   })
 
-  // O flag is_top5 é a fonte de verdade real (refresh_top5_boosters(), regras
-  // de slot etc.) — o pódio público usa o mesmo critério, em vez de ranquear
-  // por rank_stats.winrate (que hoje ninguém preenche e sempre dá 0).
-  const sorted = boosters
-    ? [...boosters].sort((a, b) => {
-        if (a.is_top5 !== b.is_top5) return a.is_top5 ? -1 : 1
-        if (b.rating !== a.rating) return b.rating - a.rating
-        return overallWinRate(b) - overallWinRate(a)
+  const { data: top3 } = useQuery({
+    queryKey: ['top-boosters', 'global'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_top_boosters', {
+        p_service_type: '__all__',
+        p_rank_bucket: '__all__',
+        p_limit: 3,
       })
-    : []
-  const top5 = sorted.filter(b => b.is_top5).slice(0, 5)
-  const rest = sorted.filter(b => !b.is_top5)
+      if (error) throw error
+      const result = data as { success: boolean; boosters: TopBoosterEntry[] } | null
+      return result?.boosters ?? []
+    },
+    staleTime: 60_000,
+  })
+
+  const sorted = boosters ? [...boosters].sort((a, b) => b.rating - a.rating) : []
+  const top3Ids = new Set((top3 ?? []).map(b => b.booster_id))
+  const rest = sorted.filter(b => !top3Ids.has(b.id))
 
   return (
     <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-16">
@@ -212,38 +210,35 @@ export function BoostersPage() {
         </div>
       ) : !sorted.length ? (
         <div className="text-center py-20">
-          <p className="text-ink-secondary text-sm">Nenhum booster disponível no momento.</p>
+          <p className="text-ink-secondary text-sm">Nenhum booster encontrado no momento.</p>
         </div>
       ) : (
         <div className="space-y-16">
 
-          {/* ── Top 5 Podium ── */}
-          {top5.length > 0 && (
+          {/* ── Top 3 Boosters ── */}
+          {top3 && top3.length > 0 && (
             <section>
-              <div className="flex items-center justify-center gap-2 mb-10">
+              <div className="flex items-center justify-center gap-2 mb-2">
                 <Trophy className="h-5 w-5 text-yellow-400" />
-                <h2 className="text-xl font-black text-ink">Top 5 Boosters</h2>
+                <h2 className="text-xl font-black text-ink">Top 3 Boosters</h2>
                 <Trophy className="h-5 w-5 text-yellow-400" />
               </div>
+              <p className="text-center text-xs text-ink-muted mb-8 flex items-center justify-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                Seleção automática por win rate, KDA e avaliações — não é uma lista fixa
+              </p>
 
-              <div className="overflow-x-auto pb-2">
-                <div className="flex items-start justify-center gap-3 min-w-max mx-auto px-4">
-                  {PODIUM_SLOTS.map(({ arrIdx, pos, pt, w }) => {
-                    const b = top5[arrIdx]
-                    if (!b) return null
-                    return (
-                      <motion.div
-                        key={b.id}
-                        initial={{ opacity: 0, y: 24 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: arrIdx * 0.08 }}
-                        className={cn('shrink-0', pt, w)}
-                      >
-                        <PodiumCard booster={b} position={pos} />
-                      </motion.div>
-                    )
-                  })}
-                </div>
+              <div className="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                {top3.map((entry, idx) => (
+                  <motion.div
+                    key={entry.booster_id}
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: idx * 0.08 }}
+                  >
+                    <TopBoosterCard entry={entry} position={idx + 1} />
+                  </motion.div>
+                ))}
               </div>
             </section>
           )}
@@ -254,10 +249,15 @@ export function BoostersPage() {
               <p className="text-xs font-bold uppercase tracking-widest text-ink-muted text-center mb-8">
                 Demais Boosters
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {/* flex-wrap centralizado em vez de grid rígido: com poucos
+                  boosters (plataforma nova), os cards ficam centralizados e
+                  compactos em vez de esparramados num grid de 5 colunas com
+                  metade da tela vazia. */}
+              <div className="flex flex-wrap justify-center gap-4">
                 {rest.map(b => (
                   <motion.div
                     key={b.id}
+                    className="w-[160px] sm:w-[180px]"
                     initial={{ opacity: 0, y: 16 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}

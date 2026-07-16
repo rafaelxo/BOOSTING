@@ -87,11 +87,18 @@ serve(async (req) => {
     }
     const { id: discordUserId } = await meRes.json() as { id: string }
 
-    const discordIdentity = auth.user.identities?.find((identity) => identity.provider === 'discord')
-    const expectedDiscordId = discordIdentity?.identity_id
-      ?? auth.user.user_metadata?.provider_id
-      ?? auth.user.user_metadata?.sub
-    if (!expectedDiscordId || String(expectedDiscordId) !== discordUserId) {
+    // Compara contra TODAS as identidades Discord vinculadas (não só a
+    // primeira via .find()) — um usuário que já tinha uma conta Discord
+    // vinculada e logou de novo com outra (ou tem múltiplas identidades
+    // linkadas) fazia .find() pegar a identidade errada e disparar um 403
+    // de "mismatch" mesmo com um token válido e pertencente ao usuário.
+    const discordIdentities = auth.user.identities?.filter((identity) => identity.provider === 'discord') ?? []
+    const matchesLinkedIdentity = discordIdentities.some((identity) => String(identity.identity_id) === discordUserId)
+    const matchesMetadataFallback = discordIdentities.length === 0 && (
+      String(auth.user.user_metadata?.provider_id ?? '') === discordUserId
+      || String(auth.user.user_metadata?.sub ?? '') === discordUserId
+    )
+    if (!matchesLinkedIdentity && !matchesMetadataFallback) {
       return errorResponse(req, 'Discord identity mismatch', 403)
     }
 

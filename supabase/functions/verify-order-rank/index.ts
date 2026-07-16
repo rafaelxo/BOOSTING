@@ -69,7 +69,7 @@ serve(async (req) => {
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
     const { user, client: userClient } = auth
 
-    const rateLimit = await consumeUserRateLimit('verify-order-rank', user.id, 5, 300)
+    const rateLimit = await consumeUserRateLimit('verify-order-rank', user.id, 10, 300)
     if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
 
     const rawBody = await readJsonBody(req)

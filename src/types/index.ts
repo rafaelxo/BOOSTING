@@ -32,7 +32,7 @@ export type OrderStatus =
 
 export type BoosterStatus = 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
 
-type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
 
 export type NotificationType =
   | 'order_status_changed'
@@ -98,8 +98,7 @@ export interface BoosterProfile {
   rating: number
   rating_count: number
   games: string[]
-  is_available: boolean
-  is_top5: boolean
+  is_top3: boolean
   opgg_link: string | null
   hours_per_day_min: number | null
   hours_per_day_max: number | null
@@ -123,17 +122,6 @@ export interface BoosterProfile {
 
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
-export interface Service {
-  id: string
-  game_id: string
-  type: ServiceType
-  name: string
-  description: string | null
-  short_description: string | null
-  is_active: boolean
-  sort_order: number
-}
-
 // Fluxo do configurador de boost ao qual um addon pertence. null = extra
 // legado (pré-reforma), mantido só para exibição de pedidos antigos —
 // nunca oferecido no configurador atual.
@@ -151,14 +139,6 @@ export interface ServiceExtra {
   icon: string | null
   flow: BoostFlow | null
   code: string | null          // identificador estável — nunca o label
-}
-
-export interface MasterPlusPricing {
-  id: string
-  tier: 'master' | 'grandmaster' | 'challenger'
-  price: number | null   // null = tier ainda sem preço comercial definido
-  updated_at: string
-  updated_by: string | null
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -231,6 +211,11 @@ export interface Order {
   // Pacote de coach comprado (booster_services.id) — só setado quando
   // service_type === 'coaching'.
   booster_service_id: string | null
+  // Início real do boost (primeira transição pra in_progress) — janela a
+  // partir da qual sync-order-matches contabiliza partidas; também usado
+  // como início do prazo estimado (CountdownTimer).
+  match_sync_started_at: string | null
+  last_match_synced_at: string | null
 }
 
 export interface OrderStatusHistory {
@@ -271,6 +256,21 @@ export interface OrderDropRequest {
   admin_note: string | null
   created_at: string
   resolved_at: string | null
+}
+
+export interface OrderMatch {
+  id: string
+  order_id: string
+  external_match_id: string
+  result: 'win' | 'loss'
+  champion: string | null
+  kills: number
+  deaths: number
+  assists: number
+  queue_id: number | null
+  duration_seconds: number | null
+  played_at: string
+  created_at: string
 }
 
 export interface OrderChatMessage {
@@ -377,6 +377,7 @@ export interface DuoAccount {
   id: string
   game_id: string
   label: string
+  riot_id: string | null
   current_rank: { tier: RankTier; division: Division } | null
   notes: string | null
   encrypted_credentials: string | null
@@ -384,6 +385,9 @@ export interface DuoAccount {
   created_by: string | null
   created_at: string
   updated_at: string
+  reserved_by: string | null
+  reserved_order_id: string | null
+  reserved_at: string | null
 }
 
 // ─── Booster Services ─────────────────────────────────────────────────────────

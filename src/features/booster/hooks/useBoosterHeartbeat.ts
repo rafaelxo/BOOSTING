@@ -4,10 +4,9 @@ import { supabase } from '@/lib/supabase'
 const HEARTBEAT_INTERVAL_MS = 60_000
 
 /**
- * Mantém a presença do booster atualizada enquanto o painel está aberto.
- * O RPC booster_heartbeat atualiza booster_profiles.last_active_at, de onde a
- * view public_booster_profiles deriva is_available (janela de 5 minutos) —
- * é isso que faz o site público mostrar o booster como "Disponível".
+ * Mantém booster_profiles.last_active_at atualizado enquanto o painel está
+ * aberto. Alimenta apenas o "visto por último" exibido publicamente — não há
+ * badge binário de status para aceitar pedidos.
  */
 export function useBoosterHeartbeat() {
   useEffect(() => {

@@ -1,18 +1,43 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Briefcase, Clock, Swords, Users,
-  Wallet, Banknote, PiggyBank, Hourglass, CalendarClock,
+  Briefcase, Clock, Swords, Users, CalendarClock, Wallet, ArrowRight,
+  Trophy, Target, Star, CheckCircle2, TrendingUp,
 } from 'lucide-react'
-import { Button, Card, Skeleton, EmptyState, StatCard } from '@/components/ui'
+import { Button, Card, Skeleton, StatCard, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
-import { formatDate } from '@/lib/utils'
-import type { Order, BoosterProfile, PayoutRecord } from '@/types'
+import type { Order, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
-import { useCurrency } from '@/hooks/useCurrency'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
+
+interface PerformanceSummary {
+  total_matches: number
+  wins: number
+  losses: number
+  average_kda: number | null
+  review_count: number
+  average_rating: number | null
+}
+
+function usePerformanceSummary(boosterId: string | undefined) {
+  return useQuery({
+    queryKey: ['booster-performance-summary', boosterId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_performance_segments')
+        .select('total_matches, wins, losses, average_kda, review_count, average_rating')
+        .eq('booster_id', boosterId!)
+        .eq('service_type', '__all__')
+        .eq('rank_bucket', '__all__')
+        .maybeSingle()
+      if (error) throw error
+      return data as PerformanceSummary | null
+    },
+    enabled: !!boosterId,
+  })
+}
 
 function useBoosterProfile(userId: string) {
   return useQuery({
@@ -50,32 +75,12 @@ function useAssignedOrders(boosterUserId: string | undefined) {
   })
 }
 
-interface PayoutSummary {
-  total_earned: number
-  total_withdrawn: number
-  available: number
-  processing: number
-}
-
-function usePayoutSummary(userId: string | undefined) {
-  return useQuery({
-    queryKey: ['booster-payout-summary', userId],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('booster_payout_summary' as never, { p_booster_user_id: userId! } as never)
-      if (error) throw error
-      return data as unknown as PayoutSummary
-    },
-    enabled: !!userId,
-  })
-}
-
 export function BoosterDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
-  const currency = useCurrency()
   const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
   const { data: activeOrders } = useAssignedOrders(profile?.id)
-  const { data: payoutSummary, isLoading: loadingPayoutSummary } = usePayoutSummary(
+  const { data: performance, isLoading: loadingPerformance } = usePerformanceSummary(
     boosterProfile?.status === 'approved' ? profile?.id : undefined,
   )
 
@@ -86,25 +91,7 @@ export function BoosterDashboard() {
         p_booster_user_id: profile!.id,
         p_boost_mode: 'solo',
       })
-      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top5: boolean; exclusive_slot_used: boolean; max_exclusive: number } | null
-    },
-    enabled: !!profile?.id && boosterProfile?.status === 'approved',
-  })
-
-  // Capped list for display only — the balance totals below come from
-  // booster_payout_summary(), a server-side aggregate over ALL payout rows,
-  // so the "Total Ganho" etc. boxes stay correct regardless of this limit.
-  const { data: payouts, isLoading: loadingPayouts } = useQuery({
-    queryKey: ['booster-payouts', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payout_records')
-        .select('*')
-        .eq('booster_id', profile!.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data as PayoutRecord[]
+      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean; exclusive_slot_used: boolean; max_exclusive: number } | null
     },
     enabled: !!profile?.id && boosterProfile?.status === 'approved',
   })
@@ -147,20 +134,6 @@ export function BoosterDashboard() {
     )
   }
 
-  // Ganho/Sacado/Disponível/Pendente — agregados no servidor sobre TODOS os
-  // payouts (booster_payout_summary), não só os 50 mais recentes da lista.
-  const totalEarned = payoutSummary?.total_earned ?? 0
-  const totalWithdrawn = payoutSummary?.total_withdrawn ?? 0
-  const available = payoutSummary?.available ?? 0
-  const processing = payoutSummary?.processing ?? 0
-
-  const BALANCE_BOXES = [
-    { label: 'Total Ganho', value: totalEarned, icon: Wallet, color: 'text-success bg-success/10' },
-    { label: 'Total Sacado', value: totalWithdrawn, icon: Banknote, color: 'text-brand bg-brand/10' },
-    { label: 'Valor Disponível', value: available, icon: PiggyBank, color: 'text-success bg-success/10' },
-    { label: 'Pagamento Pendente', value: processing, icon: Hourglass, color: 'text-warning bg-warning/10' },
-  ]
-
   return (
     <div className="max-w-5xl space-y-6">
       <div className="flex items-start justify-between">
@@ -180,20 +153,52 @@ export function BoosterDashboard() {
         </Button>
       </div>
 
-      {/* Saldo e movimentações */}
+      {/* Performance */}
       <div>
-        <h2 className="text-base font-semibold text-ink mb-3">Saldo</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {BALANCE_BOXES.map(({ label, value, icon, color }) => (
-            <StatCard
-              key={label}
-              label={label}
-              icon={icon}
-              color={color}
-              value={loadingPayoutSummary ? <Skeleton className="h-6 w-20" /> : currency(value)}
+        <h2 className="text-base font-semibold text-ink mb-3 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-ink-muted" />
+          Performance
+        </h2>
+        {loadingPerformance ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
+          </div>
+        ) : !performance || performance.total_matches === 0 ? (
+          <Card padding="md">
+            <EmptyState
+              icon={Trophy}
+              title="Ainda sem estatísticas suficientes"
+              description="Complete seus primeiros pedidos para ver win rate, KDA e avaliações aqui."
             />
-          ))}
-        </div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              label="Win rate"
+              icon={Target}
+              color="text-success bg-success/10"
+              value={`${((performance.wins / performance.total_matches) * 100).toFixed(1)}%`}
+            />
+            <StatCard
+              label="KDA médio"
+              icon={Swords}
+              color="text-brand bg-brand/10"
+              value={performance.average_kda != null ? performance.average_kda.toFixed(1) : '—'}
+            />
+            <StatCard
+              label="Avaliação"
+              icon={Star}
+              color="text-warning bg-warning/10"
+              value={performance.average_rating != null ? `${performance.average_rating.toFixed(1)} (${performance.review_count})` : 'Sem avaliações'}
+            />
+            <StatCard
+              label="Serviços concluídos"
+              icon={CheckCircle2}
+              color="text-accent bg-accent/10"
+              value={boosterProfile?.total_completed ?? 0}
+            />
+          </div>
+        )}
       </div>
 
       {/* Slot usage */}
@@ -203,14 +208,14 @@ export function BoosterDashboard() {
             <div>
               <p className="text-sm font-semibold text-ink flex items-center gap-2">
                 Slots de Pedido
-                {slotInfo.is_top5 && (
+                {slotInfo.is_top3 && (
                   <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2 py-0.5 uppercase tracking-wide">
-                    TOP 5
+                    TOP 3
                   </span>
                 )}
               </p>
               <p className="text-xs text-ink-muted mt-0.5">
-                {slotInfo.is_top5 ? 'Top5: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'} + 1 exclusivo
+                {slotInfo.is_top3 ? 'Top3: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'} + 1 exclusivo
               </p>
             </div>
           </div>
@@ -262,37 +267,21 @@ export function BoosterDashboard() {
         )}
       </div>
 
-      {/* Histórico de pagamentos (movimentações recentes) */}
-      <Card padding="md">
-        <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.earnings.payoutHistory')}</h3>
-        {loadingPayouts ? (
-          <Skeleton className="h-32 w-full" />
-        ) : !payouts?.length ? (
-          <EmptyState icon={Wallet} title={t('booster.earnings.noPayouts')} />
-        ) : (
-          <div className="space-y-2">
-            {payouts.map((p) => (
-              <div key={p.id} className="flex items-center justify-between py-2.5 border-b border-bg-elevated last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-ink">{t('booster.earnings.order', { id: p.order_id.slice(0, 8).toUpperCase() })}</p>
-                  <p className="text-xs text-ink-muted">{formatDate(p.created_at)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-success">{currency(p.net_amount)}</span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    p.status === 'paid' ? 'bg-success/10 text-success' :
-                    p.status === 'pending' ? 'bg-warning/10 text-warning' :
-                    p.status === 'processing' ? 'bg-brand/10 text-brand' :
-                    'bg-danger/10 text-danger'
-                  }`}>
-                    {p.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+      {/* Ganhos — detalhe completo em Pagamentos */}
+      <Link to="/booster/payments">
+        <Card padding="md" className="flex items-center justify-between hover:border-brand/20 hover:shadow-card-hover transition-all">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
+              <Wallet className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink">Saldo e pagamentos</p>
+              <p className="text-xs text-ink-muted">Veja saldo disponível, saques e histórico completo</p>
+            </div>
           </div>
-        )}
-      </Card>
+          <ArrowRight className="h-4 w-4 text-ink-muted shrink-0" />
+        </Card>
+      </Link>
     </div>
   )
 }

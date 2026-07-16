@@ -42,7 +42,7 @@ serve(async (req) => {
     const auth = await getAuthUser(req.headers.get('Authorization'))
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
 
-    const rateLimit = await consumeUserRateLimit('riot-account-rank', auth.user.id, 10, 60)
+    const rateLimit = await consumeUserRateLimit('riot-account-rank', auth.user.id, 20, 60)
     if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
 
     const rawBody = await readJsonBody(req, 8 * 1024)

@@ -166,6 +166,117 @@ export type Database = {
           },
         ]
       }
+      booster_order_events: {
+        Row: {
+          created_at: string
+          id: number
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_order_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booster_performance_segments: {
+        Row: {
+          adjusted_rating: number
+          adjusted_win_rate: number
+          average_kda: number | null
+          average_rating: number | null
+          booster_id: string
+          calculated_at: string
+          id: string
+          last_match_at: string | null
+          losses: number
+          normalized_kda: number
+          performance_score: number
+          rank_bucket: string
+          review_count: number
+          score_version: string
+          service_type: string
+          total_matches: number
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          adjusted_rating?: number
+          adjusted_win_rate?: number
+          average_kda?: number | null
+          average_rating?: number | null
+          booster_id: string
+          calculated_at?: string
+          id?: string
+          last_match_at?: string | null
+          losses?: number
+          normalized_kda?: number
+          performance_score?: number
+          rank_bucket?: string
+          review_count?: number
+          score_version?: string
+          service_type?: string
+          total_matches?: number
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          adjusted_rating?: number
+          adjusted_win_rate?: number
+          average_kda?: number | null
+          average_rating?: number | null
+          booster_id?: string
+          calculated_at?: string
+          id?: string
+          last_match_at?: string | null
+          losses?: number
+          normalized_kda?: number
+          performance_score?: number
+          rank_bucket?: string
+          review_count?: number
+          score_version?: string
+          service_type?: string
+          total_matches?: number
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_performance_segments_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "booster_performance_segments_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       booster_profiles: {
         Row: {
           available_days: string[] | null
@@ -181,8 +292,7 @@ export type Database = {
           hours_per_day_max: number | null
           hours_per_day_min: number | null
           id: string
-          is_available: boolean
-          is_top5: boolean
+          is_top3: boolean
           lanes: string[] | null
           last_active_at: string | null
           opgg_link: string | null
@@ -214,8 +324,7 @@ export type Database = {
           hours_per_day_max?: number | null
           hours_per_day_min?: number | null
           id?: string
-          is_available?: boolean
-          is_top5?: boolean
+          is_top3?: boolean
           lanes?: string[] | null
           last_active_at?: string | null
           opgg_link?: string | null
@@ -247,8 +356,7 @@ export type Database = {
           hours_per_day_max?: number | null
           hours_per_day_min?: number | null
           id?: string
-          is_available?: boolean
-          is_top5?: boolean
+          is_top3?: boolean
           lanes?: string[] | null
           last_active_at?: string | null
           opgg_link?: string | null
@@ -393,6 +501,10 @@ export type Database = {
           is_active: boolean
           label: string
           notes: string | null
+          reserved_at: string | null
+          reserved_by: string | null
+          reserved_order_id: string | null
+          riot_id: string | null
           updated_at: string
         }
         Insert: {
@@ -405,6 +517,10 @@ export type Database = {
           is_active?: boolean
           label: string
           notes?: string | null
+          reserved_at?: string | null
+          reserved_by?: string | null
+          reserved_order_id?: string | null
+          riot_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -417,6 +533,10 @@ export type Database = {
           is_active?: boolean
           label?: string
           notes?: string | null
+          reserved_at?: string | null
+          reserved_by?: string | null
+          reserved_order_id?: string | null
+          riot_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -425,6 +545,34 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_reserved_by_fkey"
+            columns: ["reserved_by"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_reserved_by_fkey"
+            columns: ["reserved_by"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_reserved_order_id_fkey"
+            columns: ["reserved_order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_reserved_order_id_fkey"
+            columns: ["reserved_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -620,6 +768,66 @@ export type Database = {
           },
           {
             foreignKeyName: "order_drop_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_matches: {
+        Row: {
+          assists: number
+          champion: string | null
+          created_at: string
+          deaths: number
+          duration_seconds: number | null
+          external_match_id: string
+          id: string
+          kills: number
+          order_id: string
+          played_at: string
+          queue_id: number | null
+          result: string
+        }
+        Insert: {
+          assists?: number
+          champion?: string | null
+          created_at?: string
+          deaths?: number
+          duration_seconds?: number | null
+          external_match_id: string
+          id?: string
+          kills?: number
+          order_id: string
+          played_at: string
+          queue_id?: number | null
+          result: string
+        }
+        Update: {
+          assists?: number
+          champion?: string | null
+          created_at?: string
+          deaths?: number
+          duration_seconds?: number | null
+          external_match_id?: string
+          id?: string
+          kills?: number
+          order_id?: string
+          played_at?: string
+          queue_id?: number | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_matches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_matches_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -827,7 +1035,9 @@ export type Database = {
           game_id: string
           id: string
           idempotency_key: string | null
+          last_match_synced_at: string | null
           losses_played: number
+          match_sync_started_at: string | null
           md5_matches_remaining: number | null
           mp_payment_id: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
@@ -877,7 +1087,9 @@ export type Database = {
           game_id: string
           id?: string
           idempotency_key?: string | null
+          last_match_synced_at?: string | null
           losses_played?: number
+          match_sync_started_at?: string | null
           md5_matches_remaining?: number | null
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
@@ -927,7 +1139,9 @@ export type Database = {
           game_id?: string
           id?: string
           idempotency_key?: string | null
+          last_match_synced_at?: string | null
           losses_played?: number
+          match_sync_started_at?: string | null
           md5_matches_remaining?: number | null
           mp_payment_id?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
@@ -958,17 +1172,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_chat_locked_by_fkey"
-            columns: ["chat_locked_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_booster_service_id_fkey"
             columns: ["booster_service_id"]
             isOneToOne: false
             referencedRelation: "booster_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_chat_locked_by_fkey"
+            columns: ["chat_locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1533,8 +1747,7 @@ export type Database = {
           display_name: string | null
           games: string[] | null
           id: string | null
-          is_available: boolean | null
-          is_top5: boolean | null
+          is_top3: boolean | null
           lanes: string[] | null
           last_active_at: string | null
           peak_rank: Json | null
@@ -1562,13 +1775,17 @@ export type Database = {
         Args: { p_booster_user_id: string; p_order_id: string }
         Returns: Json
       }
-      admin_set_order_chat_lock: {
-        Args: { p_locked: boolean; p_order_id: string }
-        Returns: Json
-      }
       admin_dashboard_stats: { Args: never; Returns: Json }
       admin_override_order_status: {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
+        Returns: Json
+      }
+      admin_release_duo_account: {
+        Args: { p_account_id: string }
+        Returns: Json
+      }
+      admin_set_order_chat_lock: {
+        Args: { p_locked: boolean; p_order_id: string }
         Returns: Json
       }
       approve_booster: {
@@ -1583,11 +1800,11 @@ export type Database = {
           total_count: number
         }[]
       }
-      booster_heartbeat: { Args: never; Returns: undefined }
       booster_has_active_exclusive_slot: {
         Args: { p_booster_user_id: string }
         Returns: boolean
       }
+      booster_heartbeat: { Args: never; Returns: undefined }
       booster_payout_summary: {
         Args: { p_booster_user_id: string }
         Returns: Json
@@ -1609,6 +1826,7 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_order_completion: { Args: { p_order_id: string }; Returns: Json }
       consume_edge_rate_limit: {
         Args: {
           p_limit: number
@@ -1622,28 +1840,39 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      dispute_order_completion: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Json
+      }
+      duo_account_rank_is_valid: { Args: { p_rank: Json }; Returns: boolean }
       ensure_profile_exists: {
         Args: { p_display_name?: string }
         Returns: undefined
       }
       expire_stale_pix_orders: { Args: never; Returns: undefined }
+      get_customer_order_state: { Args: { p_order_id?: string }; Returns: Json }
+      get_duo_account_access_token: {
+        Args: { p_account_id: string }
+        Returns: Json
+      }
       get_duo_account_credentials: {
         Args: { p_account_id: string }
         Returns: Json
       }
-      list_duo_accounts: { Args: never; Returns: Json }
+      get_order_chat: { Args: { p_order_id: string }; Returns: Json }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
-      get_customer_order_state: {
-        Args: { p_order_id?: string }
+      get_top_boosters: {
+        Args: {
+          p_limit?: number
+          p_rank_bucket?: string
+          p_service_type?: string
+        }
         Returns: Json
       }
-      get_order_chat: { Args: { p_order_id: string }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
       is_approved_booster: { Args: never; Returns: boolean }
-      log_match_result: {
-        Args: { p_losses: number; p_order_id: string; p_wins: number }
-        Returns: Json
-      }
+      list_duo_accounts: { Args: never; Returns: Json }
+      mark_order_match_sync: { Args: { p_order_id: string }; Returns: Json }
       onboard_booster:
         | {
             Args: {
@@ -1688,9 +1917,25 @@ export type Database = {
         }
         Returns: Json
       }
+      rank_bucket_of: { Args: { p_tier: string }; Returns: string }
       rank_step: {
         Args: { p_division: string; p_tier: string }
         Returns: number
+      }
+      record_order_match: {
+        Args: {
+          p_assists: number
+          p_champion: string
+          p_deaths: number
+          p_duration_seconds: number
+          p_external_match_id: string
+          p_kills: number
+          p_order_id: string
+          p_played_at: string
+          p_queue_id: number
+          p_result: string
+        }
+        Returns: Json
       }
       record_pix_payment: {
         Args: {
@@ -1701,14 +1946,26 @@ export type Database = {
         }
         Returns: Json
       }
+      refresh_booster_performance_segments: {
+        Args: { p_booster_id?: string }
+        Returns: undefined
+      }
       refresh_booster_rating: {
         Args: { p_booster_id: string }
         Returns: undefined
       }
-      refresh_top5_boosters: { Args: never; Returns: undefined }
+      refresh_top3_boosters: { Args: never; Returns: undefined }
+      release_duo_account_reservation: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       request_booster_role: { Args: never; Returns: Json }
       request_order_drop: {
         Args: { p_order_id: string; p_reason: string }
+        Returns: Json
+      }
+      reserve_duo_account: {
+        Args: { p_account_id: string; p_order_id: string }
         Returns: Json
       }
       resolve_drop_request: {
@@ -1719,43 +1976,62 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_duo_account_access_token: {
+        Args: { p_access_token: string; p_booster_user_id: string }
+        Returns: Json
+      }
       resolve_order_access_token: {
         Args: { p_access_token: string; p_booster_user_id: string }
         Returns: Json
       }
-      set_duo_account_credentials: {
-        Args: { p_account_id: string; p_login: string; p_password: string }
-        Returns: Json
-      }
-      save_duo_account: {
-        Args: {
-          p_account_id: string | null
-          p_division: string
-          p_is_active: boolean
-          p_label: string
-          p_login?: string | null
-          p_notes: string | null
-          p_password?: string | null
-          p_tier: string
-        }
+      save_duo_account:
+        | {
+            Args: {
+              p_account_id: string
+              p_division: string
+              p_is_active: boolean
+              p_label: string
+              p_login?: string
+              p_notes: string
+              p_password?: string
+              p_tier: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_account_id: string
+              p_division: string
+              p_is_active: boolean
+              p_label: string
+              p_login?: string
+              p_notes: string
+              p_password?: string
+              p_riot_id?: string
+              p_tier: string
+            }
+            Returns: Json
+          }
+      send_order_message: {
+        Args: { p_content: string; p_order_id: string }
         Returns: Json
       }
       set_duo_account_active: {
         Args: { p_account_id: string; p_is_active: boolean }
         Returns: Json
       }
+      set_duo_account_credentials: {
+        Args: { p_account_id: string; p_login: string; p_password: string }
+        Returns: Json
+      }
       set_order_credentials: {
         Args: { p_login: string; p_order_id: string; p_password: string }
         Returns: Json
       }
-      send_order_message: {
-        Args: { p_content: string; p_order_id: string }
-        Returns: Json
-      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
-      toggle_booster_top5: {
-        Args: { p_booster_id: string; p_is_top5: boolean }
+      toggle_booster_top3: {
+        Args: { p_booster_id: string; p_is_top3: boolean }
         Returns: Json
       }
       update_my_username: { Args: { p_username: string }; Returns: Json }

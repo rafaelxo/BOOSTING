@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { cn, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { isRankLocked, tierHasDivisions } from '@/lib/boostDomain'
+import { riotRankEmblemUrl } from '@/lib/riotAssets'
 import type { Division, RankTier } from '@/types'
 import { Shield, Star, Gem, Diamond, Crown, Flame } from 'lucide-react'
 
@@ -29,10 +30,14 @@ interface RankLockGridProps {
   disabled?: boolean
 }
 
+// live (Community Dragon) -> local (public/ranks/*.webp) -> ícone lucide —
+// mesmo padrão de fallback do RankBadge.
+type ImageStage = 'live' | 'local' | 'icon'
+
 function TierButton({ tier, isSelected, isLocked, onClick }: {
   tier: RankTier; isSelected: boolean; isLocked: boolean; onClick: () => void
 }) {
-  const [imgErr, setImgErr] = useState(false)
+  const [stage, setStage] = useState<ImageStage>('live')
   const FallbackIcon = TIER_FALLBACK[tier]
   return (
     <button
@@ -47,9 +52,13 @@ function TierButton({ tier, isSelected, isLocked, onClick }: {
             : 'border-bg-elevated bg-bg-card hover:border-brand/30 hover:bg-bg-elevated/40',
       )}
     >
-      {!imgErr ? (
-        <img src={TIER_IMAGE[tier]} alt={RANK_TIER_LABEL[tier]} onError={() => setImgErr(true)}
-          className="w-8 h-8 object-contain" draggable={false} />
+      {stage !== 'icon' ? (
+        <img
+          src={stage === 'live' ? riotRankEmblemUrl(tier) : TIER_IMAGE[tier]}
+          alt={RANK_TIER_LABEL[tier]}
+          onError={() => setStage((s) => s === 'live' ? 'local' : 'icon')}
+          className="w-8 h-8 object-contain" draggable={false}
+        />
       ) : (
         <FallbackIcon className={cn('w-7 h-7', RANK_TIER_COLOR[tier])} />
       )}

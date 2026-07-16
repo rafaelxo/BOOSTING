@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import tailwindcssAnimate from 'tailwindcss-animate'
 
 export default {
   darkMode: 'class',
@@ -55,6 +56,7 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['"Space Grotesk"', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       borderRadius: {
@@ -72,10 +74,10 @@ export default {
       backgroundImage: {
         'gradient-brand':  'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',
         'gradient-accent': 'linear-gradient(135deg, #F5B800 0%, #F97316 100%)',
-        'gradient-dark':   'linear-gradient(180deg, #0F1211 0%, #0B0D0C 100%)',
-        'gradient-card':   'linear-gradient(135deg, #151A18 0%, #1C2421 100%)',
-        'hero-glow':       'radial-gradient(ellipse 90% 70% at 50% -10%, rgba(34,197,94,0.18), transparent)',
-        'section-glow':    'radial-gradient(ellipse 60% 40% at 50% 100%, rgba(34,197,94,0.08), transparent)',
+        'gradient-dark':   'linear-gradient(180deg, #15181D 0%, #0F1216 100%)',
+        'gradient-card':   'linear-gradient(135deg, #1B1F24 0%, #232830 100%)',
+        'hero-glow':       'radial-gradient(ellipse 90% 70% at 50% -10%, rgba(34,197,94,0.16), transparent)',
+        'section-glow':    'radial-gradient(ellipse 60% 40% at 50% 100%, rgba(34,197,94,0.07), transparent)',
       },
       animation: {
         'fade-in':    'fadeIn 0.2s ease-in-out',
@@ -98,5 +100,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [tailwindcssAnimate],
 } satisfies Config
