@@ -238,8 +238,8 @@
       "jobs": "Jobs",
       "orders": "Pedidos",
       "services": "Serviços",
-      "accounts": "Contas",
       "payments": "Pagamentos",
+      "accounts": "Contas",
       "signOut": "Sair",
       "role": "Booster",
       "pendingBanner": "Candidatura pendente",
@@ -336,7 +336,6 @@
     "nav": {
       "operations": "Operações",
       "finance": "Finanças",
-      "system": "Sistema",
       "overview": "Visão Geral",
       "orders": "Pedidos",
       "boosters": "Boosters",
@@ -344,7 +343,6 @@
       "payments": "Pagamentos",
       "refunds": "Reembolsos",
       "reviews": "Avaliações",
-      "audit": "Auditoria",
       "signOut": "Sair",
       "role": "Admin",
       "panel": "Painel Admin"
@@ -437,17 +435,6 @@
         "date": "Data"
       },
       "empty": "Nenhum reembolso emitido"
-    },
-    "audit": {
-      "title": "Logs de Auditoria",
-      "table": {
-        "actor": "Ator",
-        "action": "Ação",
-        "entity": "Entidade",
-        "ip": "IP",
-        "time": "Hora"
-      },
-      "empty": "Nenhum evento de auditoria ainda"
     }
   },
   "pricing": {

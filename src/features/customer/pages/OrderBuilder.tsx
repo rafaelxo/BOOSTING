@@ -247,7 +247,7 @@ export function OrderBuilderPage() {
   })
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div>
       {/* Stepper */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-ink mb-1">Novo Pedido</h1>

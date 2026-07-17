@@ -23,7 +23,7 @@ export function CompletedOrderCard({ order }: CompletedOrderCardProps) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <p className="text-xs font-mono text-ink-muted">#{order.id.slice(0, 8).toUpperCase()}</p>
-            <p className="text-sm font-semibold text-ink truncate">{getServiceLabel(order.service_id)}</p>
+            <p className="text-sm font-semibold text-ink truncate">{getServiceLabel(order.service_type)}</p>
           </div>
           <OrderStatusBadge status={order.status} />
         </div>

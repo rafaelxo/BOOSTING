@@ -620,7 +620,7 @@ export function OrderDetailPage() {
   }, [order?.status, navigate])
 
   if (isLoading) return (
-    <div className="max-w-7xl space-y-4">
+    <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -628,7 +628,7 @@ export function OrderDetailPage() {
 
   if (isError) {
     return (
-      <div className="max-w-7xl space-y-4">
+      <div className="space-y-4">
         <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
         <Button onClick={() => refetch()}>Tentar novamente</Button>
       </div>
@@ -637,7 +637,7 @@ export function OrderDetailPage() {
 
   if (!order) {
     return (
-      <div className="max-w-7xl space-y-4">
+      <div className="space-y-4">
         <ErrorAlert message="Pedido não encontrado." />
         <Button onClick={() => navigate('/orders')}>Voltar para meus pedidos</Button>
       </div>
@@ -645,7 +645,7 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Button asChild variant="ghost" size="icon">
@@ -672,30 +672,38 @@ export function OrderDetailPage() {
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: t('customer.order.service'),     value: getServiceLabel(order.service_id as string) },
-                { label: t('customer.order.queue'),       value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') },
-                ...(order.service_id === 'elo_boost' && !order.pdl_bracket
+                { label: t('customer.order.service'), value: getServiceLabel(order.service_type) },
+                ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
+                  ? [{ label: t('customer.order.queue'), value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') }]
+                  : []),
+                ...(order.service_type === 'elo_boost' && !order.pdl_bracket
                   ? [{ label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
                   : []),
-                {
+                ...(order.current_rank ? [{
                   label: t('customer.order.currentRank'),
-                  value: order.current_rank ? formatRank(
+                  value: formatRank(
                     (order.current_rank as { tier: string }).tier as never,
                     (order.current_rank as { division: string }).division
-                  ) : '—',
-                },
-                {
+                  ),
+                }] : []),
+                ...(order.service_type === 'elo_boost' && order.target_rank ? [{
                   label: t('customer.order.targetRank'),
-                  value: order.target_rank ? formatRank(
+                  value: formatRank(
                     (order.target_rank as { tier: string }).tier as never,
                     (order.target_rank as { division: string }).division
-                  ) : '—',
-                },
+                  ),
+                }] : []),
                 ...(order.pdl_bracket ? [
                   { label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
                   { label: 'Méd. PDL Ganho/Vitória', value: order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—' },
                   { label: 'Méd. PDL Perdido/Derrota', value: order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—' },
                 ] : []),
+                ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
+                  ? [{ label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+                  : []),
+                ...(order.service_type === 'coaching' && order.sessions_purchased
+                  ? [{ label: 'Sessões', value: `${order.sessions_purchased}` }]
+                  : []),
                 { label: t('customer.order.totalPaid'),   value: currency(order.total_price) },
               ].map(({ label, value }) => (
                 <div key={label}>

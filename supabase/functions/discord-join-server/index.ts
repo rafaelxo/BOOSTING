@@ -99,7 +99,18 @@ serve(async (req) => {
       || String(auth.user.user_metadata?.sub ?? '') === discordUserId
     )
     if (!matchesLinkedIdentity && !matchesMetadataFallback) {
-      return errorResponse(req, 'Discord identity mismatch', 403)
+      // IDs do Discord (snowflakes) não são segredo — inclusos na resposta só
+      // pra diagnosticar esse mismatch sem precisar puxar os logs da function.
+      console.error('Discord identity mismatch', {
+        token_discord_id: discordUserId,
+        linked_identity_ids: discordIdentities.map((i) => i.identity_id),
+        metadata_provider_id: auth.user.user_metadata?.provider_id,
+        metadata_sub: auth.user.user_metadata?.sub,
+      })
+      return errorResponse(req, 'Discord identity mismatch', 403, 'DISCORD_IDENTITY_MISMATCH', {
+        token_discord_id: discordUserId,
+        linked_identity_ids: discordIdentities.map((i) => i.identity_id),
+      })
     }
 
     // Add user to the guild (bot must already be in the server)

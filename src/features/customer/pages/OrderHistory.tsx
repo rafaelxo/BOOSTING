@@ -49,7 +49,7 @@ export function OrderHistoryPage() {
   }) ?? []
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">{t('customer.history.title')}</h1>
 
       {/* Filters */}
@@ -98,7 +98,7 @@ export function OrderHistoryPage() {
               key={order.id}
               order={order}
               currency={currency}
-              subtitle={getServiceLabel(order.service_id as string)}
+              subtitle={getServiceLabel(order.service_type)}
               showIcon={false}
             />
           ))}

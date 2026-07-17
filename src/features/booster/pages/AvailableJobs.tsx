@@ -187,14 +187,14 @@ export function AvailableJobsPage() {
     }
     const msg = statusMessages[boosterProfile.status] ?? { title: t('booster.jobs.locked.default'), desc: t('booster.jobs.locked.defaultDesc') }
     return (
-      <div className="max-w-4xl">
+      <div>
         <EmptyState icon={Lock} title={msg.title} description={msg.desc} />
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-ink">{t('booster.jobs.title')}</h1>

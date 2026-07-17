@@ -342,20 +342,6 @@ export interface Notification {
   created_at: string
 }
 
-// ─── Audit ────────────────────────────────────────────────────────────────────
-
-export interface AuditLog {
-  id: string
-  actor_id: string
-  actor_role: UserRole
-  action: string
-  entity_type: string
-  entity_id: string
-  diff: Record<string, unknown> | null
-  ip_address: string | null
-  created_at: string
-}
-
 // ─── Earnings ─────────────────────────────────────────────────────────────────
 
 export interface PayoutRecord {

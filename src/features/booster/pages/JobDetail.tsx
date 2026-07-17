@@ -18,11 +18,15 @@ import { useTranslation } from 'react-i18next'
 type BoosterVisibleDuoAccount = {
   id: string
   label: string
+  riot_id: string | null
   current_rank: { tier: RankTier; division: Division } | null
   is_active: boolean
   reserved_by: string | null
   reserved_order_id: string | null
 }
+
+const DUO_FILTER_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
+const DUO_FILTER_DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 
 function DuoAccountSection({ order }: { order: Order }) {
   const queryClient = useQueryClient()
@@ -31,6 +35,9 @@ function DuoAccountSection({ order }: { order: Order }) {
   const [switching, setSwitching] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [search, setSearch] = useState('')
+  const [tierFilter, setTierFilter] = useState<RankTier | 'all'>('all')
+  const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all')
 
   const { data: accounts, isLoading } = useQuery({
     queryKey: ['booster-duo-accounts', order.id],
@@ -44,7 +51,12 @@ function DuoAccountSection({ order }: { order: Order }) {
   })
 
   const reserved = accounts?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
-  const available = accounts?.filter(a => a.reserved_by === null) ?? []
+  const available = (accounts?.filter(a => a.reserved_by === null) ?? []).filter((a) => {
+    if (search.trim() && !(a.riot_id ?? a.label).toLowerCase().includes(search.trim().toLowerCase())) return false
+    if (tierFilter !== 'all' && a.current_rank?.tier !== tierFilter) return false
+    if (divisionFilter !== 'all' && a.current_rank?.division !== divisionFilter) return false
+    return true
+  })
 
   const reserve = useMutation({
     mutationFn: async (accountId: string) => {
@@ -98,7 +110,7 @@ function DuoAccountSection({ order }: { order: Order }) {
         <div className="space-y-3">
           <div className="flex items-center justify-between bg-bg-elevated rounded-xl px-3 py-2.5">
             <div>
-              <p className="text-sm font-semibold text-ink">{reserved.label}</p>
+              <p className="text-sm font-semibold text-ink">{reserved.riot_id ?? reserved.label}</p>
               {reserved.current_rank && (
                 <p className="text-xs text-ink-muted">
                   {RANK_TIER_LABEL[reserved.current_rank.tier]} {reserved.current_rank.division}
@@ -146,37 +158,73 @@ function DuoAccountSection({ order }: { order: Order }) {
         </div>
       ) : (
         <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-1.5">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nick..."
+              className="input-base col-span-3 sm:col-span-1 text-xs"
+            />
+            <select
+              value={tierFilter}
+              onChange={(e) => { setTierFilter(e.target.value as RankTier | 'all'); setSelectedAccountId('') }}
+              className="input-base text-xs"
+            >
+              <option value="all">Elo</option>
+              {DUO_FILTER_TIERS.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
+            </select>
+            <select
+              value={divisionFilter}
+              onChange={(e) => { setDivisionFilter(e.target.value as Division | 'all'); setSelectedAccountId('') }}
+              className="input-base text-xs"
+            >
+              <option value="all">Divisão</option>
+              {DUO_FILTER_DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+
           {available.length === 0 ? (
-            <p className="text-xs text-ink-muted">Nenhuma conta Duo disponível no momento.</p>
+            <p className="text-xs text-ink-muted py-2">Nenhuma conta Duo disponível com esse filtro.</p>
           ) : (
-            <>
-              <select
-                value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="input-base w-full text-sm"
-              >
-                <option value="">Selecione uma conta...</option>
-                {available.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}{a.current_rank ? ` — ${RANK_TIER_LABEL[a.current_rank.tier]} ${a.current_rank.division}` : ''}
-                  </option>
-                ))}
-              </select>
-              <Button
-                size="sm"
-                className="w-full"
-                disabled={!selectedAccountId}
-                loading={reserve.isPending}
-                onClick={() => reserve.mutate(selectedAccountId)}
-              >
-                Reservar esta conta
-              </Button>
-              {switching && (
-                <Button size="sm" variant="ghost" className="w-full" onClick={() => setSwitching(false)}>
-                  Cancelar
-                </Button>
-              )}
-            </>
+            <div className="max-h-52 space-y-1.5 overflow-y-auto pr-0.5">
+              {available.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setSelectedAccountId(a.id)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors ${
+                    selectedAccountId === a.id
+                      ? 'border-brand bg-brand/10'
+                      : 'border-bg-elevated hover:bg-bg-elevated/60'
+                  }`}
+                >
+                  {a.current_rank && (
+                    <RankBadge tier={a.current_rank.tier} division={a.current_rank.division} size="xs" showLabel={false} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink">{a.riot_id ?? a.label}</p>
+                    {a.current_rank && (
+                      <p className="text-[10px] text-ink-muted">{RANK_TIER_LABEL[a.current_rank.tier]} {a.current_rank.division}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={!selectedAccountId}
+            loading={reserve.isPending}
+            onClick={() => reserve.mutate(selectedAccountId)}
+          >
+            Reservar esta conta
+          </Button>
+          {switching && (
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => setSwitching(false)}>
+              Cancelar
+            </Button>
           )}
           {reserve.isError && (
             <ErrorAlert message={reserve.error instanceof Error ? reserveErrorMessage(reserve.error.message) : 'Erro ao reservar conta'} />
@@ -332,7 +380,7 @@ export function JobDetailPage() {
 
   if (orderError) {
     return (
-      <div className="max-w-4xl space-y-4">
+      <div className="space-y-4">
         <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
         <Button onClick={() => refetchOrder()}>Tentar novamente</Button>
       </div>
@@ -347,7 +395,7 @@ export function JobDetailPage() {
   )
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
           <Link to="/booster/jobs"><ArrowLeft className="h-4 w-4" /></Link>

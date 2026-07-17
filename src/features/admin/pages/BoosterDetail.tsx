@@ -135,7 +135,7 @@ export function AdminBoosterDetailPage() {
   const isPending = booster.status === 'pending' || booster.status === 'under_review'
 
   return (
-    <div className="max-w-6xl space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Button asChild variant="ghost" size="icon">

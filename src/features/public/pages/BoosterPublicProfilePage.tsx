@@ -1,9 +1,9 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, TrendingUp, Zap, DollarSign, Package, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, Zap, DollarSign, Package, MessageSquare } from 'lucide-react'
 import { Button, Card, RankBadge, Avatar, Skeleton, StarRating, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { timeAgo, formatRank, formatDate, formatLastSeen } from '@/lib/utils'
+import { timeAgo, formatRank, formatDate, formatLastSeen, getServiceLabel } from '@/lib/utils'
 import { LANE_LABEL, SPECIALTY_LABEL } from '@/lib/lolTaxonomy'
 import type { BoosterProfile, BoosterService, Review, RankTier } from '@/types'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -96,8 +96,30 @@ export function BoosterPublicProfilePage() {
   const hasLanes      = booster.lanes && booster.lanes.length > 0
   const hasSpecialties = booster.specialties && booster.specialties.length > 0
 
+  const statCells: {
+    key: string
+    label: string
+    value: string
+    color: string
+    icon?: typeof CheckCircle2
+    rankTier?: RankTier
+    rankDivision?: string | null
+  }[] = [
+    { key: 'completed', icon: CheckCircle2, label: 'Concluídos',       value: String(booster.total_completed), color: 'text-success' },
+    { key: 'rating',    icon: Star,         label: 'Avaliação',        value: booster.rating_count > 0 ? `${booster.rating.toFixed(1)} / 5` : '—', color: 'text-warning' },
+    { key: 'lastSeen',  icon: Clock,        label: 'Visto por último', value: booster.last_active_at ? timeAgo(booster.last_active_at) : '—', color: 'text-ink-secondary' },
+    {
+      key: 'peakRank',
+      label: 'Rank Máximo',
+      value: booster.peak_rank ? formatRank(booster.peak_rank.tier as RankTier, (booster.peak_rank as { division?: string | null }).division ?? null) : '—',
+      color: 'text-brand',
+      rankTier: booster.peak_rank?.tier as RankTier | undefined,
+      rankDivision: (booster.peak_rank as { division?: string | null })?.division ?? null,
+    },
+  ]
+
   return (
-    <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 space-y-6">
+    <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16 space-y-10">
       {/* Back */}
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to="/boosters"><ArrowLeft className="h-4 w-4 mr-1" /> Todos os Boosters</Link>
@@ -122,6 +144,21 @@ export function BoosterPublicProfilePage() {
               <p className="text-[10px] font-medium text-ink-muted">
                 {formatLastSeen(booster.last_active_at)}
               </p>
+            </div>
+
+            {/* Estatísticas — 2x2 logo abaixo do nome/badge */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {statCells.map(({ key, icon: Icon, label, value, color, rankTier, rankDivision }) => (
+                <div key={key} className="rounded-xl bg-bg-elevated/50 p-2.5 flex flex-col items-center gap-1">
+                  {rankTier ? (
+                    <RankBadge tier={rankTier} division={rankDivision as never} size="xs" showLabel={false} />
+                  ) : Icon ? (
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  ) : null}
+                  <p className="text-xs font-bold text-ink text-center leading-tight">{value}</p>
+                  <p className="text-[9px] text-ink-muted uppercase tracking-wide">{label}</p>
+                </div>
+              ))}
             </div>
 
             {booster.rating_count > 0 && (
@@ -176,37 +213,10 @@ export function BoosterPublicProfilePage() {
               </div>
             )}
           </Card>
-
-          {/* CTA */}
-          <Card padding="md" variant="brand" className="text-center space-y-3">
-            <div>
-              <p className="text-sm font-bold text-ink">Quer boostar com {booster.display_name}?</p>
-              <p className="text-xs text-ink-secondary mt-0.5">Faça um pedido e o booster poderá aceitar.</p>
-            </div>
-            <Button asChild size="sm" className="w-full">
-              <Link to={`/orders/new?booster=${booster.user_id}`}>Fazer Pedido</Link>
-            </Button>
-          </Card>
         </div>
 
         {/* ── Main content ── */}
         <div className="lg:col-span-2 space-y-6">
-
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { icon: CheckCircle2, label: 'Concluídos',    value: String(booster.total_completed),            color: 'text-success'        },
-              { icon: Star,         label: 'Avaliação',     value: booster.rating_count > 0 ? `${booster.rating.toFixed(1)} / 5` : '—', color: 'text-warning' },
-              { icon: Clock,        label: 'Visto por último', value: booster.last_active_at ? timeAgo(booster.last_active_at) : '—', color: 'text-ink-secondary' },
-              { icon: TrendingUp,   label: 'Rank Máximo',  value: booster.peak_rank ? `${booster.peak_rank.tier}${booster.peak_rank.division ? ' ' + booster.peak_rank.division : ''}` : '—', color: 'text-brand' },
-            ].map(({ icon: Icon, label, value, color }) => (
-              <Card key={label} padding="md" className="flex flex-col gap-1">
-                <Icon className={`h-4 w-4 ${color}`} />
-                <p className="text-[10px] text-ink-muted mt-1">{label}</p>
-                <p className="text-sm font-bold text-ink capitalize">{value}</p>
-              </Card>
-            ))}
-          </div>
 
           {/* Serviços */}
           {services.length > 0 && (
@@ -215,10 +225,18 @@ export function BoosterPublicProfilePage() {
                 <Package className="h-4 w-4 text-brand" />
                 <h2 className="text-sm font-bold text-ink">Serviços</h2>
               </div>
+              <p className="text-xs text-ink-muted mb-4">
+                Pacotes oferecidos diretamente por {booster.display_name} — cada um com escopo, tempo estimado e preço fechado.
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {services.map(s => (
                   <div key={s.id} className="rounded-xl border border-bg-elevated bg-bg-elevated/30 p-4 flex flex-col gap-2">
-                    <p className="text-sm font-bold text-ink">{s.title}</p>
+                    <div>
+                      <p className="text-sm font-bold text-ink">{s.title}</p>
+                      {s.service_type && (
+                        <p className="text-[10px] font-semibold text-brand uppercase tracking-wide mt-0.5">{getServiceLabel(s.service_type)}</p>
+                      )}
+                    </div>
                     {s.description && (
                       <p className="text-xs text-ink-secondary leading-relaxed flex-1">{s.description}</p>
                     )}
@@ -261,6 +279,17 @@ export function BoosterPublicProfilePage() {
             </Card>
           )}
 
+          {/* CTA — logo abaixo dos serviços */}
+          <Card padding="md" variant="brand" className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-center sm:text-left">
+              <p className="text-sm font-bold text-ink">Quer boostar com {booster.display_name}?</p>
+              <p className="text-xs text-ink-secondary mt-0.5">Faça um pedido e o booster poderá aceitar.</p>
+            </div>
+            <Button asChild size="sm" className="w-full sm:w-auto shrink-0">
+              <Link to={`/orders/new?booster=${booster.user_id}`}>Fazer Pedido</Link>
+            </Button>
+          </Card>
+
           {/* Rank stats */}
           <Card padding="md">
             <div className="flex items-center gap-2 mb-4">
@@ -302,30 +331,32 @@ export function BoosterPublicProfilePage() {
             )}
           </Card>
 
-          {/* Avaliações */}
-          <Card padding="md">
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="h-4 w-4 text-brand" />
-              <h2 className="text-sm font-bold text-ink">Avaliações</h2>
-            </div>
-            {!reviews.length ? (
-              <EmptyState icon={MessageSquare} title="Este booster ainda não recebeu avaliações." />
-            ) : (
-              <div className="space-y-3">
-                {reviews.map(review => (
-                  <div key={review.id} className="rounded-xl border border-bg-elevated p-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <StarRating rating={review.rating} size="xs" showValue={false} />
-                      <span className="text-[10px] text-ink-muted">{formatDate(review.created_at)}</span>
-                    </div>
-                    {review.content && <p className="text-xs text-ink-secondary leading-relaxed">{review.content}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
         </div>
+      </div>
+
+      {/* ── Avaliações — carrossel full-width no rodapé ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="h-4 w-4 text-brand" />
+          <h2 className="text-sm font-bold text-ink">Avaliações</h2>
+        </div>
+        {!reviews.length ? (
+          <EmptyState icon={MessageSquare} title="Este booster ainda não recebeu avaliações." />
+        ) : (
+          <div className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
+            <div className="flex w-max gap-4 animate-marquee group-hover:[animation-play-state:paused]">
+              {[...reviews, ...reviews].map((review, i) => (
+                <div key={`${review.id}-${i}`} className="w-72 shrink-0 rounded-xl border border-bg-elevated bg-bg-card p-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <StarRating rating={review.rating} size="xs" showValue={false} />
+                    <span className="text-[10px] text-ink-muted">{formatDate(review.created_at)}</span>
+                  </div>
+                  {review.content && <p className="text-xs text-ink-secondary leading-relaxed line-clamp-4">{review.content}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

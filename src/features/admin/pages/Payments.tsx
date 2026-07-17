@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Banknote, CheckCircle2, Clock3, CreditCard, DollarSign,
-  Hourglass, ReceiptText, Search, XCircle,
+  ReceiptText, Search,
 } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
@@ -82,7 +82,7 @@ function sumByStatus(rows: PayoutRow[] | undefined, status: PayoutStatus) {
 export function AdminPaymentsPage() {
   const currency = useCurrency()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<PaymentsTab>('payouts')
+  const [tab, setTab] = useState<PaymentsTab>('payments')
   const [payoutFilter, setPayoutFilter] = useState<PayoutFilter>('pending')
   const [search, setSearch] = useState('')
 
@@ -162,9 +162,7 @@ export function AdminPaymentsPage() {
   }, [filteredPayouts])
 
   const pendingTotal = sumByStatus(payouts, 'pending')
-  const processingTotal = sumByStatus(payouts, 'processing')
   const paidTotal = sumByStatus(payouts, 'paid')
-  const failedTotal = sumByStatus(payouts, 'failed')
   const collectedTotal = payments?.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0) ?? 0
 
   return (
@@ -181,28 +179,26 @@ export function AdminPaymentsPage() {
         <div className="flex rounded-xl border border-bg-elevated bg-bg-surface p-1">
           <button
             type="button"
-            onClick={() => setTab('payouts')}
-            className={cn('rounded-lg px-3 py-2 text-sm font-bold transition-colors', tab === 'payouts' ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink')}
-          >
-            Repasses aos boosters
-          </button>
-          <button
-            type="button"
             onClick={() => setTab('payments')}
             className={cn('rounded-lg px-3 py-2 text-sm font-bold transition-colors', tab === 'payments' ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink')}
           >
-            Recebimentos PIX
+            Recebimentos
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('payouts')}
+            className={cn('rounded-lg px-3 py-2 text-sm font-bold transition-colors', tab === 'payouts' ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink')}
+          >
+            Repasses
           </button>
         </div>
       </div>
 
       {tab === 'payouts' ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2">
             <StatCard label="A pagar" value={currency(pendingTotal)} icon={Clock3} tone="bg-warning/10 text-warning" />
-            <StatCard label="Processando" value={currency(processingTotal)} icon={Hourglass} tone="bg-brand/10 text-brand" />
-            <StatCard label="Já pago" value={currency(paidTotal)} icon={CheckCircle2} tone="bg-success/10 text-success" />
-            <StatCard label="Falhou" value={currency(failedTotal)} icon={XCircle} tone="bg-danger/10 text-danger" />
+            <StatCard label="Pagos" value={currency(paidTotal)} icon={CheckCircle2} tone="bg-success/10 text-success" />
           </div>
 
           {boosterSummary.length > 0 && (
@@ -354,10 +350,9 @@ export function AdminPaymentsPage() {
         </>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard label="Recebido dos clientes" value={currency(collectedTotal)} icon={DollarSign} tone="bg-success/10 text-success" />
-            <StatCard label="Pagamentos listados" value={String(payments?.length ?? 0)} icon={ReceiptText} tone="bg-brand/10 text-brand" />
-            <StatCard label="Repasses já pagos" value={currency(paidTotal)} icon={Banknote} tone="bg-success/10 text-success" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <StatCard label="Recebido do cliente" value={currency(collectedTotal)} icon={DollarSign} tone="bg-success/10 text-success" />
+            <StatCard label="Pedidos listados" value={String(payments?.length ?? 0)} icon={ReceiptText} tone="bg-brand/10 text-brand" />
           </div>
 
           <Card padding="none">

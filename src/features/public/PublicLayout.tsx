@@ -153,9 +153,9 @@ export function PublicLayout() {
 
             {[
               { title: t('footer.services'), links: [
-                { href: '/orders/new?service=elo_boost',          label: t('footer.eloBoost') },
-                { href: '/orders/new?service=win_boost',          label: t('footer.winBoost') },
-                { href: '/orders/new?service=coaching',           label: t('footer.coaching') },
+                { href: '/services#elo-boost', label: t('footer.eloBoost') },
+                { href: '/services#win-boost', label: t('footer.winBoost') },
+                { href: '/services#coaching',  label: t('footer.coaching') },
               ]},
               { title: t('footer.company'), links: [
                 { href: '/pricing',   label: t('footer.pricing')  },

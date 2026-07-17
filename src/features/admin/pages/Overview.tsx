@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { ShoppingBag, DollarSign, Users } from 'lucide-react'
+import { ShoppingBag, DollarSign, Users, Banknote, TrendingUp } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton, StatCard } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
@@ -12,6 +12,8 @@ import { useCurrency } from '@/hooks/useCurrency'
 
 interface AdminDashboardStats {
   total_revenue: number
+  total_payouts: number
+  platform_profit: number
   active_orders_count: number
   pending_boosters_count: number
   recent_orders: Pick<Order, 'id' | 'status' | 'total_price' | 'created_at'>[]
@@ -48,7 +50,7 @@ export function AdminOverview() {
   , [stats?.daily_orders])
 
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-ink">{t('admin.overview.title')}</h1>
         <div className="flex items-center gap-2 text-xs text-ink-muted">
@@ -60,16 +62,18 @@ export function AdminOverview() {
       {/* KPI cards */}
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {[
-            { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10', trend: '+12%' },
-            { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10', trend: null },
-            { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10', trend: null },
-          ].map(({ label, value, icon, color, trend }) => (
-            <StatCard key={label} label={label} value={value} icon={icon} color={color} trend={trend} iconSize="md" />
+            { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10' },
+            { label: 'Repasses geral', value: currency(stats?.total_payouts ?? 0), icon: Banknote, color: 'text-info bg-info/10' },
+            { label: 'Lucro da plataforma', value: currency(stats?.platform_profit ?? 0), icon: TrendingUp, color: 'text-brand bg-brand/10' },
+            { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10' },
+            { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10' },
+          ].map(({ label, value, icon, color }) => (
+            <StatCard key={label} label={label} value={value} icon={icon} color={color} iconSize="md" />
           ))}
         </div>
       )}

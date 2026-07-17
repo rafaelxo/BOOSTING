@@ -84,9 +84,13 @@ export function CustomerLayout() {
           </div>
         </header>
 
-        {/* Content */}
+        {/* Content — largura padronizada pra toda página do painel do cliente
+            herdar exatamente o mesmo tamanho, em vez de cada página escolher
+            o próprio max-w. */}
         <main className="flex-1 overflow-auto p-6 lg:p-8">
-          <Outlet />
+          <div className="max-w-7xl mx-auto w-full">
+            <Outlet />
+          </div>
         </main>
 
         {/* Mobile bottom nav */}

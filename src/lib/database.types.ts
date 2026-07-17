@@ -1840,6 +1840,7 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      delete_duo_account: { Args: { p_account_id: string }; Returns: Json }
       dispute_order_completion: {
         Args: { p_order_id: string; p_reason: string }
         Returns: Json

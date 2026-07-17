@@ -92,7 +92,7 @@ export function AdminOrdersPage() {
                       #{order.id.slice(0, 8).toUpperCase()}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-ink">{getServiceLabel(order.service_id as string)}</TableCell>
+                  <TableCell className="text-ink">{getServiceLabel(order.service_type)}</TableCell>
                   <TableCell className="font-semibold text-ink">{currency(order.total_price)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">

@@ -121,7 +121,7 @@ export function AdminOrderDetailPage() {
 
   if (orderError) {
     return (
-      <div className="max-w-4xl space-y-4">
+      <div className="space-y-4">
         <ErrorAlert message="Não foi possível carregar o pedido. Tente novamente." />
         <Button onClick={() => refetchOrder()}>Tentar novamente</Button>
       </div>
@@ -131,7 +131,7 @@ export function AdminOrderDetailPage() {
   if (!order) return null
 
   return (
-    <div className="max-w-5xl space-y-5">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button asChild variant="ghost" size="icon">
@@ -156,16 +156,28 @@ export function AdminOrderDetailPage() {
               {(
                 [
                   ['Cliente', parties?.customerUsername ?? '…'],
-                  ['Serviço', getServiceLabel(order.service_id as string)],
-                  ['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex'],
-                  ...(!order.pdl_bracket ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']] : []),
-                  ['Rank Atual', order.current_rank ? formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division) : '—'],
-                  ['Rank Alvo', order.target_rank ? formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division) : '—'],
+                  ['Serviço', getServiceLabel(order.service_type)],
+                  ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
+                    ? [['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex']]
+                    : []),
+                  ...(order.service_type === 'elo_boost' && !order.pdl_bracket
+                    ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]
+                    : []),
+                  ...(order.current_rank ? [['Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
+                  ...(order.service_type === 'elo_boost' && order.target_rank
+                    ? [['Rank Alvo', formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)]]
+                    : []),
                   ...(order.pdl_bracket ? [
                     ['PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
                     ['Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
                     ['Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
                   ] : []),
+                  ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
+                    ? [['Vitórias Compradas', `${order.wins_purchased}`]]
+                    : []),
+                  ...(order.service_type === 'coaching' && order.sessions_purchased
+                    ? [['Sessões', `${order.sessions_purchased}`]]
+                    : []),
                   ['Base', currency(order.base_price)],
                   ['Extras', currency(order.extras_price)],
                   ['Total', currency(order.total_price)],

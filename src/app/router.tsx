@@ -47,7 +47,6 @@ const AdminBoosterDetailPage = lazy(() => import('@/features/admin/pages/Booster
 const AdminCustomersPage  = lazy(() => import('@/features/admin/pages/Customers').then(m => ({ default: m.AdminCustomersPage })))
 const AdminPaymentsPage   = lazy(() => import('@/features/admin/pages/Payments').then(m => ({ default: m.AdminPaymentsPage })))
 const AdminRefundsPage    = lazy(() => import('@/features/admin/pages/Refunds').then(m => ({ default: m.AdminRefundsPage })))
-const AdminAuditPage      = lazy(() => import('@/features/admin/pages/AuditLogs').then(m => ({ default: m.AdminAuditPage })))
 const AdminDropsPage      = lazy(() => import('@/features/admin/pages/Drops').then(m => ({ default: m.AdminDropsPage })))
 const AdminDuoAccountsPage = lazy(() => import('@/features/admin/pages/DuoAccounts').then(m => ({ default: m.AdminDuoAccountsPage })))
 
@@ -145,8 +144,8 @@ export const router = createBrowserRouter([
           { path: '/admin/customers',    element: <SuspensePage><AdminCustomersPage /></SuspensePage> },
           { path: '/admin/payments',     element: <SuspensePage><AdminPaymentsPage /></SuspensePage> },
           { path: '/admin/refunds',      element: <SuspensePage><AdminRefundsPage /></SuspensePage> },
-          { path: '/admin/audit',        element: <SuspensePage><AdminAuditPage /></SuspensePage> },
           { path: '/admin/reviews',      element: <Navigate to="/admin" replace /> },
+          { path: '/admin/audit',        element: <Navigate to="/admin" replace /> },
           // Catálogo de serviços/preços passou a ser gerido só pelo sistema (fórmulas
           // em shared/pricing.ts + migrations) — sem UI de admin dedicada.
           { path: '/admin/services',     element: <Navigate to="/admin" replace /> },

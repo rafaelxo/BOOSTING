@@ -19,9 +19,9 @@ function ApprovedBoosterPanel() {
     { href: '/booster',          icon: LayoutDashboard, label: t('booster.nav.dashboard') },
     { href: '/booster/jobs',     icon: Briefcase,        label: t('booster.nav.jobs')      },
     { href: '/booster/orders',   icon: ClipboardList,    label: t('booster.nav.orders')    },
+    { href: '/booster/payments', icon: Wallet,           label: t('booster.nav.payments')  },
     { href: '/booster/services', icon: Wrench,           label: t('booster.nav.services')  },
     { href: '/booster/accounts', icon: Landmark,         label: t('booster.nav.accounts')  },
-    { href: '/booster/payments', icon: Wallet,           label: t('booster.nav.payments')  },
   ]
 
   return (
@@ -65,8 +65,11 @@ function ApprovedBoosterPanel() {
           <div className="hidden md:block" />
           <UserAccountBadge />
         </header>
+        {/* Largura padronizada — mesma régua do painel de cliente e admin. */}
         <main className="flex-1 overflow-auto p-6 lg:p-8">
-          <Outlet />
+          <div className="max-w-7xl mx-auto w-full">
+            <Outlet />
+          </div>
         </main>
 
         <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0" aria-label="Navegação do booster">

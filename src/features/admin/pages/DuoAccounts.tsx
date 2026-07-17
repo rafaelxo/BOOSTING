@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2 } from 'lucide-react'
+import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2, Trash2 } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
+import { FormField } from '@/components/ui/FormField'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
@@ -16,32 +17,37 @@ type RiotRankResponse = {
   ranked?: boolean
   tier?: RankTier
   division?: Division | null
+  league_points?: number
+  avg_lp_gain?: number | null
+  avg_lp_loss?: number | null
   message?: string
 }
 
-const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-const DUO_RANK_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
 type AdminDuoAccount = DuoAccount & { has_credentials?: boolean }
 
 function duoAccountError(code?: string): string {
   const messages: Record<string, string> = {
     unauthorized: 'Somente administradores podem gerenciar contas Duo.',
-    invalid_label: 'Informe um identificador válido para a conta.',
+    invalid_label: 'Riot ID inválido para identificar a conta.',
+    invalid_riot_id: 'Riot ID muito longo.',
     rank_out_of_supported_range: 'Contas Duo devem estar entre Ferro IV e Diamante I.',
     login_and_password_required_together: 'Preencha login e senha juntos.',
     credentials_required: 'Uma conta ativa precisa ter login e senha cadastrados.',
     invalid_credentials: 'Login ou senha inválidos.',
     account_not_found: 'Conta Duo não encontrada.',
+    account_reserved: 'Libere a reserva desta conta antes de excluí-la.',
     server_key_not_configured: 'A chave de criptografia do servidor não está configurada.',
   }
   return messages[code ?? ''] ?? 'Não foi possível salvar a conta Duo.'
 }
 
 interface AccountForm {
-  label: string
   riot_id: string
   tier: RankTier
   division: Division
+  leaguePoints: number | null
+  avgGain: number | null
+  avgLoss: number | null
   notes: string
   is_active: boolean
   login: string
@@ -49,15 +55,18 @@ interface AccountForm {
 }
 
 const EMPTY_FORM: AccountForm = {
-  label: '', riot_id: '', tier: 'gold', division: 'IV', notes: '', is_active: true, login: '', password: '',
+  riot_id: '', tier: 'gold', division: 'IV', leaguePoints: null, avgGain: null, avgLoss: null,
+  notes: '', is_active: true, login: '', password: '',
 }
 
 function accountToForm(a: AdminDuoAccount): AccountForm {
   return {
-    label: a.label,
     riot_id: a.riot_id ?? '',
     tier: a.current_rank?.tier ?? 'gold',
     division: a.current_rank?.division ?? 'IV',
+    leaguePoints: null,
+    avgGain: null,
+    avgLoss: null,
     notes: a.notes ?? '',
     is_active: a.is_active,
     login: '',
@@ -85,17 +94,20 @@ export function AdminDuoAccountsPage() {
     },
     onSuccess: (result) => {
       setRiotLookupError(null)
-      if (!result.found) {
+      if (!result.found || !result.ranked || !result.tier) {
         setRiotLookupMessage(null)
-        setRiotLookupError('Conta Riot não encontrada.')
+        setRiotLookupError(!result.found ? 'Conta Riot não encontrada.' : 'Conta sem rank nesta fila — contas Duo precisam de um rank definido.')
         return
       }
-      if (result.ranked && result.tier) {
-        setForm((f) => ({ ...f, tier: result.tier!, division: result.division ?? 'IV' }))
-        setRiotLookupMessage(result.message ?? 'Rank preenchido automaticamente a partir da Riot.')
-      } else {
-        setRiotLookupMessage('Conta sem rank nesta fila — preencha o rank manualmente abaixo.')
-      }
+      setForm((f) => ({
+        ...f,
+        tier: result.tier!,
+        division: result.division ?? 'IV',
+        leaguePoints: result.league_points ?? null,
+        avgGain: result.avg_lp_gain ?? null,
+        avgLoss: result.avg_lp_loss ?? null,
+      }))
+      setRiotLookupMessage(result.message ?? 'Rank preenchido automaticamente a partir da Riot.')
       setRiotVerified(true)
     },
     onError: (err) => {
@@ -128,7 +140,8 @@ export function AdminDuoAccountsPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      if (!form.label.trim()) throw new Error('Nome/identificador é obrigatório')
+      if (!form.riot_id.trim()) throw new Error('Riot ID é obrigatório')
+      if (modal?.mode === 'create' && !riotVerified) throw new Error('Verifique o Riot ID antes de salvar')
       if (modal?.mode === 'create' && (!form.login.trim() || !form.password.trim())) {
         throw new Error('Login e senha são obrigatórios ao criar uma conta')
       }
@@ -136,11 +149,12 @@ export function AdminDuoAccountsPage() {
       // save_duo_account aceita NULL em p_account_id/p_notes/p_login/p_password
       // (criação vs. edição, campos opcionais) — o tipo gerado pelo Supabase
       // não modela isso para parâmetros escalares de RPC, daí o cast pontual
-      // para a assinatura real da função em vez de usar `any`.
+      // para a assinatura real da função em vez de usar `any`. label = riot_id:
+      // não existe mais um identificador manual separado na UI.
       const { data, error } = await supabase.rpc('save_duo_account', {
         p_account_id: modal?.mode === 'edit' ? modal.account?.id ?? null : null,
-        p_riot_id: form.riot_id.trim() || null,
-        p_label: form.label.trim(),
+        p_riot_id: form.riot_id.trim(),
+        p_label: form.riot_id.trim(),
         p_tier: form.tier,
         p_division: form.division,
         p_notes: form.notes.trim() || null,
@@ -176,6 +190,20 @@ export function AdminDuoAccountsPage() {
       if (!result?.success) throw new Error(duoAccountError(result?.error))
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] }),
+  })
+
+  const [deleteTarget, setDeleteTarget] = useState<AdminDuoAccount | null>(null)
+  const deleteAccount = useMutation({
+    mutationFn: async (accountId: string) => {
+      const { data, error } = await supabase.rpc('delete_duo_account', { p_account_id: accountId })
+      if (error) throw error
+      const result = data as { success?: boolean; error?: string } | null
+      if (!result?.success) throw new Error(duoAccountError(result?.error))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] })
+      setDeleteTarget(null)
+    },
   })
 
   async function toggleReveal(a: AdminDuoAccount) {
@@ -226,7 +254,7 @@ export function AdminDuoAccountsPage() {
                 const rev = revealed[a.id]
                 return (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium text-ink">{a.label}</TableCell>
+                    <TableCell className="font-medium text-ink">{a.riot_id ?? a.label}</TableCell>
                     <TableCell>
                       {a.current_rank ? (
                         <div className="flex items-center gap-2">
@@ -278,6 +306,16 @@ export function AdminDuoAccountsPage() {
                         <Button size="xs" variant="ghost" onClick={() => setModal({ mode: 'edit', account: a })}>
                           Editar
                         </Button>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          className="text-danger hover:bg-danger/10"
+                          disabled={!!a.reserved_by}
+                          title={a.reserved_by ? 'Libere a reserva antes de excluir' : 'Excluir conta'}
+                          onClick={() => setDeleteTarget(a)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -293,21 +331,15 @@ export function AdminDuoAccountsPage() {
         onOpenChange={(open) => !open && setModal(null)}
         title={modal?.mode === 'edit' ? 'Editar Conta Duo' : 'Adicionar Conta Duo'}
         description="Login e senha são criptografados no banco e só podem ser revelados por admins e boosters aprovados."
+        maxWidth="lg"
       >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Identificador</label>
-            <input
-              value={form.label}
-              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-              className="input-base w-full text-sm"
-              placeholder="Ex: Conta Duo BR #1"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Riot ID</label>
-            <div className="flex gap-2">
+        <div className="space-y-5">
+          <FormField
+            label="Riot ID"
+            required
+            hint="Consulta rank, divisão e PDL/LP atuais na Riot — nenhum campo de rank é preenchido manualmente."
+          >
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={form.riot_id}
                 onChange={(e) => {
@@ -316,97 +348,89 @@ export function AdminDuoAccountsPage() {
                   setRiotLookupMessage(null)
                   setRiotLookupError(null)
                 }}
-                className="input-base w-full text-sm"
-                placeholder="Ex: NomeDaConta#BR1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); lookupRiot.mutate() }
+                }}
+                className="input-base flex-1"
+                placeholder="NomeDaConta#TAG"
                 autoComplete="off"
+                disabled={modal?.mode === 'edit'}
+                maxLength={32}
               />
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0"
-                loading={lookupRiot.isPending}
-                disabled={!form.riot_id.trim()}
+              <button
+                type="button"
                 onClick={() => lookupRiot.mutate()}
-                leftIcon={<Search className="h-3.5 w-3.5" />}
+                disabled={lookupRiot.isPending || !form.riot_id.trim()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Verificar
-              </Button>
+                <Search className="h-4 w-4" />
+                {lookupRiot.isPending ? 'Consultando...' : 'Verificar'}
+              </button>
             </div>
-            <p className="text-[10px] text-ink-muted">
-              Consulta rank e PDL atuais na Riot antes de liberar login/senha abaixo.
-            </p>
-            {riotLookupMessage && (
-              <p className="text-xs text-success flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {riotLookupMessage}</p>
-            )}
-            {riotLookupError && <ErrorAlert message={riotLookupError} />}
-          </div>
+            {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
+          </FormField>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank atual</label>
-              <select
-                value={form.tier}
-                onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as RankTier }))}
-                className="input-base w-full text-sm"
-              >
-                {DUO_RANK_TIERS.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
-              </select>
+          {riotVerified && (
+            <div className="flex items-center gap-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3.5">
+              <RankBadge tier={form.tier} division={form.division} size="md" showLabel={false} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-ink">
+                  {RANK_TIER_LABEL[form.tier]} {form.division}
+                </p>
+                <p className="text-xs text-ink-secondary flex items-center gap-1 mt-0.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
+                  {riotLookupMessage ?? 'Rank cadastrado — verifique novamente pra atualizar.'}
+                </p>
+              </div>
+              {form.leaguePoints != null && (
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-bold text-ink">{form.leaguePoints} PDL</p>
+                  {form.avgGain != null && (
+                    <p className="text-[11px] text-ink-muted mt-0.5">
+                      Média: +{form.avgGain}{form.avgLoss != null ? ` / −${form.avgLoss}` : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Divisão</label>
-              <select
-                value={form.division}
-                onChange={(e) => setForm((f) => ({ ...f, division: e.target.value as Division }))}
-                className="input-base w-full text-sm"
-              >
-                {DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
 
           {!riotVerified ? (
-            <p className="text-xs text-ink-muted rounded-xl border border-bg-elevated bg-bg-elevated/40 px-3 py-2.5">
+            <p className="text-xs text-ink-muted rounded-xl border border-bg-elevated bg-bg-elevated/40 px-4 py-3">
               Verifique o Riot ID acima para liberar os campos de login e senha.
             </p>
           ) : (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-                Login {modal?.mode === 'edit' && '(deixe em branco p/ manter)'}
-              </label>
-              <input
-                value={form.login}
-                onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
-                className="input-base w-full text-sm"
-                autoComplete="off"
-              />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <FormField label={`Login${modal?.mode === 'edit' ? ' (deixe em branco p/ manter)' : ''}`}>
+                <input
+                  value={form.login}
+                  onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
+                  className="input-base w-full"
+                  autoComplete="off"
+                />
+              </FormField>
+              <FormField label={`Senha${modal?.mode === 'edit' ? ' (deixe em branco p/ manter)' : ''}`}>
+                <input
+                  type="text"
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  className="input-base w-full"
+                  autoComplete="off"
+                />
+              </FormField>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-                Senha {modal?.mode === 'edit' && '(deixe em branco p/ manter)'}
-              </label>
-              <input
-                type="text"
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                className="input-base w-full text-sm"
-                autoComplete="off"
-              />
-            </div>
-          </div>
           )}
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Notas internas</label>
+          <FormField label="Notas internas">
             <textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               rows={2}
-              className="input-base w-full text-sm resize-none"
+              className="input-base w-full resize-none"
             />
-          </div>
+          </FormField>
 
-          <label className="flex items-center gap-2 text-sm text-ink-secondary">
+          <label className="flex items-center gap-2.5 text-sm text-ink-secondary">
             <input
               type="checkbox"
               checked={form.is_active}
@@ -418,9 +442,32 @@ export function AdminDuoAccountsPage() {
 
           {save.isError && <ErrorAlert message={(save.error as Error).message} />}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-bg-elevated -mx-6 px-6 -mb-6 pb-6 mt-2">
             <Button variant="secondary" onClick={() => setModal(null)}>Cancelar</Button>
             <Button loading={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Excluir conta Duo"
+        description={`Tem certeza que quer excluir "${deleteTarget?.riot_id ?? deleteTarget?.label}"? Essa ação não pode ser desfeita.`}
+      >
+        <div className="space-y-3">
+          {deleteAccount.isError && (
+            <ErrorAlert message={deleteAccount.error instanceof Error ? deleteAccount.error.message : 'Erro ao excluir'} />
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+            <Button
+              variant="danger"
+              loading={deleteAccount.isPending}
+              onClick={() => deleteTarget && deleteAccount.mutate(deleteTarget.id)}
+            >
+              Excluir
+            </Button>
           </div>
         </div>
       </Modal>

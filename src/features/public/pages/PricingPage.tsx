@@ -7,7 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
-const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster' | 'challenger'> = ['master', 'grandmaster', 'challenger']
+const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster'> = ['master', 'grandmaster']
 
 const WIN_TIERS: RankTier[] = [
   'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',
@@ -147,24 +147,24 @@ export function PricingPage() {
 
         {/* ── Coaching ── */}
         <section>
-          <div className="card p-6 flex items-start gap-4">
+          <h2 className="text-xl font-bold text-ink mb-1">Coaching</h2>
+          <p className="text-sm text-ink-secondary mb-4">
+            Sessões individuais com um booster Grão-mestre ou Desafiante — valor combinado por sessão de acordo com o coach escolhido.
+          </p>
+          <div className="card p-6 flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
             <div className="h-11 w-11 rounded-2xl bg-success/20 border border-success/30 flex items-center justify-center shrink-0">
               <MessageCircle className="h-5 w-5 text-success" />
             </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-ink mb-1">Coaching</h2>
-              <p className="text-sm text-ink-secondary mb-3">
-                Sessões individuais com um booster Grão-mestre ou Desafiante. Selecione o pacote que mais combina com seus objetivos.
-              </p>
-              <div className="flex flex-col gap-2 text-sm mb-3">
-                {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
-                  <span key={item} className="flex items-center gap-1.5 text-xs text-ink-secondary">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
-                  </span>
-                ))}
-              </div>
-              <p className="text-lg font-bold text-brand">Valor a combinar · por sessão</p>
+            <div className="flex flex-col gap-2 items-start">
+              {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
+                <span key={item} className="flex items-center gap-1.5 text-sm text-ink-secondary">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
+                </span>
+              ))}
             </div>
+            <p className="text-lg font-bold text-brand pt-2 border-t border-bg-elevated w-full">
+              Valor a combinar <span className="text-xs font-normal text-ink-muted">· por sessão</span>
+            </p>
           </div>
         </section>
 
@@ -190,30 +190,15 @@ export function PricingPage() {
           <div className="mt-8">
             <h3 className="text-sm font-bold text-ink mb-1">+ MD5: garantia de win rate — ative automaticamente se ainda não jogou o posicionamento</h3>
             <p className="text-xs text-ink-secondary mb-3">Preço da Vitória Avulsa com 50% de desconto. Valor abaixo já é o pacote completo de 5 vitórias — menos vitórias desconta proporcionalmente.</p>
-            <div className="card overflow-hidden p-0">
-              <table className="w-full text-sm">
-                <thead className="border-b border-bg-elevated">
-                  <tr>
-                    <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Rank desejado</th>
-                    <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Preço</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-bg-elevated">
-                  {MD5_TIERS.map((tier) => (
-                    <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
-                      <td className="py-3 px-5">
-                        <div className="flex items-center gap-3">
-                          <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
-                          <span className={`font-semibold ${RANK_TIER_COLOR[tier]}`}>
-                            {RANK_TIER_LABEL[tier]}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {MD5_TIERS.map((tier) => (
+                <div key={tier} className="card p-4 text-center flex flex-col items-center gap-1.5">
+                  <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
+                  <p className={`text-sm font-bold ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</p>
+                  <p className="text-xl font-extrabold text-ink">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</p>
+                  <p className="text-[10px] text-ink-muted mt-0.5">pacote MD5</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>

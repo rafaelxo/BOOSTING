@@ -28,7 +28,7 @@ export function BoosterServicesPage() {
   if (!profile) return null
 
   return (
-    <div className="max-w-3xl space-y-8">
+    <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-bold text-ink">Serviços</h1>
         {boosterProfileId && (

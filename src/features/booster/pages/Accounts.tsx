@@ -7,7 +7,7 @@ import { RANK_TIER_LABEL } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { DuoAccount } from '@/types'
 
-type BoosterVisibleDuoAccount = Pick<DuoAccount, 'id' | 'label' | 'current_rank' | 'is_active' | 'reserved_by' | 'reserved_order_id'>
+type BoosterVisibleDuoAccount = Pick<DuoAccount, 'id' | 'label' | 'riot_id' | 'current_rank' | 'is_active' | 'reserved_by' | 'reserved_order_id'>
 
 export function BoosterAccountsPage() {
   const { profile } = useAuthStore()
@@ -26,7 +26,7 @@ export function BoosterAccountsPage() {
   const reserved = accounts?.filter(a => a.reserved_by === profile?.id) ?? []
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink">Contas Duo Boost</h1>
         <p className="text-sm text-ink-secondary mt-1">
@@ -55,7 +55,7 @@ export function BoosterAccountsPage() {
                     <RankBadge tier={a.current_rank.tier} division={a.current_rank.division} size="sm" showLabel={false} />
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink truncate">{a.label}</p>
+                    <p className="text-sm font-semibold text-ink truncate">{a.riot_id ?? a.label}</p>
                     {a.current_rank && (
                       <p className="text-xs text-ink-muted">
                         {RANK_TIER_LABEL[a.current_rank.tier]}{a.current_rank.division ? ` ${a.current_rank.division}` : ''}

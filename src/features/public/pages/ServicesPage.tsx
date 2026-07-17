@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { TrendingUp, Zap, Users, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
@@ -21,7 +22,7 @@ const SERVICES = [
       'Proteção VPN + conta offline em cada partida',
       'Começa em até 30 minutos',
     ],
-    color: 'text-brand',
+    color: 'text-success',
     bgColor: 'bg-brand/10',
     cta: '/orders/new?service=elo_boost',
   },
@@ -39,7 +40,7 @@ const SERVICES = [
       'Solo queue ou flex',
       'Começa em até 30 minutos',
     ],
-    color: 'text-accent',
+    color: 'text-success',
     bgColor: 'bg-accent/10',
     cta: '/orders/new?service=win_boost',
   },
@@ -93,6 +94,19 @@ function ExtraGroup({ flow, label }: { flow: BoostFlow; label: string }) {
 }
 
 export function ServicesPage() {
+  const { hash } = useLocation()
+
+  // Deep-link do footer (ex: /services#elo-boost) — sem isso a navegação
+  // troca a URL mas fica no topo da página, já que essa rota não usa scroll
+  // automático de hash como o botão "Serviços" da home usa.
+  useEffect(() => {
+    if (!hash) return
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [hash])
+
   return (
     <div className="py-16">
       <div className="container-app space-y-20">
@@ -107,8 +121,8 @@ export function ServicesPage() {
 
         {/* Services */}
         <div className="space-y-8">
-          {SERVICES.map(({ icon: Icon, title, tagline, description, rankRange, highlights, color, bgColor, cta }) => (
-            <div key={title} className="card p-8 flex flex-col md:flex-row gap-8">
+          {SERVICES.map(({ icon: Icon, slug, title, tagline, description, rankRange, highlights, color, bgColor, cta }) => (
+            <div key={title} id={slug.replace(/_/g, '-')} className="card p-8 flex flex-col md:flex-row gap-8 scroll-mt-24">
               <div className="md:w-2/5 space-y-4">
                 <div className={`h-12 w-12 rounded-2xl ${bgColor} flex items-center justify-center`}>
                   <Icon className={`h-6 w-6 ${color}`} />

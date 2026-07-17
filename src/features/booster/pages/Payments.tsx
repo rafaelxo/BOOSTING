@@ -64,7 +64,7 @@ export function BoosterPaymentsPage() {
   ]
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink">Pagamentos</h1>
         <p className="text-ink-secondary mt-1">Saldo, saques e histórico de pagamentos por pedido.</p>
