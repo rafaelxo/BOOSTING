@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -8,14 +9,6 @@ import { cn, formatRank, formatLastSeen } from '@/lib/utils'
 import type { BoosterProfile, RankTier, Division } from '@/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function overallWinRate(b: BoosterProfile): number {
-  const s = b.rank_stats
-  if (!s) return 0
-  const values = [s.gold_minus?.winrate, s.plat_diamond?.winrate, s.master_plus?.winrate]
-    .filter((v): v is number => v !== undefined)
-  return values.length ? values.reduce((a, c) => a + c, 0) / values.length : 0
-}
 
 interface TopBoosterEntry {
   booster_id: string
@@ -95,9 +88,7 @@ function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position:
 
 // ── BoosterCard (grid) ────────────────────────────────────────────────────────
 
-function BoosterCard({ booster }: { booster: BoosterProfile }) {
-  const winRate = overallWinRate(booster)
-
+function BoosterCard({ booster, winRate }: { booster: BoosterProfile; winRate: number }) {
   return (
     <Link to={`/boosters/${booster.id}`}>
       <div className="card flex flex-col items-center text-center gap-3 p-4 hover:border-brand/30 hover:shadow-card-hover transition-all cursor-pointer h-full">
@@ -184,6 +175,33 @@ export function BoostersPage() {
     staleTime: 60_000,
   })
 
+  const boosterUserIds = useMemo(() => (boosters ?? []).map(b => b.user_id), [boosters])
+
+  // Win rate real, calculado a partir de partidas sincronizadas
+  // (booster_performance_segments -- ver migration 054), nunca digitado à
+  // mão. Rollup geral do booster: service_type/rank_bucket = '__all__'.
+  const { data: overallPerformance } = useQuery({
+    queryKey: ['public-boosters-performance', boosterUserIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_performance_segments')
+        .select('booster_id, adjusted_win_rate, total_matches')
+        .in('booster_id', boosterUserIds)
+        .eq('service_type', '__all__')
+        .eq('rank_bucket', '__all__')
+      if (error) throw error
+      return data as { booster_id: string; adjusted_win_rate: number; total_matches: number }[]
+    },
+    enabled: boosterUserIds.length > 0,
+    staleTime: 60_000,
+  })
+
+  const winRateByUserId = useMemo(() => new Map(
+    (overallPerformance ?? [])
+      .filter(s => s.total_matches > 0)
+      .map(s => [s.booster_id, s.adjusted_win_rate * 100]),
+  ), [overallPerformance])
+
   const sorted = boosters ? [...boosters].sort((a, b) => b.rating - a.rating) : []
   const top3Ids = new Set((top3 ?? []).map(b => b.booster_id))
   const rest = sorted.filter(b => !top3Ids.has(b.id))
@@ -263,7 +281,7 @@ export function BoostersPage() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.35 }}
                   >
-                    <BoosterCard booster={b} />
+                    <BoosterCard booster={b} winRate={winRateByUserId.get(b.user_id) ?? 0} />
                   </motion.div>
                 ))}
               </div>

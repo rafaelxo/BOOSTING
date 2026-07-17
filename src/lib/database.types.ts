@@ -83,89 +83,6 @@ export type Database = {
           },
         ]
       }
-      booster_applications: {
-        Row: {
-          admin_notes: string | null
-          available_days: string[]
-          cpf: string | null
-          created_at: string
-          discord_tag: string | null
-          email: string | null
-          full_name: string | null
-          games: string[]
-          has_coaching: boolean
-          hours_per_week: number
-          id: string
-          motivation: string
-          opgg_link: string | null
-          peak_rank: string
-          phone: string | null
-          region: string
-          roles: string[]
-          status: string
-          summoner_name: string
-          updated_at: string
-          user_id: string | null
-          years_experience: number
-        }
-        Insert: {
-          admin_notes?: string | null
-          available_days?: string[]
-          cpf?: string | null
-          created_at?: string
-          discord_tag?: string | null
-          email?: string | null
-          full_name?: string | null
-          games?: string[]
-          has_coaching?: boolean
-          hours_per_week: number
-          id?: string
-          motivation: string
-          opgg_link?: string | null
-          peak_rank: string
-          phone?: string | null
-          region: string
-          roles?: string[]
-          status?: string
-          summoner_name: string
-          updated_at?: string
-          user_id?: string | null
-          years_experience: number
-        }
-        Update: {
-          admin_notes?: string | null
-          available_days?: string[]
-          cpf?: string | null
-          created_at?: string
-          discord_tag?: string | null
-          email?: string | null
-          full_name?: string | null
-          games?: string[]
-          has_coaching?: boolean
-          hours_per_week?: number
-          id?: string
-          motivation?: string
-          opgg_link?: string | null
-          peak_rank?: string
-          phone?: string | null
-          region?: string
-          roles?: string[]
-          status?: string
-          summoner_name?: string
-          updated_at?: string
-          user_id?: string | null
-          years_experience?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "booster_applications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       booster_order_events: {
         Row: {
           created_at: string
@@ -298,7 +215,6 @@ export type Database = {
           opgg_link: string | null
           peak_rank: Json | null
           queue_preferences: string[]
-          rank_stats: Json | null
           rating: number
           rating_count: number
           region_preferences: string[]
@@ -330,7 +246,6 @@ export type Database = {
           opgg_link?: string | null
           peak_rank?: Json | null
           queue_preferences?: string[]
-          rank_stats?: Json | null
           rating?: number
           rating_count?: number
           region_preferences?: string[]
@@ -362,7 +277,6 @@ export type Database = {
           opgg_link?: string | null
           peak_rank?: Json | null
           queue_preferences?: string[]
-          rank_stats?: Json | null
           rating?: number
           rating_count?: number
           region_preferences?: string[]
@@ -389,7 +303,7 @@ export type Database = {
           availability_note: string | null
           booster_id: string
           created_at: string | null
-          description: string | null
+          description: string
           id: string
           is_active: boolean
           lanes: string[] | null
@@ -398,7 +312,7 @@ export type Database = {
           rules: string | null
           service_type: string | null
           specialties: string[] | null
-          tempo: string | null
+          tempo: string
           title: string
           unit: string
           updated_at: string
@@ -407,7 +321,7 @@ export type Database = {
           availability_note?: string | null
           booster_id: string
           created_at?: string | null
-          description?: string | null
+          description: string
           id?: string
           is_active?: boolean
           lanes?: string[] | null
@@ -416,7 +330,7 @@ export type Database = {
           rules?: string | null
           service_type?: string | null
           specialties?: string[] | null
-          tempo?: string | null
+          tempo: string
           title: string
           unit?: string
           updated_at?: string
@@ -425,7 +339,7 @@ export type Database = {
           availability_note?: string | null
           booster_id?: string
           created_at?: string | null
-          description?: string | null
+          description?: string
           id?: string
           is_active?: boolean
           lanes?: string[] | null
@@ -434,7 +348,7 @@ export type Database = {
           rules?: string | null
           service_type?: string | null
           specialties?: string[] | null
-          tempo?: string | null
+          tempo?: string
           title?: string
           unit?: string
           updated_at?: string
@@ -1507,6 +1421,27 @@ export type Database = {
           },
         ]
       }
+      riot_league_cutoffs: {
+        Row: {
+          cutoff_lp: number
+          fetched_at: string
+          queue: Database["public"]["Enums"]["queue_type"]
+          tier: string
+        }
+        Insert: {
+          cutoff_lp: number
+          fetched_at?: string
+          queue: Database["public"]["Enums"]["queue_type"]
+          tier: string
+        }
+        Update: {
+          cutoff_lp?: number
+          fetched_at?: string
+          queue?: Database["public"]["Enums"]["queue_type"]
+          tier?: string
+        }
+        Relationships: []
+      }
       service_extras: {
         Row: {
           code: string | null
@@ -1600,50 +1535,6 @@ export type Database = {
       }
     }
     Views: {
-      admin_duo_accounts: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          current_rank: Json | null
-          game_id: string | null
-          id: string | null
-          is_active: boolean | null
-          label: string | null
-          notes: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          current_rank?: Json | null
-          game_id?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          label?: string | null
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          current_rank?: Json | null
-          game_id?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          label?: string | null
-          notes?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "duo_accounts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       available_boost_orders: {
         Row: {
           avg_pdl_gain: number | null
@@ -1751,7 +1642,6 @@ export type Database = {
           lanes: string[] | null
           last_active_at: string | null
           peak_rank: Json | null
-          rank_stats: Json | null
           rating: number | null
           rating_count: number | null
           specialties: string[] | null
@@ -1776,6 +1666,10 @@ export type Database = {
         Returns: Json
       }
       admin_dashboard_stats: { Args: never; Returns: Json }
+      admin_drop_order: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Json
+      }
       admin_override_order_status: {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
@@ -1871,7 +1765,9 @@ export type Database = {
         Returns: Json
       }
       is_admin: { Args: never; Returns: boolean }
-      is_approved_booster: { Args: never; Returns: boolean }
+      is_approved_booster:
+        | { Args: never; Returns: boolean }
+        | { Args: { p_booster_id: string }; Returns: boolean }
       list_duo_accounts: { Args: never; Returns: Json }
       mark_order_match_sync: { Args: { p_order_id: string }; Returns: Json }
       onboard_booster:
@@ -1888,6 +1784,20 @@ export type Database = {
           }
         | {
             Args: {
+              p_bio: string
+              p_cpf?: string
+              p_display_name: string
+              p_full_name?: string
+              p_hours_per_day_max?: number
+              p_hours_per_day_min?: number
+              p_opgg_link?: string
+              p_peak_rank: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_available_days?: string[]
               p_bio: string
               p_cpf?: string
               p_display_name: string
@@ -2033,6 +1943,24 @@ export type Database = {
       show_trgm: { Args: { "": string }; Returns: string[] }
       toggle_booster_top3: {
         Args: { p_booster_id: string; p_is_top3: boolean }
+        Returns: Json
+      }
+      update_booster_professional_profile: {
+        Args: {
+          p_available_days: string[]
+          p_bio: string
+          p_display_name: string
+          p_hours_per_day_max: number
+          p_hours_per_day_min: number
+          p_lanes: string[]
+          p_opgg_link: string
+          p_peak_tier: string
+          p_specialties: string[]
+        }
+        Returns: Json
+      }
+      update_duo_account_rank: {
+        Args: { p_account_id: string; p_division: string; p_tier: string }
         Returns: Json
       }
       update_my_username: { Args: { p_username: string }; Returns: Json }

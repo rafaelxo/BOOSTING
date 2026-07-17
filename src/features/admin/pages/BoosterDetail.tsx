@@ -1,39 +1,41 @@
-import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, Save } from 'lucide-react'
-import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
+import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, ClipboardList } from 'lucide-react'
+import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert, EmptyState } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { formatDate, formatRank, formatLastSeen, RANK_TIER_ORDER, RANK_TIER_LABEL } from '@/lib/utils'
+import { formatDate, formatDateTime, formatRank, formatLastSeen, timeAgo } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { BoosterProfile, RankTier, Division } from '@/types'
+import type { BoosterProfile } from '@/types'
 
-const DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
-const MASTER_PLUS: RankTier[] = ['master', 'grandmaster', 'challenger']
-
-type RankStatsBracket = 'gold_minus' | 'plat_diamond' | 'master_plus'
-const BRACKET_LABEL: Record<RankStatsBracket, string> = {
-  gold_minus: 'Ouro-',
+type RankBucket = 'gold_minus' | 'plat_diamond' | 'master_plus'
+const BRACKET_LABEL: Record<RankBucket, string> = {
+  gold_minus: 'Ouro e abaixo',
   plat_diamond: 'Platina–Diamante',
   master_plus: 'Mestre+',
 }
 
-interface RankStatsForm {
-  current_tier: RankTier | ''
-  current_division: Division | ''
-  stats: Record<RankStatsBracket, { kda: string; winrate: string }>
+interface PerformanceSegment {
+  rank_bucket: string
+  average_kda: number | null
+  adjusted_win_rate: number
+  total_matches: number
 }
 
-function emptyStatsForm(): RankStatsForm {
-  return {
-    current_tier: '',
-    current_division: '',
-    stats: {
-      gold_minus: { kda: '', winrate: '' },
-      plat_diamond: { kda: '', winrate: '' },
-      master_plus: { kda: '', winrate: '' },
-    },
-  }
+interface AuditLogEntry {
+  id: string
+  actor_id: string
+  actor_role: string
+  action: string
+  created_at: string
+}
+
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  'booster.approved': 'Booster aprovado',
+  'booster.rejected': 'Candidatura rejeitada',
+  'booster.suspended': 'Booster suspenso',
+  'booster.under_review': 'Candidatura em revisão',
+  'booster.top3_granted': 'Marcado como Top3',
+  'booster.top3_removed': 'Removido do Top3',
 }
 
 function safeOpggUrl(url: string | null): string | undefined {
@@ -46,6 +48,8 @@ function safeOpggUrl(url: string | null): string | undefined {
     return undefined
   }
 }
+
+const DAY_LABEL: Record<string, string> = { mon: 'Seg', tue: 'Ter', wed: 'Qua', thu: 'Qui', fri: 'Sex', sat: 'Sáb', sun: 'Dom' }
 
 export function AdminBoosterDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -60,6 +64,7 @@ export function AdminBoosterDetailPage() {
       return data as unknown as BoosterProfile
     },
     enabled: !!id,
+    refetchInterval: 20000,
   })
 
   const { data: slotInfo } = useQuery({
@@ -72,6 +77,43 @@ export function AdminBoosterDetailPage() {
       return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean } | null
     },
     enabled: !!booster?.user_id && booster?.status === 'approved',
+    refetchInterval: 15000,
+  })
+
+  // Desempenho por faixa de elo -- calculado automaticamente a partir de
+  // partidas reais sincronizadas (order_matches) e reviews, nunca digitado
+  // à mão (ver refresh_booster_performance_segments, migration 054).
+  const { data: performanceSegments } = useQuery({
+    queryKey: ['admin-booster-performance', booster?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_performance_segments')
+        .select('rank_bucket, average_kda, adjusted_win_rate, total_matches')
+        .eq('booster_id', booster!.user_id)
+        .eq('service_type', '__all__')
+        .neq('rank_bucket', '__all__')
+      if (error) throw error
+      return data as PerformanceSegment[]
+    },
+    enabled: !!booster?.user_id,
+  })
+
+  // Trilha de auditoria pra controle admin -- aprovação/rejeição/suspensão e
+  // mudanças de Top3 (approve_booster / toggle_booster_top3).
+  const { data: auditLog } = useQuery({
+    queryKey: ['admin-booster-audit', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('id, actor_id, actor_role, action, created_at')
+        .eq('entity_type', 'booster_profile')
+        .eq('entity_id', id!)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (error) throw error
+      return data as AuditLogEntry[]
+    },
+    enabled: !!id,
   })
 
   const updateStatus = useMutation({
@@ -84,55 +126,15 @@ export function AdminBoosterDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-booster', id] })
       queryClient.invalidateQueries({ queryKey: ['admin-boosters'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-booster-audit', id] })
     },
-  })
-
-  // Estatísticas públicas (rank_stats / current_rank) — antes só editável
-  // manualmente via SQL direto no banco; sem isso o pódio público e o perfil
-  // público do booster nunca tinham dado real pra mostrar.
-  const [statsForm, setStatsForm] = useState<RankStatsForm>(emptyStatsForm())
-
-  useEffect(() => {
-    if (!booster) return
-    const s = booster.rank_stats
-    setStatsForm({
-      current_tier: booster.current_rank?.tier ?? '',
-      current_division: booster.current_rank?.division ?? '',
-      stats: {
-        gold_minus: { kda: s?.gold_minus?.kda?.toString() ?? '', winrate: s?.gold_minus?.winrate?.toString() ?? '' },
-        plat_diamond: { kda: s?.plat_diamond?.kda?.toString() ?? '', winrate: s?.plat_diamond?.winrate?.toString() ?? '' },
-        master_plus: { kda: s?.master_plus?.kda?.toString() ?? '', winrate: s?.master_plus?.winrate?.toString() ?? '' },
-      },
-    })
-  }, [booster])
-
-  const saveStats = useMutation({
-    mutationFn: async () => {
-      const rankStats: Record<string, { kda: number; winrate: number }> = {}
-      for (const bracket of Object.keys(statsForm.stats) as RankStatsBracket[]) {
-        const { kda, winrate } = statsForm.stats[bracket]
-        if (kda.trim() || winrate.trim()) {
-          rankStats[bracket] = { kda: parseFloat(kda) || 0, winrate: parseFloat(winrate) || 0 }
-        }
-      }
-
-      const currentRank = statsForm.current_tier
-        ? { tier: statsForm.current_tier, division: MASTER_PLUS.includes(statsForm.current_tier) ? null : (statsForm.current_division || 'IV') }
-        : null
-
-      const { error } = await supabase
-        .from('booster_profiles')
-        .update({ current_rank: currentRank as never, rank_stats: rankStats as never })
-        .eq('id', id!)
-      if (error) throw error
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-booster', id] }),
   })
 
   if (isLoading) return null
   if (!booster) return <p className="text-ink-muted">Booster não encontrado.</p>
 
   const isPending = booster.status === 'pending' || booster.status === 'under_review'
+  const hasStats = !!performanceSegments?.some(s => s.total_matches > 0)
 
   return (
     <div className="space-y-5">
@@ -213,8 +215,10 @@ export function AdminBoosterDetailPage() {
         </Card>
       )}
 
+      {/* Dados da candidatura -- replica o que foi submetido no formulário
+          (BoosterApplicationForm), pra fins de verificação/controle. Não é
+          o perfil profissional (isso o cliente já vê na página pública). */}
       <div className="grid md:grid-cols-2 gap-5">
-        {/* Profile overview */}
         <Card padding="md">
           <div className="flex items-start gap-4 mb-4">
             <Avatar name={booster.display_name} size="lg" />
@@ -238,28 +242,30 @@ export function AdminBoosterDetailPage() {
           </div>
           <div className="space-y-2 text-sm">
             {[
-              ['Entrou em',   formatDate(booster.created_at)],
-              ['Verificado',  booster.verified_at ? formatDate(booster.verified_at) : 'Ainda não'],
+              ['Entrou em', formatDate(booster.created_at)],
+              ['Verificado', booster.verified_at ? formatDate(booster.verified_at) : 'Ainda não'],
+              ['Disponibilidade', booster.available_days?.length
+                ? booster.available_days.map(d => DAY_LABEL[d] ?? d).join(', ')
+                : 'Não informado'],
               ['Carga horária', booster.hours_per_day_min || booster.hours_per_day_max
                 ? `${booster.hours_per_day_min ?? '?'}–${booster.hours_per_day_max ?? '?'} h/dia`
                 : 'Não informado'],
             ].map(([l, v]) => (
-              <div key={l} className="flex justify-between">
-                <span className="text-ink-muted">{l}</span>
-                <span className="text-ink font-medium">{v}</span>
+              <div key={l} className="flex justify-between gap-4">
+                <span className="text-ink-muted shrink-0">{l}</span>
+                <span className="text-ink font-medium text-right">{v}</span>
               </div>
             ))}
           </div>
         </Card>
 
-        {/* Personal info / PIX */}
         <Card padding="md">
           <h3 className="text-sm font-semibold text-ink mb-3">Dados Pessoais / PIX</h3>
           <div className="space-y-2 text-sm">
             {[
               ['Nome completo', booster.full_name ?? '—'],
-              ['Email',         booster.email    ?? '—'],
-              ['CPF',           booster.cpf      ? booster.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '—'],
+              ['Email', booster.email ?? '—'],
+              ['CPF', booster.cpf ? booster.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '—'],
             ].map(([l, v]) => (
               <div key={l} className="flex justify-between gap-4">
                 <span className="text-ink-muted shrink-0">{l}</span>
@@ -267,6 +273,12 @@ export function AdminBoosterDetailPage() {
               </div>
             ))}
           </div>
+          {booster.bio && (
+            <div className="mt-3 pt-3 border-t border-bg-elevated">
+              <p className="text-xs text-ink-muted mb-1">Bio (candidatura)</p>
+              <p className="text-sm text-ink-secondary leading-relaxed">{booster.bio}</p>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -276,8 +288,8 @@ export function AdminBoosterDetailPage() {
         <div className="grid grid-cols-3 gap-4 text-center">
           {[
             { label: 'Pedidos', value: booster.total_completed },
-            { label: 'Ganhos',  value: currency(booster.total_earnings) },
-            { label: 'Rating',  value: booster.rating.toFixed(1) },
+            { label: 'Ganhos', value: currency(booster.total_earnings) },
+            { label: 'Rating', value: booster.rating.toFixed(1) },
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-lg font-bold text-ink">{value}</p>
@@ -287,82 +299,41 @@ export function AdminBoosterDetailPage() {
         </div>
       </Card>
 
-      {/* Estatísticas públicas — current_rank + rank_stats */}
+      {/* Estatísticas por faixa de elo -- somente leitura, calculadas
+          automaticamente a partir de partidas reais sincronizadas. */}
       <Card padding="md">
-        <h3 className="text-sm font-semibold text-ink mb-1">Estatísticas Públicas</h3>
+        <h3 className="text-sm font-semibold text-ink mb-1">Estatísticas por Faixa de Elo</h3>
         <p className="text-xs text-ink-muted mb-4">
-          Exibidas no pódio e no perfil público do booster (página /boosters).
+          Calculado automaticamente a partir das partidas sincronizadas dos pedidos concluídos -- mesmos dados exibidos no perfil público.
         </p>
-
-        <div className="space-y-1.5 mb-4">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank Atual</label>
-          <div className="flex gap-2">
-            <select
-              value={statsForm.current_tier}
-              onChange={(e) => setStatsForm((f) => ({ ...f, current_tier: e.target.value as RankTier | '' }))}
-              className="input-base flex-1 text-sm"
-            >
-              <option value="">— sem rank —</option>
-              {RANK_TIER_ORDER.map((tier) => (
-                <option key={tier} value={tier}>{RANK_TIER_LABEL[tier]}</option>
-              ))}
-            </select>
-            {statsForm.current_tier && !MASTER_PLUS.includes(statsForm.current_tier) && (
-              <select
-                value={statsForm.current_division}
-                onChange={(e) => setStatsForm((f) => ({ ...f, current_division: e.target.value as Division | '' }))}
-                className="input-base w-24 text-sm"
-              >
-                {DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            )}
+        {!hasStats ? (
+          <p className="text-xs text-ink-muted py-4 text-center">Ainda sem partidas suficientes para gerar estatísticas.</p>
+        ) : (
+          <div className="space-y-3">
+            {(Object.keys(BRACKET_LABEL) as RankBucket[]).map((bracket) => {
+              const stats = performanceSegments?.find(s => s.rank_bucket === bracket)
+              if (!stats || stats.total_matches === 0) return null
+              return (
+                <div key={bracket} className="flex items-center justify-between py-2 border-b border-bg-elevated last:border-0">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">{BRACKET_LABEL[bracket]}</p>
+                    <p className="text-[10px] text-ink-muted">{stats.total_matches} partida{stats.total_matches === 1 ? '' : 's'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6 text-right">
+                    <div>
+                      <p className="text-[10px] text-ink-muted">KDA Médio</p>
+                      <p className="text-sm font-bold text-ink">{stats.average_kda != null ? stats.average_kda.toFixed(1) : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-ink-muted">Winrate</p>
+                      <p className="text-sm font-bold text-brand">{Math.round(stats.adjusted_win_rate * 100)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </div>
-
-        <div className="space-y-3">
-          {(Object.keys(BRACKET_LABEL) as RankStatsBracket[]).map((bracket) => (
-            <div key={bracket} className="grid grid-cols-3 gap-2 items-end">
-              <span className="text-xs font-semibold text-ink-secondary">{BRACKET_LABEL[bracket]}</span>
-              <div className="space-y-1">
-                <label className="text-[9px] text-ink-muted">KDA</label>
-                <input
-                  type="number" step="0.01" min="0"
-                  value={statsForm.stats[bracket].kda}
-                  onChange={(e) => setStatsForm((f) => ({
-                    ...f, stats: { ...f.stats, [bracket]: { ...f.stats[bracket], kda: e.target.value } },
-                  }))}
-                  className="input-base w-full text-sm"
-                  placeholder="ex: 3.5"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] text-ink-muted">Winrate %</label>
-                <input
-                  type="number" step="0.1" min="0" max="100"
-                  value={statsForm.stats[bracket].winrate}
-                  onChange={(e) => setStatsForm((f) => ({
-                    ...f, stats: { ...f.stats, [bracket]: { ...f.stats[bracket], winrate: e.target.value } },
-                  }))}
-                  className="input-base w-full text-sm"
-                  placeholder="ex: 62"
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3 mt-4">
-          <Button
-            size="sm"
-            leftIcon={<Save className="h-3.5 w-3.5" />}
-            loading={saveStats.isPending}
-            onClick={() => saveStats.mutate()}
-          >
-            Salvar Estatísticas
-          </Button>
-          {saveStats.isSuccess && <span className="text-xs text-success">Salvo!</span>}
-          {saveStats.isError && <span className="text-xs text-danger">{(saveStats.error as Error).message}</span>}
-        </div>
+        )}
       </Card>
 
       {/* Active slots */}
@@ -393,13 +364,22 @@ export function AdminBoosterDetailPage() {
         </Card>
       )}
 
-      {/* Bio */}
-      {booster.bio && (
-        <Card padding="md">
-          <h3 className="text-sm font-semibold text-ink mb-2">Biografia</h3>
-          <p className="text-sm text-ink-secondary leading-relaxed">{booster.bio}</p>
-        </Card>
-      )}
+      {/* Atividade -- trilha de auditoria pra controle admin */}
+      <Card padding="md">
+        <h3 className="text-sm font-semibold text-ink mb-3">Atividade</h3>
+        {!auditLog?.length ? (
+          <EmptyState icon={ClipboardList} title="Nenhum evento registrado" />
+        ) : (
+          <div className="space-y-3">
+            {auditLog.map((entry) => (
+              <div key={entry.id} className="flex items-center justify-between text-sm">
+                <span className="text-ink">{AUDIT_ACTION_LABEL[entry.action] ?? entry.action}</span>
+                <span className="text-xs text-ink-muted" title={formatDateTime(entry.created_at)}>{timeAgo(entry.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

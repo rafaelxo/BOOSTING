@@ -31,6 +31,7 @@ export function AdminBoostersPage() {
       if (error) throw error
       return data as unknown as BoosterProfile[]
     },
+    refetchInterval: 20000,
   })
 
   const updateBoosterStatus = useMutation({

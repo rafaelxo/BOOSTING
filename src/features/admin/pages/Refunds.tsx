@@ -25,6 +25,7 @@ export function AdminRefundsPage() {
       if (error) throw error
       return data as Refund[]
     },
+    refetchInterval: 20000,
   })
 
   return (

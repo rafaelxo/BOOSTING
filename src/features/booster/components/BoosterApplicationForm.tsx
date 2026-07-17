@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { Button, Card } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { cn } from '@/lib/utils'
+import { cn, boosterFormErrorMessage } from '@/lib/utils'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
 
 const DAYS = [
@@ -27,8 +27,8 @@ const PEAK_OPTIONS = [
 const schema = z.object({
   full_name:         z.string().min(3, 'Nome completo obrigatório'),
   cpf:               z.string().regex(/^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/, 'CPF inválido (ex: 000.000.000-00)'),
-  opgg_link:         z.string().url('URL inválida').optional().or(z.literal('')),
-  bio:               z.string().max(256, 'Máximo 256 caracteres').optional(),
+  opgg_link:         z.string().min(1, 'Link do OP.GG obrigatório').url('URL inválida'),
+  bio:               z.string().min(1, 'Conte um pouco sobre você').max(256, 'Máximo 256 caracteres'),
   peak_tier:         z.enum(['grandmaster', 'challenger'], { required_error: 'Selecione seu rank de pico' }),
   available_days:    z.array(z.string()).min(1, 'Selecione ao menos um dia'),
   hours_per_day_min: z.coerce.number().min(1).max(24),
@@ -118,30 +118,21 @@ export function BoosterApplicationForm({
 
     const { data: result, error } = await supabase.rpc('onboard_booster', {
       p_display_name:      profile.username,
-      p_bio:               data.bio ?? '',
+      p_bio:               data.bio,
       p_peak_rank:         { tier: data.peak_tier, division: null },
-      p_opgg_link:         data.opgg_link || undefined,
+      p_opgg_link:         data.opgg_link,
       p_hours_per_day_min: data.hours_per_day_min,
       p_hours_per_day_max: data.hours_per_day_max,
       p_full_name:         data.full_name,
       p_cpf:               data.cpf.replace(/\D/g, ''),
+      p_available_days:    data.available_days,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any
 
     if (error) { setSubmitError(`Erro: ${error.message}`); return }
 
     const res = result as { success: boolean; error?: string }
-    if (!res.success) { setSubmitError(`Erro: ${res.error ?? 'falha desconhecida'}`); return }
-
-    const { error: updateError } = await supabase
-      .from('booster_profiles')
-      .update({ available_days: data.available_days })
-      .eq('user_id', profile.id)
-
-    if (updateError) {
-      setSubmitError(`Erro: ${updateError.message}`)
-      return
-    }
+    if (!res.success) { setSubmitError(boosterFormErrorMessage(res.error)); return }
 
     if (onSuccess) onSuccess()
     else navigate('/booster')
@@ -180,7 +171,7 @@ export function BoosterApplicationForm({
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-4">Conta de Jogo</p>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs text-ink-muted">Link do OP.GG (opcional)</label>
+            <label className="text-xs text-ink-muted">Link do OP.GG</label>
             <input
               {...register('opgg_link')}
               placeholder="https://op.gg/summoners/br/SeuNome"

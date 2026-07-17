@@ -49,7 +49,7 @@ serve(async (req) => {
     // defesa em profundidade, mesmo padrão da verify-order-rank.
     const { data: order, error: orderErr } = await userClient
       .from('orders')
-      .select('id, status, assigned_booster_id, riot_id, queue_type, match_sync_started_at, wins_purchased')
+      .select('id, status, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased')
       .eq('id', orderId)
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
@@ -58,17 +58,34 @@ serve(async (req) => {
     if (!['in_progress', 'paused'].includes(order.status as string)) {
       return badRequest(req, 'Pedido não está em um status sincronizável')
     }
-    if (!order.riot_id) {
+
+    const serviceClient = supabaseAdmin()
+
+    // Duo Boost: o booster joga com uma conta Duo separada, não a conta do
+    // cliente (order.riot_id) -- as partidas de verdade acontecem nessa
+    // conta reservada, então é dela que sincronizamos.
+    let riotIdSource = order.riot_id as string | null
+    if (order.boost_mode === 'duo') {
+      const { data: duoAccount, error: duoErr } = await serviceClient
+        .from('duo_accounts')
+        .select('riot_id')
+        .eq('reserved_order_id', orderId)
+        .maybeSingle()
+      if (duoErr) return errorResponse(req, 'Failed to load duo account', 500)
+      riotIdSource = duoAccount?.riot_id ?? null
+      if (!riotIdSource) {
+        return badRequest(req, 'Nenhuma conta Duo reservada com Riot ID cadastrado para este pedido')
+      }
+    } else if (!riotIdSource) {
       return badRequest(req, 'Este pedido não tem conta Riot cadastrada para sincronizar')
     }
 
-    const riotId = String(order.riot_id)
+    const riotId = String(riotIdSource)
     const hashIdx = riotId.lastIndexOf('#')
     if (hashIdx < 1 || hashIdx === riotId.length - 1) {
       return badRequest(req, 'Riot ID inválido')
     }
 
-    const serviceClient = supabaseAdmin()
     const startTimeEpochSeconds = order.match_sync_started_at
       ? Math.floor(new Date(order.match_sync_started_at as string).getTime() / 1000)
       : Math.floor(Date.now() / 1000) - 60 * 60 * 24

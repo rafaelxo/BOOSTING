@@ -1,18 +1,19 @@
 import { Link } from 'react-router-dom'
 import { Clock, ArrowRight } from 'lucide-react'
 import { Card, OrderStatusBadge, RankBadge } from '@/components/ui'
-import { formatRank, formatDate, getServiceLabel, formatEstimatedDelivery, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
+import { formatRank, formatDate, getServiceLabel, formatEstimatedDelivery, boosterEarningsShare, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import type { Division, Order, RankTier } from '@/types'
 
 interface CompletedOrderCardProps {
   order: Order
+  isTop3?: boolean | null
 }
 
 // Shared card used by the "Pedidos Concluídos" page and the Earnings
 // monthly-services list — one place for the field spec both need:
 // tipo de serviço, rank atual → rank objetivo, valor do booster, tempo estimado.
-export function CompletedOrderCard({ order }: CompletedOrderCardProps) {
+export function CompletedOrderCard({ order, isTop3 }: CompletedOrderCardProps) {
   const currency = useCurrency()
   const currentRank = order.current_rank as { tier: RankTier; division: Division } | null
   const targetRank = order.target_rank as { tier: RankTier; division: Division } | null
@@ -51,7 +52,7 @@ export function CompletedOrderCard({ order }: CompletedOrderCardProps) {
 
         <div className="flex items-center justify-between pt-3 border-t border-bg-elevated">
           <div>
-            <p className="text-sm font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</p>
+            <p className="text-sm font-bold text-success">{currency(order.total_price * boosterEarningsShare(isTop3))}</p>
             <p className="text-[10px] text-ink-muted">Seu valor</p>
           </div>
           {order.estimated_hours != null && (

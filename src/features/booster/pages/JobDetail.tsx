@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
-import { formatRank, RANK_TIER_LABEL, BOOSTER_EARNINGS_SHARE, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
+import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import type { Division, Order, OrderStatus, OrderDropRequest, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 
@@ -48,6 +48,7 @@ function DuoAccountSection({ order }: { order: Order }) {
       if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
       return result.accounts ?? []
     },
+    refetchInterval: 15000,
   })
 
   const reserved = accounts?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
@@ -254,6 +255,15 @@ export function JobDetailPage() {
     { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
   ]
 
+  const { data: boosterProfile } = useQuery({
+    queryKey: ['booster-profile-top3', profile?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('booster_profiles').select('is_top3').eq('user_id', profile!.id).maybeSingle()
+      return data
+    },
+    enabled: !!profile?.id,
+  })
+
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
     queryKey: ['order', id],
     queryFn: async () => {
@@ -270,10 +280,12 @@ export function JobDetailPage() {
       return data as unknown as Order
     },
     enabled: !!id,
+    refetchInterval: 15000,
   })
 
   const { data: pendingDrop } = useQuery({
     queryKey: ['drop-request', id],
+    refetchInterval: 15000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('order_drop_requests')
@@ -417,9 +429,13 @@ export function JobDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
-              {!order.pdl_bracket && (
-                <div><p className="text-xs text-ink-muted">Modo</p><p className="text-sm font-semibold text-ink">{order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'}</p></div>
+              <div><p className="text-xs text-ink-muted">Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
+              <div><p className="text-xs text-ink-muted">Tipo</p><p className="text-sm font-semibold text-ink">{getOrderModeType(order)}</p></div>
+              {(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5') && (
+                <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
+              )}
+              {(order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null && (
+                <div><p className="text-xs text-ink-muted">Vitórias Compradas</p><p className="text-sm font-semibold text-ink">{order.wins_purchased}</p></div>
               )}
               {order.pdl_bracket && (
                 <>
@@ -487,8 +503,8 @@ export function JobDetailPage() {
         <div className="space-y-4">
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.earnings')}</h3>
-            <p className="text-2xl font-bold text-success">{currency(order.total_price * BOOSTER_EARNINGS_SHARE)}</p>
-            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { amount: currency(order.total_price) })}</p>
+            <p className="text-2xl font-bold text-success">{currency(order.total_price * boosterEarningsShare(boosterProfile?.is_top3))}</p>
+            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { pct: Math.round(boosterEarningsShare(boosterProfile?.is_top3) * 100) })}</p>
           </Card>
 
           {order.status === 'awaiting_customer' && (

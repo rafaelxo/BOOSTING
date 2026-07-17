@@ -35,12 +35,18 @@ export function BoosterServiceForm({
     }))
   }
 
-  const valid = data.title.trim().length > 0 && parseFloat(data.price) > 0
+  const valid =
+    data.title.trim().length > 0 &&
+    data.description.trim().length > 0 &&
+    data.tempo.trim().length > 0 &&
+    parseFloat(data.price) > 0 &&
+    data.lanes.length > 0 &&
+    data.specialties.length > 0
 
   return (
     <div className="card border-brand/30 p-5 space-y-4">
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Título</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Título <span className="text-danger">*</span></label>
         <input
           value={data.title}
           onChange={field('title')}
@@ -52,7 +58,7 @@ export function BoosterServiceForm({
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Descrição</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Descrição <span className="text-danger">*</span></label>
           <span className="text-[10px] text-ink-muted">{data.description.length}/300</span>
         </div>
         <textarea
@@ -67,7 +73,7 @@ export function BoosterServiceForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Duração / prazo estimado</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Duração / prazo estimado <span className="text-danger">*</span></label>
           <input
             value={data.tempo}
             onChange={field('tempo')}
@@ -77,7 +83,7 @@ export function BoosterServiceForm({
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Valor (R$)</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Valor (R$) <span className="text-danger">*</span></label>
           <input
             value={data.price}
             onChange={field('price')}
@@ -92,7 +98,7 @@ export function BoosterServiceForm({
 
       <div className="space-y-2">
         <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-          Lanes <span className="normal-case font-normal">(máx. 2)</span>
+          Lanes <span className="text-danger">*</span> <span className="normal-case font-normal">(máx. 2)</span>
         </label>
         <div className="flex flex-wrap gap-2">
           {LANES.map(({ key, label }) => {
@@ -121,7 +127,7 @@ export function BoosterServiceForm({
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Especialidades</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Especialidades <span className="text-danger">*</span></label>
         <div className="flex flex-wrap gap-2">
           {COACH_SPECIALTIES.map(({ key, label }) => {
             const selected = data.specialties.includes(key)

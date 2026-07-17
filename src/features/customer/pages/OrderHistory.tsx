@@ -40,6 +40,7 @@ export function OrderHistoryPage() {
       return data as unknown as Order[]
     },
     enabled: !!profile?.id,
+    refetchInterval: 15000,
   })
 
   const filtered = orders?.filter((o) => {

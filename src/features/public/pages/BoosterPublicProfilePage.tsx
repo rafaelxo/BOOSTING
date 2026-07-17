@@ -70,6 +70,25 @@ export function BoosterPublicProfilePage() {
     enabled: !!booster?.user_id,
   })
 
+  // Desempenho por faixa de elo vem de booster_performance_segments —
+  // calculado automaticamente a partir de partidas reais (order_matches,
+  // sincronizadas via sync-order-matches) e reviews, nunca digitado à mão
+  // (ver refresh_booster_performance_segments, migration 054).
+  const { data: performanceSegments = [] } = useQuery({
+    queryKey: ['public-booster-performance', booster?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_performance_segments')
+        .select('rank_bucket, average_kda, adjusted_win_rate, total_matches')
+        .eq('booster_id', booster!.user_id)
+        .eq('service_type', '__all__')
+        .neq('rank_bucket', '__all__')
+      if (error) throw error
+      return data as { rank_bucket: string; average_kda: number | null; adjusted_win_rate: number; total_matches: number }[]
+    },
+    enabled: !!booster?.user_id,
+  })
+
   if (isLoading) return (
     <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -91,8 +110,9 @@ export function BoosterPublicProfilePage() {
     </div>
   )
 
-  const hasRankStats  = booster.rank_stats && Object.keys(booster.rank_stats).length > 0
-  const rankGroups = RANK_GROUPS.filter(group => booster.rank_stats?.[group.key])
+  const hasRankStats = performanceSegments.some(s => s.total_matches > 0)
+  const rankGroups = RANK_GROUPS.filter(group =>
+    performanceSegments.some(s => s.rank_bucket === group.key && s.total_matches > 0))
   const hasLanes      = booster.lanes && booster.lanes.length > 0
   const hasSpecialties = booster.specialties && booster.specialties.length > 0
 
@@ -302,7 +322,7 @@ export function BoosterPublicProfilePage() {
             ) : (
               <div className="space-y-3">
                 {rankGroups.map(g => {
-                  const stats = booster.rank_stats?.[g.key]
+                  const stats = performanceSegments.find(s => s.rank_bucket === g.key)
                   return (
                     <div key={g.key} className="flex items-center gap-4 py-3 border-b border-bg-elevated last:border-0">
                       <div className="flex-1 min-w-0">
@@ -317,11 +337,11 @@ export function BoosterPublicProfilePage() {
                       <div className="grid grid-cols-2 gap-6 text-right">
                         <div>
                           <p className="text-[10px] text-ink-muted">KDA Médio</p>
-                          <p className="text-sm font-bold text-ink">{stats?.kda != null ? stats.kda.toFixed(1) : '—'}</p>
+                          <p className="text-sm font-bold text-ink">{stats?.average_kda != null ? stats.average_kda.toFixed(1) : '—'}</p>
                         </div>
                         <div>
                           <p className="text-[10px] text-ink-muted">Winrate</p>
-                          <p className="text-sm font-bold text-brand">{stats?.winrate != null ? `${stats.winrate}%` : '—'}</p>
+                          <p className="text-sm font-bold text-brand">{stats && stats.total_matches > 0 ? `${Math.round(stats.adjusted_win_rate * 100)}%` : '—'}</p>
                         </div>
                       </div>
                     </div>

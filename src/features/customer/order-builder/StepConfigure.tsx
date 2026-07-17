@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { FormField } from '@/components/ui/FormField'
@@ -225,6 +225,27 @@ export function StepConfigure() {
     enabled: currentIsMasterPlus && !!targetRank,
   })
 
+  // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot —
+  // usado só na estimativa de prazo do Master+ (nunca no preço, fixo por
+  // tier). Cacheado no servidor (riot_league_cutoffs); staleTime aqui só
+  // evita rebuscar a cada render, o valor em si já "atualiza sozinho" pois o
+  // servidor reconsulta a Riot quando o cache passa de 6h.
+  const { data: leagueCutoffs } = useQuery({
+    queryKey: ['riot-league-cutoffs', queueType],
+    queryFn: () => invokeEdgeFunction<{ grandmaster_cutoff: number | null; challenger_cutoff: number | null }>('riot-league-cutoffs', {
+      body: { queue: queueType },
+      requireAuth: true,
+    }),
+    enabled: serviceType === 'elo_boost',
+    staleTime: 5 * 60 * 1000,
+  })
+  const masterPlusCutoffs = useMemo(
+    () => leagueCutoffs
+      ? { grandmaster: leagueCutoffs.grandmaster_cutoff, challenger: leagueCutoffs.challenger_cutoff }
+      : undefined,
+    [leagueCutoffs],
+  )
+
   useEffect(() => {
     if (serviceType === 'elo_boost') {
       if (!currentRank) return
@@ -246,6 +267,7 @@ export function StepConfigure() {
           avgLpGain: 30,
           avgLpLoss: 30,
           currentPdl,
+          masterPlusCutoffs,
         })
         setEstimatedHours(masterPlusHours == null ? null : masterPlusHours * DELIVERY_ESTIMATE_MULTIPLIER)
         return
@@ -269,6 +291,7 @@ export function StepConfigure() {
         avgLpGain,
         avgLpLoss,
         currentPdl: null,
+        masterPlusCutoffs,
       })
       setEstimatedHours(eloHours == null ? null : eloHours * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(lpModifierPct(avgLpGain))
@@ -300,7 +323,7 @@ export function StepConfigure() {
     }
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
-    currentLp, avgLpGain, avgLpLoss, currentPdl, currentIsMasterPlus, masterPlusPriceRow,
+    currentLp, avgLpGain, avgLpLoss, currentPdl, currentIsMasterPlus, masterPlusPriceRow, masterPlusCutoffs,
     setBasePrice, setEstimatedHours, setPdlModifierPct,
   ])
 
@@ -624,6 +647,12 @@ export function StepConfigure() {
                     {loadingMasterPlusPrice && <p className="text-[11px] text-ink-muted">Calculando preço…</p>}
                     {!loadingMasterPlusPrice && targetRank && masterPlusPriceRow?.price == null && (
                       <p className="text-[11px] text-warning">Preço ainda não configurado para esse tier. Fale com o suporte.</p>
+                    )}
+                    {targetRank?.tier === 'grandmaster' && leagueCutoffs?.grandmaster_cutoff != null && (
+                      <p className="text-[11px] text-ink-muted">Corte atual do Grão-Mestre: {leagueCutoffs.grandmaster_cutoff} PDL (atualizado automaticamente)</p>
+                    )}
+                    {targetRank?.tier === 'challenger' && leagueCutoffs?.challenger_cutoff != null && (
+                      <p className="text-[11px] text-ink-muted">Corte atual do Challenger: {leagueCutoffs.challenger_cutoff} PDL (atualizado automaticamente)</p>
                     )}
                   </>
                 )}

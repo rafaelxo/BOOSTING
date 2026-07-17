@@ -1,13 +1,12 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
-import { Button, ThemeToggle } from '@/components/ui'
+import { Button, LogoMark, ThemeToggle } from '@/components/ui'
 import { PageLoader } from '@/components/ui/Spinner'
 import { supabase } from '@/lib/supabase'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
 import { LEGAL_VERSION, hasAcceptedLegal } from '@/lib/legal'
 import { useAuthStore } from '@/stores/authStore'
-import { Zap } from 'lucide-react'
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -135,9 +134,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-between mb-8">
           <Link to="/" className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
+            <LogoMark className="h-9 w-9" />
             <span className="text-xl font-bold text-ink">
               Elo<span className="text-brand">Peak</span>
             </span>

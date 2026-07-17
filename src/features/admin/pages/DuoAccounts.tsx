@@ -7,6 +7,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { RANK_TIER_LABEL, formatDate } from '@/lib/utils'
+import { useDuoAccountAutoRefresh } from '@/hooks/useDuoAccountAutoRefresh'
 import type { DuoAccount, Division, RankTier } from '@/types'
 import type { Database } from '@/lib/database.types'
 
@@ -126,7 +127,10 @@ export function AdminDuoAccountsPage() {
       if (!result?.success) throw new Error(duoAccountError(result?.error))
       return result.accounts ?? []
     },
+    refetchInterval: 15000,
   })
+
+  useDuoAccountAutoRefresh(accounts)
 
   useEffect(() => {
     if (!modal) return

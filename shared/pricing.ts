@@ -132,11 +132,13 @@ export const MATCH_DURATION_HOURS = 0.5
 // Fonte única de verdade do prazo de entrega mostrado ao cliente. A
 // estimativa de horas de jogo puro (estimateEloBoostHours / partidas * 0.5h)
 // nunca reflete a realidade — booster também dorme, tem outros pedidos, faz
-// pausas. Multiplicamos por 2 aqui, uma única vez, no fechamento de
+// pausas. Multiplicamos por 5 aqui, uma única vez, no fechamento de
 // computeOrderPrice() — nunca no frontend, nunca em cada serviceType
-// separadamente. Substitui a antiga margem fixa de 2 partidas (que era
-// pequena demais pra refletir prazo real de entrega).
-export const DELIVERY_ESTIMATE_MULTIPLIER = 2
+// separadamente. Aplica-se a TODO pedido medido em partidas (win_boost,
+// md5, placement_matches e elo_boost — tanto o fluxo padrão com LP médio
+// quanto o Master+ com PDL médio); coaching é a única exceção, pois usa a
+// duração real do pacote/sessões, não contagem de partidas.
+export const DELIVERY_ESTIMATE_MULTIPLIER = 5
 export const EXPECTED_BOOST_WIN_RATE = 0.8
 export const MASTER_PLUS_LP_PER_GAME = 30
 export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenger', number> = {
@@ -147,11 +149,31 @@ export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenge
 
 const MASTER_START_ABSOLUTE_LP = 28 * 100
 
+// Corte real (PDL do último colocado) das ligas Grão-Mestre/Challenger na
+// Riot, quando disponível (riot_league_cutoffs, atualizado pela edge
+// function riot-league-cutoffs) -- substitui os alvos fixos de
+// MASTER_PLUS_TARGET_LP na estimativa de prazo. Nunca afeta o preço (fixo
+// por tier -- migration 028), só a estimativa de horas.
+export interface MasterPlusCutoffs {
+  grandmaster?: number | null
+  challenger?: number | null
+}
+
+function masterPlusTargetLp(
+  tier: 'master' | 'grandmaster' | 'challenger',
+  liveCutoffs?: MasterPlusCutoffs,
+): number {
+  if (tier === 'grandmaster' && liveCutoffs?.grandmaster != null) return liveCutoffs.grandmaster
+  if (tier === 'challenger' && liveCutoffs?.challenger != null) return liveCutoffs.challenger
+  return MASTER_PLUS_TARGET_LP[tier]
+}
+
 /**
  * Estima somente tempo efetivo de jogo. Abaixo de Master, percorre os 100 LP
  * de cada divisão e considera ganho/perda esperados com 80% de win rate do
  * serviço. Em Master+, usa a progressão fixa de 30 PDL por partida definida
- * pelo produto, até 1.200 (GM) ou 2.200 (Challenger).
+ * pelo produto, até o corte atual de GM/Challenger (masterPlusCutoffs, com
+ * fallback pros alvos fixos de MASTER_PLUS_TARGET_LP quando indisponível).
  */
 export function estimateEloBoostHours(input: {
   currentRank: { tier: RankTier; division: Division | null }
@@ -160,6 +182,7 @@ export function estimateEloBoostHours(input: {
   avgLpGain: number
   avgLpLoss: number
   currentPdl: number | null
+  masterPlusCutoffs?: MasterPlusCutoffs
 }): number | null {
   const { currentRank, targetRank, currentLp, avgLpGain, avgLpLoss } = input
   const fromStep = rankStep(currentRank.tier, currentRank.division)
@@ -187,12 +210,12 @@ export function estimateEloBoostHours(input: {
     standardGames = Math.ceil(requiredStandardLp / expectedNetLpPerGame)
 
     if (isMasterPlus(targetRank.tier)) {
-      masterPlusGames = Math.ceil(MASTER_PLUS_TARGET_LP[targetRank.tier] / MASTER_PLUS_LP_PER_GAME)
+      masterPlusGames = Math.ceil(masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs) / MASTER_PLUS_LP_PER_GAME)
     }
   } else {
     if (!isMasterPlus(targetRank.tier)) return null
     const currentMasterPlusLp = Math.max(0, input.currentPdl ?? 0)
-    const requiredMasterPlusLp = Math.max(0, MASTER_PLUS_TARGET_LP[targetRank.tier] - currentMasterPlusLp)
+    const requiredMasterPlusLp = Math.max(0, masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs) - currentMasterPlusLp)
     masterPlusGames = Math.max(1, Math.ceil(requiredMasterPlusLp / MASTER_PLUS_LP_PER_GAME))
   }
 
@@ -238,8 +261,8 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 // efetivamente "compra" o tier Master através dele.
 export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
   master: 89990,
-  grandmaster: 124990,
-  challenger: 214980,
+  grandmaster: 89990,
+  challenger: 124990,
 } as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────
@@ -321,6 +344,10 @@ export interface OrderPriceInput {
   // inventado). Ignorado para qualquer serviceType/rank que não seja
   // elo_boost com rank atual Master+/Grão-Mestre.
   masterPlusPrice: number | null
+  // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot,
+  // quando disponível — ver MasterPlusCutoffs. Afeta só estimatedHours,
+  // nunca o preço.
+  masterPlusCutoffs?: MasterPlusCutoffs
   winsPurchased: number | null
   sessionsPurchased: number | null
   extras: OrderExtraInput[]
@@ -377,6 +404,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
             avgLpGain: MASTER_PLUS_LP_PER_GAME,
             avgLpLoss: MASTER_PLUS_LP_PER_GAME,
             currentPdl: input.currentPdl,
+            masterPlusCutoffs: input.masterPlusCutoffs,
           })
         }
       } else {
@@ -397,6 +425,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
           avgLpGain,
           avgLpLoss,
           currentPdl: null,
+          masterPlusCutoffs: input.masterPlusCutoffs,
         })
         pdlModifierPct = lpModifierPct(avgLpGain)
       }

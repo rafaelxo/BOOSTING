@@ -27,6 +27,7 @@ function useRecentOrders(customerId: string) {
       if (error) throw error
       return data as unknown as Order[]
     },
+    refetchInterval: 15000,
   })
 }
 
@@ -62,6 +63,7 @@ function useDashboardStats(customerId: string) {
         completedCount: completedCount ?? 0,
       }
     },
+    refetchInterval: 15000,
   })
 }
 

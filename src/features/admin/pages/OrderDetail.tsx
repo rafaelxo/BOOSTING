@@ -1,7 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, RefreshCw, Clock, ShieldCheck } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader } from '@/components/ui'
+import { ArrowLeft, RefreshCw, Clock, ShieldCheck, XOctagon } from 'lucide-react'
+import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
@@ -20,6 +21,10 @@ function BoosterLink({ userId, booster }: { userId: string; booster: BoosterRef 
   )
 }
 
+// Mesmo conjunto de status aceitos por admin_drop_order (migration 071) —
+// 'drop_requested' fica de fora porque já tem sua própria fila em /admin/drops.
+const DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 'awaiting_customer']
+
 const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
   { value: 'awaiting_assignment', label: 'Esperando Booster' },
   { value: 'assigned',            label: 'Booster Atribuído' },
@@ -36,6 +41,8 @@ export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
   const currency = useCurrency()
+  const [showDropModal, setShowDropModal] = useState(false)
+  const [dropReason, setDropReason] = useState('')
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
     queryKey: ['admin-order', id],
@@ -112,6 +119,24 @@ export function AdminOrderDetailPage() {
       if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar status')
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-order', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin-order-history', id] })
+    },
+  })
+
+  const dropOrder = useMutation({
+    mutationFn: async (reason: string) => {
+      const { data, error } = await supabase.rpc('admin_drop_order', {
+        p_order_id: id!,
+        p_reason: reason,
+      })
+      if (error) throw error
+      const result = data as { success: boolean; error?: string }
+      if (!result.success) throw new Error(result.error ?? 'Erro ao dropar pedido')
+    },
+    onSuccess: () => {
+      setShowDropModal(false)
+      setDropReason('')
       queryClient.invalidateQueries({ queryKey: ['admin-order', id] })
       queryClient.invalidateQueries({ queryKey: ['admin-order-history', id] })
     },
@@ -319,8 +344,71 @@ export function AdminOrderDetailPage() {
                 : 'Nenhum booster atribuído.'}
             </p>
           </Card>
+
+          {/* Dropar pedido — cancela na hora, sem penalidade pro booster
+              (diferente do drop pedido pelo próprio booster, que passa pela
+              fila de /admin/drops). */}
+          {DROPPABLE_STATUSES.includes(order.status) && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-2 flex items-center gap-2">
+                <XOctagon className="h-4 w-4 text-danger" />
+                Dropar Pedido
+              </h3>
+              <p className="text-xs text-ink-muted mb-3">
+                Cancela o pedido imediatamente. Não aplica penalidade ao booster.
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowDropModal(true)}
+              >
+                Dropar Pedido
+              </Button>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Drop modal */}
+      <Modal
+        open={showDropModal}
+        onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
+        title="Dropar Pedido"
+        description="O pedido será cancelado imediatamente. Nenhuma penalidade é aplicada ao booster."
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo (mín. 10 caracteres)
+          </label>
+          <textarea
+            value={dropReason}
+            onChange={(e) => setDropReason(e.target.value)}
+            placeholder="Justificativa para o drop..."
+            className="input-base w-full min-h-[80px] resize-none text-sm"
+            maxLength={500}
+          />
+        </div>
+        {dropOrder.isError && (
+          <ErrorAlert
+            message={dropOrder.error instanceof Error ? dropOrder.error.message : 'Erro'}
+            className="mt-2"
+          />
+        )}
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            loading={dropOrder.isPending}
+            disabled={dropReason.trim().length < 10}
+            onClick={() => dropOrder.mutate(dropReason.trim())}
+          >
+            Confirmar Drop
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

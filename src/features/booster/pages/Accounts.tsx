@@ -5,6 +5,7 @@ import { Card, EmptyState, Skeleton, RankBadge, ErrorAlert } from '@/components/
 import { supabase } from '@/lib/supabase'
 import { RANK_TIER_LABEL } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { useDuoAccountAutoRefresh } from '@/hooks/useDuoAccountAutoRefresh'
 import type { DuoAccount } from '@/types'
 
 type BoosterVisibleDuoAccount = Pick<DuoAccount, 'id' | 'label' | 'riot_id' | 'current_rank' | 'is_active' | 'reserved_by' | 'reserved_order_id'>
@@ -21,7 +22,10 @@ export function BoosterAccountsPage() {
       if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
       return result.accounts ?? []
     },
+    refetchInterval: 15000,
   })
+
+  useDuoAccountAutoRefresh(accounts)
 
   const reserved = accounts?.filter(a => a.reserved_by === profile?.id) ?? []
 

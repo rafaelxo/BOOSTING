@@ -4,7 +4,7 @@ import { Briefcase, Lock, Sparkles, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { timeAgo, formatRank, BOOSTER_EARNINGS_SHARE, sortOrderExtras } from '@/lib/utils'
+import { timeAgo, formatRank, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras } from '@/lib/utils'
 import type { Division, Order, QueueType, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -255,14 +255,19 @@ export function AvailableJobsPage() {
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs font-mono text-ink-muted">#{job.id.slice(0, 8).toUpperCase()}</span>
                     <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">
-                      {job.queue_type === 'solo_duo' ? t('booster.jobs.soloQueue') : t('booster.jobs.flexQueue')}
+                      {getServiceLabel(job.service_type)}
                     </span>
+                    {(job.service_type === 'elo_boost' || job.service_type === 'win_boost' || job.service_type === 'md5') && (
+                      <span className="text-xs bg-bg-elevated text-ink-secondary px-2 py-0.5 rounded-lg">
+                        {job.queue_type === 'solo_duo' ? t('booster.jobs.soloQueue') : t('booster.jobs.flexQueue')}
+                      </span>
+                    )}
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide ${
                       isDuo
                         ? 'bg-brand/10 text-brand border border-brand/20'
                         : 'bg-bg-elevated text-ink-muted'
                     }`}>
-                      {isDuo ? 'Duo Boost' : 'Solo Boost'}
+                      {getOrderModeType(job)}
                     </span>
                     {exclusiveLabel && (
                       <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-accent/15 text-accent border border-accent/30">
@@ -294,6 +299,22 @@ export function AvailableJobsPage() {
                       </span>
                     </div>
                   )}
+                  {job.current_rank && !job.target_rank && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <RankBadge
+                        tier={(job.current_rank as { tier: RankTier }).tier}
+                        division={(job.current_rank as { division: Division }).division}
+                        size="xs"
+                        showLabel={false}
+                      />
+                      <span className="text-xs font-medium text-ink-secondary">
+                        {formatRank((job.current_rank as { tier: RankTier }).tier, (job.current_rank as { division: Division }).division)}
+                      </span>
+                      {job.wins_purchased != null && (
+                        <span className="text-xs text-ink-muted">· {job.wins_purchased} vitória{job.wins_purchased === 1 ? '' : 's'}</span>
+                      )}
+                    </div>
+                  )}
                   {job.extras?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {sortOrderExtras(job.extras).map((extra) => (
@@ -310,8 +331,8 @@ export function AvailableJobsPage() {
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-right">
-                    <p className="text-sm font-bold text-success">{currency(job.total_price * BOOSTER_EARNINGS_SHARE)}</p>
-                    <p className="text-[10px] text-ink-muted">{t('booster.jobs.yourCut')}</p>
+                    <p className="text-sm font-bold text-success">{currency(job.total_price * boosterEarningsShare(slotInfo?.is_top3))}</p>
+                    <p className="text-[10px] text-ink-muted">{t('booster.jobs.yourCut', { pct: Math.round(boosterEarningsShare(slotInfo?.is_top3) * 100) })}</p>
                   </div>
                   <div className="flex flex-col gap-1">
                     <Button

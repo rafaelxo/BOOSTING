@@ -1,5 +1,5 @@
 import { z } from 'https://esm.sh/zod@3.23.8'
-import { computeOrderPrice, rankStep, type OrderPriceInput, type RankValue, type ServiceType } from '../../../shared/pricing.ts'
+import { computeOrderPrice, rankStep, type MasterPlusCutoffs, type OrderPriceInput, type RankValue, type ServiceType } from '../../../shared/pricing.ts'
 import {
   type BoostFlow,
   isAddonCodeValidForFlow,
@@ -306,6 +306,7 @@ export async function validateAndPriceIntent(
   let normalized: NormalizedIntent
   let pdlBracket: string | null = null
   let masterPlusPrice: number | null = null
+  let masterPlusCutoffs: MasterPlusCutoffs | undefined
 
   if (flow === 'master_plus') {
     const mp = parsedIntent.data as z.infer<typeof masterPlusIntentSchema>
@@ -329,6 +330,20 @@ export async function validateAndPriceIntent(
       return { ok: false, response: badRequest(req, 'Preço ainda não configurado para este tier. Fale com o suporte.') }
     }
     masterPlusPrice = Number(priceRow.price)
+
+    // Corte atual de GM/Challenger, se já cacheado (riot-league-cutoffs) —
+    // só afeta a estimativa de horas exibida/gravada, nunca o preço acima.
+    // Sem cache ainda: computeOrderPrice cai pros alvos fixos default.
+    const { data: cutoffRows } = await serviceClient
+      .from('riot_league_cutoffs')
+      .select('tier, cutoff_lp')
+      .eq('queue', mp.queue_type)
+    if (cutoffRows?.length) {
+      masterPlusCutoffs = {
+        grandmaster: cutoffRows.find((r) => r.tier === 'grandmaster')?.cutoff_lp ?? null,
+        challenger: cutoffRows.find((r) => r.tier === 'challenger')?.cutoff_lp ?? null,
+      }
+    }
 
     normalized = {
       serviceType: 'elo_boost',
@@ -668,6 +683,7 @@ export async function validateAndPriceIntent(
     avgLpLoss: normalized.avgLpLoss,
     currentPdl: normalized.currentPdl,
     masterPlusPrice,
+    masterPlusCutoffs,
     winsPurchased: normalized.winsPurchased,
     sessionsPurchased: normalized.sessionsPurchased,
     extras: extras.map((e) => ({ id: e.id, priceModifier: Number(e.price_modifier), priceModifierPct: Number(e.price_modifier_pct) })),

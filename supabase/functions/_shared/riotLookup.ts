@@ -92,6 +92,42 @@ export const RIOT_QUEUE_TYPE: Record<'solo_duo' | 'flex', { leagueQueue: string;
   flex: { leagueQueue: 'RANKED_FLEX_SR', matchQueueId: 440 },
 }
 
+export type LeagueCutoffResult =
+  | { ok: true; cutoffLp: number }
+  | { ok: false; reason: 'rate_limited' | 'upstream_error' | 'empty_league'; status: number }
+
+// Challenger/Grandmaster league-v4 endpoints devolvem TODOS os jogadores da
+// liga -- o "corte" (LP mínimo pra estar naquela liga agora) é o menor
+// leaguePoints entre as entries. Usado só pra estimativa de prazo do Master+
+// (nunca pro preço, que é fixo por tier -- migration 028); cacheado em
+// riot_league_cutoffs (migration 074) porque essas ligas têm centenas/
+// milhares de entries e não podem ser consultadas a cada visualização de
+// pedido.
+export async function fetchLeagueCutoff(
+  tier: 'grandmaster' | 'challenger',
+  queue: 'solo_duo' | 'flex',
+  apiKey: string,
+  platformRoute: string,
+): Promise<LeagueCutoffResult> {
+  const { leagueQueue } = RIOT_QUEUE_TYPE[queue]
+  const path = tier === 'challenger' ? 'challengerleagues' : 'grandmasterleagues'
+  const resp = await fetchWithTimeout(
+    `https://${platformRoute}.api.riotgames.com/lol/league/v4/${path}/by-queue/${leagueQueue}`,
+    { headers: { 'X-Riot-Token': apiKey } },
+    15_000,
+  )
+  if (resp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
+  if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
+
+  const body = await resp.json() as { entries?: { leaguePoints?: number }[] }
+  const points = (body.entries ?? [])
+    .map((e) => e.leaguePoints)
+    .filter((lp): lp is number => typeof lp === 'number')
+  if (points.length === 0) return { ok: false, reason: 'empty_league', status: 502 }
+
+  return { ok: true, cutoffLp: Math.min(...points) }
+}
+
 export type MatchIdsResult =
   | { ok: true; matchIds: string[] }
   | { ok: false; reason: 'rate_limited' | 'upstream_error'; status: number }

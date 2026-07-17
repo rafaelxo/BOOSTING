@@ -24,6 +24,7 @@ function usePayoutSummary(userId: string | undefined) {
       return data as unknown as PayoutSummary
     },
     enabled: !!userId,
+    refetchInterval: 30000,
   })
 }
 
@@ -49,6 +50,7 @@ export function BoosterPaymentsPage() {
       return data as PayoutRecord[]
     },
     enabled: !!profile?.id,
+    refetchInterval: 30000,
   })
 
   const totalEarned = payoutSummary?.total_earned ?? 0

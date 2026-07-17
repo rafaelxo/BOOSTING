@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Briefcase, Clock, Swords, Users, CalendarClock, Wallet, ArrowRight,
+  Briefcase, Clock, Swords, Users, CalendarClock,
   Trophy, Target, Star, CheckCircle2, TrendingUp,
 } from 'lucide-react'
 import { Button, Card, Skeleton, StatCard, EmptyState } from '@/components/ui'
@@ -72,6 +72,7 @@ function useAssignedOrders(boosterUserId: string | undefined) {
       if (error) throw error
       return data as unknown as Order[]
     },
+    refetchInterval: 15000,
   })
 }
 
@@ -94,6 +95,7 @@ export function BoosterDashboard() {
       return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean; exclusive_slot_used: boolean; max_exclusive: number } | null
     },
     enabled: !!profile?.id && boosterProfile?.status === 'approved',
+    refetchInterval: 15000,
   })
 
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
@@ -112,6 +114,7 @@ export function BoosterDashboard() {
       return data as unknown as Order[]
     },
     enabled: !!profile?.id && boosterProfile?.status === 'approved',
+    refetchInterval: 30000,
   })
 
   if (profileLoading) return <Skeleton className="h-64 w-full" />
@@ -262,26 +265,11 @@ export function BoosterDashboard() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {monthOrders.map((order) => <CompletedOrderCard key={order.id} order={order} />)}
+            {monthOrders.map((order) => <CompletedOrderCard key={order.id} order={order} isTop3={boosterProfile?.is_top3} />)}
           </div>
         )}
       </div>
 
-      {/* Ganhos — detalhe completo em Pagamentos */}
-      <Link to="/booster/payments">
-        <Card padding="md" className="flex items-center justify-between hover:border-brand/20 hover:shadow-card-hover transition-all">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center shrink-0">
-              <Wallet className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-ink">Saldo e pagamentos</p>
-              <p className="text-xs text-ink-muted">Veja saldo disponível, saques e histórico completo</p>
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-ink-muted shrink-0" />
-        </Card>
-      </Link>
     </div>
   )
 }

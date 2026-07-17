@@ -98,6 +98,7 @@ export function AdminPaymentsPage() {
       if (error) throw error
       return data as PayoutRow[]
     },
+    refetchInterval: 20000,
   })
 
   const { data: payments, isLoading: loadingPayments } = useQuery({
@@ -111,6 +112,7 @@ export function AdminPaymentsPage() {
       if (error) throw error
       return data as Payment[]
     },
+    refetchInterval: 20000,
   })
 
   const updatePayout = useMutation({

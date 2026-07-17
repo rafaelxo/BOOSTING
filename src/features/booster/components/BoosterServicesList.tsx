@@ -14,14 +14,10 @@ const MAX_SERVICES = 3
 
 const SERVICE_TYPE_OPTIONS = [
   { value: 'coaching', label: 'Coaching' },
-  { value: 'boost_package', label: 'Pacote de Boost' },
-  { value: 'other', label: 'Outro' },
 ] as const
 
 const SERVICE_TYPE_LABEL: Record<string, string> = {
   coaching: 'Coaching',
-  boost_package: 'Pacote de Boost',
-  other: 'Outro',
 }
 
 export function BoosterServicesList({ userId }: { userId: string }) {

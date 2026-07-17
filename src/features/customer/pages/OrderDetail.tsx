@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, RefreshCw, CheckCircle2, AlertTriangle, Receipt } from 'lucide-react'
+import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle, Receipt } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
@@ -350,23 +350,14 @@ function PendingPaymentSection({ order }: { order: Order }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant={copied ? 'success' : 'secondary'}
-              onClick={copyPix}
-              leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            >
-              {copied ? 'Copiado' : 'Copiar'}
-            </Button>
-            <Button
-              variant="secondary"
-              loading={loadPix.isPending}
-              onClick={() => loadPix.mutate()}
-              leftIcon={<RefreshCw className="h-4 w-4" />}
-            >
-              Atualizar
-            </Button>
-          </div>
+          <Button
+            className="w-full"
+            variant={copied ? 'success' : 'secondary'}
+            onClick={copyPix}
+            leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          >
+            {copied ? 'Copiado' : 'Copiar'}
+          </Button>
 
           <Button
             className="w-full"

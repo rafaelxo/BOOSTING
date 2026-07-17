@@ -24,6 +24,7 @@ export function StepReview() {
     isMd5, md5MatchesRemaining, riotId,
     currentLp, currentPdl,
     basePrice, extrasPrice, estimatedHours, pdlModifierPct, customerNotes,
+    selectedCoachPackage,
     setNotes, nextStep, prevStep,
   } = useOrderBuilderStore()
 
@@ -157,10 +158,12 @@ export function StepReview() {
           {serviceType === 'coaching' ? (
             <div className="card p-4 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-ink-secondary">Coaching por sessão</span>
-                <span className="text-sm font-bold text-brand">A combinar</span>
+                <span className="text-sm text-ink-secondary">{selectedCoachPackage?.title ?? 'Pacote de coaching'}</span>
+                <span className="text-sm font-bold text-brand">{currency(totalPrice)}</span>
               </div>
-              <p className="text-[10px] text-ink-muted">O valor será definido com o booster após a criação do pedido.</p>
+              {selectedCoachPackage?.tempo && (
+                <p className="text-[10px] text-ink-muted">{selectedCoachPackage.tempo}</p>
+              )}
             </div>
           ) : (
             <div className="card p-0 px-2">

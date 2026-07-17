@@ -1,7 +1,6 @@
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Zap } from 'lucide-react'
-import { PageLoader, ThemeToggle } from '@/components/ui'
+import { LogoMark, PageLoader, ThemeToggle } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterApplicationForm } from '@/features/booster/components/BoosterApplicationForm'
@@ -45,9 +44,7 @@ export function BoosterApplyPage() {
   const header = (
     <div className="flex items-center justify-between">
       <Link to="/" className="flex items-center gap-2">
-        <div className="h-9 w-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-          <Zap className="h-5 w-5 text-white" />
-        </div>
+        <LogoMark className="h-9 w-9" />
         <span className="text-xl font-bold text-ink">
           Elo<span className="text-brand">Peak</span>
         </span>

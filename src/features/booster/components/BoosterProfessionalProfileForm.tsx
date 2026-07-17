@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, X } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { cn, boosterFormErrorMessage } from '@/lib/utils'
 import { LANES } from '@/lib/lolTaxonomy'
 import type { RankTier } from '@/types'
 
@@ -120,27 +120,30 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     // salvo — mesmo que o campo (desabilitado) tenha algum valor digitado
     // antes de travar. O backend rejeitaria de qualquer forma (migration
     // 025), isso só evita barrar o resto do formulário por causa disso.
-    const nextDisplayName = nameChangeLocked ? profile?.display_name : (displayName.trim() || undefined)
-    const { error } = await supabase
-      .from('booster_profiles')
-      .update({
-        display_name: nextDisplayName,
-        bio: bio.trim() || null,
-        lanes,
-        specialties,
-        peak_rank: peakTier ? { tier: peakTier, division: null } : null,
-        opgg_link: opggLink.trim() || null,
-        available_days: availableDays,
-        hours_per_day_min: hoursMin ? Number(hoursMin) : null,
-        hours_per_day_max: hoursMax ? Number(hoursMax) : null,
-      })
-      .eq('user_id', userId)
+    const nextDisplayName = nameChangeLocked ? profile?.display_name : displayName.trim()
+    const { data: result, error } = await supabase.rpc('update_booster_professional_profile', {
+      p_display_name: nextDisplayName,
+      p_bio: bio.trim(),
+      p_lanes: lanes,
+      p_specialties: specialties,
+      p_peak_tier: peakTier,
+      p_opgg_link: opggLink.trim(),
+      p_available_days: availableDays,
+      p_hours_per_day_min: hoursMin ? Number(hoursMin) : null,
+      p_hours_per_day_max: hoursMax ? Number(hoursMax) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any
     setSaving(false)
     if (error) {
-      // Mensagem do trigger de cooldown (migration 025) já vem pronta pro
-      // usuário ("...tente novamente em N dia(s)") — mostra ela direto em
-      // vez de um erro genérico quando é esse o motivo da rejeição.
+      // Mensagem do trigger de cooldown (migration 025/067) já vem pronta
+      // pro usuário ("...em 30 dias") — mostra ela direto em vez de um erro
+      // genérico quando é esse o motivo da rejeição.
       setError(error.message?.includes('30 dias') ? error.message : 'Erro ao salvar. Tente novamente.')
+      return
+    }
+    const res = result as { success: boolean; error?: string }
+    if (!res.success) {
+      setError(boosterFormErrorMessage(res.error))
       return
     }
     setSaved(true)
@@ -164,6 +167,12 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   }
 
   const isComplete = !!(displayName.trim() && bio.trim() && lanes.length && peakTier)
+  const formValid = !!(
+    displayName.trim() && bio.trim() && peakTier
+    && lanes.length > 0 && specialties.length > 0
+    && opggLink.trim() && availableDays.length > 0
+    && hoursMin && hoursMax
+  )
 
   return (
     <div className="card p-6 space-y-6">
@@ -177,7 +186,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
 
       {/* Nome de exibição */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de exibição</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de exibição <span className="text-danger">*</span></label>
         <input
           value={displayName}
           onChange={e => setDisplayName(e.target.value.slice(0, 32))}
@@ -196,7 +205,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
       {/* Bio */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Apresentação / Bio</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Apresentação / Bio <span className="text-danger">*</span></label>
           <span className="text-[10px] text-ink-muted">{bio.length}/256</span>
         </div>
         <textarea
@@ -210,7 +219,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
 
       {/* Rank de pico */}
       <div className="space-y-2">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank de Pico</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Rank de Pico <span className="text-danger">*</span></label>
         <div className="grid grid-cols-2 gap-3 max-w-xs">
           {PEAK_OPTIONS.map(({ value, label }) => (
             <button
@@ -233,7 +242,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
       {/* Lanes */}
       <div className="space-y-2">
         <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-          Lanes Masterizadas <span className="normal-case font-normal">(máx. 2)</span>
+          Lanes Masterizadas <span className="text-danger">*</span> <span className="normal-case font-normal">(máx. 2)</span>
         </label>
         <div className="flex flex-wrap gap-2">
           {LANES.map(({ key, label }) => {
@@ -264,7 +273,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
       {/* Specialties */}
       <div className="space-y-2">
         <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-          Especialidades <span className="normal-case font-normal">({specialties.length}/{MAX_SPECIALTIES})</span>
+          Especialidades <span className="text-danger">*</span> <span className="normal-case font-normal">({specialties.length}/{MAX_SPECIALTIES})</span>
         </label>
         {specialties.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -301,7 +310,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
 
       {/* OP.GG */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Link do OP.GG (opcional)</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Link do OP.GG <span className="text-danger">*</span></label>
         <input
           value={opggLink}
           onChange={e => setOpggLink(e.target.value)}
@@ -312,7 +321,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
 
       {/* Disponibilidade de horários */}
       <div className="space-y-3">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Disponibilidade</label>
+        <label className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Disponibilidade <span className="text-danger">*</span></label>
         <div className="flex gap-1.5 flex-wrap">
           {DAYS.map(({ key, label }) => {
             const selected = availableDays.includes(key)
@@ -352,7 +361,8 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !formValid}
+          title={!formValid ? 'Preencha todos os campos obrigatórios para salvar' : undefined}
           className="px-4 py-2 rounded-xl bg-brand text-white text-sm font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors"
         >
           {saving ? 'Salvando...' : 'Salvar perfil'}

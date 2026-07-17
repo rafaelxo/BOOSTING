@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { ClipboardList } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
@@ -37,6 +37,15 @@ export function BoosterOrdersPage() {
   const [tab, setTab] = useState<TabKey>('active')
   const activeTab = TABS.find(t => t.key === tab)!
 
+  const { data: boosterProfile } = useQuery({
+    queryKey: ['booster-profile-top3', profile?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('booster_profiles').select('is_top3').eq('user_id', profile!.id).maybeSingle()
+      return data
+    },
+    enabled: !!profile?.id,
+  })
+
   const {
     data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useInfiniteQuery({
@@ -57,6 +66,7 @@ export function BoosterOrdersPage() {
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => (lastPage.length === pageSize ? allPages.length : undefined),
     enabled: !!profile?.id,
+    refetchInterval: 15000,
   })
 
   const orders = data?.pages.flat() ?? []
@@ -106,7 +116,7 @@ export function BoosterOrdersPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {orders.map((order) => <CompletedOrderCard key={order.id} order={order} />)}
+            {orders.map((order) => <CompletedOrderCard key={order.id} order={order} isTop3={boosterProfile?.is_top3} />)}
           </div>
           <div ref={sentinelRef} className="h-4" />
           {isFetchingNextPage && (

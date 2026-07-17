@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { Users } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
@@ -22,6 +23,7 @@ export function AdminCustomersPage() {
       if (error) throw error
       return data
     },
+    refetchInterval: 30000,
   })
 
   return (
@@ -44,8 +46,12 @@ export function AdminCustomersPage() {
               {customers.map((c) => {
                 const p = c.profiles as { email: string; username: string; created_at: string } | null
                 return (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium text-ink">{p?.username ?? '—'}</TableCell>
+                  <TableRow key={c.id} clickable>
+                    <TableCell className="font-medium text-ink">
+                      <Link to={`/admin/customers/${c.id}`} className="text-brand hover:underline">
+                        {p?.username ?? '—'}
+                      </Link>
+                    </TableCell>
                     <TableCell>{p?.email ?? '—'}</TableCell>
                     <TableCell>{c.total_orders}</TableCell>
                     <TableCell className="font-semibold">{currency(c.total_spent)}</TableCell>

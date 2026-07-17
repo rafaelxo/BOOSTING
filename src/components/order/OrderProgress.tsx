@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { Card } from '@/components/ui'
+import { Swords, ArrowRight } from 'lucide-react'
+import { Card, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { formatRank } from '@/lib/utils'
 import { rankStep } from '../../../shared/pricing'
@@ -27,13 +28,18 @@ function WinBoostProgress({ order }: { order: Order }) {
   return (
     <Card padding="md">
       <h3 className="text-sm font-semibold text-ink mb-3">Progresso</h3>
-      <div className="flex items-center justify-between text-xs text-ink-secondary mb-1.5">
-        <span>{completed} de {purchased} vitórias</span>
-        <span className="font-semibold text-ink">{percent.toFixed(0)}%</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
+            <Swords className="h-4 w-4 text-brand" />
+          </div>
+          <span className="text-sm font-bold text-ink">{remaining} vitória{remaining === 1 ? '' : 's'} restante{remaining === 1 ? '' : 's'}</span>
+        </div>
+        <span className="font-semibold text-ink text-sm">{percent.toFixed(0)}%</span>
       </div>
       <ProgressBar percent={percent} tone={done ? 'success' : 'brand'} />
       <p className="text-xs text-ink-muted mt-2">
-        {done ? 'Objetivo de vitórias atingido!' : `Faltam ${remaining} vitória${remaining === 1 ? '' : 's'} para finalizar.`}
+        {done ? 'Objetivo de vitórias atingido!' : `${completed} de ${purchased} vitórias concluídas.`}
       </p>
       {order.losses_played > 0 && (
         <p className="text-[10px] text-ink-muted mt-1">{order.losses_played} derrota{order.losses_played === 1 ? '' : 's'} no período.</p>
@@ -82,9 +88,16 @@ function EloBoostProgress({ order }: { order: Order }) {
   return (
     <Card padding="md">
       <h3 className="text-sm font-semibold text-ink mb-3">Progresso</h3>
-      <div className="flex items-center justify-between text-xs text-ink-secondary mb-1.5">
-        <span>{formatRank(initial.tier, initial.division)} → {formatRank(target.tier, target.division)}</span>
-        {percent != null && <span className="font-semibold text-ink">{percent.toFixed(0)}%</span>}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <RankBadge tier={initial.tier} division={initial.division} size="sm" showLabel={false} />
+          <ArrowRight className="h-3.5 w-3.5 text-ink-muted shrink-0" />
+          <RankBadge tier={target.tier} division={target.division} size="sm" showLabel={false} />
+          <span className="text-xs font-semibold text-ink-secondary">
+            {formatRank(initial.tier, initial.division)} → {formatRank(target.tier, target.division)}
+          </span>
+        </div>
+        {percent != null && <span className="font-semibold text-ink text-sm shrink-0">{percent.toFixed(0)}%</span>}
       </div>
       <ProgressBar percent={percent ?? 0} tone={done ? 'success' : 'brand'} />
       <p className="text-xs text-ink-muted mt-2">

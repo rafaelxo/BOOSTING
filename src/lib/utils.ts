@@ -24,7 +24,7 @@ export function timeAgo(date: string | Date) {
   return formatDistanceToNow(new Date(date), { addSuffix: true, locale: ptBR })
 }
 
-// Prazo de entrega já vem dobrado do backend (DELIVERY_ESTIMATE_MULTIPLIER
+// Prazo de entrega já vem multiplicado pelo backend (DELIVERY_ESTIMATE_MULTIPLIER
 // em shared/pricing.ts) — só formata pra dias+horas quando passa de 24h.
 export function formatEstimatedDelivery(hours: number): string {
   if (hours < 24) return `~${hours} hora${hours === 1 ? '' : 's'}`
@@ -169,6 +169,19 @@ export function getServiceLabel(serviceId: string): string {
   return SERVICE_LABEL_MAP[serviceId] ?? serviceId.replace(/_/g, ' ')
 }
 
+// Rótulo específico dentro da categoria de getServiceLabel -- "Solo Boost /
+// Duo Boost" (elo_boost) vira "Solo Boost" ou "Duo Boost"; "Vitórias / MD5"
+// vira "Vitórias" ou "MD5". Usado nos cards/detalhes de pedido do booster
+// pra deixar claro exatamente qual variação é o pedido, não só a categoria.
+export function getOrderModeType(order: Pick<Order, 'service_type' | 'boost_mode'>): string {
+  if (order.service_type === 'elo_boost') return order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'
+  if (order.service_type === 'win_boost') return 'Vitórias'
+  if (order.service_type === 'md5') return 'MD5'
+  if (order.service_type === 'coaching') return 'Coaching'
+  if (order.service_type === 'placement_matches') return 'MD5 Completo'
+  return getServiceLabel(order.service_type)
+}
+
 // Mirrors public.order_requires_access_token(service_type, boost_mode) —
 // mantém a mesma predicate no front pra decidir quando mostrar a seção de
 // credenciais da conta, sem duplicar a regra em cada tela.
@@ -180,9 +193,37 @@ export function orderRequiresAccountAccess(order: Order): boolean {
   )
 }
 
+// Mensagens amigáveis pros códigos de erro retornados por onboard_booster e
+// update_booster_professional_profile (migration 076) -- a validação real
+// (obrigatoriedade, formato) mora no backend; isso só traduz o código pro
+// usuário em vez de mostrar o código cru.
+const BOOSTER_FORM_ERROR_MESSAGES: Record<string, string> = {
+  not_a_booster: 'Não foi possível identificar sua candidatura de booster.',
+  display_name_required: 'Nome de exibição é obrigatório.',
+  bio_required: 'Conte um pouco sobre você.',
+  invalid_peak_rank: 'Selecione seu rank de pico (Grão-mestre ou Desafiante).',
+  invalid_opgg_link: 'Link do OP.GG inválido.',
+  invalid_hours: 'Informe uma faixa de horas válida (1 a 24, com o mínimo menor ou igual ao máximo).',
+  full_name_required: 'Nome completo é obrigatório.',
+  invalid_cpf: 'CPF inválido.',
+  available_days_required: 'Selecione ao menos um dia disponível.',
+  invalid_lanes: 'Selecione entre 1 e 2 lanes.',
+  invalid_specialties: 'Selecione ao menos uma especialidade.',
+}
+
+export function boosterFormErrorMessage(code: string | undefined): string {
+  return BOOSTER_FORM_ERROR_MESSAGES[code ?? ''] ?? `Erro: ${code ?? 'falha desconhecida'}`
+}
+
 // Share of order.total_price the booster receives before an authoritative
-// payout_records row exists (mirrors the platform commission split).
-export const BOOSTER_EARNINGS_SHARE = 0.75
+// payout_records row exists (mirrors trg_fn_order_completed_booster_stats,
+// migration 069): 55% normally, 60% for Top3 boosters.
+export const BOOSTER_EARNINGS_SHARE_NORMAL = 0.55
+export const BOOSTER_EARNINGS_SHARE_TOP3 = 0.60
+
+export function boosterEarningsShare(isTop3?: boolean | null): number {
+  return isTop3 ? BOOSTER_EARNINGS_SHARE_TOP3 : BOOSTER_EARNINGS_SHARE_NORMAL
+}
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 

@@ -1,11 +1,107 @@
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ChevronRight, MessageCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, Skeleton, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney } from '@/lib/pricing'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import type { RankTier, ServiceExtra } from '@/types'
+import { supabase } from '@/lib/supabase'
+import type { RankTier, ServiceExtra, BoosterService } from '@/types'
+
+const COACHING_HIGHLIGHTS = ['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva']
+
+type CoachPackageRow = Pick<BoosterService, 'id' | 'title' | 'price' | 'tempo' | 'booster_id'>
+
+function CoachingPricingSection({ currency }: { currency: (n: number) => string }) {
+  const { data: packages = [], isLoading } = useQuery({
+    queryKey: ['pricing-coach-packages'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_services')
+        .select('id, title, price, tempo, booster_id')
+        .eq('service_type', 'coaching')
+        .eq('is_active', true)
+        .order('price', { ascending: true })
+        .limit(20)
+      if (error) throw error
+      return data as CoachPackageRow[]
+    },
+  })
+
+  const boosterIds = useMemo(() => [...new Set(packages.map(p => p.booster_id))], [packages])
+
+  const { data: boosters = [] } = useQuery({
+    queryKey: ['pricing-coach-boosters', boosterIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('public_booster_profiles')
+        .select('user_id, display_name')
+        .in('user_id', boosterIds)
+      if (error) throw error
+      return data as { user_id: string; display_name: string }[]
+    },
+    enabled: boosterIds.length > 0,
+  })
+
+  const boosterName = useMemo(
+    () => Object.fromEntries(boosters.map(b => [b.user_id, b.display_name])),
+    [boosters],
+  )
+
+  return (
+    <section>
+      <h2 className="text-xl font-bold text-ink mb-1">Coaching</h2>
+      <p className="text-sm text-ink-secondary mb-4">
+        Sessões individuais com nossos coaches — o valor de cada pacote é definido pelo coach escolhido.
+      </p>
+
+      <div className="flex flex-col gap-1.5 mb-4">
+        {COACHING_HIGHLIGHTS.map(item => (
+          <span key={item} className="flex items-center gap-2 text-sm text-ink-secondary">
+            <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
+          </span>
+        ))}
+      </div>
+
+      <div className="card overflow-hidden p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b border-bg-elevated">
+            <tr>
+              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Pacote</th>
+              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Coach</th>
+              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Duração</th>
+              <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Valor</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-bg-elevated">
+            {isLoading ? (
+              [1, 2, 3].map(i => (
+                <tr key={i}>
+                  <td colSpan={4} className="p-3"><Skeleton className="h-6 w-full" /></td>
+                </tr>
+              ))
+            ) : packages.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-8 px-5 text-center text-sm text-ink-muted">
+                  Nenhum pacote de coaching disponível no momento.
+                </td>
+              </tr>
+            ) : packages.map(p => (
+              <tr key={p.id} className="hover:bg-bg-elevated/40 transition-colors">
+                <td className="py-3 px-5 text-ink font-semibold">{p.title}</td>
+                <td className="py-3 px-5 text-ink-secondary">{boosterName[p.booster_id] ?? '—'}</td>
+                <td className="py-3 px-5 text-ink-secondary">{p.tempo || '—'}</td>
+                <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(p.price)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
 
 const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster'> = ['master', 'grandmaster']
 
@@ -91,7 +187,7 @@ export function PricingPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-1">Solo Boost / Duo Boost</h2>
           <p className="text-sm text-ink-secondary mb-4">
-            Até Diamante, o preço é por divisão. Mestre, Grão-mestre e Challenger são tiers separados, sem Duo e sem tier completo.
+            Até Diamante, o preço é por divisão. Mestre, Grão-mestre e Challenger pelo tiers completos, sem Duo.
           </p>
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
@@ -146,27 +242,7 @@ export function PricingPage() {
         </section>
 
         {/* ── Coaching ── */}
-        <section>
-          <h2 className="text-xl font-bold text-ink mb-1">Coaching</h2>
-          <p className="text-sm text-ink-secondary mb-4">
-            Sessões individuais com um booster Grão-mestre ou Desafiante — valor combinado por sessão de acordo com o coach escolhido.
-          </p>
-          <div className="card p-6 flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
-            <div className="h-11 w-11 rounded-2xl bg-success/20 border border-success/30 flex items-center justify-center shrink-0">
-              <MessageCircle className="h-5 w-5 text-success" />
-            </div>
-            <div className="flex flex-col gap-2 items-start">
-              {['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva'].map(item => (
-                <span key={item} className="flex items-center gap-1.5 text-sm text-ink-secondary">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
-                </span>
-              ))}
-            </div>
-            <p className="text-lg font-bold text-brand pt-2 border-t border-bg-elevated w-full">
-              Valor a combinar <span className="text-xs font-normal text-ink-muted">· por sessão</span>
-            </p>
-          </div>
-        </section>
+        <CoachingPricingSection currency={currency} />
 
         {/* ── Vitórias / MD5 ── */}
         <section>
