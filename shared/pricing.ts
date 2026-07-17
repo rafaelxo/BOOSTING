@@ -261,8 +261,8 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 // efetivamente "compra" o tier Master através dele.
 export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
   master: 89990,
-  grandmaster: 89990,
-  challenger: 124990,
+  grandmaster: 124990,
+  challenger: 214990,
 } as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────

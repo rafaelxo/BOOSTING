@@ -165,7 +165,8 @@ const SERVICE_LABEL_MAP: Record<string, string> = {
   md5:               'Vitórias / MD5',
 }
 
-export function getServiceLabel(serviceId: string): string {
+export function getServiceLabel(serviceId: string | null | undefined): string {
+  if (!serviceId) return '—'
   return SERVICE_LABEL_MAP[serviceId] ?? serviceId.replace(/_/g, ' ')
 }
 
@@ -174,6 +175,7 @@ export function getServiceLabel(serviceId: string): string {
 // vira "Vitórias" ou "MD5". Usado nos cards/detalhes de pedido do booster
 // pra deixar claro exatamente qual variação é o pedido, não só a categoria.
 export function getOrderModeType(order: Pick<Order, 'service_type' | 'boost_mode'>): string {
+  if (!order.service_type) return '—'
   if (order.service_type === 'elo_boost') return order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'
   if (order.service_type === 'win_boost') return 'Vitórias'
   if (order.service_type === 'md5') return 'MD5'
@@ -187,10 +189,11 @@ export function getOrderModeType(order: Pick<Order, 'service_type' | 'boost_mode
 // credenciais da conta, sem duplicar a regra em cada tela.
 export function orderRequiresAccountAccess(order: Order): boolean {
   return (
-    (order.service_type === 'elo_boost' && order.boost_mode === 'solo') ||
-    order.service_type === 'win_boost' ||
-    order.service_type === 'md5'
-  )
+    (order.service_type === "elo_boost" && order.boost_mode === "solo") ||
+    (order.service_type === "elo_boost" && order.boost_mode === "duo") ||
+    order.service_type === "win_boost" ||
+    order.service_type === "md5"
+  );
 }
 
 // Mensagens amigáveis pros códigos de erro retornados por onboard_booster e

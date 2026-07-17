@@ -1,0 +1,77 @@
+import { supabase } from '@/lib/supabase'
+import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
+import type { SaveDuoAccountParams } from './types'
+
+const RESERVE_MESSAGES: Record<string, string> = {
+  account_unavailable: 'Esta conta acabou de ser reservada por outro booster.',
+}
+
+export async function reserveDuoAccount(params: { orderId: string; accountId: string }) {
+  const { data, error } = await supabase.rpc('reserve_duo_account', {
+    p_order_id: params.orderId, p_account_id: params.accountId,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string }, RESERVE_MESSAGES)
+}
+
+export async function releaseDuoAccountReservation(orderId: string) {
+  const { data, error } = await supabase.rpc('release_duo_account_reservation', { p_order_id: orderId })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string })
+}
+
+export async function getDuoAccountAccessToken(accountId: string) {
+  const { data, error } = await supabase.rpc('get_duo_account_access_token', { p_account_id: accountId })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string; access_token?: string })
+}
+
+export async function updateDuoAccountRank(params: { accountId: string; tier: string; division: string | null }) {
+  const { data, error } = await supabase.rpc('update_duo_account_rank', {
+    p_account_id: params.accountId, p_tier: params.tier, p_division: (params.division ?? '') as never,
+  })
+  if (error) throw normalizeApiError(error)
+  return data as { success?: boolean; error?: string }
+}
+
+export async function adminSaveDuoAccount(params: SaveDuoAccountParams) {
+  const { data, error } = await supabase.rpc('save_duo_account', {
+    p_account_id: params.accountId as never,
+    p_riot_id: params.riotId as never,
+    p_label: params.label,
+    p_tier: params.tier,
+    p_division: params.division as never,
+    p_notes: params.notes as never,
+    p_is_active: params.isActive,
+    p_login: params.login as never,
+    p_password: params.password as never,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success?: boolean; error?: string })
+}
+
+export async function adminSetDuoAccountActive(params: { accountId: string; isActive: boolean }) {
+  const { data, error } = await supabase.rpc('set_duo_account_active', {
+    p_account_id: params.accountId, p_is_active: params.isActive,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success?: boolean; error?: string })
+}
+
+export async function adminReleaseDuoAccount(accountId: string) {
+  const { data, error } = await supabase.rpc('admin_release_duo_account', { p_account_id: accountId })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success?: boolean; error?: string })
+}
+
+export async function adminDeleteDuoAccount(accountId: string) {
+  const { data, error } = await supabase.rpc('delete_duo_account', { p_account_id: accountId })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success?: boolean; error?: string })
+}
+
+export async function adminGetDuoAccountCredentials(accountId: string) {
+  const { data, error } = await supabase.rpc('get_duo_account_credentials', { p_account_id: accountId })
+  if (error) throw normalizeApiError(error)
+  return data as { success: boolean; login?: string; password?: string }
+}

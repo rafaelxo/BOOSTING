@@ -24,6 +24,9 @@ const bodySchema = z.object({
   preferred_booster_id: z.string().uuid().optional(),
 }).strict().refine((body) => Boolean(body.order_id) !== Boolean(body.intent), {
   message: 'Informe exatamente um entre order_id e intent',
+}).refine((body) => !body.intent || Boolean(body.idempotency_key), {
+  message: 'idempotency_key é obrigatório ao criar um pedido novo (intent)',
+  path: ['idempotency_key'],
 })
 
 function badRequest(req: Request, message: string) {

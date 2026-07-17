@@ -111,15 +111,19 @@ describe('Tabela master_plus_pricing — 12 combinações válidas, sem preço f
 // StepConfigure e revalidada em orderPricing.ts). São duas fontes de verdade
 // para o mesmo valor monetário: se divergirem, o cliente vê um preço e é
 // cobrado outro. Este teste amarra a seed da migration (028 + correções
-// posteriores, ex.: 068) ao constante do código — sempre o estado FINAL do
-// banco, nunca só o seed original.
-describe('master_plus_pricing (028+068) — seed do banco bate com o preço exibido na página pública', () => {
+// posteriores, ex.: 068, 078) ao constante do código — sempre o estado
+// FINAL do banco, nunca só o seed original.
+describe('master_plus_pricing (028+068+078) — seed do banco bate com o preço exibido na página pública', () => {
   const migration028 = readFileSync(
     join(__dirname, '..', 'supabase', 'migrations', '028_master_plus_pricing_flat_tiers.sql'),
     'utf-8',
   )
   const migration068 = readFileSync(
     join(__dirname, '..', 'supabase', 'migrations', '068_fix_master_plus_pricing_values.sql'),
+    'utf-8',
+  )
+  const migration078 = readFileSync(
+    join(__dirname, '..', 'supabase', 'migrations', '078_fix_master_plus_pricing_tiers.sql'),
     'utf-8',
   )
 
@@ -145,7 +149,10 @@ describe('master_plus_pricing (028+068) — seed do banco bate com o preço exib
     return out
   }
 
-  const seeded = applyTierPriceUpdates(parseTierPrices(migration028), migration068)
+  const seeded = applyTierPriceUpdates(
+    applyTierPriceUpdates(parseTierPrices(migration028), migration068),
+    migration078,
+  )
 
   it('semeia exatamente os 3 tiers (master, grandmaster, challenger)', () => {
     expect(Object.keys(seeded).sort()).toEqual(['challenger', 'grandmaster', 'master'])

@@ -22,6 +22,15 @@ const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const REGIONAL_ROUTE = 'americas'
 const PLATFORM_ROUTE = 'br1'
 
+// orders.queue_type -> Riot League-V4 queueType. Antes a verificação sempre
+// checava RANKED_SOLO_5x5, então um pedido de fila Flex nunca conseguia
+// completar por verificação automática de rank (o entry de Flex existe na
+// resposta da Riot mas era ignorado).
+const RIOT_QUEUE_TYPE: Record<string, string> = {
+  solo_duo: 'RANKED_SOLO_5x5',
+  flex: 'RANKED_FLEX_SR',
+}
+
 const bodySchema = z.object({
   order_id: z.string().uuid(),
 }).strict()
@@ -82,7 +91,7 @@ serve(async (req) => {
     // check needed beyond what the query itself can return.
     const { data: order, error: orderErr } = await userClient
       .from('orders')
-      .select('id, status, target_rank, riot_id, assigned_booster_id')
+      .select('id, status, target_rank, riot_id, assigned_booster_id, queue_type')
       .eq('id', orderId)
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
@@ -132,11 +141,12 @@ serve(async (req) => {
       console.error('Riot league-v4 error', leagueResult.status)
       return errorResponse(req, 'Falha ao consultar rank na Riot', 502)
     }
-    const soloEntry = leagueResult.entries.find((e) => e.queueType === 'RANKED_SOLO_5x5')
+    const riotQueueType = RIOT_QUEUE_TYPE[order.queue_type as string] ?? 'RANKED_SOLO_5x5'
+    const rankedEntry = leagueResult.entries.find((e) => e.queueType === riotQueueType)
 
-    const fetchedTier = soloEntry?.tier ? RIOT_TIER_MAP[soloEntry.tier] ?? null : null
-    const fetchedDivision = fetchedTier && !NO_DIVISION_TIERS.includes(fetchedTier) && soloEntry?.rank
-      ? RIOT_DIVISION_MAP[soloEntry.rank] ?? null
+    const fetchedTier = rankedEntry?.tier ? RIOT_TIER_MAP[rankedEntry.tier] ?? null : null
+    const fetchedDivision = fetchedTier && !NO_DIVISION_TIERS.includes(fetchedTier) && rankedEntry?.rank
+      ? RIOT_DIVISION_MAP[rankedEntry.rank] ?? null
       : null
 
     if (!fetchedTier) {

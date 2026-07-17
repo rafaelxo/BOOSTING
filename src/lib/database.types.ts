@@ -83,6 +83,80 @@ export type Database = {
           },
         ]
       }
+      booster_ledger_entries: {
+        Row: {
+          actor_id: string | null
+          actor_role: Database["public"]["Enums"]["user_role"] | null
+          amount: number
+          booster_id: string
+          correlation_id: string
+          created_at: string
+          description: string | null
+          entry_type: Database["public"]["Enums"]["ledger_entry_type"]
+          id: string
+          metadata: Json
+          order_id: string | null
+          payout_request_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["user_role"] | null
+          amount: number
+          booster_id: string
+          correlation_id?: string
+          created_at?: string
+          description?: string | null
+          entry_type: Database["public"]["Enums"]["ledger_entry_type"]
+          id?: string
+          metadata?: Json
+          order_id?: string | null
+          payout_request_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["user_role"] | null
+          amount?: number
+          booster_id?: string
+          correlation_id?: string
+          created_at?: string
+          description?: string | null
+          entry_type?: Database["public"]["Enums"]["ledger_entry_type"]
+          id?: string
+          metadata?: Json
+          order_id?: string | null
+          payout_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_ledger_entries_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_ledger_entries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_ledger_entries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_ledger_entries_payout_request_id_fkey"
+            columns: ["payout_request_id"]
+            isOneToOne: false
+            referencedRelation: "payout_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booster_order_events: {
         Row: {
           created_at: string
@@ -920,6 +994,71 @@ export type Database = {
           },
         ]
       }
+      order_support_escalations: {
+        Row: {
+          customer_id: string
+          deadline_at: string
+          delay_minutes: number
+          id: string
+          order_id: string
+          requested_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          customer_id: string
+          deadline_at: string
+          delay_minutes: number
+          id?: string
+          order_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          customer_id?: string
+          deadline_at?: string
+          delay_minutes?: number
+          id?: string
+          order_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_support_escalations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_support_escalations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_support_escalations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_support_escalations_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           assigned_booster_id: string | null
@@ -948,7 +1087,7 @@ export type Database = {
           game_credentials: string | null
           game_id: string
           id: string
-          idempotency_key: string | null
+          idempotency_key: string
           last_match_synced_at: string | null
           losses_played: number
           match_sync_started_at: string | null
@@ -1000,7 +1139,7 @@ export type Database = {
           game_credentials?: string | null
           game_id: string
           id?: string
-          idempotency_key?: string | null
+          idempotency_key?: string
           last_match_synced_at?: string | null
           losses_played?: number
           match_sync_started_at?: string | null
@@ -1052,7 +1191,7 @@ export type Database = {
           game_credentials?: string | null
           game_id?: string
           id?: string
-          idempotency_key?: string | null
+          idempotency_key?: string
           last_match_synced_at?: string | null
           losses_played?: number
           match_sync_started_at?: string | null
@@ -1242,6 +1381,85 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_requests: {
+        Row: {
+          admin_note: string | null
+          amount: number
+          booster_cpf_snapshot: string | null
+          booster_id: string
+          booster_legal_name_snapshot: string | null
+          created_at: string
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          proof_url: string | null
+          rejection_reason: string | null
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["payout_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          admin_note?: string | null
+          amount: number
+          booster_cpf_snapshot?: string | null
+          booster_id: string
+          booster_legal_name_snapshot?: string | null
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          proof_url?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["payout_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          admin_note?: string | null
+          amount?: number
+          booster_cpf_snapshot?: string | null
+          booster_id?: string
+          booster_legal_name_snapshot?: string | null
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          proof_url?: string | null
+          rejection_reason?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["payout_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_requests_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_requests_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1670,12 +1888,24 @@ export type Database = {
         Args: { p_order_id: string; p_reason: string }
         Returns: Json
       }
+      admin_mark_payout_paid: {
+        Args: { p_proof_url: string; p_request_id: string }
+        Returns: Json
+      }
       admin_override_order_status: {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
       }
       admin_release_duo_account: {
         Args: { p_account_id: string }
+        Returns: Json
+      }
+      admin_resolve_order_support: {
+        Args: { p_escalation_id: string }
+        Returns: Json
+      }
+      admin_review_payout_request: {
+        Args: { p_new_status: string; p_note?: string; p_request_id: string }
         Returns: Json
       }
       admin_set_order_chat_lock: {
@@ -1694,6 +1924,10 @@ export type Database = {
           total_count: number
         }[]
       }
+      booster_available_balance: {
+        Args: { p_booster_id: string }
+        Returns: number
+      }
       booster_has_active_exclusive_slot: {
         Args: { p_booster_user_id: string }
         Returns: boolean
@@ -1703,10 +1937,12 @@ export type Database = {
         Args: { p_booster_user_id: string }
         Returns: Json
       }
+      booster_payout_totals: { Args: { p_booster_id: string }; Returns: Json }
       can_booster_accept_order: {
         Args: { p_boost_mode: string; p_booster_user_id: string }
         Returns: Json
       }
+      cancel_payout_request: { Args: { p_request_id: string }; Returns: Json }
       check_own_write_rate_limit: {
         Args: { p_limit: number; p_scope: string; p_window_seconds: number }
         Returns: boolean
@@ -1816,6 +2052,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      payout_request_order_breakdown: {
+        Args: { p_request_id: string }
+        Returns: {
+          amount_included: number
+          booster_commission: number
+          commission_rate: number
+          gross_amount: number
+          order_id: string
+          service_type: Database["public"]["Enums"]["service_type"]
+        }[]
+      }
       process_mp_payment_event: {
         Args: {
           p_amount: number
@@ -1875,6 +2122,8 @@ export type Database = {
         Args: { p_order_id: string; p_reason: string }
         Returns: Json
       }
+      request_order_support: { Args: { p_order_id: string }; Returns: Json }
+      request_payout: { Args: { p_amount: number }; Returns: Json }
       reserve_duo_account: {
         Args: { p_account_id: string; p_order_id: string }
         Returns: Json
@@ -1976,6 +2225,15 @@ export type Database = {
         | "approved"
         | "suspended"
         | "rejected"
+      ledger_entry_type:
+        | "commission_credit"
+        | "commission_adjustment"
+        | "drop_penalty"
+        | "refund_debit"
+        | "manual_admin_adjustment"
+        | "payout_reservation"
+        | "payout_release"
+        | "payout_paid"
       order_status:
         | "draft"
         | "awaiting_payment"
@@ -1997,6 +2255,13 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
         | "disputed"
+      payout_request_status:
+        | "requested"
+        | "under_review"
+        | "approved"
+        | "paid"
+        | "rejected"
+        | "canceled"
       payout_status: "pending" | "processing" | "paid" | "failed"
       queue_type: "solo_duo" | "flex"
       service_type:
@@ -2593,6 +2858,16 @@ export const Constants = {
         "suspended",
         "rejected",
       ],
+      ledger_entry_type: [
+        "commission_credit",
+        "commission_adjustment",
+        "drop_penalty",
+        "refund_debit",
+        "manual_admin_adjustment",
+        "payout_reservation",
+        "payout_release",
+        "payout_paid",
+      ],
       order_status: [
         "draft",
         "awaiting_payment",
@@ -2615,6 +2890,14 @@ export const Constants = {
         "refunded",
         "partially_refunded",
         "disputed",
+      ],
+      payout_request_status: [
+        "requested",
+        "under_review",
+        "approved",
+        "paid",
+        "rejected",
+        "canceled",
       ],
       payout_status: ["pending", "processing", "paid", "failed"],
       queue_type: ["solo_duo", "flex"],
