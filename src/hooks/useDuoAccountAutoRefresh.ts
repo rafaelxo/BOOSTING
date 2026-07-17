@@ -26,7 +26,7 @@ async function refreshRank(accountId: string, riotId: string) {
     await supabase.rpc('update_duo_account_rank', {
       p_account_id: accountId,
       p_tier: result.tier,
-      p_division: result.division ?? null,
+      p_division: (result.division ?? null) as never,
     })
   } catch {
     // Refresh best-effort em segundo plano — falha silenciosa, o próximo

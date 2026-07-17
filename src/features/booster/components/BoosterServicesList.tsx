@@ -57,10 +57,10 @@ export function BoosterServicesList({ userId }: { userId: string }) {
     const { error } = await supabase.from('booster_services').insert({
       booster_id: userId,
       title: form.title.trim(),
-      description: form.description.trim() || null,
+      description: form.description.trim(),
       service_type: newServiceType,
       unit: 'fixed',
-      tempo: form.tempo.trim() || null,
+      tempo: form.tempo.trim(),
       price: parseFloat(form.price),
       lanes: form.lanes as never,
       specialties: form.specialties as never,
@@ -77,8 +77,8 @@ export function BoosterServicesList({ userId }: { userId: string }) {
     setError(null)
     const { error } = await supabase.from('booster_services').update({
       title: form.title.trim(),
-      description: form.description.trim() || null,
-      tempo: form.tempo.trim() || null,
+      description: form.description.trim(),
+      tempo: form.tempo.trim(),
       price: parseFloat(form.price),
       lanes: form.lanes as never,
       specialties: form.specialties as never,

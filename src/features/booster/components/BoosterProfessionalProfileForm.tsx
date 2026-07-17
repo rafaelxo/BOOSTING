@@ -120,17 +120,17 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     // salvo — mesmo que o campo (desabilitado) tenha algum valor digitado
     // antes de travar. O backend rejeitaria de qualquer forma (migration
     // 025), isso só evita barrar o resto do formulário por causa disso.
-    const nextDisplayName = nameChangeLocked ? profile?.display_name : displayName.trim()
+    const nextDisplayName = (nameChangeLocked ? profile?.display_name : displayName.trim()) ?? ''
     const { data: result, error } = await supabase.rpc('update_booster_professional_profile', {
       p_display_name: nextDisplayName,
       p_bio: bio.trim(),
       p_lanes: lanes,
       p_specialties: specialties,
-      p_peak_tier: peakTier,
+      p_peak_tier: peakTier ?? '',
       p_opgg_link: opggLink.trim(),
       p_available_days: availableDays,
-      p_hours_per_day_min: hoursMin ? Number(hoursMin) : null,
-      p_hours_per_day_max: hoursMax ? Number(hoursMax) : null,
+      p_hours_per_day_min: hoursMin ? Number(hoursMin) : 0,
+      p_hours_per_day_max: hoursMax ? Number(hoursMax) : 0,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any
     setSaving(false)
