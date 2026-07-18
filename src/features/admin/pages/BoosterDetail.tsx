@@ -1,10 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, ClipboardList } from 'lucide-react'
-import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert, EmptyState } from '@/components/ui'
-import { formatDate, formatDateTime, formatRank, formatLastSeen, timeAgo } from '@/lib/utils'
+import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
+import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
+import { formatDate, formatRank, formatLastSeen } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
-  useAdminBoosterDetail, useBoosterPerformanceByRank, useBoosterAuditLog, useAdminApproveBooster,
+  useAdminBoosterDetail, useBoosterPerformanceByRank, useAdminApproveBooster,
   useAdminToggleBoosterTop3,
 } from '@/api/boosters'
 import { useBoosterSlotInfo } from '@/api/orders'
@@ -14,15 +14,6 @@ const BRACKET_LABEL: Record<RankBucket, string> = {
   gold_minus: 'Ouro e abaixo',
   plat_diamond: 'Platina–Diamante',
   master_plus: 'Mestre+',
-}
-
-const AUDIT_ACTION_LABEL: Record<string, string> = {
-  'booster.approved': 'Booster aprovado',
-  'booster.rejected': 'Candidatura rejeitada',
-  'booster.suspended': 'Booster suspenso',
-  'booster.under_review': 'Candidatura em revisão',
-  'booster.top3_granted': 'Marcado como Top3',
-  'booster.top3_removed': 'Removido do Top3',
 }
 
 function safeOpggUrl(url: string | null): string | undefined {
@@ -49,10 +40,6 @@ export function AdminBoosterDetailPage() {
   // partidas reais sincronizadas (order_matches) e reviews, nunca digitado
   // à mão (ver refresh_booster_performance_segments, migration 054).
   const { data: performanceSegments } = useBoosterPerformanceByRank(booster?.user_id)
-
-  // Trilha de auditoria pra controle admin -- aprovação/rejeição/suspensão e
-  // mudanças de Top3 (approve_booster / toggle_booster_top3).
-  const { data: auditLog } = useBoosterAuditLog(id)
 
   const updateStatusMutation = useAdminApproveBooster()
   const updateStatus = {
@@ -293,10 +280,12 @@ export function AdminBoosterDetailPage() {
               ({slotInfo.is_top3 ? 'Top3: máx 3 / 2 duo' : 'Normal: máx 3 / 1 duo'})
             </span>
           </h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {[
               { label: 'Solo', value: slotInfo.solo_count, icon: Swords, color: 'text-brand bg-brand/10' },
               { label: 'Duo',  value: `${slotInfo.duo_count}/${slotInfo.max_duo}`, icon: Users, color: 'text-accent bg-accent/10' },
+              { label: 'Exclusivo', value: `${slotInfo.exclusive_slot_used ? 1 : 0}/${slotInfo.max_exclusive ?? 1}`, icon: Trophy,
+                color: slotInfo.exclusive_slot_used ? 'text-danger bg-danger/10' : 'text-success bg-success/10' },
               { label: 'Total', value: `${slotInfo.total_count}/${slotInfo.max_total}`, icon: Trophy,
                 color: (slotInfo.total_count ?? 0) >= (slotInfo.max_total ?? 3) ? 'text-danger bg-danger/10' : 'text-success bg-success/10' },
             ].map(({ label, value, icon: Icon, color }) => (
@@ -312,22 +301,6 @@ export function AdminBoosterDetailPage() {
         </Card>
       )}
 
-      {/* Atividade -- trilha de auditoria pra controle admin */}
-      <Card padding="md">
-        <h3 className="text-sm font-semibold text-ink mb-3">Atividade</h3>
-        {!auditLog?.length ? (
-          <EmptyState icon={ClipboardList} title="Nenhum evento registrado" />
-        ) : (
-          <div className="space-y-3">
-            {auditLog.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between text-sm">
-                <span className="text-ink">{AUDIT_ACTION_LABEL[entry.action] ?? entry.action}</span>
-                <span className="text-xs text-ink-muted" title={formatDateTime(entry.created_at)}>{timeAgo(entry.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
     </div>
   )
 }

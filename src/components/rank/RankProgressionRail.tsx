@@ -40,14 +40,13 @@ export function RankProgressionRail({
           <RankBadge tier={currentTier} division={currentDivision} size={badgeSize} />
           {currentLp != null && (
             <span className="text-xs font-semibold text-brand tabular-figures" data-tabular>
-              {currentLp} LP
+              {currentLp} PDL
             </span>
           )}
         </div>
         {targetTier != null && (
           <div className="flex flex-col items-center gap-1.5">
             <RankBadge tier={targetTier} division={targetDivision ?? null} size={badgeSize} />
-            <span className="text-xs font-semibold text-accent">Meta</span>
           </div>
         )}
       </div>

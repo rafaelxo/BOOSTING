@@ -186,11 +186,12 @@ export function getOrderModeType(order: Pick<Order, 'service_type' | 'boost_mode
 
 // Mirrors public.order_requires_access_token(service_type, boost_mode) —
 // mantém a mesma predicate no front pra decidir quando mostrar a seção de
-// credenciais da conta, sem duplicar a regra em cada tela.
+// credenciais da conta, sem duplicar a regra em cada tela. Duo nunca entra
+// aqui: pedidos duo usam a conta duo da empresa (DuoAccountSection), o
+// cliente nunca gera/fornece as próprias credenciais.
 export function orderRequiresAccountAccess(order: Order): boolean {
   return (
-    (order.service_type === "elo_boost" && order.boost_mode === "solo") ||
-    (order.service_type === "elo_boost" && order.boost_mode === "duo") ||
+    (order.service_type === "elo_boost" && (order.boost_mode ?? "solo") === "solo") ||
     order.service_type === "win_boost" ||
     order.service_type === "md5"
   );

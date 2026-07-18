@@ -230,6 +230,7 @@ export interface OrderRankVerification {
   riot_id_checked: string
   fetched_tier: RankTier | null
   fetched_division: Division | null
+  fetched_lp: number | null
   target_tier: RankTier
   target_division: Division | null
   passed: boolean

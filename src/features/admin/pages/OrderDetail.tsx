@@ -1,13 +1,15 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, RefreshCw, Clock, ShieldCheck, XOctagon, MessageCircleWarning } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Clock, XOctagon, MessageCircleWarning } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderProgress } from '@/components/order/OrderProgress'
 import { supabase } from '@/lib/supabase'
 import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useOrder, useOrderStatusHistory, useOrderRankVerifications, useAdminOverrideOrderStatus, useAdminDropOrder } from '@/api/orders'
+import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder } from '@/api/orders'
 import { useOrderSupportEscalation, useAdminResolveOrderSupport } from '@/api/admin'
 import type { OrderStatus } from '@/types'
 
@@ -26,16 +28,31 @@ function BoosterLink({ userId, booster }: { userId: string; booster: BoosterRef 
 // 'drop_requested' fica de fora porque já tem sua própria fila em /admin/drops.
 const DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 'awaiting_customer']
 
-const ADMIN_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
-  { value: 'awaiting_assignment', label: 'Esperando Booster' },
-  { value: 'assigned',            label: 'Booster Atribuído' },
-  { value: 'in_progress',        label: 'Em Andamento' },
-  { value: 'paused',             label: 'Pausado' },
-  { value: 'awaiting_customer',  label: 'Aguardando Cliente' },
-  { value: 'completed',          label: 'Concluído' },
-  { value: 'disputed',           label: 'Disputado' },
-  { value: 'refunded',           label: 'Reembolsado' },
-  { value: 'canceled',           label: 'Cancelado' },
+// admin_override_order_status aceita qualquer status sem validar a transição
+// (é a válvula de escape do admin) -- mas listar as 9 opções lado a lado sem
+// contexto obriga o admin a saber de cor qual é o próximo passo certo. Aqui
+// só a etapa seguinte natural do status atual aparece em destaque; o resto
+// (disputa/reembolso/cancelamento) continua sempre disponível, só que
+// separado como ação excepcional -- nenhuma capacidade foi removida.
+const FORWARD_STATUS: Partial<Record<OrderStatus, { value: OrderStatus; label: string }[]>> = {
+  awaiting_assignment: [{ value: 'assigned', label: 'Marcar como atribuído' }],
+  assigned: [{ value: 'in_progress', label: 'Iniciar pedido' }],
+  in_progress: [
+    { value: 'paused', label: 'Pausar' },
+    { value: 'awaiting_customer', label: 'Marcar objetivo alcançado' },
+  ],
+  paused: [{ value: 'in_progress', label: 'Retomar' }],
+  awaiting_customer: [{ value: 'completed', label: 'Confirmar conclusão' }],
+  disputed: [
+    { value: 'in_progress', label: 'Reabrir pedido' },
+    { value: 'completed', label: 'Confirmar conclusão' },
+  ],
+}
+
+const EXCEPTIONAL_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
+  { value: 'disputed', label: 'Marcar como disputado' },
+  { value: 'refunded', label: 'Marcar como reembolsado' },
+  { value: 'canceled', label: 'Cancelar pedido' },
 ]
 
 function SupportEscalationCard({ orderId }: { orderId: string }) {
@@ -68,7 +85,6 @@ export function AdminOrderDetailPage() {
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
-  const { data: rankVerifications } = useOrderRankVerifications(id)
 
   const { data: parties } = useQuery({
     queryKey: ['admin', 'order-parties', order?.customer_id, order?.assigned_booster_id, order?.preferred_booster_id],
@@ -104,6 +120,8 @@ export function AdminOrderDetailPage() {
 
   if (!order) return null
 
+  const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -124,6 +142,7 @@ export function AdminOrderDetailPage() {
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
+            <OrderProgress order={order} />
             <h3 className="text-sm font-semibold text-ink mb-4">Detalhes do Pedido</h3>
             <div className="grid grid-cols-2 gap-3">
               {(
@@ -136,8 +155,8 @@ export function AdminOrderDetailPage() {
                   ...(order.service_type === 'elo_boost' && !order.pdl_bracket
                     ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]
                     : []),
-                  ...(order.current_rank ? [['Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
-                  ...(order.service_type === 'elo_boost' && order.target_rank
+                  ...(!hasRankRail && order.current_rank ? [['Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
+                  ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank
                     ? [['Rank Alvo', formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)]]
                     : []),
                   ...(order.pdl_bracket ? [
@@ -194,24 +213,43 @@ export function AdminOrderDetailPage() {
             )}
           </Card>
 
-          <OrderChat orderId={order.id} viewerRole="admin" />
+          {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <OrderMatchHistory orderId={order.id} />
+          )}
         </div>
 
         <div className="space-y-4">
+          <OrderChat orderId={order.id} viewerRole="admin" orderStatus={order.status} />
+
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-ink-secondary" />
               Alterar Status
             </h3>
+
+            {!!FORWARD_STATUS[order.status]?.length && (
+              <div className="space-y-1.5 mb-3">
+                {FORWARD_STATUS[order.status]!.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateStatus.mutate({ orderId: order.id, newStatus: value })}
+                    disabled={updateStatus.isPending}
+                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold bg-brand/10 text-brand hover:bg-brand/15 transition-colors disabled:opacity-50"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-muted mb-1.5">Ações excepcionais</p>
             <div className="space-y-1.5">
-              {ADMIN_STATUS_OPTIONS.map(({ value, label }) => (
+              {EXCEPTIONAL_STATUS_OPTIONS.filter(({ value }) => value !== order.status).map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => updateStatus.mutate({ orderId: order.id, newStatus: value })}
-                  disabled={order.status === value || updateStatus.isPending}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    order.status === value ? 'bg-brand/10 text-brand cursor-default' : 'text-ink-secondary hover:bg-bg-elevated hover:text-ink'
-                  }`}
+                  disabled={updateStatus.isPending}
+                  className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-ink-secondary hover:bg-bg-elevated hover:text-ink transition-colors disabled:opacity-50"
                 >
                   {label}
                 </button>
@@ -243,38 +281,6 @@ export function AdminOrderDetailPage() {
                 ))}
               </div>
             )}
-          </Card>
-
-          {!!rankVerifications?.length && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-ink-secondary" />
-                Verificações de Rank
-              </h3>
-              <div className="space-y-3">
-                {rankVerifications.map((v) => (
-                  <div key={v.id} className="flex gap-2">
-                    <div className={`h-1.5 w-1.5 rounded-full mt-1.5 shrink-0 ${v.passed ? 'bg-success' : 'bg-warning'}`} />
-                    <div>
-                      <p className="text-xs font-semibold text-ink">
-                        {v.riot_id_checked} — {v.passed ? 'Aprovado' : 'Não bateu'}
-                        {v.fetched_tier && ` (${formatRank(v.fetched_tier, v.fetched_division)} / alvo ${formatRank(v.target_tier, v.target_division)})`}
-                      </p>
-                      <p className="text-[10px] text-ink-muted">{timeAgo(v.created_at)}{v.error_reason ? ` · ${v.error_reason}` : ''}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-2">Booster</h3>
-            <p className="text-xs text-ink-secondary">
-              {order.assigned_booster_id
-                ? <BoosterLink userId={order.assigned_booster_id} booster={parties?.boosterByUserId.get(order.assigned_booster_id)} />
-                : 'Nenhum booster atribuído.'}
-            </p>
           </Card>
 
           {DROPPABLE_STATUSES.includes(order.status) && (

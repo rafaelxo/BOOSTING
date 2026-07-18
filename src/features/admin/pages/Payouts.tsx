@@ -11,17 +11,20 @@ import { uploadPayoutProof, getPayoutProofSignedUrl } from '@/api/payouts'
 import type { PayoutRequestRow, PayoutRequestStatus } from '@/api/payouts'
 
 const STATUS_LABEL: Record<PayoutRequestStatus, string> = {
-  requested: 'Solicitado', under_review: 'Em revisão', approved: 'Aprovado',
+  requested: 'Aguardando', under_review: 'Aguardando', approved: 'Aguardando',
   paid: 'Pago', rejected: 'Rejeitado', canceled: 'Cancelado',
 }
 const STATUS_COLOR: Record<PayoutRequestStatus, string> = {
   requested: 'text-warning bg-warning/10 border-warning/20',
-  under_review: 'text-info bg-info/10 border-info/20',
-  approved: 'text-brand bg-brand/10 border-brand/20',
+  under_review: 'text-warning bg-warning/10 border-warning/20',
+  approved: 'text-warning bg-warning/10 border-warning/20',
   paid: 'text-success bg-success/10 border-success/20',
   rejected: 'text-danger bg-danger/10 border-danger/20',
   canceled: 'text-ink-muted bg-bg-elevated border-border-subtle',
 }
+// Só requested/under_review/approved têm ação pendente pro admin -- o resto
+// (pago/rejeitado/cancelado) é estado final, só consulta.
+const PENDING_STATUSES: PayoutRequestStatus[] = ['requested', 'under_review', 'approved']
 
 function StatusBadge({ status }: { status: PayoutRequestStatus }) {
   return (
@@ -47,26 +50,43 @@ function StatCard({ label, value, icon: Icon, tone }: { label: string; value: st
   )
 }
 
-function PayoutDetailModal({ request, onClose }: { request: PayoutRequestRow; onClose: () => void }) {
+// Ação única por solicitação: o admin escolhe Pago ou Rejeitado -- sem etapa
+// intermediária de "colocar em revisão"/"aprovar" separada na tela (o
+// backend ainda passa por 'approved' internamente antes de 'paid', porque
+// admin_mark_payout_paid exige isso, mas isso fica encadeado aqui dentro,
+// invisível pro admin).
+function PayoutActionModal({ request, onClose }: { request: PayoutRequestRow; onClose: () => void }) {
   const currency = useCurrency()
   const { data: breakdown, isLoading } = usePayoutRequestBreakdown(request.id)
   const review = useAdminReviewPayoutRequest()
   const markPaid = useAdminMarkPayoutPaid()
   const [note, setNote] = useState('')
   const [proofFile, setProofFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
+  const [working, setWorking] = useState(false)
   const [proofSignedUrl, setProofSignedUrl] = useState<string | null>(null)
+
+  const isPending = PENDING_STATUSES.includes(request.status)
+  const canReject = request.status === 'requested' || request.status === 'under_review'
 
   async function handleMarkPaid() {
     if (!proofFile) return
-    setUploading(true)
+    setWorking(true)
     try {
+      if (request.status !== 'approved') {
+        await review.mutateAsync({ requestId: request.id, newStatus: 'approved' })
+      }
       const path = await uploadPayoutProof({ requestId: request.id, file: proofFile })
       await markPaid.mutateAsync({ requestId: request.id, proofUrl: path })
       onClose()
+    } catch {
+      // Erro já refletido via review.isError / markPaid.isError abaixo.
     } finally {
-      setUploading(false)
+      setWorking(false)
     }
+  }
+
+  function handleReject() {
+    review.mutate({ requestId: request.id, newStatus: 'rejected', note }, { onSuccess: onClose })
   }
 
   async function handleViewProof() {
@@ -105,47 +125,40 @@ function PayoutDetailModal({ request, onClose }: { request: PayoutRequestRow; on
           )}
         </div>
 
-        {request.status === 'requested' && (
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" loading={review.isPending} onClick={() => review.mutate({ requestId: request.id, newStatus: 'under_review' })}>
-              Colocar em revisão
-            </Button>
-          </div>
-        )}
-
-        {(request.status === 'requested' || request.status === 'under_review') && (
-          <div className="space-y-2 border-t border-border-subtle pt-4">
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Observação (obrigatória para rejeitar)"
-              className="input-base w-full min-h-16 resize-none text-sm"
-            />
-            <div className="flex gap-2">
-              <Button size="sm" variant="success" loading={review.isPending} leftIcon={<CheckCircle2 className="h-4 w-4" />}
-                onClick={() => review.mutate({ requestId: request.id, newStatus: 'approved', note })}>
-                Aprovar
-              </Button>
-              <Button size="sm" variant="danger" loading={review.isPending} disabled={note.trim().length < 3} leftIcon={<XCircle className="h-4 w-4" />}
-                onClick={() => review.mutate({ requestId: request.id, newStatus: 'rejected', note })}>
-                Rejeitar
+        {isPending && (
+          <div className="space-y-4 border-t border-border-subtle pt-4">
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase text-ink-secondary">Marcar como pago</p>
+              <label className="flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-4 py-3 text-sm cursor-pointer hover:border-brand/50">
+                <Upload className="h-4 w-4 text-ink-muted shrink-0" />
+                <span className="text-ink-secondary truncate">{proofFile?.name ?? 'Selecionar comprovante (PDF/imagem)'}</span>
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} />
+              </label>
+              <Button className="w-full" variant="success" disabled={!proofFile} loading={working} leftIcon={<ShieldCheck className="h-4 w-4" />} onClick={handleMarkPaid}>
+                Marcar como pago
               </Button>
             </div>
-          </div>
-        )}
 
-        {request.status === 'approved' && (
-          <div className="space-y-3 border-t border-border-subtle pt-4">
-            <p className="text-xs font-bold uppercase text-ink-secondary">Marcar como pago</p>
-            <p className="text-xs text-ink-muted">O comprovante é obrigatório antes de marcar como pago.</p>
-            <label className="flex items-center gap-2 rounded-xl border border-dashed border-border-strong px-4 py-3 text-sm cursor-pointer hover:border-brand/50">
-              <Upload className="h-4 w-4 text-ink-muted shrink-0" />
-              <span className="text-ink-secondary truncate">{proofFile?.name ?? 'Selecionar comprovante (PDF/imagem)'}</span>
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} />
-            </label>
-            <Button className="w-full" variant="success" disabled={!proofFile} loading={uploading || markPaid.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />} onClick={handleMarkPaid}>
-              Marcar como pago
-            </Button>
+            {canReject && (
+              <div className="space-y-2">
+                <p className="text-xs font-bold uppercase text-ink-secondary">Rejeitar</p>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Motivo da rejeição (obrigatório)"
+                  className="input-base w-full min-h-16 resize-none text-sm"
+                />
+                <Button className="w-full" variant="danger" loading={review.isPending} disabled={note.trim().length < 3} leftIcon={<XCircle className="h-4 w-4" />} onClick={handleReject}>
+                  Rejeitar solicitação
+                </Button>
+              </div>
+            )}
+
+            {(review.isError || markPaid.isError) && (
+              <p className="text-xs text-danger">
+                {(review.error instanceof Error && review.error.message) || (markPaid.error instanceof Error && markPaid.error.message) || 'Erro ao processar a solicitação.'}
+              </p>
+            )}
           </div>
         )}
 
@@ -162,11 +175,10 @@ function PayoutDetailModal({ request, onClose }: { request: PayoutRequestRow; on
 
 export function AdminPayoutsPage() {
   const currency = useCurrency()
-  const [filter, setFilter] = useState<PayoutRequestStatus | 'all'>('requested')
   const [selected, setSelected] = useState<PayoutRequestRow | null>(null)
-  const { data: requests, isLoading } = useAdminPayoutRequests(filter === 'all' ? undefined : filter)
+  const { data: requests, isLoading } = useAdminPayoutRequests()
 
-  const pendingTotal = (requests ?? []).filter((r) => r.status === 'requested' || r.status === 'under_review').reduce((sum, r) => sum + r.amount, 0)
+  const pendingTotal = (requests ?? []).filter((r) => PENDING_STATUSES.includes(r.status)).reduce((sum, r) => sum + r.amount, 0)
   const paidTotal = (requests ?? []).filter((r) => r.status === 'paid').reduce((sum, r) => sum + r.amount, 0)
 
   return (
@@ -180,27 +192,11 @@ export function AdminPayoutsPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <StatCard label="Aguardando análise/pagamento" value={currency(pendingTotal)} icon={Clock3} tone="bg-warning/10 text-warning" />
-        <StatCard label="Pago (filtro atual)" value={currency(paidTotal)} icon={CheckCircle2} tone="bg-success/10 text-success" />
+        <StatCard label="Aguardando" value={currency(pendingTotal)} icon={Clock3} tone="bg-warning/10 text-warning" />
+        <StatCard label="Pago" value={currency(paidTotal)} icon={CheckCircle2} tone="bg-success/10 text-success" />
       </div>
 
       <Card padding="none">
-        <div className="flex flex-wrap gap-2 border-b border-border-subtle p-4">
-          {(['requested', 'under_review', 'approved', 'paid', 'rejected', 'canceled', 'all'] as const).map((status) => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setFilter(status)}
-              className={cn(
-                'rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors',
-                filter === status ? 'border-brand bg-brand text-white' : 'border-border-subtle text-ink-secondary hover:border-brand/40 hover:text-ink',
-              )}
-            >
-              {status === 'all' ? 'Todos' : STATUS_LABEL[status]}
-            </button>
-          ))}
-        </div>
-
         {isLoading ? (
           <div className="p-4"><Skeleton className="h-56 w-full" /></div>
         ) : !requests?.length ? (
@@ -215,7 +211,7 @@ export function AdminPayoutsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Solicitado</TableHead>
                 <TableHead>Última atualização</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="text-right">Ação</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -228,7 +224,9 @@ export function AdminPayoutsPage() {
                   <TableCell><span className="text-xs">{formatDateTime(row.requested_at)}</span></TableCell>
                   <TableCell><span className="text-xs">{formatDateTime(row.updated_at)}</span></TableCell>
                   <TableCell className="text-right">
-                    <Button size="xs" variant="secondary" onClick={() => setSelected(row)}>Ver detalhes</Button>
+                    <Button size="xs" variant="secondary" onClick={() => setSelected(row)}>
+                      {PENDING_STATUSES.includes(row.status) ? 'Ação' : 'Ver detalhes'}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -237,7 +235,7 @@ export function AdminPayoutsPage() {
         )}
       </Card>
 
-      {selected && <PayoutDetailModal request={selected} onClose={() => setSelected(null)} />}
+      {selected && <PayoutActionModal request={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

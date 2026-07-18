@@ -47,6 +47,7 @@ async function logAttempt(
     riotId: string
     fetchedTier: RankTier | null
     fetchedDivision: Division | null
+    fetchedLp?: number | null
     targetTier: RankTier
     targetDivision: Division | null
     passed: boolean
@@ -59,6 +60,7 @@ async function logAttempt(
     riot_id_checked: params.riotId,
     fetched_tier: params.fetchedTier,
     fetched_division: params.fetchedDivision,
+    fetched_lp: params.fetchedLp ?? null,
     target_tier: params.targetTier,
     target_division: params.targetDivision,
     passed: params.passed,
@@ -148,10 +150,11 @@ serve(async (req) => {
     const fetchedDivision = fetchedTier && !NO_DIVISION_TIERS.includes(fetchedTier) && rankedEntry?.rank
       ? RIOT_DIVISION_MAP[rankedEntry.rank] ?? null
       : null
+    const fetchedLp = rankedEntry?.leaguePoints ?? null
 
     if (!fetchedTier) {
       await logAttempt(serviceClient, {
-        orderId, requestedBy: user.id, riotId, fetchedTier: null, fetchedDivision: null,
+        orderId, requestedBy: user.id, riotId, fetchedTier: null, fetchedDivision: null, fetchedLp: null,
         targetTier: targetRank.tier, targetDivision: targetRank.division,
         passed: false, errorReason: 'unranked',
       })
@@ -161,7 +164,7 @@ serve(async (req) => {
     const passed = rankStep(fetchedTier, fetchedDivision) >= rankStep(targetRank.tier, targetRank.division)
 
     await logAttempt(serviceClient, {
-      orderId, requestedBy: user.id, riotId, fetchedTier, fetchedDivision,
+      orderId, requestedBy: user.id, riotId, fetchedTier, fetchedDivision, fetchedLp,
       targetTier: targetRank.tier, targetDivision: targetRank.division,
       passed, errorReason: passed ? undefined : 'target_not_reached',
     })

@@ -169,13 +169,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     if (sessionStorage.getItem(storageKey) === 'true' || discordJoinInFlight.current) return
 
     if (!providerToken) {
-      setDiscordJoinNotice(discordJoinMessage(new EdgeFunctionError({
-        status: 400,
-        code: 'DISCORD_TOKEN_MISSING',
-        message: 'Discord provider token missing',
-        body: null,
-      })))
-      sessionStorage.setItem(storageKey, 'true')
+      // provider_token só existe no instante exato do redirect de volta do
+      // OAuth -- qualquer outro disparo de SIGNED_IN (nova aba, sincronização
+      // de sessão entre abas, reinicialização do client) legitimamente não
+      // tem esse token, sem que a sessão do usuário esteja quebrada. Tratar
+      // isso como erro ("entre novamente pelo Discord") é alarme falso: não
+      // marca como concluído (pra tentar de novo na próxima janela real de
+      // SIGNED_IN com token), só não incomoda o usuário à toa.
+      if (import.meta.env.DEV) console.warn('joinDiscordServer: sem provider_token, pulando silenciosamente')
       return
     }
 

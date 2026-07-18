@@ -17,6 +17,7 @@ export const queryKeys = {
     chat: (orderId: string) => ['orders', 'chat', orderId] as const,
     matches: (orderId: string) => ['orders', 'matches', orderId] as const,
     supportEscalation: (orderId: string) => ['orders', 'support-escalation', orderId] as const,
+    latestRankVerification: (orderId: string) => ['orders', 'detail', orderId, 'rank-verifications', 'latest'] as const,
   },
   boosters: {
     profile: (userId: string) => ['boosters', 'profile', userId] as const,

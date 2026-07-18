@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Play, Pause, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, RefreshCw, Landmark, RefreshCcw } from 'lucide-react'
+import { ArrowLeft, Play, Pause, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
@@ -227,6 +227,7 @@ export function JobDetailPage() {
   const availableActions = STATUS_ACTIONS.filter(a =>
     a.from.includes(order.status) && (a.to !== 'awaiting_customer' || objectiveReached)
   )
+  const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
 
   return (
     <div className="space-y-6">
@@ -248,6 +249,7 @@ export function JobDetailPage() {
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
+            <OrderProgress order={order} />
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div><p className="text-xs text-ink-muted">Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
@@ -264,7 +266,7 @@ export function JobDetailPage() {
                   <div><p className="text-xs text-ink-muted">Méd. Ganho/Perda</p><p className="text-sm font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</p></div>
                 </>
               )}
-              {order.current_rank && (
+              {!hasRankRail && order.current_rank && (
                 <div>
                   <p className="text-xs text-ink-muted mb-1">{t('booster.job.from')}</p>
                   <div className="flex items-center gap-2">
@@ -273,7 +275,7 @@ export function JobDetailPage() {
                   </div>
                 </div>
               )}
-              {order.target_rank && (
+              {!hasRankRail && order.target_rank && (
                 <div>
                   <p className="text-xs text-ink-muted mb-1">{t('booster.job.to')}</p>
                   <div className="flex items-center gap-2">
@@ -301,7 +303,21 @@ export function JobDetailPage() {
             )}
           </Card>
 
-          <OrderChat orderId={order.id} viewerRole="booster" />
+          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <OrderMatchHistory
+              orderId={order.id}
+              sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                onSync: () => syncMatches.mutate(),
+                syncing: syncMatches.isPending,
+                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                resultMessage: syncMatches.data
+                  ? (syncMatches.data.synced
+                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                  : null,
+              } : undefined}
+            />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -334,7 +350,10 @@ export function JobDetailPage() {
             <DuoAccountSection order={order} />
           )}
 
-          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id && (
+          <OrderChat orderId={order.id} viewerRole="booster" orderStatus={order.status} />
+
+          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
+            && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-brand" />
@@ -365,36 +384,6 @@ export function JobDetailPage() {
                 <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
               )}
             </Card>
-          )}
-
-          <OrderProgress order={order} />
-
-          {(order.status === 'in_progress' || order.status === 'paused') && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3">Sincronizar partidas</h3>
-              <p className="text-xs text-ink-secondary mb-3">
-                Os resultados são identificados automaticamente pela Riot Games — não é possível editar manualmente.
-              </p>
-              <Button className="w-full" variant="secondary" leftIcon={<RefreshCw className="h-4 w-4" />} loading={syncMatches.isPending} onClick={() => syncMatches.mutate()}>
-                Sincronizar partidas
-              </Button>
-              {syncMatches.isError && (
-                <ErrorAlert className="mt-2" message={syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas'} />
-              )}
-              {syncMatches.data && (
-                <p className="text-xs text-ink-muted mt-2 text-center">
-                  {syncMatches.data.synced
-                    ? syncMatches.data.new_matches
-                      ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).`
-                      : 'Nenhuma partida nova encontrada.'
-                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.'}
-                </p>
-              )}
-            </Card>
-          )}
-
-          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderMatchHistory orderId={order.id} />
           )}
 
           {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (

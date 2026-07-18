@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { Swords } from 'lucide-react'
-import { Card } from '@/components/ui'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
 import { listOrderRankVerifications } from '@/api/orders'
+import { queryKeys } from '@/api/core/queryKeys'
 import type { Order, RankTier, Division } from '@/types'
 
 function ProgressBar({ percent, tone = 'brand' }: { percent: number; tone?: 'brand' | 'success' }) {
@@ -25,7 +25,7 @@ function WinBoostProgress({ order }: { order: Order }) {
   const done = remaining === 0
 
   return (
-    <Card padding="md">
+    <div className="mb-4 pb-4 border-b border-border-subtle">
       <h3 className="text-sm font-semibold text-ink mb-3">Progresso</h3>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -43,13 +43,13 @@ function WinBoostProgress({ order }: { order: Order }) {
       {order.losses_played > 0 && (
         <p className="text-[10px] text-ink-muted mt-1">{order.losses_played} derrota{order.losses_played === 1 ? '' : 's'} no período.</p>
       )}
-    </Card>
+    </div>
   )
 }
 
 function useLatestVerification(orderId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['orders', 'detail', orderId, 'rank-verifications', 'latest'],
+    queryKey: queryKeys.orders.latestRankVerification(orderId),
     queryFn: async () => (await listOrderRankVerifications(orderId, 1))[0] ?? null,
     enabled,
   })
@@ -68,7 +68,7 @@ function EloBoostProgress({ order }: { order: Order }) {
   const done = latest?.passed === true
 
   return (
-    <Card padding="md">
+    <div className="mb-4 pb-4 border-b border-border-subtle">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-ink">Progresso</h3>
         {done && (
@@ -80,6 +80,7 @@ function EloBoostProgress({ order }: { order: Order }) {
       <RankProgressionRail
         currentTier={current.tier}
         currentDivision={current.division}
+        currentLp={latest?.fetched_tier ? latest.fetched_lp : null}
         targetTier={target.tier}
         targetDivision={target.division}
       />
@@ -88,10 +89,14 @@ function EloBoostProgress({ order }: { order: Order }) {
           ? 'Verificado automaticamente via Riot API na última tentativa de conclusão.'
           : 'Ainda sem verificação de rank registrada — o booster verifica o rank ao concluir o pedido.'}
       </p>
-    </Card>
+    </div>
   )
 }
 
+// Renderiza inline dentro do card de "Detalhes do Pedido" de cada papel
+// (booster/cliente/admin) -- progresso e detalhes viram uma única badge só,
+// não dois cards separados. Retorna null quando o tipo de serviço não tem
+// barra de progresso aplicável (ex.: coaching).
 export function OrderProgress({ order }: { order: Order }) {
   if (order.wins_purchased != null) return <WinBoostProgress order={order} />
   if (order.target_rank && order.current_rank && !order.pdl_bracket) return <EloBoostProgress order={order} />

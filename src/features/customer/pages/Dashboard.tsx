@@ -19,6 +19,10 @@ export function CustomerDashboard() {
   const activeOrders = orders?.filter(o =>
     ['paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(o.status)
   ) ?? []
+  // "Recentes" mostra o que não já apareceu em "Ativos" logo acima -- sem
+  // isso, todo pedido ativo (o caso mais comum) renderizava duas vezes na
+  // mesma tela.
+  const recentOrders = orders?.filter(o => !activeOrders.some(a => a.id === o.id)) ?? []
 
   const activeCount = stats?.activeOrders ?? 0
 
@@ -89,9 +93,11 @@ export function CustomerDashboard() {
             description={t('customer.dashboard.emptyDesc')}
             action={{ label: t('customer.dashboard.startBoost'), onClick: () => navigate('/orders/new') }}
           />
+        ) : !recentOrders.length ? (
+          <p className="text-sm text-ink-muted py-6 text-center">{t('customer.dashboard.allActive')}</p>
         ) : (
           <div className="space-y-3">
-            {orders.slice(0, 5).map((order) => (
+            {recentOrders.slice(0, 5).map((order) => (
               <OrderRow key={order.id} order={order} currency={currency} />
             ))}
           </div>

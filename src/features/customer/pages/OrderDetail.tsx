@@ -487,6 +487,8 @@ export function OrderDetailPage() {
     )
   }
 
+  const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -515,6 +517,9 @@ export function OrderDetailPage() {
         {/* Main info */}
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
+            {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+              <OrderProgress order={order} />
+            )}
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -525,11 +530,11 @@ export function OrderDetailPage() {
                 ...(order.service_type === 'elo_boost' && !order.pdl_bracket
                   ? [{ label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
                   : []),
-                ...(order.current_rank ? [{
+                ...(!hasRankRail && order.current_rank ? [{
                   label: t('customer.order.currentRank'),
                   value: formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division),
                 }] : []),
-                ...(order.service_type === 'elo_boost' && order.target_rank ? [{
+                ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank ? [{
                   label: t('customer.order.targetRank'),
                   value: formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division),
                 }] : []),
@@ -575,15 +580,11 @@ export function OrderDetailPage() {
             )}
           </Card>
 
-          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderProgress order={order} />
-          )}
-
           {order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
             <OrderMatchHistory orderId={order.id} />
           )}
 
-          <OrderChat orderId={order.id} viewerRole="customer" />
+          <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
         </div>
 
         {/* Sidebar */}

@@ -17,6 +17,10 @@ import type { BoosterOrdersTab } from './types'
 
 // Pedido individual: Realtime + fallback conservador (30s) no lugar do
 // polling agressivo de 4-15s que existia em cada página antes desta camada.
+// Assina order_status_events (não orders diretamente) -- orders nunca entra
+// na publicação supabase_realtime pra não transmitir a linha inteira (preço,
+// notas, dados do cliente) pra quem estiver com o canal aberto (ver migration
+// 042/088); o evento mínimo só dispara um refetch normal, que já respeita RLS.
 export function useOrder(orderId: string | undefined) {
   const query = useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? ''),
@@ -26,8 +30,9 @@ export function useOrder(orderId: string | undefined) {
   })
   useRealtimeInvalidate({
     channel: `order-${orderId ?? 'none'}`,
-    table: 'orders',
-    filter: orderId ? `id=eq.${orderId}` : undefined,
+    table: 'order_status_events',
+    event: 'INSERT',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
     queryKeys: orderId ? [queryKeys.orders.detail(orderId)] : [],
     enabled: !!orderId,
   })
@@ -43,8 +48,9 @@ export function useBoosterOrder(orderId: string | undefined) {
   })
   useRealtimeInvalidate({
     channel: `booster-order-${orderId ?? 'none'}`,
-    table: 'orders',
-    filter: orderId ? `id=eq.${orderId}` : undefined,
+    table: 'order_status_events',
+    event: 'INSERT',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
     queryKeys: orderId ? [queryKeys.orders.detail(orderId)] : [],
     enabled: !!orderId,
   })
@@ -58,10 +64,13 @@ export function useCustomerOrders(customerId: string | undefined, limit?: number
     enabled: !!customerId,
     refetchInterval: 30_000,
   })
+  // Sem filter= aqui de propósito -- order_status_events não tem coluna
+  // customer_id pra filtrar na assinatura. RLS da própria tabela (migration
+  // 088) já restringe o que este cliente recebe às linhas dos pedidos dele.
   useRealtimeInvalidate({
     channel: `customer-orders-${customerId ?? 'none'}`,
-    table: 'orders',
-    filter: customerId ? `customer_id=eq.${customerId}` : undefined,
+    table: 'order_status_events',
+    event: 'INSERT',
     queryKeys: customerId ? [queryKeys.orders.customerList(customerId, { limit })] : [],
     enabled: !!customerId,
   })
@@ -102,7 +111,8 @@ export function useAdminOrders(status?: OrderStatus | 'all') {
   })
   useRealtimeInvalidate({
     channel: 'admin-orders',
-    table: 'orders',
+    table: 'order_status_events',
+    event: 'INSERT',
     queryKeys: [queryKeys.orders.adminList({ status })],
   })
   return query
@@ -273,6 +283,11 @@ export function useSyncOrderMatches(orderId: string) {
     onSuccess: () => {
       invalidateOrder(queryClient, orderId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.matches(orderId) })
+      // Partidas sincronizadas podem ter mudado o resultado (wins_played,
+      // vitórias/derrotas) -- o card de Progresso lê a mesma order.detail já
+      // invalidada acima, mas a barra de rank (elo_boost) lê separadamente a
+      // última verificação: invalida aqui também pra nunca ficar com dado velho.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.latestRankVerification(orderId) })
     },
   })
 }
@@ -289,6 +304,9 @@ export function useVerifyOrderRank(orderId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => verifyOrderRank(orderId),
-    onSuccess: () => invalidateOrder(queryClient, orderId),
+    onSuccess: () => {
+      invalidateOrder(queryClient, orderId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.latestRankVerification(orderId) })
+    },
   })
 }

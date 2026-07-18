@@ -4,7 +4,7 @@ import { Avatar, Button, Card, ErrorAlert, Skeleton } from '@/components/ui'
 import { cn, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useOrderChat, useSendOrderMessage, useSetOrderChatLock } from '@/api/chat'
-import type { UserRole } from '@/types'
+import type { OrderStatus, UserRole } from '@/types'
 
 const ROLE_LABEL: Record<UserRole, string> = {
   customer: 'Cliente',
@@ -12,7 +12,11 @@ const ROLE_LABEL: Record<UserRole, string> = {
   admin: 'Admin',
 }
 
-export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole: UserRole }) {
+// orderStatus é opcional só pra decidir a mensagem certa quando o chat está
+// travado (pedido concluído trava sozinho -- ver trigger
+// trg_lock_chat_on_order_completed, migration 085 -- e não deve soar como se
+// um admin tivesse bloqueado manualmente).
+export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: string; viewerRole: UserRole; orderStatus?: OrderStatus }) {
   const { profile } = useAuthStore()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -94,7 +98,11 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
           {locked && (
             <div className="flex items-start gap-2 border-b border-warning/20 bg-warning/10 px-4 py-3 text-xs text-warning">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Chat bloqueado pela administração. Somente administradores podem enviar mensagens.</span>
+              <span>
+                {orderStatus === 'completed'
+                  ? 'Pedido concluído — o chat fica salvo aqui só para consulta.'
+                  : 'Chat bloqueado pela administração. Somente administradores podem enviar mensagens.'}
+              </span>
             </div>
           )}
 

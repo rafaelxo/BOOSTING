@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { Wallet, Banknote, PiggyBank, Hourglass, Send, FileText, XCircle } from 'lucide-react'
-import { Button, Card, Skeleton, EmptyState, StatCard, ErrorAlert } from '@/components/ui'
+import { Button, Card, Skeleton, EmptyState, StatCard, ErrorAlert, CurrencyMaskedInput } from '@/components/ui'
 import { formatDateTime, cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
   useBoosterPayoutTotals, useBoosterPayoutRequests, useRequestPayout, useCancelPayoutRequest,
-  getPayoutProofSignedUrl,
+  getPayoutProofSignedUrl, MIN_PAYOUT_AMOUNT,
 } from '@/api/payouts'
-import { useBoosterPanelFields } from '@/api/auth'
 import type { PayoutRequestStatus } from '@/api/payouts'
 
 const STATUS_LABEL: Record<PayoutRequestStatus, string> = {
@@ -24,11 +23,13 @@ const STATUS_COLOR: Record<PayoutRequestStatus, string> = {
 function RequestPayoutCard({ available }: { available: number }) {
   const { profile } = useAuthStore()
   const currency = useCurrency()
-  const [amount, setAmount] = useState('')
+  const [cents, setCents] = useState(0)
   const requestPayout = useRequestPayout(profile?.id)
 
-  const numericAmount = Number(amount.replace(',', '.'))
-  const valid = numericAmount > 0 && numericAmount <= available
+  const numericAmount = cents / 100
+  const availableCents = Math.round(available * 100)
+  const belowMinimum = cents > 0 && cents < MIN_PAYOUT_AMOUNT * 100
+  const valid = cents > 0 && cents <= availableCents && !belowMinimum
 
   return (
     <Card padding="md" className="ring-1 ring-brand/20">
@@ -38,27 +39,28 @@ function RequestPayoutCard({ available }: { available: number }) {
       </div>
       <p className="text-xs text-ink-muted mb-4">
         Disponível: <span className="font-bold text-ink" data-tabular>{currency(available)}</span>
+        {' · '}Mínimo: <span className="font-bold text-ink" data-tabular>{currency(MIN_PAYOUT_AMOUNT)}</span>
       </p>
       <div className="flex gap-2">
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0,00"
-          className="input-base flex-1 text-sm"
-          data-tabular
+        <CurrencyMaskedInput
+          valueCents={cents}
+          onChangeCents={setCents}
+          maxCents={availableCents}
+          className="flex-1 text-sm"
+          aria-label="Valor do saque"
         />
         <Button
           loading={requestPayout.isPending}
           disabled={!valid}
-          onClick={() => requestPayout.mutate(numericAmount, { onSuccess: () => setAmount('') })}
+          onClick={() => requestPayout.mutate(numericAmount, { onSuccess: () => setCents(0) })}
         >
           Solicitar
         </Button>
       </div>
-      {amount && !valid && (
-        <p className="text-xs text-danger mt-2">Informe um valor entre R$ 0,01 e {currency(available)}.</p>
+      {cents > 0 && !valid && (
+        <p className="text-xs text-danger mt-2">
+          Informe um valor entre {currency(MIN_PAYOUT_AMOUNT)} e {currency(available)}.
+        </p>
       )}
       {requestPayout.isError && (
         <ErrorAlert className="mt-2" message={requestPayout.error instanceof Error ? requestPayout.error.message : 'Erro ao solicitar saque.'} />
@@ -73,7 +75,6 @@ export function BoosterPaymentsPage() {
 
   const { data: totals, isLoading: loadingTotals } = useBoosterPayoutTotals(profile?.id)
   const { data: requests, isLoading: loadingRequests } = useBoosterPayoutRequests(profile?.id)
-  const { data: panelFields } = useBoosterPanelFields(profile?.id, true)
   const cancelRequest = useCancelPayoutRequest(profile?.id)
 
   const BALANCE_BOXES = [
@@ -94,20 +95,6 @@ export function BoosterPaymentsPage() {
         <h1 className="text-2xl font-bold text-ink">Pagamentos</h1>
         <p className="text-ink-secondary mt-1">Saldo, saques e histórico de solicitações.</p>
       </div>
-
-      {panelFields && (
-        <Card padding="md">
-          <h3 className="text-sm font-semibold text-ink mb-3">Dados para saque</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-            <div><p className="text-xs text-ink-muted">Nome</p><p className="font-semibold text-ink">{panelFields.display_name ?? '—'}</p></div>
-            <div><p className="text-xs text-ink-muted">Nome legal</p><p className="font-semibold text-ink">{panelFields.full_name ?? '—'}</p></div>
-            <div><p className="text-xs text-ink-muted">CPF</p><p className="font-semibold text-ink" data-tabular>{panelFields.cpf ?? '—'}</p></div>
-          </div>
-          {(!panelFields.full_name || !panelFields.cpf) && (
-            <p className="text-xs text-warning mt-3">Complete nome legal e CPF no seu perfil antes de solicitar um saque.</p>
-          )}
-        </Card>
-      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {BALANCE_BOXES.map(({ label, value, icon, color }) => (

@@ -151,7 +151,8 @@
       "viewAll": "Ver todos →",
       "empty": "Sem pedidos ainda",
       "emptyDesc": "Faça seu primeiro pedido e comece a subir.",
-      "startBoost": "Começar Boost"
+      "startBoost": "Começar Boost",
+      "allActive": "Todos os seus pedidos recentes estão ativos — veja acima."
     },
     "order": {
       "id": "Pedido #{{id}}",

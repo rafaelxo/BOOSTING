@@ -103,7 +103,7 @@ function CoachingPricingSection({ currency }: { currency: (n: number) => string 
   )
 }
 
-const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster' | 'challenger'> = ['master', 'grandmaster', 'challenger']
+const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster'> = ['master', 'grandmaster']
 
 const WIN_TIERS: RankTier[] = [
   'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',
@@ -187,7 +187,7 @@ export function PricingPage() {
         <section>
           <h2 className="text-xl font-bold text-ink mb-1">Solo Boost / Duo Boost</h2>
           <p className="text-sm text-ink-secondary mb-4">
-            Até Diamante, o preço é por divisão. Mestre, Grão-mestre e Challenger pelo tiers completos, sem Duo.
+            Até Diamante, o preço é por divisão. Mestre e Grão-mestre pelo tiers completos, sem Duo.
           </p>
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">

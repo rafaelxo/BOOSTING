@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ShoppingBag, DollarSign, Users, Banknote, TrendingUp } from 'lucide-react'
+import { ShoppingBag, Users, TrendingUp } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton, StatCard } from '@/components/ui'
 import { timeAgo } from '@/lib/utils'
 import { Link } from 'react-router-dom'
@@ -34,14 +34,12 @@ export function AdminOverview() {
 
       {/* KPI cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: t('admin.overview.totalRevenue'), value: currency(stats?.total_revenue ?? 0), icon: DollarSign, color: 'text-success bg-success/10' },
-            { label: 'Repasses geral', value: currency(stats?.total_payouts ?? 0), icon: Banknote, color: 'text-info bg-info/10' },
             { label: 'Lucro da plataforma', value: currency(stats?.platform_profit ?? 0), icon: TrendingUp, color: 'text-brand bg-brand/10' },
             { label: t('admin.overview.activeOrders'), value: stats?.active_orders_count ?? 0, icon: ShoppingBag, color: 'text-brand bg-brand/10' },
             { label: t('admin.overview.pendingBoosters'), value: stats?.pending_boosters_count ?? 0, icon: Users, color: 'text-warning bg-warning/10' },

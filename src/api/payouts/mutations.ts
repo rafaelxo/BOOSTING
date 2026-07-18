@@ -1,8 +1,14 @@
 import { supabase } from '@/lib/supabase'
 import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
 
+// Espelha v_min_amount em request_payout (migration 089) -- só pra
+// habilitar/desabilitar o botão sem round-trip; o valor que vale de
+// verdade é sempre o checado no servidor.
+export const MIN_PAYOUT_AMOUNT = 50
+
 const REQUEST_PAYOUT_MESSAGES: Record<string, string> = {
   invalid_amount: 'Informe um valor de saque válido.',
+  below_minimum_amount: `O valor mínimo de saque é R$ ${MIN_PAYOUT_AMOUNT.toFixed(2).replace('.', ',')}.`,
   booster_not_approved: 'Sua conta de booster ainda não está aprovada.',
   insufficient_balance: 'O valor solicitado é maior que o seu saldo disponível.',
   unauthorized: 'Sua sessão expirou. Entre novamente para continuar.',

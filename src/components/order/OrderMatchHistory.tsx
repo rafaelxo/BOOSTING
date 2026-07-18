@@ -1,5 +1,5 @@
-import { Trophy, XCircle, Clock } from 'lucide-react'
-import { Card, Skeleton } from '@/components/ui'
+import { Trophy, XCircle, Clock, RefreshCw } from 'lucide-react'
+import { Card, Skeleton, Button, ErrorAlert } from '@/components/ui'
 import { cn, formatDateTime } from '@/lib/utils'
 import { useOrderMatches } from '@/api/orders'
 
@@ -10,7 +10,18 @@ function formatDuration(seconds: number | null): string {
   return `${minutes}:${String(remaining).padStart(2, '0')}`
 }
 
-export function OrderMatchHistory({ orderId }: { orderId: string }) {
+interface SyncControls {
+  onSync: () => void
+  syncing: boolean
+  error?: string | null
+  resultMessage?: string | null
+}
+
+// A janela de partidas contadas é definida pelo backend (order_matches +
+// match_sync_started_at, ver migration 052) -- desde que o booster clicou em
+// "Iniciar pedido" até a conclusão, nunca antes disso. Esta tela só exibe o
+// que já foi sincronizado, nunca recalcula a janela no front.
+export function OrderMatchHistory({ orderId, sync }: { orderId: string; sync?: SyncControls }) {
   const { data: matches, isLoading } = useOrderMatches(orderId)
 
   const wins = matches?.filter((m) => m.result === 'win').length ?? 0
@@ -22,7 +33,17 @@ export function OrderMatchHistory({ orderId }: { orderId: string }) {
 
   return (
     <Card padding="md">
-      <h3 className="text-sm font-semibold text-ink mb-3">Histórico de partidas</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-ink">Histórico de partidas</h3>
+        {sync && (
+          <Button size="xs" variant="secondary" leftIcon={<RefreshCw className="h-3 w-3" />} loading={sync.syncing} onClick={sync.onSync}>
+            Sincronizar
+          </Button>
+        )}
+      </div>
+
+      {sync?.error && <ErrorAlert className="mb-3" message={sync.error} />}
+      {sync?.resultMessage && <p className="text-xs text-ink-muted mb-3">{sync.resultMessage}</p>}
 
       {isLoading ? (
         <div className="space-y-2">

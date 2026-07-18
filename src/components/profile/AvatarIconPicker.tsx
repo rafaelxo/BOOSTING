@@ -15,7 +15,6 @@ interface AvatarIconPickerProps {
 // fetch/selection logic lives in exactly one place.
 export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridClassName }: AvatarIconPickerProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -38,13 +37,10 @@ export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridCla
     }
   }
 
-  const normalizedSearch = search.trim()
-  const filteredIconIds = normalizedSearch
-    ? iconIds.filter((id) => String(id).includes(normalizedSearch)).slice(0, maxIcons)
-    : iconIds.slice(0, maxIcons)
-  const visibleIconIds = selectedId && iconIds.includes(selectedId) && !filteredIconIds.includes(selectedId)
-    ? [selectedId, ...filteredIconIds]
-    : filteredIconIds
+  const limitedIconIds = iconIds.slice(0, maxIcons)
+  const visibleIconIds = selectedId && iconIds.includes(selectedId) && !limitedIconIds.includes(selectedId)
+    ? [selectedId, ...limitedIconIds]
+    : limitedIconIds
 
   return (
     <div className="space-y-3">
@@ -52,13 +48,6 @@ export function AvatarIconPicker({ currentUrl, onSelect, maxIcons = 240, gridCla
         <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Ícone de Perfil</p>
         {saving && <span className="text-[10px] text-ink-muted">Salvando...</span>}
       </div>
-      <input
-        value={search}
-        onChange={(event) => setSearch(event.target.value.replace(/\D/g, ''))}
-        inputMode="numeric"
-        placeholder="Buscar por ID"
-        className="input-base h-9 text-xs"
-      />
       {iconIds.length > 0 ? (
         <div className={cn('grid grid-cols-6 gap-1.5 max-h-64 overflow-y-auto pr-0.5', gridClassName)}>
           {visibleIconIds.map((id) => (
