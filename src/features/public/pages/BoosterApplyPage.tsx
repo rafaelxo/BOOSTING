@@ -1,11 +1,11 @@
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { LogoMark, PageLoader, ThemeToggle } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
+import { LogoMark, PageLoader } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterApplicationForm } from '@/features/booster/components/BoosterApplicationForm'
-import { useBoosterStatus } from '@/features/booster/hooks/useBoosterStatus'
 import { PendingScreen, RejectedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
+import { requestBoosterRole, useBoosterStatus } from '@/api/boosters'
+import { queryKeys } from '@/api/core/queryKeys'
 
 export function BoosterApplyPage() {
   const [searchParams] = useSearchParams()
@@ -14,7 +14,8 @@ export function BoosterApplyPage() {
   const { profile } = useAuthStore()
   const isBoosterIntent = searchParams.get('booster') === '1'
   const isAlreadyBooster = profile?.role === 'booster'
-  const { state } = useBoosterStatus()
+  const { data: accessState, isLoading: statusLoading } = useBoosterStatus(profile?.id)
+  const state = statusLoading || !accessState ? 'loading' : accessState
 
   if (!isBoosterIntent) return <Navigate to="/" replace />
   if (!profile) return null
@@ -28,28 +29,23 @@ export function BoosterApplyPage() {
     // Compatibility RPC: it no longer promotes the user to booster. It only
     // verifies the user can start an application; the role is changed by admin
     // approval in the database.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await supabase.rpc('request_booster_role') as any
-    const result = data as { success?: boolean } | null
-    if (error || !result?.success) return false
-
-    return true
+    const result = await requestBoosterRole().catch(() => null)
+    return !!result?.success
   }
 
   async function handleApplicationSaved() {
-    await queryClient.invalidateQueries({ queryKey: ['booster-profile-access-status', profile?.id] })
+    await queryClient.invalidateQueries({ queryKey: queryKeys.boosters.status(profile?.id ?? '') })
     navigate('/apply?booster=1', { replace: true })
   }
 
   const header = (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-center">
       <Link to="/" className="flex items-center gap-2">
         <LogoMark className="h-9 w-9" />
         <span className="text-xl font-bold text-ink">
           Elo<span className="text-brand">Peak</span>
         </span>
       </Link>
-      <ThemeToggle />
     </div>
   )
 

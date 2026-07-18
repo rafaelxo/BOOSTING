@@ -1,16 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShoppingBag, Search } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { OrderRow } from '@/components/order/OrderRow'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
-import type { Order, OrderStatus } from '@/types'
+import { useCustomerOrders } from '@/api/orders'
+import type { OrderStatus } from '@/types'
 
 export function OrderHistoryPage() {
   const navigate = useNavigate()
@@ -26,22 +24,7 @@ export function OrderHistoryPage() {
     { label: t('customer.history.filters.completed'), value: 'completed'  },
   ]
 
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ['customer-orders', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(ORDER_SAFE_COLUMNS)
-        .eq('customer_id', profile!.id)
-        .neq('status', 'canceled')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    enabled: !!profile?.id,
-    refetchInterval: 15000,
-  })
+  const { data: orders, isLoading } = useCustomerOrders(profile?.id, 100)
 
   const filtered = orders?.filter((o) => {
     if (filter !== 'all' && o.status !== filter) return false

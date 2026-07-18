@@ -28,6 +28,7 @@ export function BoosterServiceCard({
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={onEdit}
+            aria-label="Editar serviço"
             className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-bg-elevated transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -35,6 +36,7 @@ export function BoosterServiceCard({
           <button
             onClick={onDelete}
             disabled={deleting}
+            aria-label="Excluir serviço"
             className="p-1.5 rounded-lg text-ink-muted hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-40"
           >
             <Trash2 className="h-3.5 w-3.5" />

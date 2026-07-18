@@ -2,6 +2,22 @@ import { supabase } from '@/lib/supabase'
 import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
 import type { OnboardBoosterParams, UpdateProfessionalProfileParams } from './types'
 
+// Compartilhado entre onboard_booster e update_booster_professional_profile
+// -- as duas funções validam essencialmente o mesmo formulário profissional.
+const PROFESSIONAL_PROFILE_MESSAGES: Record<string, string> = {
+  not_a_booster: 'Não foi possível identificar sua candidatura de booster.',
+  display_name_required: 'Nome de exibição é obrigatório.',
+  bio_required: 'Conte um pouco sobre você.',
+  invalid_peak_rank: 'Selecione seu rank de pico (Grão-mestre ou Desafiante).',
+  invalid_opgg_link: 'Link do OP.GG inválido.',
+  invalid_hours: 'Informe uma faixa de horas válida (1 a 24, com o mínimo menor ou igual ao máximo).',
+  full_name_required: 'Nome completo é obrigatório.',
+  invalid_cpf: 'CPF inválido.',
+  available_days_required: 'Selecione ao menos um dia disponível.',
+  invalid_lanes: 'Selecione entre 1 e 2 lanes.',
+  invalid_specialties: 'Selecione ao menos uma especialidade.',
+}
+
 export async function boosterHeartbeat(): Promise<void> {
   // Fire-and-forget por design -- uma falha ocasional de heartbeat não deve
   // incomodar o booster com um toast de erro.
@@ -32,7 +48,7 @@ export async function onboardBooster(params: OnboardBoosterParams) {
   }
   const { data, error } = await supabase.rpc('onboard_booster', args as never)
   if (error) throw normalizeApiError(error)
-  return assertRpcSuccess(data as { success: boolean; error?: string })
+  return assertRpcSuccess(data as { success: boolean; error?: string }, PROFESSIONAL_PROFILE_MESSAGES)
 }
 
 export async function updateProfessionalProfile(params: UpdateProfessionalProfileParams) {
@@ -48,7 +64,7 @@ export async function updateProfessionalProfile(params: UpdateProfessionalProfil
     p_hours_per_day_max: params.hoursPerDayMax,
   })
   if (error) throw normalizeApiError(error)
-  return assertRpcSuccess(data as { success: boolean; error?: string })
+  return assertRpcSuccess(data as { success: boolean; error?: string }, PROFESSIONAL_PROFILE_MESSAGES)
 }
 
 export async function adminApproveBooster(params: { boosterId: string; newStatus: 'approved' | 'rejected' | 'suspended' }) {

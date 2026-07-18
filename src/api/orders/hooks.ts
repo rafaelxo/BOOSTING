@@ -35,21 +35,37 @@ export function useOrder(orderId: string | undefined) {
 }
 
 export function useBoosterOrder(orderId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? ''),
     queryFn: () => getBoosterOrder(orderId!),
     enabled: !!orderId,
     refetchInterval: 15_000,
   })
+  useRealtimeInvalidate({
+    channel: `booster-order-${orderId ?? 'none'}`,
+    table: 'orders',
+    filter: orderId ? `id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.detail(orderId)] : [],
+    enabled: !!orderId,
+  })
+  return query
 }
 
 export function useCustomerOrders(customerId: string | undefined, limit?: number) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.orders.customerList(customerId ?? '', { limit }),
     queryFn: () => listCustomerOrders(customerId!, limit),
     enabled: !!customerId,
     refetchInterval: 30_000,
   })
+  useRealtimeInvalidate({
+    channel: `customer-orders-${customerId ?? 'none'}`,
+    table: 'orders',
+    filter: customerId ? `customer_id=eq.${customerId}` : undefined,
+    queryKeys: customerId ? [queryKeys.orders.customerList(customerId, { limit })] : [],
+    enabled: !!customerId,
+  })
+  return query
 }
 
 export function useAvailableJobs() {

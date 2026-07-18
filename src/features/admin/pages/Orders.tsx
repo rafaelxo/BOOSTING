@@ -1,15 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { OrderStatusBadge, Skeleton, EmptyState, ErrorAlert, Button } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { timeAgo, getServiceLabel } from '@/lib/utils'
-import type { Order, OrderStatus } from '@/types'
+import type { OrderStatus } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminOrders } from '@/api/orders'
 
 export function AdminOrdersPage() {
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
@@ -25,17 +23,7 @@ export function AdminOrdersPage() {
     { label: t('admin.orders.filters.completed'), value: 'completed' },
   ]
 
-  const { data: orders, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin-orders', status],
-    queryFn: async () => {
-      let q = supabase.from('orders').select(ORDER_SAFE_COLUMNS).order('created_at', { ascending: false }).limit(100)
-      if (status !== 'all') q = q.eq('status', status)
-      const { data, error } = await q
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    refetchInterval: 20000,
-  })
+  const { data: orders, isLoading, isError, refetch } = useAdminOrders(status)
 
   const filtered = orders?.filter((o) =>
     !search || o.id.toLowerCase().includes(search.toLowerCase())

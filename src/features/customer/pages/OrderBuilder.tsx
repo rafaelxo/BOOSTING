@@ -11,7 +11,7 @@ import type { ServiceType, Rank } from '@/types'
 import { getServiceLabel } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { getCustomerOrderState } from '@/lib/customerOrderState'
+import { getCustomerOrderState } from '@/api/orders'
 
 const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching']
 

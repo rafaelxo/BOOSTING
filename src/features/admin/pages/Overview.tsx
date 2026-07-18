@@ -1,42 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { ShoppingBag, DollarSign, Users, Banknote, TrendingUp } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton, StatCard } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
-import type { Order } from '@/types'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
-
-interface AdminDashboardStats {
-  total_revenue: number
-  total_payouts: number
-  platform_profit: number
-  active_orders_count: number
-  pending_boosters_count: number
-  recent_orders: Pick<Order, 'id' | 'status' | 'total_price' | 'created_at'>[]
-  daily_orders: { day: string; count: number }[]
-}
-
-// Server-side aggregate (admin_dashboard_stats RPC) instead of downloading
-// the entire orders/payments/booster_profiles tables to the
-// client just to compute counts and sums, repeated every 30s.
-function useAdminStats() {
-  return useQuery({
-    queryKey: ['admin-stats'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_dashboard_stats' as never)
-      if (error) throw error
-      return data as unknown as AdminDashboardStats
-    },
-    refetchInterval: 30000,
-  })
-}
+import { useAdminDashboardStats } from '@/api/admin'
 
 export function AdminOverview() {
-  const { data: stats, isLoading } = useAdminStats()
+  const { data: stats, isLoading } = useAdminDashboardStats()
   const { t } = useTranslation()
   const currency = useCurrency()
 
@@ -84,15 +57,18 @@ export function AdminOverview() {
           <h3 className="text-sm font-semibold text-ink mb-4">{t('admin.overview.ordersWeek')}</h3>
           <ResponsiveContainer width="100%" height={160}>
             <BarChart data={chartData}>
-              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#555A70' }} />
+              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6C6F75' }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#6C6F75' }} />
               <Tooltip
-                contentStyle={{ background: '#181C2E', border: '1px solid #1E2338', borderRadius: '0.75rem' }}
-                labelStyle={{ color: '#F1F4FF', fontSize: 12 }}
+                contentStyle={{ background: '#141417', border: '1px solid #28282D', borderRadius: '0.75rem' }}
+                labelStyle={{ color: '#EDEEEF', fontSize: 12 }}
               />
-              <Bar dataKey="orders" fill="#5B6CFF" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="orders" fill="#22C55E" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          <p className="sr-only">
+            Pedidos por dia na última semana: {chartData.map((d) => `${d.day}: ${d.orders}`).join(', ')}.
+          </p>
         </Card>
 
         {/* Recent orders */}
@@ -106,12 +82,12 @@ export function AdminOverview() {
               <Link key={order.id} to={`/admin/orders/${order.id}`}>
                 <div className="flex items-center justify-between py-2 hover:bg-bg-elevated rounded-lg px-2 -mx-2 transition-colors cursor-pointer">
                   <div>
-                    <p className="text-xs font-mono text-ink">#{order.id.slice(0, 8).toUpperCase()}</p>
-                    <p className="text-[10px] text-ink-muted">{timeAgo(order.created_at)}</p>
+                    <p className="text-xs font-mono text-ink">#{order.id?.slice(0, 8).toUpperCase()}</p>
+                    <p className="text-[10px] text-ink-muted">{order.created_at && timeAgo(order.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold text-ink">{currency(order.total_price)}</span>
-                    <OrderStatusBadge status={order.status} />
+                    <span className="text-xs font-semibold text-ink" data-tabular>{currency(order.total_price ?? 0)}</span>
+                    {order.status && <OrderStatusBadge status={order.status} />}
                   </div>
                 </div>
               </Link>

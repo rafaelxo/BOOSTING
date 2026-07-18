@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, MessageCircle, Trophy, CreditCard, Star, UserCheck, Briefcase, RefreshCw } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { Notification, NotificationType } from '@/types'
+import { useNotifications, useMarkNotificationsRead } from '@/api/notifications'
 
 const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   order_status_changed: RefreshCw,
@@ -40,25 +39,11 @@ function orderPathForRole(role: string | undefined, orderId: string): string {
 export function NotificationBell() {
   const { profile } = useAuthStore()
   const navigate = useNavigate()
-  const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { data: notifications = [] } = useQuery({
-    queryKey: ['notifications', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', profile!.id)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (error) throw error
-      return data as unknown as Notification[]
-    },
-    enabled: !!profile?.id,
-    refetchInterval: 30000,
-  })
+  const { data: notifications = [] } = useNotifications(profile?.id)
+  const markRead = useMarkNotificationsRead(profile?.id)
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
@@ -72,10 +57,9 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  async function markAsRead(ids: string[]) {
+  function markAsRead(ids: string[]) {
     if (!ids.length) return
-    await supabase.from('notifications').update({ is_read: true }).in('id', ids)
-    qc.invalidateQueries({ queryKey: ['notifications', profile?.id] })
+    markRead.mutate(ids)
   }
 
   function handleItemClick(n: Notification) {

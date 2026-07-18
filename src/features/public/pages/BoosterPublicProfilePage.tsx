@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Star, Clock, CheckCircle2, Trophy, Zap, DollarSign, Package, MessageSquare } from 'lucide-react'
 import { Button, Card, RankBadge, Avatar, Skeleton, StarRating, EmptyState } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { timeAgo, formatRank, formatDate, formatLastSeen, getServiceLabel } from '@/lib/utils'
 import { LANE_LABEL, SPECIALTY_LABEL } from '@/lib/lolTaxonomy'
-import type { BoosterProfile, BoosterService, Review, RankTier } from '@/types'
+import type { RankTier } from '@/types'
 import { useCurrency } from '@/hooks/useCurrency'
+import { usePublicBooster, useBoosterPerformanceByRank } from '@/api/boosters'
+import { usePublicCoachingPackages } from '@/api/coaching'
+import { useBoosterReviews } from '@/api/reviews'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -24,70 +25,15 @@ export function BoosterPublicProfilePage() {
   const { id } = useParams<{ id: string }>()
   const currency = useCurrency()
 
-  const { data: booster, isLoading } = useQuery({
-    queryKey: ['public-booster', id],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('public_booster_profiles')
-        .select('*')
-        .eq('id', id!)
-        .maybeSingle()
-      if (error) throw error
-      return data as BoosterProfile | null
-    },
-    enabled: !!id,
-  })
-
-  const { data: services = [] } = useQuery({
-    queryKey: ['public-booster-services', booster?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_services')
-        .select('*')
-        .eq('booster_id', booster!.user_id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as BoosterService[]
-    },
-    enabled: !!booster?.user_id,
-  })
-
-  const { data: reviews = [] } = useQuery({
-    queryKey: ['public-booster-reviews', booster?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('id, rating, content, created_at')
-        .eq('booster_id', booster!.user_id)
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data as Pick<Review, 'id' | 'rating' | 'content' | 'created_at'>[]
-    },
-    enabled: !!booster?.user_id,
-  })
+  const { data: booster, isLoading } = usePublicBooster(id)
+  const { data: services = [] } = usePublicCoachingPackages(booster?.user_id)
+  const { data: reviews = [] } = useBoosterReviews(booster?.user_id)
 
   // Desempenho por faixa de elo vem de booster_performance_segments —
   // calculado automaticamente a partir de partidas reais (order_matches,
   // sincronizadas via sync-order-matches) e reviews, nunca digitado à mão
   // (ver refresh_booster_performance_segments, migration 054).
-  const { data: performanceSegments = [] } = useQuery({
-    queryKey: ['public-booster-performance', booster?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_performance_segments')
-        .select('rank_bucket, average_kda, adjusted_win_rate, total_matches')
-        .eq('booster_id', booster!.user_id)
-        .eq('service_type', '__all__')
-        .neq('rank_bucket', '__all__')
-      if (error) throw error
-      return data as { rank_bucket: string; average_kda: number | null; adjusted_win_rate: number; total_matches: number }[]
-    },
-    enabled: !!booster?.user_id,
-  })
+  const { data: performanceSegments = [] } = useBoosterPerformanceByRank(booster?.user_id)
 
   if (isLoading) return (
     <div className="max-w-6xl mx-auto px-5 sm:px-8 py-16">
@@ -341,7 +287,7 @@ export function BoosterPublicProfilePage() {
                         </div>
                         <div>
                           <p className="text-[10px] text-ink-muted">Winrate</p>
-                          <p className="text-sm font-bold text-brand">{stats && stats.total_matches > 0 ? `${Math.round(stats.adjusted_win_rate * 100)}%` : '—'}</p>
+                          <p className="text-sm font-bold text-brand">{stats && stats.total_matches > 0 ? `${Math.round((stats.adjusted_win_rate ?? 0) * 100)}%` : '—'}</p>
                         </div>
                       </div>
                     </div>

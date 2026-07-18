@@ -1,32 +1,19 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink, ClipboardList } from 'lucide-react'
 import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert, EmptyState } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { formatDate, formatDateTime, formatRank, formatLastSeen, timeAgo } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { BoosterProfile } from '@/types'
+import {
+  useAdminBoosterDetail, useBoosterPerformanceByRank, useBoosterAuditLog, useAdminApproveBooster,
+  useAdminToggleBoosterTop3,
+} from '@/api/boosters'
+import { useBoosterSlotInfo } from '@/api/orders'
 
 type RankBucket = 'gold_minus' | 'plat_diamond' | 'master_plus'
 const BRACKET_LABEL: Record<RankBucket, string> = {
   gold_minus: 'Ouro e abaixo',
   plat_diamond: 'Platina–Diamante',
   master_plus: 'Mestre+',
-}
-
-interface PerformanceSegment {
-  rank_bucket: string
-  average_kda: number | null
-  adjusted_win_rate: number
-  total_matches: number
-}
-
-interface AuditLogEntry {
-  id: string
-  actor_id: string
-  actor_role: string
-  action: string
-  created_at: string
 }
 
 const AUDIT_ACTION_LABEL: Record<string, string> = {
@@ -53,82 +40,31 @@ const DAY_LABEL: Record<string, string> = { mon: 'Seg', tue: 'Ter', wed: 'Qua', 
 
 export function AdminBoosterDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const queryClient = useQueryClient()
   const currency = useCurrency()
 
-  const { data: booster, isLoading } = useQuery({
-    queryKey: ['admin-booster', id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('booster_profiles').select('*').eq('id', id!).single()
-      if (error) throw error
-      return data as unknown as BoosterProfile
-    },
-    enabled: !!id,
-    refetchInterval: 20000,
-  })
-
-  const { data: slotInfo } = useQuery({
-    queryKey: ['admin-booster-slots', booster?.user_id],
-    queryFn: async () => {
-      const { data } = await supabase.rpc('can_booster_accept_order', {
-        p_booster_user_id: booster!.user_id,
-        p_boost_mode: 'solo',
-      })
-      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean } | null
-    },
-    enabled: !!booster?.user_id && booster?.status === 'approved',
-    refetchInterval: 15000,
-  })
+  const { data: booster, isLoading } = useAdminBoosterDetail(id)
+  const { data: slotInfo } = useBoosterSlotInfo(booster?.user_id, booster?.status === 'approved')
 
   // Desempenho por faixa de elo -- calculado automaticamente a partir de
   // partidas reais sincronizadas (order_matches) e reviews, nunca digitado
   // à mão (ver refresh_booster_performance_segments, migration 054).
-  const { data: performanceSegments } = useQuery({
-    queryKey: ['admin-booster-performance', booster?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_performance_segments')
-        .select('rank_bucket, average_kda, adjusted_win_rate, total_matches')
-        .eq('booster_id', booster!.user_id)
-        .eq('service_type', '__all__')
-        .neq('rank_bucket', '__all__')
-      if (error) throw error
-      return data as PerformanceSegment[]
-    },
-    enabled: !!booster?.user_id,
-  })
+  const { data: performanceSegments } = useBoosterPerformanceByRank(booster?.user_id)
 
   // Trilha de auditoria pra controle admin -- aprovação/rejeição/suspensão e
   // mudanças de Top3 (approve_booster / toggle_booster_top3).
-  const { data: auditLog } = useQuery({
-    queryKey: ['admin-booster-audit', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('id, actor_id, actor_role, action, created_at')
-        .eq('entity_type', 'booster_profile')
-        .eq('entity_id', id!)
-        .order('created_at', { ascending: false })
-        .limit(20)
-      if (error) throw error
-      return data as AuditLogEntry[]
-    },
-    enabled: !!id,
-  })
+  const { data: auditLog } = useBoosterAuditLog(id)
 
-  const updateStatus = useMutation({
-    mutationFn: async (status: string) => {
-      const { data, error } = await supabase.rpc('approve_booster', { p_booster_id: id!, p_new_status: status })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar booster')
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-booster', id] })
-      queryClient.invalidateQueries({ queryKey: ['admin-boosters'] })
-      queryClient.invalidateQueries({ queryKey: ['admin-booster-audit', id] })
-    },
-  })
+  const updateStatusMutation = useAdminApproveBooster()
+  const updateStatus = {
+    isPending: updateStatusMutation.isPending,
+    isError: updateStatusMutation.isError,
+    isSuccess: updateStatusMutation.isSuccess,
+    error: updateStatusMutation.error,
+    mutate: (status: 'approved' | 'rejected' | 'suspended') =>
+      updateStatusMutation.mutate({ boosterId: id!, newStatus: status }),
+  }
+
+  const toggleTop3Mutation = useAdminToggleBoosterTop3()
 
   if (isLoading) return null
   if (!booster) return <p className="text-ink-muted">Booster não encontrado.</p>
@@ -140,7 +76,7 @@ export function AdminBoosterDetailPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" aria-label="Voltar">
           <Link to="/admin/boosters"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <h1 className="text-xl font-bold text-ink">{booster.display_name}</h1>
@@ -149,6 +85,18 @@ export function AdminBoosterDetailPage() {
           <span className="flex items-center gap-1 text-xs font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2.5 py-1 uppercase tracking-wide">
             <Trophy className="h-3 w-3" /> TOP 3
           </span>
+        )}
+        {booster.status === 'approved' && (
+          <Button
+            variant={booster.is_top3 ? 'secondary' : 'ghost'}
+            size="sm"
+            leftIcon={<Trophy className="h-3.5 w-3.5" />}
+            loading={toggleTop3Mutation.isPending}
+            onClick={() => toggleTop3Mutation.mutate({ boosterId: booster.id, isTop3: !booster.is_top3 })}
+            className="ml-auto"
+          >
+            {booster.is_top3 ? 'Remover do Top 3' : 'Marcar como Top 3'}
+          </Button>
         )}
       </div>
 
@@ -326,7 +274,7 @@ export function AdminBoosterDetailPage() {
                     </div>
                     <div>
                       <p className="text-[10px] text-ink-muted">Winrate</p>
-                      <p className="text-sm font-bold text-brand">{Math.round(stats.adjusted_win_rate * 100)}%</p>
+                      <p className="text-sm font-bold text-brand">{Math.round((stats.adjusted_win_rate ?? 0) * 100)}%</p>
                     </div>
                   </div>
                 </div>
@@ -350,7 +298,7 @@ export function AdminBoosterDetailPage() {
               { label: 'Solo', value: slotInfo.solo_count, icon: Swords, color: 'text-brand bg-brand/10' },
               { label: 'Duo',  value: `${slotInfo.duo_count}/${slotInfo.max_duo}`, icon: Users, color: 'text-accent bg-accent/10' },
               { label: 'Total', value: `${slotInfo.total_count}/${slotInfo.max_total}`, icon: Trophy,
-                color: slotInfo.total_count >= slotInfo.max_total ? 'text-danger bg-danger/10' : 'text-success bg-success/10' },
+                color: (slotInfo.total_count ?? 0) >= (slotInfo.max_total ?? 3) ? 'text-danger bg-danger/10' : 'text-success bg-success/10' },
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="text-center">
                 <div className={`h-9 w-9 rounded-xl ${color} flex items-center justify-center mx-auto mb-2`}>

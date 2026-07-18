@@ -1,28 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Lock, MessageCircle, Send, ShieldCheck, Unlock } from 'lucide-react'
 import { Avatar, Button, Card, ErrorAlert, Skeleton } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { cn, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-import type { OrderChatMessage, UserRole } from '@/types'
-
-type OrderChatResponse = {
-  success: boolean
-  code?: string
-  message?: string
-  chat_available: boolean
-  chat_locked: boolean
-  chat_locked_at: string | null
-  can_send: boolean
-  messages: OrderChatMessage[]
-}
-
-type ChatActionResponse = {
-  success: boolean
-  code?: string
-  message?: string
-}
+import { useOrderChat, useSendOrderMessage, useSetOrderChatLock } from '@/api/chat'
+import type { UserRole } from '@/types'
 
 const ROLE_LABEL: Record<UserRole, string> = {
   customer: 'Cliente',
@@ -30,68 +12,14 @@ const ROLE_LABEL: Record<UserRole, string> = {
   admin: 'Admin',
 }
 
-function actionError(result: ChatActionResponse, fallback: string) {
-  const messages: Record<string, string> = {
-    not_authenticated: 'Sua sessao expirou. Entre novamente.',
-    profile_not_found: 'Seu perfil nao foi encontrado. Entre novamente.',
-    order_not_found: 'Pedido nao encontrado ou sem permissao de acesso.',
-    chat_unavailable: 'O chat sera liberado quando um booster for atribuido.',
-    chat_locked: 'O chat foi bloqueado pela administracao.',
-    invalid_content: 'A mensagem deve ter entre 1 e 4000 caracteres.',
-    rate_limited: 'Muitas mensagens em pouco tempo. Aguarde um minuto.',
-    forbidden: 'Voce nao tem permissao para esta acao.',
-  }
-  return new Error(messages[result.code ?? ''] ?? result.message ?? fallback)
-}
-
-async function loadOrderChat(orderId: string) {
-  const { data, error } = await supabase.rpc('get_order_chat', { p_order_id: orderId })
-  if (error) throw error
-  const result = data as unknown as OrderChatResponse
-  if (!result.success) throw actionError(result, 'Nao foi possivel carregar o chat.')
-  return result
-}
-
 export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole: UserRole }) {
   const { profile } = useAuthStore()
-  const queryClient = useQueryClient()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const chat = useQuery({
-    queryKey: ['order-chat', orderId],
-    queryFn: () => loadOrderChat(orderId),
-    refetchInterval: 4000,
-  })
-
-  const sendMessage = useMutation({
-    mutationFn: async (content: string) => {
-      const { data, error } = await supabase.rpc('send_order_message', {
-        p_order_id: orderId,
-        p_content: content,
-      })
-      if (error) throw error
-      const result = data as unknown as ChatActionResponse
-      if (!result.success) throw actionError(result, 'Nao foi possivel enviar a mensagem.')
-    },
-    onSuccess: async () => {
-      setMessage('')
-      await queryClient.invalidateQueries({ queryKey: ['order-chat', orderId] })
-    },
-  })
-
-  const setLocked = useMutation({
-    mutationFn: async (locked: boolean) => {
-      const { data, error } = await supabase.rpc('admin_set_order_chat_lock', {
-        p_order_id: orderId,
-        p_locked: locked,
-      })
-      if (error) throw error
-      const result = data as unknown as ChatActionResponse
-      if (!result.success) throw actionError(result, 'Nao foi possivel alterar o bloqueio do chat.')
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['order-chat', orderId] }),
-  })
+  const chat = useOrderChat(orderId)
+  const sendMessage = useSendOrderMessage(orderId)
+  const setLocked = useSetOrderChatLock(orderId)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -100,7 +28,7 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
   function submitMessage() {
     const content = message.trim()
     if (!content || sendMessage.isPending || !chat.data?.can_send) return
-    sendMessage.mutate(content)
+    sendMessage.mutate(content, { onSuccess: () => setMessage('') })
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -122,7 +50,7 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
   if (chat.isError || !chat.data) {
     return (
       <Card padding="md">
-        <ErrorAlert message={chat.error instanceof Error ? chat.error.message : 'Nao foi possivel carregar o chat.'} />
+        <ErrorAlert message={chat.error instanceof Error ? chat.error.message : 'Não foi possível carregar o chat.'} />
       </Card>
     )
   }
@@ -131,7 +59,7 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
 
   return (
     <Card padding="none" className="overflow-hidden">
-      <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-bg-elevated px-4 py-3">
+      <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-3">
         <MessageCircle className="h-4 w-4 text-brand" />
         <div>
           <h3 className="text-sm font-semibold text-ink">Chat do pedido</h3>
@@ -156,9 +84,9 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-bg-elevated">
             <Lock className="h-5 w-5 text-ink-muted" />
           </div>
-          <p className="text-sm font-semibold text-ink">Chat ainda indisponivel</p>
+          <p className="text-sm font-semibold text-ink">Chat ainda indisponível</p>
           <p className="mt-1 max-w-sm text-xs text-ink-muted">
-            Cliente e booster poderao conversar quando um booster for atribuido a este pedido.
+            Cliente e booster poderão conversar quando um booster for atribuído a este pedido.
           </p>
         </div>
       ) : (
@@ -166,11 +94,11 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
           {locked && (
             <div className="flex items-start gap-2 border-b border-warning/20 bg-warning/10 px-4 py-3 text-xs text-warning">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Chat bloqueado pela administracao. Somente administradores podem enviar mensagens.</span>
+              <span>Chat bloqueado pela administração. Somente administradores podem enviar mensagens.</span>
             </div>
           )}
 
-          <div className="min-h-64 max-h-[430px] space-y-4 overflow-y-auto px-4 py-5">
+          <div className="min-h-64 max-h-[430px] space-y-4 overflow-y-auto px-4 py-5" aria-live="polite">
             {messages.length === 0 ? (
               <p className="py-12 text-center text-xs text-ink-muted">Nenhuma mensagem enviada.</p>
             ) : (
@@ -207,7 +135,7 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
           </div>
 
           {canSend ? (
-            <div className="flex items-end gap-2 border-t border-bg-elevated p-3">
+            <div className="flex items-end gap-2 border-t border-border-subtle p-3">
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
@@ -215,6 +143,7 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
                 maxLength={4000}
                 rows={2}
                 placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
+                aria-label="Escrever mensagem"
                 className="input-base min-h-11 flex-1 resize-y py-2.5 text-sm"
                 disabled={sendMessage.isPending}
               />
@@ -230,20 +159,20 @@ export function OrderChat({ orderId, viewerRole }: { orderId: string; viewerRole
               </Button>
             </div>
           ) : locked ? null : (
-            <div className="border-t border-bg-elevated px-4 py-3 text-center text-xs text-ink-muted">
-              Voce nao pode enviar mensagens neste chat.
+            <div className="border-t border-border-subtle px-4 py-3 text-center text-xs text-ink-muted">
+              Você não pode enviar mensagens neste chat.
             </div>
           )}
         </>
       )}
 
       {sendMessage.isError && (
-        <div className="border-t border-bg-elevated p-3">
+        <div className="border-t border-border-subtle p-3">
           <ErrorAlert message={sendMessage.error instanceof Error ? sendMessage.error.message : 'Erro ao enviar mensagem.'} />
         </div>
       )}
       {setLocked.isError && (
-        <div className="border-t border-bg-elevated p-3">
+        <div className="border-t border-border-subtle p-3">
           <ErrorAlert message={setLocked.error instanceof Error ? setLocked.error.message : 'Erro ao controlar o chat.'} />
         </div>
       )}

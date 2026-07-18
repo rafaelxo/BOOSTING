@@ -1,20 +1,12 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Search, Clock, DollarSign, CheckCircle2, Star, SlidersHorizontal, Check, X } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { LANES, LANE_LABEL, COACH_SPECIALTIES, SPECIALTY_LABEL } from '@/lib/lolTaxonomy'
 import { matchesCoachPackageFilters, activeFilterCount } from '@/lib/coachFilters'
 import type { BoosterService } from '@/types'
-
-interface CoachBoosterInfo {
-  user_id: string
-  display_name: string
-  rating: number | null
-  is_top3: boolean | null
-}
+import { useAllCoachingPackages, useCoachBoosterInfo } from '@/api/coaching'
 
 export function CoachPackagePicker() {
   const currency = useCurrency()
@@ -41,35 +33,11 @@ export function CoachPackagePicker() {
   const activeCount = activeFilterCount({ lanes: laneFilters, specialties: specialtyFilters })
   const hasAnyFilter = activeCount > 0 || search.trim().length > 0
 
-  const { data: packages = [], isLoading } = useQuery({
-    queryKey: ['coach-packages'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_services')
-        .select('*')
-        .eq('service_type', 'coaching')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data as BoosterService[]
-    },
-  })
+  const { data: packages = [], isLoading } = useAllCoachingPackages()
 
   const boosterIds = useMemo(() => [...new Set(packages.map(p => p.booster_id))], [packages])
 
-  const { data: boosters = [] } = useQuery({
-    queryKey: ['coach-packages-boosters', boosterIds],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('public_booster_profiles')
-        .select('user_id, display_name, rating, is_top3')
-        .in('user_id', boosterIds)
-      if (error) throw error
-      return data as unknown as CoachBoosterInfo[]
-    },
-    enabled: boosterIds.length > 0,
-  })
+  const { data: boosters = [] } = useCoachBoosterInfo(boosterIds)
 
   const boosterMap = useMemo(
     () => Object.fromEntries(boosters.map(b => [b.user_id, b])),

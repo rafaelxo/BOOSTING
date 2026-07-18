@@ -1,29 +1,14 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap, Star, Trophy, Swords, Sparkles } from 'lucide-react'
 import { Avatar, Skeleton, RankBadge } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { cn, formatRank, formatLastSeen } from '@/lib/utils'
-import type { BoosterProfile, RankTier, Division } from '@/types'
+import type { BoosterProfile, RankTier } from '@/types'
+import { usePublicBoosters, useTopBoosters, useBoostersPerformance } from '@/api/boosters'
+import type { TopBoosterEntry } from '@/api/boosters'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-interface TopBoosterEntry {
-  booster_id: string
-  display_name: string
-  avatar_url: string | null
-  current_rank: { tier: RankTier; division: Division | null } | null
-  total_matches: number
-  wins: number
-  losses: number
-  win_rate_pct: number
-  average_kda: number | null
-  review_count: number
-  average_rating: number | null
-  performance_score: number
-}
 
 const MEDAL: Record<number, { border: string; badge: string; text: string }> = {
   1: { border: 'border-yellow-400/60', badge: 'bg-yellow-400 text-bg-base', text: 'text-yellow-400' },
@@ -41,7 +26,7 @@ function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position:
 
   return (
     <Link
-      to={`/boosters/${entry.booster_id}`}
+      to={`/boosters/${entry.booster_profile_id}`}
       className={cn(
         'card flex flex-col gap-3 p-5 border-2 transition-all hover:-translate-y-1 hover:shadow-card-hover',
         medal.border,
@@ -146,64 +131,28 @@ function BoosterCardSkeleton() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function BoostersPage() {
-  const { data: boosters, isLoading } = useQuery({
-    queryKey: ['public-boosters'],
-    queryFn: async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('public_booster_profiles')
-        .select('*')
-        .limit(100)
-      if (error) throw error
-      return data as BoosterProfile[]
-    },
-    staleTime: 60_000,
-  })
-
-  const { data: top3 } = useQuery({
-    queryKey: ['top-boosters', 'global'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_top_boosters', {
-        p_service_type: '__all__',
-        p_rank_bucket: '__all__',
-        p_limit: 3,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; boosters: TopBoosterEntry[] } | null
-      return result?.boosters ?? []
-    },
-    staleTime: 60_000,
-  })
+  const { data: boosters, isLoading } = usePublicBoosters()
+  const { data: top3 } = useTopBoosters(3)
 
   const boosterUserIds = useMemo(() => (boosters ?? []).map(b => b.user_id), [boosters])
 
   // Win rate real, calculado a partir de partidas sincronizadas
   // (booster_performance_segments -- ver migration 054), nunca digitado à
   // mão. Rollup geral do booster: service_type/rank_bucket = '__all__'.
-  const { data: overallPerformance } = useQuery({
-    queryKey: ['public-boosters-performance', boosterUserIds],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_performance_segments')
-        .select('booster_id, adjusted_win_rate, total_matches')
-        .in('booster_id', boosterUserIds)
-        .eq('service_type', '__all__')
-        .eq('rank_bucket', '__all__')
-      if (error) throw error
-      return data as { booster_id: string; adjusted_win_rate: number; total_matches: number }[]
-    },
-    enabled: boosterUserIds.length > 0,
-    staleTime: 60_000,
-  })
+  const { data: overallPerformance } = useBoostersPerformance(boosterUserIds)
 
   const winRateByUserId = useMemo(() => new Map(
     (overallPerformance ?? [])
       .filter(s => s.total_matches > 0)
-      .map(s => [s.booster_id, s.adjusted_win_rate * 100]),
+      .map(s => [s.booster_id, (s.adjusted_win_rate ?? 0) * 100]),
   ), [overallPerformance])
 
   const sorted = boosters ? [...boosters].sort((a, b) => b.rating - a.rating) : []
-  const top3Ids = new Set((top3 ?? []).map(b => b.booster_id))
+  // booster_profile_id (não booster_id/user_id) -- precisa bater com b.id
+  // (booster_profiles.id) pra de fato excluir os Top 3 da grade "Demais
+  // Boosters" abaixo. Antes disso comparava contra o id errado e todo Top 3
+  // aparecia duplicado nas duas seções.
+  const top3Ids = new Set((top3 ?? []).map(b => b.booster_profile_id))
   const rest = sorted.filter(b => !top3Ids.has(b.id))
 
   return (

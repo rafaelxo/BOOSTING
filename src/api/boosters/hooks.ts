@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import {
   getAdminBoosterDetail, getBoosterAccessState, getBoosterPerformanceByRank, getOwnBoosterProfileId,
-  getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters, listBoosterAuditLog,
-  listBoostersPerformance, listPublicBoosters,
+  getOwnBoosterTop3Status, getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters,
+  listBoosterAuditLog, listBoostersPerformance, listBoosterNames, listPublicBoosters,
 } from './queries'
 import { adminApproveBooster, adminToggleBoosterTop3, boosterHeartbeat, onboardBooster, requestBoosterRole, updateProfessionalProfile } from './mutations'
 
@@ -28,6 +28,14 @@ export function useOwnBoosterProfileId(userId: string | undefined) {
   return useQuery({
     queryKey: ['boosters', 'own-profile-id', userId ?? ''],
     queryFn: () => getOwnBoosterProfileId(userId!),
+    enabled: !!userId,
+  })
+}
+
+export function useOwnBoosterTop3Status(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['boosters', 'own-top3-status', userId ?? ''],
+    queryFn: () => getOwnBoosterTop3Status(userId!),
     enabled: !!userId,
   })
 }
@@ -87,6 +95,14 @@ export function useAdminBoosterDetail(boosterId: string | undefined) {
     queryFn: () => getAdminBoosterDetail(boosterId!),
     enabled: !!boosterId,
     refetchInterval: 20_000,
+  })
+}
+
+export function useBoosterNames(boosterUserIds: string[]) {
+  return useQuery({
+    queryKey: ['boosters', 'names', boosterUserIds],
+    queryFn: () => listBoosterNames(boosterUserIds),
+    enabled: boosterUserIds.length > 0,
   })
 }
 

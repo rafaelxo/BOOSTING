@@ -196,28 +196,6 @@ export function orderRequiresAccountAccess(order: Order): boolean {
   );
 }
 
-// Mensagens amigáveis pros códigos de erro retornados por onboard_booster e
-// update_booster_professional_profile (migration 076) -- a validação real
-// (obrigatoriedade, formato) mora no backend; isso só traduz o código pro
-// usuário em vez de mostrar o código cru.
-const BOOSTER_FORM_ERROR_MESSAGES: Record<string, string> = {
-  not_a_booster: 'Não foi possível identificar sua candidatura de booster.',
-  display_name_required: 'Nome de exibição é obrigatório.',
-  bio_required: 'Conte um pouco sobre você.',
-  invalid_peak_rank: 'Selecione seu rank de pico (Grão-mestre ou Desafiante).',
-  invalid_opgg_link: 'Link do OP.GG inválido.',
-  invalid_hours: 'Informe uma faixa de horas válida (1 a 24, com o mínimo menor ou igual ao máximo).',
-  full_name_required: 'Nome completo é obrigatório.',
-  invalid_cpf: 'CPF inválido.',
-  available_days_required: 'Selecione ao menos um dia disponível.',
-  invalid_lanes: 'Selecione entre 1 e 2 lanes.',
-  invalid_specialties: 'Selecione ao menos uma especialidade.',
-}
-
-export function boosterFormErrorMessage(code: string | undefined): string {
-  return BOOSTER_FORM_ERROR_MESSAGES[code ?? ''] ?? `Erro: ${code ?? 'falha desconhecida'}`
-}
-
 // Share of order.total_price the booster receives before an authoritative
 // payout_records row exists (mirrors trg_fn_order_completed_booster_stats,
 // migration 069): 55% normally, 60% for Top3 boosters.

@@ -1,16 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Shield, CheckCircle2, XCircle, Trophy, Star } from 'lucide-react'
 import { Button, BoosterStatusBadge, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
 import type { BoosterProfile } from '@/types'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAdminBoosters, useAdminApproveBooster } from '@/api/boosters'
 
 export function AdminBoostersPage() {
-  const queryClient = useQueryClient()
   const [filter, setFilter] = useState<BoosterProfile['status'] | 'all'>('all')
   const { t } = useTranslation()
 
@@ -22,27 +20,12 @@ export function AdminBoostersPage() {
     suspended: t('admin.boosters.filters.suspended'),
   }
 
-  const { data: boosters, isLoading } = useQuery({
-    queryKey: ['admin-boosters', filter],
-    queryFn: async () => {
-      let q = supabase.from('booster_profiles').select('*').order('created_at', { ascending: false }).limit(100)
-      if (filter !== 'all') q = q.eq('status', filter)
-      const { data, error } = await q
-      if (error) throw error
-      return data as unknown as BoosterProfile[]
-    },
-    refetchInterval: 20000,
-  })
-
-  const updateBoosterStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { data, error } = await supabase.rpc('approve_booster', { p_booster_id: id, p_new_status: status })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar booster')
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-boosters'] }),
-  })
+  const { data: boosters, isLoading } = useAdminBoosters(filter)
+  const updateBoosterStatusMutation = useAdminApproveBooster()
+  const updateBoosterStatus = {
+    mutate: (params: { id: string; status: 'approved' | 'rejected' | 'suspended' }) =>
+      updateBoosterStatusMutation.mutate({ boosterId: params.id, newStatus: params.status }),
+  }
 
   const filtered = boosters ?? []
 

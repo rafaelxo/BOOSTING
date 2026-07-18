@@ -1,12 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
 import { formatDateTime } from '@/lib/utils'
 import type { Refund } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminRefunds } from '@/api/admin'
 
 const REFUND_STATUS_LABEL: Record<Refund['status'], string> = {
   pending: 'Pendente',
@@ -18,15 +17,7 @@ export function AdminRefundsPage() {
   const { t } = useTranslation()
   const currency = useCurrency()
 
-  const { data: refunds, isLoading } = useQuery({
-    queryKey: ['admin-refunds'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('refunds').select('*').order('created_at', { ascending: false }).limit(100)
-      if (error) throw error
-      return data as Refund[]
-    },
-    refetchInterval: 20000,
-  })
+  const { data: refunds, isLoading } = useAdminRefunds()
 
   return (
     <div className="space-y-5">

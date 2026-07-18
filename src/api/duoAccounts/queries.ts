@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { normalizeApiError } from '@/api/core/errors'
+import type { Division, RankTier } from '@/types'
 import type { AdminDuoAccount, BoosterVisibleDuoAccount } from './types'
 
 export async function listDuoAccounts<T = BoosterVisibleDuoAccount>(): Promise<T[]> {
@@ -18,8 +19,8 @@ export async function listAdminDuoAccounts(): Promise<AdminDuoAccount[]> {
 export interface RiotRankLookup {
   found?: boolean
   ranked?: boolean
-  tier?: string
-  division?: string | null
+  tier?: RankTier
+  division?: Division | null
   league_points?: number
   avg_lp_gain?: number
   avg_lp_loss?: number

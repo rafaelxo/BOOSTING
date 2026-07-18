@@ -1,14 +1,13 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Package } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
 import type { BoosterService } from '@/types'
 import { BoosterServiceForm } from './BoosterServiceForm'
 import { BoosterServiceCard } from './BoosterServiceCard'
 import { EMPTY_SERVICE_FORM, serviceToForm, type ServiceFormData } from '@/features/booster/utils/boosterServiceForm'
+import { useOwnCoachingPackages, useCoachingPackageMutations } from '@/api/coaching'
 
 const MAX_SERVICES = 3
 
@@ -21,86 +20,62 @@ const SERVICE_TYPE_LABEL: Record<string, string> = {
 }
 
 export function BoosterServicesList({ userId }: { userId: string }) {
-  const qc = useQueryClient()
-
   const [adding, setAdding]               = useState(false)
   const [newServiceType, setNewServiceType] = useState<string>(SERVICE_TYPE_OPTIONS[0].value)
-  const [savingNew, setSavingNew]         = useState(false)
   const [editingId, setEditingId]         = useState<string | null>(null)
-  const [savingEdit, setSavingEdit]       = useState(false)
   const [deletingId, setDeletingId]       = useState<string | null>(null)
   const [togglingId, setTogglingId]       = useState<string | null>(null)
   const [error, setError]                 = useState<string | null>(null)
 
-  const { data: services = [], isLoading } = useQuery({
-    queryKey: ['booster-services', userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_services')
-        .select('*')
-        .eq('booster_id', userId)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as BoosterService[]
-    },
-    enabled: !!userId,
-  })
-
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: ['booster-services', userId] })
-  }
+  const { data: services = [], isLoading } = useOwnCoachingPackages(userId)
+  const { create, update, remove, toggleActive } = useCoachingPackageMutations(userId)
+  const savingNew = create.isPending
+  const savingEdit = update.isPending
 
   async function handleCreate(form: ServiceFormData) {
     if (!checkRateLimit(`svc-create-${userId}`, limits.rpcMutation)) return
-    setSavingNew(true)
     setError(null)
-    const { error } = await supabase.from('booster_services').insert({
-      booster_id: userId,
+    create.mutate({
+      boosterId: userId,
       title: form.title.trim(),
       description: form.description.trim(),
-      service_type: newServiceType,
-      unit: 'fixed',
+      serviceType: newServiceType,
       tempo: form.tempo.trim(),
       price: parseFloat(form.price),
-      lanes: form.lanes as never,
-      specialties: form.specialties as never,
+      lanes: form.lanes,
+      specialties: form.specialties,
+    }, {
+      onSuccess: () => { setAdding(false); setNewServiceType(SERVICE_TYPE_OPTIONS[0].value) },
+      onError: () => setError('Erro ao salvar serviço. Tente novamente.'),
     })
-    setSavingNew(false)
-    if (error) { setError('Erro ao salvar serviço. Tente novamente.'); return }
-    setAdding(false)
-    setNewServiceType(SERVICE_TYPE_OPTIONS[0].value)
-    invalidate()
   }
 
   async function handleUpdate(id: string, form: ServiceFormData) {
-    setSavingEdit(true)
     setError(null)
-    const { error } = await supabase.from('booster_services').update({
+    update.mutate({
+      id,
+      boosterId: userId,
       title: form.title.trim(),
       description: form.description.trim(),
+      serviceType: newServiceType,
       tempo: form.tempo.trim(),
       price: parseFloat(form.price),
-      lanes: form.lanes as never,
-      specialties: form.specialties as never,
-    }).eq('id', id)
-    setSavingEdit(false)
-    if (error) { setError('Erro ao salvar serviço. Tente novamente.'); return }
-    setEditingId(null)
-    invalidate()
+      lanes: form.lanes,
+      specialties: form.specialties,
+    }, {
+      onSuccess: () => setEditingId(null),
+      onError: () => setError('Erro ao salvar serviço. Tente novamente.'),
+    })
   }
 
   async function handleDelete(id: string) {
     setDeletingId(id)
-    await supabase.from('booster_services').delete().eq('id', id)
-    setDeletingId(null)
-    invalidate()
+    remove.mutate(id, { onSettled: () => setDeletingId(null) })
   }
 
   async function handleToggleActive(service: BoosterService) {
     setTogglingId(service.id)
-    await supabase.from('booster_services').update({ is_active: !service.is_active }).eq('id', service.id)
-    setTogglingId(null)
-    invalidate()
+    toggleActive.mutate({ id: service.id, isActive: !service.is_active }, { onSettled: () => setTogglingId(null) })
   }
 
   const canAdd = services.length < MAX_SERVICES

@@ -2,7 +2,6 @@ import type { Database } from '@/lib/database.types'
 
 export type PayoutRequestRow = Database['public']['Tables']['payout_requests']['Row']
 export type PayoutRequestStatus = Database['public']['Enums']['payout_request_status']
-export type LedgerEntryType = Database['public']['Enums']['ledger_entry_type']
 
 export interface BoosterPayoutTotals {
   available_balance: number

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { X, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
-import { supabase, signOut } from '@/lib/supabase'
+import { signOut } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { AvatarIconPicker } from '@/components/profile/AvatarIconPicker'
 import { DiscordAccountNotice } from '@/components/DiscordAccountNotice'
 import type { UserRole } from '@/types'
+import { useBoosterPanelFields, useUpdateMyUsername, useUpdateMyAvatar, useBoosterPanelMutations } from '@/api/auth'
+import { ApiError } from '@/api/core/errors'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
@@ -31,9 +32,12 @@ interface UserProfilePanelProps {
 export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   const { profile, setProfile } = useAuthStore()
   const navigate = useNavigate()
-  const qc = useQueryClient()
 
   const isBooster = profile?.role === 'booster'
+
+  const updateUsername = useUpdateMyUsername()
+  const updateAvatar = useUpdateMyAvatar()
+  const boosterMutations = useBoosterPanelMutations(profile?.id)
 
   // ── Username ──
   const [username, setUsername]             = useState(profile?.username ?? '')
@@ -62,19 +66,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   useEffect(() => { setUsername(profile?.username ?? '') }, [profile?.username])
 
   // Booster profile data
-  const { data: boosterData } = useQuery({
-    queryKey: ['booster-profile-panel', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_profiles')
-        .select('display_name, full_name, cpf')
-        .eq('user_id', profile!.id)
-        .maybeSingle()
-      if (error) throw error
-      return data as { display_name: string; full_name: string | null; cpf: string | null } | null
-    },
-    enabled: !!profile?.id && open && isBooster,
-  })
+  const { data: boosterData } = useBoosterPanelFields(profile?.id, open && isBooster)
 
   useEffect(() => {
     if (boosterData) {
@@ -106,21 +98,21 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     if (!profile || !username.trim()) return
     setUsernameSaving(true)
     setUsernameError(null)
-    const { data: result, error } = await supabase.rpc('update_my_username', { p_username: username.trim() })
-    setUsernameSaving(false)
-    const res = result as { success: boolean; error?: string } | null
-    if (error || !res?.success) {
-      setUsernameError(res?.error === 'username_taken' ? 'Nome já em uso' : 'Erro ao salvar')
-      return
+    try {
+      await updateUsername.mutateAsync(username.trim())
+      setProfile({ ...profile, username: username.trim() })
+      setUsernameSaved(true)
+      setTimeout(() => setUsernameSaved(false), 3000)
+    } catch (err) {
+      setUsernameError(err instanceof ApiError ? err.message : 'Erro ao salvar')
+    } finally {
+      setUsernameSaving(false)
     }
-    setProfile({ ...profile, username: username.trim() })
-    setUsernameSaved(true)
-    setTimeout(() => setUsernameSaved(false), 3000)
   }
 
   async function handleSelectIcon(url: string) {
     if (!profile) return
-    await supabase.from('profiles').update({ avatar_url: url }).eq('id', profile.id)
+    await updateAvatar.mutateAsync({ userId: profile.id, avatarUrl: url })
     setProfile({ ...profile, avatar_url: url })
   }
 
@@ -128,24 +120,21 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     if (!profile || !displayName.trim()) return
     setDisplayNameSaving(true)
     setDisplayNameError(null)
-    const { error } = await supabase
-      .from('booster_profiles')
-      .update({ display_name: displayName.trim() })
-      .eq('user_id', profile.id)
-    setDisplayNameSaving(false)
-    if (error) { setDisplayNameError('Erro ao salvar'); return }
-    setDisplayNameSaved(true)
-    qc.invalidateQueries({ queryKey: ['booster-profile-panel', profile.id] })
-    setTimeout(() => setDisplayNameSaved(false), 3000)
+    try {
+      await boosterMutations.updateDisplayName.mutateAsync({ userId: profile.id, displayName: displayName.trim() })
+      setDisplayNameSaved(true)
+      setTimeout(() => setDisplayNameSaved(false), 3000)
+    } catch {
+      setDisplayNameError('Erro ao salvar')
+    } finally {
+      setDisplayNameSaving(false)
+    }
   }
 
   async function handleSaveFullName() {
     if (!profile) return
     setFullNameSaving(true)
-    await supabase
-      .from('booster_profiles')
-      .update({ full_name: fullName.trim() || null })
-      .eq('user_id', profile.id)
+    await boosterMutations.updateFullName.mutateAsync({ userId: profile.id, fullName: fullName.trim() || null })
     setFullNameSaving(false)
     setFullNameSaved(true)
     setTimeout(() => setFullNameSaved(false), 3000)
@@ -157,14 +146,15 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     if (digits.length !== 11) { setCpfError('CPF inválido'); return }
     setCpfSaving(true)
     setCpfError(null)
-    const { error } = await supabase
-      .from('booster_profiles')
-      .update({ cpf: digits })
-      .eq('user_id', profile.id)
-    setCpfSaving(false)
-    if (error) { setCpfError('Erro ao salvar'); return }
-    setCpfSaved(true)
-    setTimeout(() => setCpfSaved(false), 3000)
+    try {
+      await boosterMutations.updateCpf.mutateAsync({ userId: profile.id, cpf: digits })
+      setCpfSaved(true)
+      setTimeout(() => setCpfSaved(false), 3000)
+    } catch {
+      setCpfError('Erro ao salvar')
+    } finally {
+      setCpfSaving(false)
+    }
   }
 
   async function handleSignOut() {
@@ -187,6 +177,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
           <h2 className="text-sm font-bold text-ink">Minha Conta</h2>
           <button
             onClick={onClose}
+            aria-label="Fechar"
             className="p-1.5 rounded-lg hover:bg-bg-elevated text-ink-muted hover:text-ink transition-colors"
           >
             <X className="h-4 w-4" />

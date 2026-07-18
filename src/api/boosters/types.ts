@@ -41,18 +41,33 @@ export interface UpdateProfessionalProfileParams {
   hoursPerDayMax: number
 }
 
+// Formato real retornado por get_top_boosters (migration 055) -- não é uma
+// projeção de booster_profiles, é uma linha agregada de
+// booster_performance_segments com o rank/nome/avatar já anexados.
 export interface TopBoosterEntry {
-  user_id: string
+  booster_id: string
+  /** booster_profiles.id (PK própria) -- usar este campo pra linkar /boosters/:id, nunca booster_id (=user_id). */
+  booster_profile_id: string
   display_name: string
   avatar_url: string | null
-  rating: number
-  rating_count: number
-  is_top3: boolean
-  total_completed: number
-  adjusted_win_rate: number | null
+  current_rank: Rank | null
+  segment_service_type: string
+  segment_rank_bucket: string
+  total_matches: number
+  wins: number
+  losses: number
+  win_rate_pct: number
+  average_kda: number | null
+  review_count: number
+  average_rating: number | null
+  performance_score: number
+  score_version: string
+  updated_at: string
 }
 
 export interface BoosterPerformanceSegment {
+  /** Presente em listBoostersPerformance (lookup multi-booster); ausente em getBoosterPerformanceByRank (já escopado a um booster). */
+  booster_id?: string
   rank_bucket: string
   average_kda: number | null
   adjusted_win_rate: number | null

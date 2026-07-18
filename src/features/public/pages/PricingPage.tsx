@@ -103,7 +103,7 @@ function CoachingPricingSection({ currency }: { currency: (n: number) => string 
   )
 }
 
-const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster'> = ['master', 'grandmaster']
+const ELO_MASTER_PLUS_TIERS: Array<'master' | 'grandmaster' | 'challenger'> = ['master', 'grandmaster', 'challenger']
 
 const WIN_TIERS: RankTier[] = [
   'iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger',

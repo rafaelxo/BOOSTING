@@ -1,11 +1,10 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { Plus, X } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
-import { cn, boosterFormErrorMessage } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { LANES } from '@/lib/lolTaxonomy'
-import type { RankTier } from '@/types'
+import { useOwnProfessionalProfile, useUpdateProfessionalProfile } from '@/api/boosters'
 
 const DAYS = [
   { key: 'mon', label: 'Seg' },
@@ -28,19 +27,6 @@ const MAX_SPECIALTIES = 8
 
 const DISPLAY_NAME_COOLDOWN_DAYS = 30
 
-interface ProfessionalProfileData {
-  display_name: string
-  display_name_changed_at: string | null
-  bio: string | null
-  lanes: string[] | null
-  specialties: string[] | null
-  peak_rank: { tier: RankTier; division: string | null } | null
-  opgg_link: string | null
-  available_days: string[] | null
-  hours_per_day_min: number | null
-  hours_per_day_max: number | null
-}
-
 export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   const qc = useQueryClient()
 
@@ -58,19 +44,8 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
   const [saved, setSaved]                   = useState(false)
   const [error, setError]                   = useState<string | null>(null)
 
-  const { data: profile, isLoading } = useQuery({
-    queryKey: ['booster-professional-profile', userId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_profiles')
-        .select('display_name, display_name_changed_at, bio, lanes, specialties, peak_rank, opgg_link, available_days, hours_per_day_min, hours_per_day_max')
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (error) throw error
-      return data as unknown as ProfessionalProfileData | null
-    },
-    enabled: !!userId,
-  })
+  const { data: profile, isLoading } = useOwnProfessionalProfile(userId)
+  const updateProfile = useUpdateProfessionalProfile(userId)
 
   useEffect(() => {
     if (!profile) return
@@ -121,39 +96,32 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
     // antes de travar. O backend rejeitaria de qualquer forma (migration
     // 025), isso só evita barrar o resto do formulário por causa disso.
     const nextDisplayName = (nameChangeLocked ? profile?.display_name : displayName.trim()) ?? ''
-    const { data: result, error } = await supabase.rpc('update_booster_professional_profile', {
-      p_display_name: nextDisplayName,
-      p_bio: bio.trim(),
-      p_lanes: lanes,
-      p_specialties: specialties,
-      p_peak_tier: peakTier ?? '',
-      p_opgg_link: opggLink.trim(),
-      p_available_days: availableDays,
-      p_hours_per_day_min: hoursMin ? Number(hoursMin) : 0,
-      p_hours_per_day_max: hoursMax ? Number(hoursMax) : 0,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any
-    setSaving(false)
-    if (error) {
-      // Mensagem do trigger de cooldown (migration 025/067) já vem pronta
-      // pro usuário ("...em 30 dias") — mostra ela direto em vez de um erro
-      // genérico quando é esse o motivo da rejeição.
-      setError(error.message?.includes('30 dias') ? error.message : 'Erro ao salvar. Tente novamente.')
-      return
+    try {
+      await updateProfile.mutateAsync({
+        displayName: nextDisplayName,
+        bio: bio.trim(),
+        lanes,
+        specialties,
+        peakTier: peakTier ?? '',
+        opggLink: opggLink.trim(),
+        availableDays,
+        hoursPerDayMin: hoursMin ? Number(hoursMin) : 0,
+        hoursPerDayMax: hoursMax ? Number(hoursMax) : 0,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+      // Prefix match: cobre ['boosters', 'public-profile', id] (BoosterPublicProfilePage),
+      // ['boosters', 'public-list'] (BoostersPage) e ['boosters', 'top'] (HomePage).
+      qc.invalidateQueries({ queryKey: ['boosters'] })
+    } catch (err) {
+      // ApiError.message já vem traduzido (ver PROFESSIONAL_PROFILE_MESSAGES
+      // em src/api/boosters/mutations.ts); a mensagem do trigger de cooldown
+      // (migration 025/067) chega como erro Postgres cru, com "...em 30
+      // dias" já pronta pro usuário -- ambos os casos já têm texto exibível.
+      setError(err instanceof Error ? err.message : 'Erro ao salvar. Tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    const res = result as { success: boolean; error?: string }
-    if (!res.success) {
-      setError(boosterFormErrorMessage(res.error))
-      return
-    }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-    qc.invalidateQueries({ queryKey: ['booster-professional-profile', userId] })
-    // Prefix match: cobre ['public-booster', id] (BoosterPublicProfilePage),
-    // ['public-boosters'] (BoostersPage) e ['home-featured-boosters'] (HomePage).
-    qc.invalidateQueries({ queryKey: ['public-booster'] })
-    qc.invalidateQueries({ queryKey: ['public-boosters'] })
-    qc.invalidateQueries({ queryKey: ['home-featured-boosters'] })
   }
 
   if (isLoading) {
@@ -300,6 +268,7 @@ export function BoosterProfessionalProfileForm({ userId }: { userId: string }) {
               type="button"
               onClick={addSpecialty}
               disabled={!specialtyInput.trim()}
+              aria-label="Adicionar especialidade"
               className="px-3 py-2 rounded-xl bg-bg-elevated text-ink-secondary hover:text-ink hover:bg-bg-overlay disabled:opacity-40 transition-colors"
             >
               <Plus className="h-4 w-4" />

@@ -1,79 +1,18 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ShoppingBag, Star, Wallet, ClipboardList } from 'lucide-react'
 import { Card, OrderStatusBadge, Skeleton, EmptyState, StarRating } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { formatDate, timeAgo, getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Order } from '@/types'
-
-interface CustomerReview {
-  id: string
-  order_id: string
-  booster_id: string | null
-  rating: number
-  content: string | null
-  created_at: string
-}
+import { useAdminCustomerDetail, useAdminCustomerOrders, useAdminCustomerReviews } from '@/api/customers'
 
 export function AdminCustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const currency = useCurrency()
 
-  const { data: customer, isLoading } = useQuery({
-    queryKey: ['admin-customer', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customer_profiles')
-        .select('*, profiles(id, email, username, created_at)')
-        .eq('id', id!)
-        .single()
-      if (error) throw error
-      return data as unknown as {
-        id: string
-        user_id: string
-        total_orders: number
-        total_spent: number
-        created_at: string
-        profiles: { id: string; email: string; username: string; created_at: string } | null
-      }
-    },
-    enabled: !!id,
-    refetchInterval: 20000,
-  })
-
-  const { data: orders, isLoading: loadingOrders } = useQuery({
-    queryKey: ['admin-customer-orders', customer?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(ORDER_SAFE_COLUMNS)
-        .eq('customer_id', customer!.user_id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    enabled: !!customer?.user_id,
-    refetchInterval: 20000,
-  })
-
-  const { data: reviews, isLoading: loadingReviews } = useQuery({
-    queryKey: ['admin-customer-reviews', customer?.user_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('reviews')
-        .select('id, order_id, booster_id, rating, content, created_at')
-        .eq('customer_id', customer!.user_id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (error) throw error
-      return data as CustomerReview[]
-    },
-    enabled: !!customer?.user_id,
-  })
+  const { data: customer, isLoading } = useAdminCustomerDetail(id)
+  const { data: orders, isLoading: loadingOrders } = useAdminCustomerOrders(customer?.user_id)
+  const { data: reviews, isLoading: loadingReviews } = useAdminCustomerReviews(customer?.user_id)
 
   if (isLoading) return null
   if (!customer) return <p className="text-ink-muted">Cliente não encontrado.</p>

@@ -20,7 +20,7 @@ const BOOSTER_FACING_FILES = [
   'src/features/public/pages/BoosterPublicProfilePage.tsx',
   'src/features/public/pages/HomePage.tsx',
   'src/features/admin/pages/BoosterDetail.tsx',
-  'src/features/booster/hooks/useBoosterHeartbeat.ts',
+  'src/api/boosters/hooks.ts',
   'src/components/ui/Avatar.tsx',
   'src/components/UserAccountBadge.tsx',
 ]

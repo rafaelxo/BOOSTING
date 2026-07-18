@@ -1,35 +1,33 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle, Receipt } from 'lucide-react'
+import {
+  ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle, Receipt,
+  MessageCircleWarning,
+} from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
-import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
+import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
 import { formatDateTime, timeAgo, formatRank, formatLastSeen, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
-import { getCustomerOrderState, type CustomerOrderState } from '@/lib/customerOrderState'
-import type { Order, OrderStatusHistory, BoosterProfile, Payment } from '@/types'
+import {
+  useOrder, useOrderStatusHistory, useCustomerOrderState, useOrderPayments, useSetOrderCredentials,
+  useConfirmOrderCompletion, useDisputeOrderCompletion, useGeneratePix, useCancelPendingOrder,
+  useRequestOrderSupport, getCustomerOrderState,
+} from '@/api/orders'
+import { useOrderSupportEscalation } from '@/api/admin'
+import type { Order, BoosterProfile } from '@/types'
+import type { CustomerOrderState } from '@/api/orders'
+import { useQuery } from '@tanstack/react-query'
 
 function PaymentSummarySection({ orderId }: { orderId: string }) {
   const currency = useCurrency()
-  const { data: payments } = useQuery({
-    queryKey: ['order-payments', orderId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data as Payment[]
-    },
-  })
+  const { data: payments } = useOrderPayments(orderId)
 
   if (!payments?.length) return null
 
@@ -43,7 +41,7 @@ function PaymentSummarySection({ orderId }: { orderId: string }) {
         {payments.map((p) => (
           <div key={p.id} className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink">{currency(p.amount)}</p>
+              <p className="text-sm font-semibold text-ink" data-tabular>{currency(p.amount)}</p>
               <p className="text-[11px] text-ink-muted mt-0.5">
                 {formatDateTime(p.created_at)}
                 {p.payment_method_type === 'pix' && ' · Pix'}
@@ -97,7 +95,7 @@ function AssignedBoosterCard({ order }: { order: Order }) {
           <p className="text-xs text-ink-muted">{formatLastSeen(booster.last_active_at)}</p>
         </div>
         {booster.rating_count > 0 && (
-          <span className="text-xs font-semibold text-ink shrink-0">★ {booster.rating.toFixed(1)}</span>
+          <span className="text-xs font-semibold text-ink shrink-0" data-tabular>★ {booster.rating.toFixed(1)}</span>
         )}
       </Link>
       {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
@@ -109,43 +107,51 @@ function AssignedBoosterCard({ order }: { order: Order }) {
   )
 }
 
-function useOrder(id: string, refetchInterval?: number) {
-  return useQuery({
-    queryKey: ['order', id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('orders').select(ORDER_SAFE_COLUMNS).eq('id', id).single()
-      if (error) throw error
-      return data as unknown as Order
-    },
-    refetchInterval,
-  })
+// Prazo estourado: acionamento de suporte auditado no backend (migration 083),
+// não só o link estático que já existia no CountdownTimer.
+function LateOrderSupportBanner({ order }: { order: Order }) {
+  const { data: escalation } = useOrderSupportEscalation(order.id)
+  const requestSupport = useRequestOrderSupport(order.id)
+
+  if (!order.match_sync_started_at || !order.estimated_hours) return null
+  const deadline = new Date(order.match_sync_started_at).getTime() + order.estimated_hours * 3600_000
+  if (Date.now() <= deadline) return null
+
+  return (
+    <Card padding="md" className="ring-1 ring-danger/25 bg-danger/5">
+      <div className="flex items-start gap-3">
+        <MessageCircleWarning className="h-5 w-5 text-danger shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-ink">Prazo estimado excedido</p>
+          <p className="text-xs text-ink-secondary mt-1">
+            {escalation
+              ? 'Suporte já foi acionado para este pedido — nossa equipe está acompanhando.'
+              : 'Este pedido está demorando mais que o estimado. Você pode acionar o suporte para acompanhamento prioritário.'}
+          </p>
+          {!escalation && (
+            <Button
+              size="sm"
+              variant="danger"
+              className="mt-3"
+              loading={requestSupport.isPending}
+              onClick={() => requestSupport.mutate()}
+              leftIcon={<MessageCircleWarning className="h-4 w-4" />}
+            >
+              Acionar suporte
+            </Button>
+          )}
+        </div>
+      </div>
+    </Card>
+  )
 }
 
-function useOrderHistory(orderId: string) {
-  return useQuery({
-    queryKey: ['order-history', orderId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_status_history')
-        .select('*')
-        .eq('order_id', orderId)
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      return data as OrderStatusHistory[]
-    },
-  })
-}
-
-type PixPaymentResponse = {
-  success?: boolean
-  order_id: string
-  total_price: number
-  payment_id: string | number
-  status?: string
-  qr_code?: string
-  qr_code_base64?: string | null
-  expires_at: string
-  reused?: boolean
+function pixErrorMessage(err: unknown) {
+  if (!(err instanceof EdgeFunctionError)) return err instanceof Error ? err.message : 'Erro ao carregar PIX'
+  if (err.status === 401) return 'Sua sessão expirou. Entre novamente para continuar.'
+  if (err.status === 403) return 'Você não tem permissão para esse pedido.'
+  if (err.status === 409) return err.message
+  return err.message
 }
 
 function useCountdown(expiresAt: string | null) {
@@ -168,101 +174,74 @@ function useCountdown(expiresAt: string | null) {
   return { remaining, label: `${mm}:${ss}` }
 }
 
-function pixErrorMessage(err: unknown) {
-  if (!(err instanceof EdgeFunctionError)) return err instanceof Error ? err.message : 'Erro ao carregar PIX'
-  if (err.status === 401) return 'Sua sessão expirou. Entre novamente para continuar.'
-  if (err.status === 403) return 'Você não tem permissão para esse pedido.'
-  if (err.status === 409) return err.message
-  return err.message
-}
-
 function PendingPaymentSection({ order }: { order: Order }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const currency = useCurrency()
-  const [pix, setPix] = useState<PixPaymentResponse | null>(null)
+  const [pix, setPix] = useState<{ qr_code?: string; qr_code_base64?: string | null; total_price: number; expires_at: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { remaining, label } = useCountdown(pix?.expires_at ?? null)
 
-  // Depois que o cliente abre a cobrança por "Meus pedidos", acompanhe a
-  // confirmação do webhook da mesma forma que a etapa original do checkout.
-  // Sem isso o pagamento era aceito, mas a tela continuava indefinidamente
-  // como "Aguardando pagamento" até um reload manual.
+  const generatePix = useGeneratePix(order.id)
+  const cancelOrderMutation = useCancelPendingOrder()
+
   useEffect(() => {
     if (!pix || order.status !== 'awaiting_payment') return
-
     const interval = window.setInterval(async () => {
       const state = await getCustomerOrderState(order.id).catch(() => null)
-
       if (state?.payment_confirmed) {
         window.clearInterval(interval)
-        queryClient.setQueryData(['customer-order-state', order.id], state)
+        queryClient.setQueryData(['orders', 'state', order.id], state)
         if (state.requires_credentials) {
           navigate(`/orders/${order.id}#credentials`, { replace: true })
         }
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['order', order.id] }),
-          queryClient.invalidateQueries({ queryKey: ['customer-orders'] }),
+          queryClient.invalidateQueries({ queryKey: ['orders', 'detail', order.id] }),
+          queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] }),
         ])
       }
     }, 5000)
-
     return () => window.clearInterval(interval)
   }, [pix, order.id, order.status, queryClient, navigate])
 
-  const loadPix = useMutation({
-    mutationFn: async () => {
-      setError(null)
-      const response = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-        body: { order_id: order.id },
-        timeoutMs: 25_000,
-        requireAuth: true,
-      })
-      if (!response.qr_code) throw new Error('A função não retornou o código PIX.')
-      return response
-    },
-    onSuccess: (response) => setPix(response),
-    onError: (err) => setError(pixErrorMessage(err)),
-  })
+  function loadPix() {
+    setError(null)
+    generatePix.mutate(undefined, {
+      onSuccess: (response) => {
+        if (!response.qr_code) { setError('A função não retornou o código PIX.'); return }
+        setPix(response)
+      },
+      onError: (err) => setError(pixErrorMessage(err)),
+    })
+  }
 
-  const cancelOrder = useMutation({
-    mutationFn: async () => {
-      setError(null)
-      await invokeEdgeFunction('cancel-pending-order', {
-        body: { order_id: order.id },
-        timeoutMs: 20_000,
-        requireAuth: true,
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
-      queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
-      queryClient.removeQueries({ queryKey: ['order', order.id] })
-      navigate('/orders/new?new=1', { replace: true })
-    },
-    onError: async () => {
-      // Payment approval may race the last countdown second. If it won, keep
-      // the order and continue to the credential step; otherwise leave the
-      // expired checkout and reset the configurator.
-      const state = await getCustomerOrderState(order.id).catch(() => null)
-      if (state?.payment_confirmed) {
-        queryClient.setQueryData(['customer-order-state', order.id], state)
-        await queryClient.invalidateQueries({ queryKey: ['order', order.id] })
-        navigate(`/orders/${order.id}${state.requires_credentials ? '#credentials' : ''}`, { replace: true })
-        return
-      }
-      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
-      queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
-      navigate('/orders/new?new=1', { replace: true })
-    },
-  })
+  function cancelOrder() {
+    setError(null)
+    cancelOrderMutation.mutate(order.id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
+        queryClient.removeQueries({ queryKey: ['orders', 'detail', order.id] })
+        navigate('/orders/new?new=1', { replace: true })
+      },
+      onError: async () => {
+        const state = await getCustomerOrderState(order.id).catch(() => null)
+        if (state?.payment_confirmed) {
+          queryClient.setQueryData(['orders', 'state', order.id], state)
+          await queryClient.invalidateQueries({ queryKey: ['orders', 'detail', order.id] })
+          navigate(`/orders/${order.id}${state.requires_credentials ? '#credentials' : ''}`, { replace: true })
+          return
+        }
+        queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
+        navigate('/orders/new?new=1', { replace: true })
+      },
+    })
+  }
 
   useEffect(() => {
     if (!pix || remaining !== 0) return
-    cancelOrder.mutate()
-  // The expiration transition should run once when remaining reaches zero.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    cancelOrder()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining, pix])
 
   async function copyPix() {
@@ -289,34 +268,17 @@ function PendingPaymentSection({ order }: { order: Order }) {
 
       {!pix ? (
         <div className="space-y-3">
-          <Button
-            className="w-full"
-            loading={loadPix.isPending}
-            onClick={() => loadPix.mutate()}
-            leftIcon={<QrCode className="h-4 w-4" />}
-          >
+          <Button className="w-full" loading={generatePix.isPending} onClick={loadPix} leftIcon={<QrCode className="h-4 w-4" />}>
             Efetuar pagamento
           </Button>
-          <Button
-            className="w-full"
-            variant="danger"
-            loading={cancelOrder.isPending}
-            onClick={() => cancelOrder.mutate()}
-            leftIcon={<XCircle className="h-4 w-4" />}
-          >
+          <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
             Cancelar pedido
           </Button>
         </div>
       ) : expired ? (
         <div className="space-y-3">
           <ErrorAlert message="Este PIX expirou. O pedido está sendo cancelado e o configurador será reiniciado." />
-          <Button
-            className="w-full"
-            variant="danger"
-            loading={cancelOrder.isPending}
-            onClick={() => cancelOrder.mutate()}
-            leftIcon={<XCircle className="h-4 w-4" />}
-          >
+          <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
             Cancelar pedido
           </Button>
         </div>
@@ -325,9 +287,9 @@ function PendingPaymentSection({ order }: { order: Order }) {
           <div className="flex items-center justify-between rounded-xl bg-bg-elevated px-4 py-3">
             <div>
               <p className="text-xs text-ink-muted">Total</p>
-              <p className="text-lg font-bold text-ink">{currency(Number(pix.total_price))}</p>
+              <p className="text-lg font-bold text-ink" data-tabular>{currency(Number(pix.total_price))}</p>
             </div>
-            <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`}>
+            <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`} data-tabular>
               <Clock className="h-4 w-4" />
               {label}
             </div>
@@ -335,7 +297,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
 
           {pix.qr_code_base64 && (
             <div className="flex justify-center">
-              <div className="rounded-2xl border border-bg-elevated bg-white p-3">
+              <div className="rounded-2xl border border-border-subtle bg-white p-3">
                 <img src={`data:image/png;base64,${pix.qr_code_base64}`} alt="QR Code PIX" className="h-48 w-48" />
               </div>
             </div>
@@ -343,29 +305,14 @@ function PendingPaymentSection({ order }: { order: Order }) {
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase text-ink-secondary">Código PIX Copia e Cola</p>
-            <textarea
-              className="input-base min-h-24 w-full resize-none font-mono text-xs"
-              value={pix.qr_code ?? ''}
-              readOnly
-            />
+            <textarea className="input-base min-h-24 w-full resize-none font-mono text-xs" value={pix.qr_code ?? ''} readOnly />
           </div>
 
-          <Button
-            className="w-full"
-            variant={copied ? 'success' : 'secondary'}
-            onClick={copyPix}
-            leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          >
+          <Button className="w-full" variant={copied ? 'success' : 'secondary'} onClick={copyPix} leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
             {copied ? 'Copiado' : 'Copiar'}
           </Button>
 
-          <Button
-            className="w-full"
-            variant="danger"
-            loading={cancelOrder.isPending}
-            onClick={() => cancelOrder.mutate()}
-            leftIcon={<XCircle className="h-4 w-4" />}
-          >
+          <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
             Cancelar pedido
           </Button>
         </div>
@@ -377,36 +324,25 @@ function PendingPaymentSection({ order }: { order: Order }) {
 }
 
 function CredentialsSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
-  const queryClient = useQueryClient()
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [saved, setSaved] = useState(false)
-
-  const saveCredentials = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('set_order_credentials', {
-        p_order_id: order.id,
-        p_login: login.trim(),
-        p_password: password,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string; access_token?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao salvar')
-    },
-    onSuccess: () => {
-      setSaved(true)
-      setLogin('')
-      setPassword('')
-      queryClient.invalidateQueries({ queryKey: ['order', order.id] })
-      queryClient.invalidateQueries({ queryKey: ['customer-order-state', order.id] })
-      setTimeout(() => setSaved(false), 3000)
-    },
-  })
+  const saveCredentials = useSetOrderCredentials(order.id)
 
   if (!state?.requires_credentials) return null
-
   const canSet = state.can_submit_credentials === true
   if (!canSet && !state.credentials_set) return null
+
+  function submit() {
+    saveCredentials.mutate({ orderId: order.id, login: login.trim(), password }, {
+      onSuccess: () => {
+        setSaved(true)
+        setLogin('')
+        setPassword('')
+        setTimeout(() => setSaved(false), 3000)
+      },
+    })
+  }
 
   return (
     <Card id="credentials" padding="md" className="scroll-mt-24 ring-1 ring-brand/20">
@@ -426,39 +362,14 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
         <div className="space-y-3">
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Login / E-mail da conta</label>
-            <input
-              type="text"
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              placeholder="Ex: SeuUsuario#BR1"
-              className="input-base w-full text-sm"
-              autoComplete="username"
-              maxLength={160}
-            />
+            <input type="text" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Ex: SeuUsuario#BR1" className="input-base w-full text-sm" autoComplete="username" maxLength={160} />
           </div>
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Senha da conta</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="input-base w-full text-sm"
-              autoComplete="new-password"
-              maxLength={256}
-            />
-            <p className="text-[10px] text-ink-muted mt-1">
-              O valor enviado é transformado em payload criptografado no banco. Não compartilhe a senha no chat.
-            </p>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input-base w-full text-sm" autoComplete="new-password" maxLength={256} />
+            <p className="text-[10px] text-ink-muted mt-1">O valor enviado é transformado em payload criptografado no banco. Não compartilhe a senha no chat.</p>
           </div>
-          <Button
-            size="sm"
-            className="w-full"
-            loading={saveCredentials.isPending}
-            disabled={!login.trim() || password.length < 4}
-            onClick={() => saveCredentials.mutate()}
-            variant={saved ? 'success' : 'primary'}
-          >
+          <Button size="sm" className="w-full" loading={saveCredentials.isPending} disabled={!login.trim() || password.length < 4} onClick={submit} variant={saved ? 'success' : 'primary'}>
             {saved ? 'Credenciais salvas!' : state.credentials_set ? 'Atualizar credenciais' : 'Salvar credenciais'}
           </Button>
           {saveCredentials.isError && (
@@ -471,42 +382,10 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
 }
 
 function CompletionConfirmationSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
-  const queryClient = useQueryClient()
   const [showDisputeModal, setShowDisputeModal] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['order', order.id] })
-    queryClient.invalidateQueries({ queryKey: ['order-history', order.id] })
-    queryClient.invalidateQueries({ queryKey: ['customer-order-state', order.id] })
-  }
-
-  const confirm = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('confirm_order_completion', { p_order_id: order.id })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao confirmar conclusão')
-    },
-    onSuccess: invalidate,
-  })
-
-  const dispute = useMutation({
-    mutationFn: async (reason: string) => {
-      const { data, error } = await supabase.rpc('dispute_order_completion', {
-        p_order_id: order.id,
-        p_reason: reason,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao abrir disputa')
-    },
-    onSuccess: () => {
-      setShowDisputeModal(false)
-      setDisputeReason('')
-      invalidate()
-    },
-  })
+  const confirm = useConfirmOrderCompletion(order.id)
+  const dispute = useDisputeOrderCompletion(order.id)
 
   if (!state?.can_confirm_completion) return null
 
@@ -520,21 +399,10 @@ function CompletionConfirmationSection({ order, state }: { order: Order; state?:
         Serviço concluído! O booster finalizou o pedido. Confirme a conclusão após revisar o resultado.
       </p>
       <div className="space-y-2">
-        <Button
-          className="w-full"
-          variant="success"
-          leftIcon={<CheckCircle2 className="h-4 w-4" />}
-          loading={confirm.isPending}
-          onClick={() => confirm.mutate()}
-        >
+        <Button className="w-full" variant="success" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={confirm.isPending} onClick={() => confirm.mutate()}>
           Confirmar conclusão
         </Button>
-        <Button
-          className="w-full"
-          variant="danger-ghost"
-          leftIcon={<AlertTriangle className="h-4 w-4" />}
-          onClick={() => setShowDisputeModal(true)}
-        >
+        <Button className="w-full" variant="danger-ghost" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
           Não recebi o que contratei
         </Button>
       </div>
@@ -559,23 +427,11 @@ function CompletionConfirmationSection({ order, state }: { order: Order; state?:
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
             Motivo <span className="text-danger">*</span>
           </label>
-          <textarea
-            value={disputeReason}
-            onChange={(e) => setDisputeReason(e.target.value)}
-            placeholder="Descreva o que aconteceu..."
-            className="input-base w-full min-h-[100px] resize-none text-sm"
-          />
+          <textarea value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Descreva o que aconteceu..." className="input-base w-full min-h-[100px] resize-none text-sm" />
         </div>
         <div className="flex gap-3 justify-end pt-2">
-          <Button variant="ghost" onClick={() => { setShowDisputeModal(false); setDisputeReason('') }}>
-            Cancelar
-          </Button>
-          <Button
-            variant="danger"
-            loading={dispute.isPending}
-            disabled={disputeReason.trim().length < 10}
-            onClick={() => dispute.mutate(disputeReason.trim())}
-          >
+          <Button variant="ghost" onClick={() => { setShowDisputeModal(false); setDisputeReason('') }}>Cancelar</Button>
+          <Button variant="danger" loading={dispute.isPending} disabled={disputeReason.trim().length < 10} onClick={() => dispute.mutate(disputeReason.trim(), { onSuccess: () => setShowDisputeModal(false) })}>
             Enviar disputa
           </Button>
         </div>
@@ -590,13 +446,9 @@ export function OrderDetailPage() {
   const { t } = useTranslation()
   const currency = useCurrency()
 
-  const { data: order, isLoading, isError, refetch } = useOrder(id!)
-  const { data: history } = useOrderHistory(id!)
-  const { data: customerState } = useQuery({
-    queryKey: ['customer-order-state', id],
-    queryFn: () => getCustomerOrderState(id!),
-    enabled: !!id,
-  })
+  const { data: order, isLoading, isError, refetch } = useOrder(id)
+  const { data: history } = useOrderStatusHistory(id)
+  const { data: customerState } = useCustomerOrderState(id)
 
   useEffect(() => {
     if (!order || window.location.hash !== '#credentials' || !customerState?.requires_credentials) return
@@ -639,26 +491,29 @@ export function OrderDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" aria-label="Voltar">
           <Link to="/orders"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-bold text-ink">
               {t('customer.order.id', { id: order.id.slice(0, 8).toUpperCase() })}
             </h1>
             <OrderStatusBadge status={order.status} />
           </div>
           <p className="text-sm text-ink-secondary mt-0.5">
-            {t('customer.order.created', { date: formatDateTime(order.created_at) })}
+            {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
           </p>
         </div>
       </div>
 
+      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+        <LateOrderSupportBanner order={order} />
+      )}
+
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Main info */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Order details */}
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -672,17 +527,11 @@ export function OrderDetailPage() {
                   : []),
                 ...(order.current_rank ? [{
                   label: t('customer.order.currentRank'),
-                  value: formatRank(
-                    (order.current_rank as { tier: string }).tier as never,
-                    (order.current_rank as { division: string }).division
-                  ),
+                  value: formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division),
                 }] : []),
                 ...(order.service_type === 'elo_boost' && order.target_rank ? [{
                   label: t('customer.order.targetRank'),
-                  value: formatRank(
-                    (order.target_rank as { tier: string }).tier as never,
-                    (order.target_rank as { division: string }).division
-                  ),
+                  value: formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division),
                 }] : []),
                 ...(order.pdl_bracket ? [
                   { label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
@@ -695,23 +544,23 @@ export function OrderDetailPage() {
                 ...(order.service_type === 'coaching' && order.sessions_purchased
                   ? [{ label: 'Sessões', value: `${order.sessions_purchased}` }]
                   : []),
-                { label: t('customer.order.totalPaid'),   value: currency(order.total_price) },
+                { label: t('customer.order.totalPaid'), value: currency(order.total_price) },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <p className="text-xs text-ink-muted">{label}</p>
-                  <p className="text-sm font-semibold text-ink mt-0.5 capitalize">{value}</p>
+                  <p className="text-sm font-semibold text-ink mt-0.5 capitalize" data-tabular>{value}</p>
                 </div>
               ))}
             </div>
 
             {order.extras?.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-bg-elevated">
+              <div className="mt-4 pt-4 border-t border-border-subtle">
                 <p className="text-xs text-ink-muted mb-2">Extras</p>
                 <div className="space-y-1.5">
                   {sortOrderExtras(order.extras).map((extra) => (
                     <div key={extra.extra_id} className="flex items-center justify-between text-sm">
                       <span className="text-ink-secondary">{extra.name}</span>
-                      <span className="font-semibold text-ink">{currency(extra.price)}</span>
+                      <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
                     </div>
                   ))}
                 </div>
@@ -719,7 +568,7 @@ export function OrderDetailPage() {
             )}
 
             {order.customer_notes && (
-              <div className="mt-4 pt-4 border-t border-bg-elevated">
+              <div className="mt-4 pt-4 border-t border-border-subtle">
                 <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
                 <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
               </div>
@@ -740,26 +589,19 @@ export function OrderDetailPage() {
         {/* Sidebar */}
         <div className="space-y-4">
           <PendingPaymentSection order={order} />
-
           <PaymentSummarySection orderId={order.id} />
-
           <AssignedBoosterCard order={order} />
 
           {order.status === 'completed' && (
             <Card padding="md" className="ring-1 ring-success/20">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                <p className="text-sm text-ink-secondary">
-                  Serviço concluído! Seu pedido foi finalizado com sucesso.
-                </p>
+                <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
               </div>
             </Card>
           )}
 
-          {/* Confirmação de conclusão */}
           <CompletionConfirmationSection order={order} state={customerState} />
-
-          {/* Credenciais */}
           <CredentialsSection order={order} state={customerState} />
 
           <Card padding="md">
@@ -768,14 +610,12 @@ export function OrderDetailPage() {
               <p className="text-xs text-ink-muted">{t('customer.order.noHistory')}</p>
             ) : (
               <div className="relative">
-                <div className="absolute left-3.5 top-4 bottom-4 w-px bg-bg-elevated" />
+                <div className="absolute left-3.5 top-4 bottom-4 w-px bg-border-subtle" />
                 <div className="space-y-4">
                   {history.map((entry, idx) => (
                     <div key={entry.id} className="flex items-start gap-4 relative">
                       <div className={`h-7 w-7 rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${
-                        idx === history.length - 1
-                          ? 'border-brand bg-brand'
-                          : 'border-bg-elevated bg-bg-surface'
+                        idx === history.length - 1 ? 'border-brand bg-brand' : 'border-border-subtle bg-bg-surface'
                       }`}>
                         <Clock className="h-3 w-3 text-white" />
                       </div>
@@ -783,12 +623,8 @@ export function OrderDetailPage() {
                         <p className="text-xs font-semibold text-ink">
                           {ORDER_STATUS_LABEL[entry.to_status] ?? entry.to_status.replace(/_/g, ' ')}
                         </p>
-                        <p className="text-[10px] text-ink-muted mt-0.5">
-                          {timeAgo(entry.created_at)}
-                        </p>
-                        {entry.reason && (
-                          <p className="text-xs text-ink-secondary mt-0.5">{entry.reason}</p>
-                        )}
+                        <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(entry.created_at)}</p>
+                        {entry.reason && <p className="text-xs text-ink-secondary mt-0.5">{entry.reason}</p>}
                       </div>
                     </div>
                   ))}
@@ -796,7 +632,6 @@ export function OrderDetailPage() {
               </div>
             )}
           </Card>
-
         </div>
       </div>
     </div>

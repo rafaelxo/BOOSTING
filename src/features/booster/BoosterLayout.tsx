@@ -4,16 +4,16 @@ import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
-import { useBoosterStatus } from '@/features/booster/hooks/useBoosterStatus'
+import { useAuthStore } from '@/stores/authStore'
+import { useBoosterStatus, useBoosterHeartbeat } from '@/api/boosters'
 import { PendingScreen, RejectedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { useNewOrderSound } from '@/features/booster/hooks/useNewOrderSound'
-import { useBoosterHeartbeat } from '@/features/booster/hooks/useBoosterHeartbeat'
 
 function ApprovedBoosterPanel() {
   const { pathname } = useLocation()
   const { t } = useTranslation()
   useNewOrderSound()
-  useBoosterHeartbeat()
+  useBoosterHeartbeat(true)
 
   const navItems = [
     { href: '/booster',          icon: LayoutDashboard, label: t('booster.nav.dashboard') },
@@ -99,10 +99,12 @@ function ApprovedBoosterPanel() {
 // Não existe item de "Meu Perfil" — dados pessoais ficam só no popover do
 // UserAccountBadge, dados profissionais ficam em Serviços.
 export function BoosterLayout() {
-  const { state } = useBoosterStatus()
+  const { profile } = useAuthStore()
+  const { data: accessState, isLoading } = useBoosterStatus(profile?.id)
 
   // Still loading — wait
-  if (state === 'loading') return null
+  if (isLoading || !accessState) return null
+  const state = accessState
 
   // Common app shell (header only for restricted states)
   const shell = (content: React.ReactNode) => (

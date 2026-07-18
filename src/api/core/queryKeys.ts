@@ -55,6 +55,7 @@ export const queryKeys = {
     refunds: (filters?: Record<string, unknown>) => ['admin', 'refunds', filters ?? {}] as const,
     drops: (filters?: Record<string, unknown>) => ['admin', 'drops', filters ?? {}] as const,
     auditLog: (filters?: Record<string, unknown>) => ['admin', 'audit-log', filters ?? {}] as const,
+    payments: () => ['admin', 'payments'] as const,
   },
   reviews: {
     forBooster: (boosterId: string) => ['reviews', 'booster', boosterId] as const,

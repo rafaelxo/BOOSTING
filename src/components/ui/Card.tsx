@@ -14,7 +14,7 @@ const paddingMap = {
 
 const variantMap = {
   default: 'card',
-  elevated: 'card-elevated',
+  elevated: 'card-raised',
   brand: 'card-brand',
   glass: 'card-glass',
 }

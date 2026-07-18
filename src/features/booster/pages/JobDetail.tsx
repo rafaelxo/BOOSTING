@@ -1,35 +1,28 @@
 import { useParams, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Play, Pause, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, RefreshCw, Landmark, RefreshCcw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
-import { supabase } from '@/lib/supabase'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
-import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
+import { useCurrency } from '@/hooks/useCurrency'
 import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
-import type { Division, Order, OrderStatus, OrderDropRequest, RankTier } from '@/types'
-import { useTranslation } from 'react-i18next'
-
-type BoosterVisibleDuoAccount = {
-  id: string
-  label: string
-  riot_id: string | null
-  current_rank: { tier: RankTier; division: Division } | null
-  is_active: boolean
-  reserved_by: string | null
-  reserved_order_id: string | null
-}
+import {
+  useBoosterOrder, usePendingDropRequest, useUpdateOrderStatus, useSyncOrderMatches, useVerifyOrderRank,
+  useRevealOrderCredentials, useRequestOrderDrop,
+} from '@/api/orders'
+import { useOwnBoosterTop3Status } from '@/api/boosters'
+import { useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation } from '@/api/duoAccounts'
+import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
+import type { Division, Order, OrderStatus, RankTier } from '@/types'
 
 const DUO_FILTER_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
 const DUO_FILTER_DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 
 function DuoAccountSection({ order }: { order: Order }) {
-  const queryClient = useQueryClient()
   const { profile } = useAuthStore()
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [switching, setSwitching] = useState(false)
@@ -39,54 +32,35 @@ function DuoAccountSection({ order }: { order: Order }) {
   const [tierFilter, setTierFilter] = useState<RankTier | 'all'>('all')
   const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all')
 
-  const { data: accounts, isLoading } = useQuery({
-    queryKey: ['booster-duo-accounts', order.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_duo_accounts')
-      if (error) throw error
-      const result = data as { success?: boolean; accounts?: BoosterVisibleDuoAccount[]; error?: string } | null
-      if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
-      return result.accounts ?? []
-    },
-    refetchInterval: 15000,
-  })
+  const { data: accounts, isLoading } = useBoosterDuoAccounts()
+  const reserve = useReserveDuoAccount()
+  const getToken = useGetDuoAccountAccessToken()
+  const release = useReleaseDuoAccountReservation()
 
-  const reserved = accounts?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
-  const available = (accounts?.filter(a => a.reserved_by === null) ?? []).filter((a) => {
+  const reserved = (accounts as BoosterVisibleDuoAccount[] | undefined)?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
+  const available = ((accounts as BoosterVisibleDuoAccount[] | undefined)?.filter(a => a.reserved_by === null) ?? []).filter((a) => {
     if (search.trim() && !(a.riot_id ?? a.label).toLowerCase().includes(search.trim().toLowerCase())) return false
     if (tierFilter !== 'all' && a.current_rank?.tier !== tierFilter) return false
     if (divisionFilter !== 'all' && a.current_rank?.division !== divisionFilter) return false
     return true
   })
 
-  const reserve = useMutation({
-    mutationFn: async (accountId: string) => {
-      const { data, error } = await supabase.rpc('reserve_duo_account', {
-        p_order_id: order.id,
-        p_account_id: accountId,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao reservar conta')
-    },
-    onSuccess: () => {
-      setSwitching(false)
-      setAccessToken(null)
-      queryClient.invalidateQueries({ queryKey: ['booster-duo-accounts', order.id] })
-    },
-  })
+  function doReserve() {
+    reserve.mutate({ orderId: order.id, accountId: selectedAccountId }, {
+      onSuccess: () => { setSwitching(false); setAccessToken(null) },
+    })
+  }
 
-  const getToken = useMutation({
-    mutationFn: async () => {
-      if (!reserved) throw new Error('Nenhuma conta reservada')
-      const { data, error } = await supabase.rpc('get_duo_account_access_token', { p_account_id: reserved.id })
-      if (error) throw error
-      const result = data as { success: boolean; access_token?: string; error?: string } | null
-      if (!result?.success || !result.access_token) throw new Error(result?.error ?? 'Token indisponível')
-      return result.access_token
-    },
-    onSuccess: (token) => setAccessToken(token),
-  })
+  function doRelease() {
+    release.mutate(order.id, { onSuccess: () => { setSwitching(false); setAccessToken(null) } })
+  }
+
+  function doGetToken() {
+    if (!reserved) return
+    getToken.mutate(reserved.id, {
+      onSuccess: (result) => setAccessToken(result.access_token ?? null),
+    })
+  }
 
   async function copyToken() {
     if (!accessToken) return
@@ -118,38 +92,26 @@ function DuoAccountSection({ order }: { order: Order }) {
                 </p>
               )}
             </div>
-            <Button size="sm" variant="secondary" leftIcon={<RefreshCcw className="h-3.5 w-3.5" />} onClick={() => setSwitching(true)}>
-              Trocar
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button size="sm" variant="secondary" leftIcon={<RefreshCcw className="h-3.5 w-3.5" />} onClick={() => setSwitching(true)}>
+                Trocar
+              </Button>
+              <Button size="sm" variant="danger-ghost" loading={release.isPending} onClick={doRelease}>
+                Liberar
+              </Button>
+            </div>
           </div>
 
           {accessToken ? (
             <div className="space-y-2">
-              <textarea
-                readOnly
-                value={accessToken}
-                className="input-base w-full min-h-[80px] text-[11px] font-mono resize-none"
-                spellCheck={false}
-              />
-              <Button
-                size="sm"
-                className="w-full"
-                variant={tokenCopied ? 'success' : 'secondary'}
-                leftIcon={<Copy className="h-3.5 w-3.5" />}
-                onClick={() => void copyToken()}
-              >
+              <textarea readOnly value={accessToken} className="input-base w-full min-h-[80px] text-[11px] font-mono resize-none" spellCheck={false} />
+              <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyToken()}>
                 {tokenCopied ? 'Copiado' : 'Copiar token'}
               </Button>
               <p className="text-[10px] text-ink-muted">Use este token apenas no aplicativo autorizado — login e senha não são exibidos.</p>
             </div>
           ) : (
-            <Button
-              size="sm"
-              className="w-full"
-              leftIcon={<KeyRound className="h-3.5 w-3.5" />}
-              loading={getToken.isPending}
-              onClick={() => getToken.mutate()}
-            >
+            <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={getToken.isPending} onClick={doGetToken}>
               Obter token de acesso
             </Button>
           )}
@@ -160,25 +122,12 @@ function DuoAccountSection({ order }: { order: Order }) {
       ) : (
         <div className="space-y-2">
           <div className="grid grid-cols-3 gap-1.5">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nick..."
-              className="input-base col-span-3 sm:col-span-1 text-xs"
-            />
-            <select
-              value={tierFilter}
-              onChange={(e) => { setTierFilter(e.target.value as RankTier | 'all'); setSelectedAccountId('') }}
-              className="input-base text-xs"
-            >
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nick..." className="input-base col-span-3 sm:col-span-1 text-xs" />
+            <select value={tierFilter} onChange={(e) => { setTierFilter(e.target.value as RankTier | 'all'); setSelectedAccountId('') }} className="input-base text-xs">
               <option value="all">Elo</option>
               {DUO_FILTER_TIERS.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
             </select>
-            <select
-              value={divisionFilter}
-              onChange={(e) => { setDivisionFilter(e.target.value as Division | 'all'); setSelectedAccountId('') }}
-              className="input-base text-xs"
-            >
+            <select value={divisionFilter} onChange={(e) => { setDivisionFilter(e.target.value as Division | 'all'); setSelectedAccountId('') }} className="input-base text-xs">
               <option value="all">Divisão</option>
               {DUO_FILTER_DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
@@ -194,38 +143,24 @@ function DuoAccountSection({ order }: { order: Order }) {
                   type="button"
                   onClick={() => setSelectedAccountId(a.id)}
                   className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors ${
-                    selectedAccountId === a.id
-                      ? 'border-brand bg-brand/10'
-                      : 'border-bg-elevated hover:bg-bg-elevated/60'
+                    selectedAccountId === a.id ? 'border-brand bg-brand/10' : 'border-border-subtle hover:bg-bg-elevated/60'
                   }`}
                 >
-                  {a.current_rank && (
-                    <RankBadge tier={a.current_rank.tier} division={a.current_rank.division} size="xs" showLabel={false} />
-                  )}
+                  {a.current_rank && <RankBadge tier={a.current_rank.tier} division={a.current_rank.division} size="xs" showLabel={false} />}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink">{a.riot_id ?? a.label}</p>
-                    {a.current_rank && (
-                      <p className="text-[10px] text-ink-muted">{RANK_TIER_LABEL[a.current_rank.tier]} {a.current_rank.division}</p>
-                    )}
+                    {a.current_rank && <p className="text-[10px] text-ink-muted">{RANK_TIER_LABEL[a.current_rank.tier]} {a.current_rank.division}</p>}
                   </div>
                 </button>
               ))}
             </div>
           )}
 
-          <Button
-            size="sm"
-            className="w-full"
-            disabled={!selectedAccountId}
-            loading={reserve.isPending}
-            onClick={() => reserve.mutate(selectedAccountId)}
-          >
+          <Button size="sm" className="w-full" disabled={!selectedAccountId} loading={reserve.isPending} onClick={doReserve}>
             Reservar esta conta
           </Button>
           {switching && (
-            <Button size="sm" variant="ghost" className="w-full" onClick={() => setSwitching(false)}>
-              Cancelar
-            </Button>
+            <Button size="sm" variant="ghost" className="w-full" onClick={() => setSwitching(false)}>Cancelar</Button>
           )}
           {reserve.isError && (
             <ErrorAlert message={reserve.error instanceof Error ? reserveErrorMessage(reserve.error.message) : 'Erro ao reservar conta'} />
@@ -235,12 +170,10 @@ function DuoAccountSection({ order }: { order: Order }) {
     </Card>
   )
 }
-import { useCurrency } from '@/hooks/useCurrency'
 
 export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuthStore()
-  const queryClient = useQueryClient()
   const [dropReason, setDropReason] = useState('')
   const [showDropModal, setShowDropModal] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
@@ -255,112 +188,20 @@ export function JobDetailPage() {
     { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
   ]
 
-  const { data: boosterProfile } = useQuery({
-    queryKey: ['booster-profile-top3', profile?.id],
-    queryFn: async () => {
-      const { data } = await supabase.from('booster_profiles').select('is_top3').eq('user_id', profile!.id).maybeSingle()
-      return data
-    },
-    enabled: !!profile?.id,
-  })
+  const { data: isTop3 } = useOwnBoosterTop3Status(profile?.id)
 
-  const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useQuery({
-    queryKey: ['order', id],
-    queryFn: async () => {
-      const { data: available, error: availableError } = await supabase
-        .from('available_boost_orders')
-        .select('*')
-        .eq('id', id!)
-        .maybeSingle()
-      if (availableError) throw availableError
-      if (available) return available as unknown as Order
+  const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useBoosterOrder(id)
+  const { data: pendingDrop } = usePendingDropRequest(id)
 
-      const { data, error } = await supabase.from('orders').select(ORDER_SAFE_COLUMNS).eq('id', id!).single()
-      if (error) throw error
-      return data as unknown as Order
-    },
-    enabled: !!id,
-    refetchInterval: 15000,
-  })
+  const updateStatus = useUpdateOrderStatus(id ?? '')
+  const syncMatches = useSyncOrderMatches(id ?? '')
+  const verifyRank = useVerifyOrderRank(id ?? '')
+  const revealAccessToken = useRevealOrderCredentials()
+  const requestDrop = useRequestOrderDrop(id ?? '')
 
-  const { data: pendingDrop } = useQuery({
-    queryKey: ['drop-request', id],
-    refetchInterval: 15000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_drop_requests')
-        .select('*')
-        .eq('order_id', id!)
-        .eq('status', 'pending')
-        .maybeSingle()
-      if (error) throw error
-      return data as OrderDropRequest | null
-    },
-    enabled: !!id,
-  })
-
-  const updateStatus = useMutation({
-    mutationFn: async (newStatus: OrderStatus) => {
-      const { data, error } = await supabase.rpc('update_order_status', {
-        p_order_id: id!,
-        p_new_status: newStatus,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao atualizar status')
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order', id] })
-    },
-  })
-
-  const syncMatches = useMutation({
-    mutationFn: async () => {
-      return invokeEdgeFunction<{ synced: boolean; reason?: string; new_matches?: number }>('sync-order-matches', {
-        body: { order_id: id! },
-        timeoutMs: 25_000,
-        requireAuth: true,
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order', id] })
-      queryClient.invalidateQueries({ queryKey: ['order-matches', id] })
-    },
-  })
-
-  const verifyRank = useMutation({
-    mutationFn: async () => {
-      return invokeEdgeFunction<{
-        passed: boolean
-        reason?: string
-        fetched_tier?: RankTier
-        fetched_division?: Division | null
-        target_tier?: RankTier
-        target_division?: Division | null
-      }>('verify-order-rank', {
-        body: { order_id: id! },
-        requireAuth: true,
-      })
-    },
-    onSuccess: (result) => {
-      if (result.passed) queryClient.invalidateQueries({ queryKey: ['order', id] })
-    },
-  })
-
-  const revealAccessToken = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('get_order_credentials', {
-        p_order_id: id!,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; access_token?: string; error?: string } | null
-      if (!result?.success || !result.access_token) {
-        throw new Error(result?.error ?? 'Token de acesso indisponível')
-      }
-      return result.access_token
-    },
-    onSuccess: (token) => setAccessToken(token),
-  })
+  function doRevealToken() {
+    revealAccessToken.mutate(id!, { onSuccess: (result) => setAccessToken(result.access_token ?? null) })
+  }
 
   async function copyAccessToken() {
     if (!accessToken) return
@@ -368,25 +209,6 @@ export function JobDetailPage() {
     setTokenCopied(true)
     setTimeout(() => setTokenCopied(false), 1500)
   }
-
-  const requestDrop = useMutation({
-    mutationFn: async (reason: string) => {
-      const { data, error } = await supabase.rpc('request_order_drop', {
-        p_order_id: id!,
-        p_reason: reason,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; penalty_pct?: number; penalty_amount?: number; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao solicitar drop')
-      return result
-    },
-    onSuccess: () => {
-      setShowDropModal(false)
-      setDropReason('')
-      queryClient.invalidateQueries({ queryKey: ['order', id] })
-      queryClient.invalidateQueries({ queryKey: ['drop-request', id] })
-    },
-  })
 
   if (loadingOrder) return <PageLoader />
 
@@ -409,7 +231,7 @@ export function JobDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="ghost" size="icon" aria-label="Voltar">
           <Link to="/booster/jobs"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div className="flex-1">
@@ -425,7 +247,6 @@ export function JobDetailPage() {
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          {/* Order info */}
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
@@ -447,15 +268,8 @@ export function JobDetailPage() {
                 <div>
                   <p className="text-xs text-ink-muted mb-1">{t('booster.job.from')}</p>
                   <div className="flex items-center gap-2">
-                    <RankBadge
-                      tier={(order.current_rank as { tier: RankTier }).tier}
-                      division={(order.current_rank as { division: Division }).division}
-                      size="sm"
-                      showLabel={false}
-                    />
-                    <span className="text-sm font-semibold text-ink">
-                      {formatRank((order.current_rank as { tier: RankTier }).tier, (order.current_rank as { division: Division }).division)}
-                    </span>
+                    <RankBadge tier={(order.current_rank as { tier: RankTier }).tier} division={(order.current_rank as { division: Division }).division} size="sm" showLabel={false} />
+                    <span className="text-sm font-semibold text-ink">{formatRank((order.current_rank as { tier: RankTier }).tier, (order.current_rank as { division: Division }).division)}</span>
                   </div>
                 </div>
               )}
@@ -463,15 +277,8 @@ export function JobDetailPage() {
                 <div>
                   <p className="text-xs text-ink-muted mb-1">{t('booster.job.to')}</p>
                   <div className="flex items-center gap-2">
-                    <RankBadge
-                      tier={(order.target_rank as { tier: RankTier }).tier}
-                      division={(order.target_rank as { division: Division }).division}
-                      size="sm"
-                      showLabel={false}
-                    />
-                    <span className="text-sm font-semibold text-ink">
-                      {formatRank((order.target_rank as { tier: RankTier }).tier, (order.target_rank as { division: Division }).division)}
-                    </span>
+                    <RankBadge tier={(order.target_rank as { tier: RankTier }).tier} division={(order.target_rank as { division: Division }).division} size="sm" showLabel={false} />
+                    <span className="text-sm font-semibold text-ink">{formatRank((order.target_rank as { tier: RankTier }).tier, (order.target_rank as { division: Division }).division)}</span>
                   </div>
                 </div>
               )}
@@ -481,9 +288,7 @@ export function JobDetailPage() {
                 <p className="text-xs text-ink-muted mb-1.5">Extras</p>
                 <div className="flex flex-wrap gap-1.5">
                   {sortOrderExtras(order.extras).map((extra) => (
-                    <span key={extra.extra_id} className="text-[11px] font-medium bg-bg-elevated text-ink-secondary px-2 py-1 rounded-lg">
-                      {extra.name}
-                    </span>
+                    <span key={extra.extra_id} className="text-[11px] font-medium bg-bg-elevated text-ink-secondary px-2 py-1 rounded-lg">{extra.name}</span>
                   ))}
                 </div>
               </div>
@@ -499,21 +304,18 @@ export function JobDetailPage() {
           <OrderChat orderId={order.id} viewerRole="booster" />
         </div>
 
-        {/* Actions panel */}
         <div className="space-y-4">
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.earnings')}</h3>
-            <p className="text-2xl font-bold text-success">{currency(order.total_price * boosterEarningsShare(boosterProfile?.is_top3))}</p>
-            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { pct: Math.round(boosterEarningsShare(boosterProfile?.is_top3) * 100) })}</p>
+            <p className="text-2xl font-bold text-success" data-tabular>{currency(order.total_price * boosterEarningsShare(isTop3))}</p>
+            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { pct: Math.round(boosterEarningsShare(isTop3) * 100) })}</p>
           </Card>
 
           {order.status === 'awaiting_customer' && (
             <Card padding="md" className="ring-1 ring-accent/20">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
-                <p className="text-sm text-ink-secondary">
-                  Objetivo alcançado! Aguardando a confirmação final do cliente.
-                </p>
+                <p className="text-sm text-ink-secondary">Objetivo alcançado! Aguardando a confirmação final do cliente.</p>
               </div>
             </Card>
           )}
@@ -522,9 +324,7 @@ export function JobDetailPage() {
             <Card padding="md" className="ring-1 ring-success/20">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                <p className="text-sm text-ink-secondary">
-                  Serviço concluído! O cliente confirmou a entrega e seus ganhos foram liberados.
-                </p>
+                <p className="text-sm text-ink-secondary">Serviço concluído! O cliente confirmou a entrega e seus ganhos foram liberados.</p>
               </div>
             </Card>
           )}
@@ -550,66 +350,36 @@ export function JobDetailPage() {
                 </div>
               ) : accessToken ? (
                 <div className="space-y-2">
-                  <textarea
-                    readOnly
-                    value={accessToken}
-                    className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none"
-                    spellCheck={false}
-                  />
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    variant={tokenCopied ? 'success' : 'secondary'}
-                    leftIcon={<Copy className="h-3.5 w-3.5" />}
-                    onClick={() => void copyAccessToken()}
-                  >
+                  <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
+                  <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
                     {tokenCopied ? 'Copiado' : 'Copiar token'}
                   </Button>
                 </div>
               ) : (
-                <Button
-                  size="sm"
-                  className="w-full"
-                  leftIcon={<KeyRound className="h-3.5 w-3.5" />}
-                  loading={revealAccessToken.isPending}
-                  onClick={() => revealAccessToken.mutate()}
-                >
+                <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
                   Mostrar token
                 </Button>
               )}
 
               {revealAccessToken.isError && (
-                <ErrorAlert
-                  message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'}
-                  className="mt-2"
-                />
+                <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
               )}
             </Card>
           )}
 
           <OrderProgress order={order} />
 
-          {/* Sincronização automática de partidas */}
           {(order.status === 'in_progress' || order.status === 'paused') && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3">Sincronizar partidas</h3>
               <p className="text-xs text-ink-secondary mb-3">
                 Os resultados são identificados automaticamente pela Riot Games — não é possível editar manualmente.
               </p>
-              <Button
-                className="w-full"
-                variant="secondary"
-                leftIcon={<RefreshCw className="h-4 w-4" />}
-                loading={syncMatches.isPending}
-                onClick={() => syncMatches.mutate()}
-              >
+              <Button className="w-full" variant="secondary" leftIcon={<RefreshCw className="h-4 w-4" />} loading={syncMatches.isPending} onClick={() => syncMatches.mutate()}>
                 Sincronizar partidas
               </Button>
               {syncMatches.isError && (
-                <ErrorAlert
-                  className="mt-2"
-                  message={syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas'}
-                />
+                <ErrorAlert className="mt-2" message={syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas'} />
               )}
               {syncMatches.data && (
                 <p className="text-xs text-ink-muted mt-2 text-center">
@@ -627,10 +397,6 @@ export function JobDetailPage() {
             <OrderMatchHistory orderId={order.id} />
           )}
 
-          {/* Verificação de rank — só pra pedidos com rank alvo + Riot ID
-              cadastrados. Aprovado conclui o pedido automaticamente (via
-              complete_verified_order no servidor); reprovado só mostra o
-              motivo, sem mudar o status. */}
           {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
@@ -640,20 +406,11 @@ export function JobDetailPage() {
               <p className="text-xs text-ink-secondary mb-3">
                 Confirma automaticamente, via Riot Games, se a conta já atingiu o rank alvo. Se sim, o pedido é concluído.
               </p>
-              <Button
-                className="w-full"
-                variant="success"
-                leftIcon={<ShieldCheck className="h-4 w-4" />}
-                loading={verifyRank.isPending}
-                onClick={() => verifyRank.mutate()}
-              >
+              <Button className="w-full" variant="success" leftIcon={<ShieldCheck className="h-4 w-4" />} loading={verifyRank.isPending} onClick={() => verifyRank.mutate()}>
                 Verificar Rank e Concluir
               </Button>
               {verifyRank.isError && (
-                <ErrorAlert
-                  message={verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'}
-                  className="mt-2"
-                />
+                <ErrorAlert message={verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'} className="mt-2" />
               )}
               {verifyRank.data && !verifyRank.data.passed && (
                 <div className="text-xs text-warning mt-2 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
@@ -661,8 +418,8 @@ export function JobDetailPage() {
                   {verifyRank.data.reason === 'unranked' && 'A conta ainda não tem partidas ranqueadas solo/duo nesta temporada.'}
                   {verifyRank.data.reason === 'target_not_reached' && verifyRank.data.fetched_tier && (
                     <>
-                      Rank atual verificado: <strong>{formatRank(verifyRank.data.fetched_tier, verifyRank.data.fetched_division ?? null)}</strong> —
-                      alvo: <strong>{formatRank(verifyRank.data.target_tier!, verifyRank.data.target_division ?? null)}</strong>. Ainda não bateu.
+                      Rank atual verificado: <strong>{formatRank(verifyRank.data.fetched_tier as RankTier, verifyRank.data.fetched_division ?? null)}</strong> —
+                      alvo: <strong>{formatRank(verifyRank.data.target_tier as RankTier, verifyRank.data.target_division ?? null)}</strong>. Ainda não bateu.
                     </>
                   )}
                 </div>
@@ -675,14 +432,7 @@ export function JobDetailPage() {
               <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
               <div className="space-y-2">
                 {availableActions.map(({ to, label, icon: Icon, variant }) => (
-                  <Button
-                    key={to}
-                    variant={variant === 'success' ? 'success' : variant}
-                    className="w-full"
-                    leftIcon={<Icon className="h-4 w-4" />}
-                    loading={updateStatus.isPending}
-                    onClick={() => updateStatus.mutate(to)}
-                  >
+                  <Button key={to} variant={variant === 'success' ? 'success' : variant} className="w-full" leftIcon={<Icon className="h-4 w-4" />} loading={updateStatus.isPending} onClick={() => updateStatus.mutate(to)}>
                     {label}
                   </Button>
                 ))}
@@ -700,14 +450,8 @@ export function JobDetailPage() {
             </Card>
           )}
 
-          {/* Drop request */}
           {order.status === 'in_progress' && !pendingDrop && (
-            <Button
-              variant="danger-ghost"
-              className="w-full"
-              leftIcon={<AlertTriangle className="h-4 w-4" />}
-              onClick={() => setShowDropModal(true)}
-            >
+            <Button variant="danger-ghost" className="w-full" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDropModal(true)}>
               Solicitar Drop
             </Button>
           )}
@@ -724,7 +468,6 @@ export function JobDetailPage() {
         </div>
       </div>
 
-      {/* Drop request modal */}
       <Modal
         open={showDropModal}
         onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
@@ -743,22 +486,15 @@ export function JobDetailPage() {
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
             Motivo <span className="text-danger">*</span>
           </label>
-          <textarea
-            value={dropReason}
-            onChange={(e) => setDropReason(e.target.value)}
-            placeholder="Descreva o motivo para abandonar o pedido..."
-            className="input-base w-full min-h-[100px] resize-none text-sm"
-          />
+          <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo para abandonar o pedido..." className="input-base w-full min-h-[100px] resize-none text-sm" />
         </div>
         <div className="flex gap-3 justify-end pt-2">
-          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>
-            Cancelar
-          </Button>
+          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>Cancelar</Button>
           <Button
             variant="danger"
             loading={requestDrop.isPending}
             disabled={dropReason.trim().length < 10}
-            onClick={() => requestDrop.mutate(dropReason.trim())}
+            onClick={() => requestDrop.mutate(dropReason.trim(), { onSuccess: () => { setShowDropModal(false); setDropReason('') } })}
           >
             Enviar Solicitação
           </Button>

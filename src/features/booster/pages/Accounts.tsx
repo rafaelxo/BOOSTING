@@ -1,29 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Landmark, ArrowRight } from 'lucide-react'
 import { Card, EmptyState, Skeleton, RankBadge, ErrorAlert } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { RANK_TIER_LABEL } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-import { useDuoAccountAutoRefresh } from '@/hooks/useDuoAccountAutoRefresh'
-import type { DuoAccount } from '@/types'
-
-type BoosterVisibleDuoAccount = Pick<DuoAccount, 'id' | 'label' | 'riot_id' | 'current_rank' | 'is_active' | 'reserved_by' | 'reserved_order_id'>
+import { useBoosterDuoAccounts, useDuoAccountAutoRefresh } from '@/api/duoAccounts'
 
 export function BoosterAccountsPage() {
   const { profile } = useAuthStore()
 
-  const { data: accounts, isLoading, isError, error: accountsError } = useQuery({
-    queryKey: ['booster-duo-accounts'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_duo_accounts')
-      if (error) throw error
-      const result = data as { success?: boolean; accounts?: BoosterVisibleDuoAccount[]; error?: string } | null
-      if (!result?.success) throw new Error(result?.error ?? 'Não foi possível carregar as contas Duo.')
-      return result.accounts ?? []
-    },
-    refetchInterval: 15000,
-  })
+  const { data: accounts, isLoading, isError, error: accountsError } = useBoosterDuoAccounts()
 
   useDuoAccountAutoRefresh(accounts)
 

@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
@@ -8,10 +7,10 @@ import {
   ArrowRight, Lock, Star,
 } from 'lucide-react'
 import { Avatar, Button, RankBadge, HexGridBackground } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { formatRank } from '@/lib/utils'
-import type { RankTier, Division } from '@/types'
+import type { RankTier } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
+import { useTopBoosters } from '@/api/boosters'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -21,38 +20,17 @@ export function HomePage() {
   // Mesma seleção sistemática do Top 3 da página /boosters (ver
   // get_top_boosters) — só pede 1 posição a mais para preencher o teaser de
   // 4 colunas da home; não é uma lista fixa/manual.
-  const { data: featuredBoosters = [] } = useQuery({
-    queryKey: ['home-featured-boosters'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_top_boosters', {
-        p_service_type: '__all__',
-        p_rank_bucket: '__all__',
-        p_limit: 4,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; boosters: Array<{
-        booster_id: string
-        display_name: string
-        avatar_url: string | null
-        current_rank: { tier: RankTier; division: Division | null } | null
-        review_count: number
-        average_rating: number | null
-        win_rate_pct: number
-        total_matches: number
-      }> } | null
-      return (result?.boosters ?? []).map((b) => ({
-        id: b.booster_id,
-        display_name: b.display_name,
-        avatar_url: b.avatar_url,
-        current_rank: b.current_rank,
-        rating: b.average_rating ?? 0,
-        rating_count: b.review_count,
-        win_rate_pct: b.win_rate_pct,
-        total_matches: b.total_matches,
-      }))
-    },
-    staleTime: 60_000,
-  })
+  const { data: topBoosters } = useTopBoosters(4)
+  const featuredBoosters = (topBoosters ?? []).map((b) => ({
+    id: b.booster_profile_id,
+    display_name: b.display_name,
+    avatar_url: b.avatar_url,
+    current_rank: b.current_rank,
+    rating: b.average_rating ?? 0,
+    rating_count: b.review_count,
+    win_rate_pct: b.win_rate_pct,
+    total_matches: b.total_matches,
+  }))
 
   const STATS = [
     { value: '1.800+', label: t('home.stats.ordersCompleted') },

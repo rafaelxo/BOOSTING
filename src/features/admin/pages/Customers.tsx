@@ -1,30 +1,17 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Users } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminCustomers } from '@/api/customers'
 
 export function AdminCustomersPage() {
   const { t } = useTranslation()
   const currency = useCurrency()
 
-  const { data: customers, isLoading } = useQuery({
-    queryKey: ['admin-customers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customer_profiles')
-        .select('*, profiles(email, username, created_at)')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data
-    },
-    refetchInterval: 30000,
-  })
+  const { data: customers, isLoading } = useAdminCustomers()
 
   return (
     <div className="space-y-5">
@@ -43,22 +30,19 @@ export function AdminCustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((c) => {
-                const p = c.profiles as { email: string; username: string; created_at: string } | null
-                return (
-                  <TableRow key={c.id} clickable>
-                    <TableCell className="font-medium text-ink">
-                      <Link to={`/admin/customers/${c.id}`} className="text-brand hover:underline">
-                        {p?.username ?? '—'}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{p?.email ?? '—'}</TableCell>
-                    <TableCell>{c.total_orders}</TableCell>
-                    <TableCell className="font-semibold">{currency(c.total_spent)}</TableCell>
-                    <TableCell>{p?.created_at ? formatDate(p.created_at) : '—'}</TableCell>
-                  </TableRow>
-                )
-              })}
+              {customers.map((c) => (
+                <TableRow key={c.id} clickable>
+                  <TableCell className="font-medium text-ink">
+                    <Link to={`/admin/customers/${c.id}`} className="text-brand hover:underline">
+                      {c.profiles?.username ?? '—'}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{c.profiles?.email ?? '—'}</TableCell>
+                  <TableCell data-tabular>{c.total_orders}</TableCell>
+                  <TableCell className="font-semibold" data-tabular>{currency(c.total_spent)}</TableCell>
+                  <TableCell>{c.profiles?.created_at ? formatDate(c.profiles.created_at) : '—'}</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         )}

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Briefcase, Lock, Sparkles, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
@@ -8,6 +8,7 @@ import { timeAgo, formatRank, boosterEarningsShare, getServiceLabel, getOrderMod
 import type { Division, Order, QueueType, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAvailableJobs, useBoosterSlotInfo, useAcceptBoostOrder } from '@/api/orders'
 
 
 interface SlotInfo {
@@ -70,7 +71,6 @@ function exclusiveTimeLeft(job: Order, myUserId?: string): string | null {
 
 export function AvailableJobsPage() {
   const { profile } = useAuthStore()
-  const queryClient = useQueryClient()
   const [queue, setQueue] = useState<QueueType | 'all'>('all')
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -95,74 +95,28 @@ export function AvailableJobsPage() {
   })
 
   // Real-time slot counts via DB function
-  const { data: slotInfo } = useQuery({
-    queryKey: ['booster-slots', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .rpc('can_booster_accept_order', {
-          p_booster_user_id: profile!.id,
-          p_boost_mode: 'solo', // dummy mode — we just want slot counts
-        })
-      if (error) throw error
-      const result = data as unknown as SlotInfo & { allowed: boolean }
-      return {
-        solo_count: result.solo_count ?? 0,
-        duo_count: result.duo_count ?? 0,
-        total_count: result.total_count ?? 0,
-        max_total: result.max_total ?? 3,
-        max_duo: result.max_duo ?? 1,
-        is_top3: result.is_top3 ?? false,
-        exclusive_slot_used: result.exclusive_slot_used ?? false,
-        max_exclusive: result.max_exclusive ?? 1,
-      } as SlotInfo
-    },
-    enabled: !!profile?.id && boosterProfile?.status === 'approved',
-    refetchInterval: 10000,
-  })
+  const { data: slotInfoRaw } = useBoosterSlotInfo(profile?.id, boosterProfile?.status === 'approved')
+  const slotInfo: SlotInfo | undefined = slotInfoRaw ? {
+    solo_count: slotInfoRaw.solo_count ?? 0,
+    duo_count: slotInfoRaw.duo_count ?? 0,
+    total_count: slotInfoRaw.total_count ?? 0,
+    max_total: slotInfoRaw.max_total ?? 3,
+    max_duo: slotInfoRaw.max_duo ?? 1,
+    is_top3: slotInfoRaw.is_top3 ?? false,
+    exclusive_slot_used: slotInfoRaw.exclusive_slot_used ?? false,
+    max_exclusive: slotInfoRaw.max_exclusive ?? 1,
+  } : undefined
 
-  const { data: jobs, isLoading } = useQuery({
-    queryKey: ['available-jobs'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('available_boost_orders')
-        .select('*')
-        .eq('status', 'awaiting_assignment')
-        .order('created_at', { ascending: true })
-        .limit(50)
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    refetchInterval: 15000,
-  })
+  const { data: jobs, isLoading } = useAvailableJobs()
 
-  const acceptJob = useMutation({
-    mutationFn: async (orderId: string) => {
-      const { data, error } = await supabase.rpc('accept_boost_order', {
-        p_order_id: orderId,
-        p_booster_user_id: profile!.id,
-      })
-      if (error) throw error
-      const result = data as unknown as { success: boolean; error?: string; details?: SlotInfo }
-      if (!result.success) {
-        const messages: Record<string, string> = {
-          order_no_longer_available: 'Este pedido já foi aceito por outro booster.',
-          slot_limit_reached: 'Você atingiu o limite de pedidos ativos.',
-          duo_slot_limit_reached: 'Você atingiu o limite de slots Duo.',
-          exclusive_slot_already_used: 'Você já tem um pedido exclusivo ativo. Conclua-o para liberar o slot extra.',
-          order_exclusive_to_another_booster: 'Este pedido é exclusivo de outro booster no momento.',
-          booster_not_approved: 'Sua conta de booster não está aprovada.',
-          unauthorized: 'Ação não autorizada.',
-        }
-        throw new Error(messages[result.error ?? ''] ?? result.error ?? 'Erro ao aceitar pedido.')
-      }
-      return result
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['available-jobs'] })
-      queryClient.invalidateQueries({ queryKey: ['booster-assigned-orders'] })
-      queryClient.invalidateQueries({ queryKey: ['booster-slots'] })
-    },
-  })
+  // Mensagens de erro já vêm traduzidas de src/api/orders/mutations.ts (ACCEPT_ORDER_MESSAGES).
+  const acceptJobMutation = useAcceptBoostOrder()
+  const acceptJob = {
+    isPending: acceptJobMutation.isPending,
+    isError: acceptJobMutation.isError,
+    error: acceptJobMutation.error,
+    mutate: (orderId: string) => acceptJobMutation.mutate({ orderId, boosterId: profile!.id }),
+  }
 
   const canAcceptJob = (job: Order): boolean => {
     if (!slotInfo) return false

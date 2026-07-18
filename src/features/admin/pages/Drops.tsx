@@ -1,67 +1,34 @@
 // src/features/admin/pages/Drops.tsx
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
 import { timeAgo } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { OrderDropRequest } from '@/types'
+import { useAdminDropRequests, useResolveDropRequest } from '@/api/admin'
+import { useBoosterNames } from '@/api/boosters'
 
 export function AdminDropsPage() {
-  const queryClient = useQueryClient()
   const currency = useCurrency()
   const [resolving, setResolving] = useState<{ id: string; approve: boolean } | null>(null)
   const [adminNote, setAdminNote] = useState('')
 
-  const { data: requests, isLoading } = useQuery({
-    queryKey: ['admin-drop-requests'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('order_drop_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (error) throw error
-      return data as OrderDropRequest[]
-    },
-    refetchInterval: 15000,
-  })
+  const { data: requests, isLoading } = useAdminDropRequests()
 
   // Nome do booster em vez do UUID cru — mesma ideia do admin/pages/OrderDetail.tsx.
   const boosterIds = [...new Set((requests ?? []).map((r) => r.booster_id))]
-  const { data: boosterNames } = useQuery({
-    queryKey: ['admin-drop-boosters', boosterIds],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_profiles')
-        .select('id, user_id, display_name')
-        .in('user_id', boosterIds)
-      if (error) throw error
-      return new Map(data.map((b) => [b.user_id, b]))
-    },
-    enabled: boosterIds.length > 0,
-  })
+  const { data: boosterNames } = useBoosterNames(boosterIds)
 
-  const resolve = useMutation({
-    mutationFn: async ({ id, approve, note }: { id: string; approve: boolean; note: string }) => {
-      const { data, error } = await supabase.rpc('resolve_drop_request', {
-        p_request_id: id,
-        p_approve: approve,
-        p_admin_note: note || undefined,
-      })
-      if (error) throw error
-      const result = data as { success: boolean; error?: string }
-      if (!result.success) throw new Error(result.error ?? 'Erro ao resolver solicitação')
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-drop-requests'] })
-      setResolving(null)
-      setAdminNote('')
-    },
-  })
+  const resolveMutation = useResolveDropRequest()
+  const resolve = {
+    isPending: resolveMutation.isPending,
+    mutate: (params: { id: string; approve: boolean; note: string }) =>
+      resolveMutation.mutate(
+        { requestId: params.id, approve: params.approve, adminNote: params.note || undefined },
+        { onSuccess: () => { setResolving(null); setAdminNote('') } },
+      ),
+  }
 
   const pendingRequests = requests?.filter(r => r.status === 'pending') ?? []
   const pastRequests = requests?.filter(r => r.status !== 'pending') ?? []

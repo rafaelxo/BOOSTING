@@ -1,85 +1,26 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Plus, ShoppingBag, MessageCircle, Zap, Sparkles } from 'lucide-react'
 import { Button, Skeleton, EmptyState, StatCard } from '@/components/ui'
 import { OrderRow } from '@/components/order/OrderRow'
-import { supabase } from '@/lib/supabase'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
-import type { Order } from '@/types'
-
-// Pedidos cancelados ficam só na aba "Meus Pedidos" (/orders) — nunca
-// aparecem no painel, nem na lista de recentes nem nos cartões de destaque.
-function useRecentOrders(customerId: string) {
-  return useQuery({
-    queryKey: ['customer-orders', customerId, 'recent'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(ORDER_SAFE_COLUMNS)
-        .eq('customer_id', customerId)
-        .neq('status', 'canceled')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    refetchInterval: 15000,
-  })
-}
-
-// Estatísticas do painel vêm de contagens/valores reais (não da lista de
-// recentes, que é limitada a 5 linhas e não representaria um total de
-// verdade). "total gasto"/"total de pedidos" vêm de customer_profiles —
-// contadores persistidos no backend (trigger em supabase/migrations/
-// 024_customer_stats_exclude_canceled.sql), que descontam automaticamente
-// quando um pedido pago é cancelado ou reembolsado depois — nunca contam
-// pedidos cancelados/reembolsados/não pagos como "gasto".
-function useDashboardStats(customerId: string) {
-  return useQuery({
-    queryKey: ['customer-dashboard-stats', customerId],
-    queryFn: async () => {
-      const [{ data: profileStats, error: profileError }, { count: activeCount, error: activeError }, { count: completedCount, error: completedError }] = await Promise.all([
-        supabase.from('customer_profiles').select('total_orders, total_spent').eq('user_id', customerId).maybeSingle(),
-        supabase.from('orders').select('id', { count: 'exact', head: true })
-          .eq('customer_id', customerId)
-          .in('status', ['paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer']),
-        supabase.from('orders').select('id', { count: 'exact', head: true })
-          .eq('customer_id', customerId)
-          .eq('status', 'completed'),
-      ])
-
-      if (profileError) throw profileError
-      if (activeError) throw activeError
-      if (completedError) throw completedError
-
-      return {
-        totalOrders: profileStats?.total_orders ?? 0,
-        totalSpent: Number(profileStats?.total_spent ?? 0),
-        activeCount: activeCount ?? 0,
-        completedCount: completedCount ?? 0,
-      }
-    },
-    refetchInterval: 15000,
-  })
-}
+import { useCustomerOrders } from '@/api/orders'
+import { useCustomerDashboardStats } from '@/api/customers'
 
 export function CustomerDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const currency = useCurrency()
-  const { data: orders, isLoading } = useRecentOrders(profile?.id ?? '')
-  const { data: stats } = useDashboardStats(profile?.id ?? '')
+  const { data: orders, isLoading } = useCustomerOrders(profile?.id, 5)
+  const { data: stats } = useCustomerDashboardStats(profile?.id)
 
   const activeOrders = orders?.filter(o =>
     ['paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(o.status)
   ) ?? []
 
-  const activeCount = stats?.activeCount ?? 0
+  const activeCount = stats?.activeOrders ?? 0
 
   const activeMsg = activeCount === 0
     ? t('customer.dashboard.noActive')
@@ -89,7 +30,6 @@ export function CustomerDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-ink">
@@ -106,19 +46,17 @@ export function CustomerDashboard() {
         </Button>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: t('customer.dashboard.stats.active'),    value: activeCount,                        icon: Zap,           color: 'text-brand bg-brand/10' },
-          { label: t('customer.dashboard.stats.total'),     value: stats?.totalOrders ?? 0,             icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
-          { label: t('customer.dashboard.stats.completed'), value: stats?.completedCount ?? 0,          icon: ShoppingBag,   color: 'text-success bg-success/10' },
-          { label: t('customer.dashboard.stats.spent'),     value: currency(stats?.totalSpent ?? 0),    icon: MessageCircle, color: 'text-info bg-info/10' },
+          { label: t('customer.dashboard.stats.active'),    value: activeCount,                          icon: Zap,           color: 'text-brand bg-brand/10' },
+          { label: t('customer.dashboard.stats.total'),     value: stats?.totalOrders ?? 0,               icon: ShoppingBag,   color: 'text-accent bg-accent/10'  },
+          { label: t('customer.dashboard.stats.completed'), value: stats?.completedOrders ?? 0,           icon: ShoppingBag,   color: 'text-success bg-success/10' },
+          { label: t('customer.dashboard.stats.spent'),     value: currency(stats?.totalSpent ?? 0),      icon: MessageCircle, color: 'text-info bg-info/10' },
         ].map(({ label, value, icon, color }) => (
           <StatCard key={label} label={label} value={value} icon={icon} color={color} valueSize="lg" />
         ))}
       </div>
 
-      {/* Active orders */}
       {activeOrders.length > 0 && (
         <div>
           <h2 className="text-base font-semibold text-ink mb-3">{t('customer.dashboard.activeTitle')}</h2>
@@ -130,7 +68,6 @@ export function CustomerDashboard() {
         </div>
       )}
 
-      {/* Recent orders */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-ink">{t('customer.dashboard.recentTitle')}</h2>

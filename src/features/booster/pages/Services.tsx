@@ -1,29 +1,16 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterProfessionalProfileForm } from '@/features/booster/components/BoosterProfessionalProfileForm'
 import { BoosterServicesList } from '@/features/booster/components/BoosterServicesList'
+import { useOwnBoosterProfileId } from '@/api/boosters'
 
 export function BoosterServicesPage() {
   const { profile } = useAuthStore()
 
   // A rota pública usa booster_profiles.id (não o user_id) — busca só para o link de preview.
-  const { data: boosterProfileId } = useQuery({
-    queryKey: ['booster-profile-id', profile?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('booster_profiles')
-        .select('id')
-        .eq('user_id', profile!.id)
-        .maybeSingle()
-      if (error) throw error
-      return data?.id ?? null
-    },
-    enabled: !!profile?.id,
-  })
+  const { data: boosterProfileId } = useOwnBoosterProfileId(profile?.id)
 
   if (!profile) return null
 

@@ -4,10 +4,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, Card } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { cn, boosterFormErrorMessage } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
+import { useOnboardBooster } from '@/api/boosters'
 
 const DAYS = [
   { key: 'mon', label: 'Seg' },
@@ -58,6 +58,7 @@ export function BoosterApplicationForm({
   const { profile } = useAuthStore()
   const navigate = useNavigate()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const onboardBooster = useOnboardBooster(profile?.id)
 
   const {
     register, handleSubmit, setValue, watch,
@@ -116,23 +117,22 @@ export function BoosterApplicationForm({
       }
     }
 
-    const { data: result, error } = await supabase.rpc('onboard_booster', {
-      p_display_name:      profile.username,
-      p_bio:               data.bio,
-      p_peak_rank:         { tier: data.peak_tier, division: null },
-      p_opgg_link:         data.opgg_link,
-      p_hours_per_day_min: data.hours_per_day_min,
-      p_hours_per_day_max: data.hours_per_day_max,
-      p_full_name:         data.full_name,
-      p_cpf:               data.cpf.replace(/\D/g, ''),
-      p_available_days:    data.available_days,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any
-
-    if (error) { setSubmitError(`Erro: ${error.message}`); return }
-
-    const res = result as { success: boolean; error?: string }
-    if (!res.success) { setSubmitError(boosterFormErrorMessage(res.error)); return }
+    try {
+      await onboardBooster.mutateAsync({
+        displayName: profile.username,
+        bio: data.bio,
+        peakRank: { tier: data.peak_tier, division: null },
+        opggLink: data.opgg_link,
+        hoursPerDayMin: data.hours_per_day_min,
+        hoursPerDayMax: data.hours_per_day_max,
+        fullName: data.full_name,
+        cpf: data.cpf.replace(/\D/g, ''),
+        availableDays: data.available_days,
+      })
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Erro ao enviar candidatura.')
+      return
+    }
 
     if (onSuccess) onSuccess()
     else navigate('/booster')

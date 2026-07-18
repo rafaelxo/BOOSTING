@@ -309,21 +309,6 @@ export interface Refund {
   created_at: string
 }
 
-// ─── Reviews ──────────────────────────────────────────────────────────────────
-
-export interface Review {
-  id: string
-  order_id: string
-  customer_id: string
-  booster_id: string | null
-  rating: number  // 1-5
-  content: string | null
-  is_public: boolean
-  is_moderated: boolean
-  admin_note: string | null
-  created_at: string
-}
-
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export interface Notification {
@@ -335,40 +320,6 @@ export interface Notification {
   data: Record<string, unknown>
   is_read: boolean
   created_at: string
-}
-
-// ─── Earnings ─────────────────────────────────────────────────────────────────
-
-export interface PayoutRecord {
-  id: string
-  booster_id: string
-  order_id: string
-  gross_amount: number
-  commission_rate: number
-  commission_amount: number
-  net_amount: number
-  status: 'pending' | 'processing' | 'paid' | 'failed'
-  paid_at: string | null
-  created_at: string
-}
-
-// ─── Duo accounts ───────────────────────────────────────────────────────────────
-
-export interface DuoAccount {
-  id: string
-  game_id: string
-  label: string
-  riot_id: string | null
-  current_rank: { tier: RankTier; division: Division } | null
-  notes: string | null
-  encrypted_credentials: string | null
-  is_active: boolean
-  created_by: string | null
-  created_at: string
-  updated_at: string
-  reserved_by: string | null
-  reserved_order_id: string | null
-  reserved_at: string | null
 }
 
 // ─── Booster Services ─────────────────────────────────────────────────────────

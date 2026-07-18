@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Avatar, ThemeToggle } from '@/components/ui'
+import { Avatar } from '@/components/ui'
 import { NotificationBell } from '@/components/NotificationBell'
 import { UserProfilePanel } from '@/components/UserProfilePanel'
 import { useAuthStore } from '@/stores/authStore'
@@ -11,8 +11,8 @@ interface UserAccountBadgeProps {
 }
 
 /**
- * Bloco de controles do topo (tema + notificações + avatar) que abre o popover
- * de conta pessoal. Reaproveitado por BoosterLayout, CustomerLayout e
+ * Bloco de controles do topo (notificações + avatar) que abre o popover de
+ * conta pessoal. Reaproveitado por BoosterLayout, CustomerLayout e
  * AdminLayout — antes duplicado em cada um.
  */
 export function UserAccountBadge({ showNotifications = true, avatarSize = 'sm' }: UserAccountBadgeProps) {
@@ -21,7 +21,6 @@ export function UserAccountBadge({ showNotifications = true, avatarSize = 'sm' }
 
   return (
     <div className="flex items-center gap-2">
-      <ThemeToggle />
       {showNotifications && <NotificationBell />}
       <button
         onClick={() => setPanelOpen(true)}

@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/authStore'
 import type { Order, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
+import { useBoosterSlotInfo } from '@/api/orders'
 
 interface PerformanceSummary {
   total_matches: number
@@ -85,18 +86,7 @@ export function BoosterDashboard() {
     boosterProfile?.status === 'approved' ? profile?.id : undefined,
   )
 
-  const { data: slotInfo } = useQuery({
-    queryKey: ['booster-slots', profile?.id],
-    queryFn: async () => {
-      const { data } = await supabase.rpc('can_booster_accept_order', {
-        p_booster_user_id: profile!.id,
-        p_boost_mode: 'solo',
-      })
-      return data as unknown as { solo_count: number; duo_count: number; total_count: number; max_total: number; max_duo: number; is_top3: boolean; exclusive_slot_used: boolean; max_exclusive: number } | null
-    },
-    enabled: !!profile?.id && boosterProfile?.status === 'approved',
-    refetchInterval: 15000,
-  })
+  const { data: slotInfo } = useBoosterSlotInfo(profile?.id, boosterProfile?.status === 'approved')
 
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
@@ -235,7 +225,7 @@ export function BoosterDashboard() {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-ink-secondary">Total:</span>
-              <span className={`font-bold ${slotInfo.total_count >= slotInfo.max_total ? 'text-danger' : slotInfo.total_count === slotInfo.max_total - 1 ? 'text-warning' : 'text-success'}`}>
+              <span className={`font-bold ${(slotInfo.total_count ?? 0) >= (slotInfo.max_total ?? 3) ? 'text-danger' : slotInfo.total_count === (slotInfo.max_total ?? 3) - 1 ? 'text-warning' : 'text-success'}`}>
                 {slotInfo.total_count}/{slotInfo.max_total}
               </span>
             </div>

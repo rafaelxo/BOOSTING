@@ -1,46 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2, Trash2 } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
 import { FormField } from '@/components/ui/FormField'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { supabase } from '@/lib/supabase'
-import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { RANK_TIER_LABEL, formatDate } from '@/lib/utils'
-import { useDuoAccountAutoRefresh } from '@/hooks/useDuoAccountAutoRefresh'
-import type { DuoAccount, Division, RankTier } from '@/types'
-import type { Database } from '@/lib/database.types'
+import {
+  useAdminDuoAccounts, useDuoAccountAutoRefresh, useAdminSaveDuoAccount, useAdminSetDuoAccountActive,
+  useAdminReleaseDuoAccount, useAdminDeleteDuoAccount, lookupDuoAccountRiotRank, adminGetDuoAccountCredentials,
+} from '@/api/duoAccounts'
+import type { AdminDuoAccount } from '@/api/duoAccounts'
+import type { Division, RankTier } from '@/types'
 
 const RIOT_ID_FORMAT = /^[^#]{1,16}#[A-Za-z0-9]{2,5}$/
-
-type RiotRankResponse = {
-  found?: boolean
-  ranked?: boolean
-  tier?: RankTier
-  division?: Division | null
-  league_points?: number
-  avg_lp_gain?: number | null
-  avg_lp_loss?: number | null
-  message?: string
-}
-
-type AdminDuoAccount = DuoAccount & { has_credentials?: boolean }
-
-function duoAccountError(code?: string): string {
-  const messages: Record<string, string> = {
-    unauthorized: 'Somente administradores podem gerenciar contas Duo.',
-    invalid_label: 'Riot ID inválido para identificar a conta.',
-    invalid_riot_id: 'Riot ID muito longo.',
-    rank_out_of_supported_range: 'Contas Duo devem estar entre Ferro IV e Diamante I.',
-    login_and_password_required_together: 'Preencha login e senha juntos.',
-    credentials_required: 'Uma conta ativa precisa ter login e senha cadastrados.',
-    invalid_credentials: 'Login ou senha inválidos.',
-    account_not_found: 'Conta Duo não encontrada.',
-    account_reserved: 'Libere a reserva desta conta antes de excluí-la.',
-    server_key_not_configured: 'A chave de criptografia do servidor não está configurada.',
-  }
-  return messages[code ?? ''] ?? 'Não foi possível salvar a conta Duo.'
-}
 
 interface AccountForm {
   riot_id: string
@@ -76,7 +48,6 @@ function accountToForm(a: AdminDuoAccount): AccountForm {
 }
 
 export function AdminDuoAccountsPage() {
-  const queryClient = useQueryClient()
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; account?: AdminDuoAccount } | null>(null)
   const [form, setForm] = useState<AccountForm>(EMPTY_FORM)
   const [revealed, setRevealed] = useState<Record<string, { login: string; password: string } | 'loading' | 'error'>>({})
@@ -88,10 +59,7 @@ export function AdminDuoAccountsPage() {
     mutationFn: async () => {
       const trimmed = form.riot_id.trim()
       if (!RIOT_ID_FORMAT.test(trimmed)) throw new Error('Riot ID inválido. Use o formato Nome#TAG (ex.: Fulano#BR1).')
-      return invokeEdgeFunction<RiotRankResponse>('riot-account-rank', {
-        body: { riot_id: trimmed, queue: 'solo_duo' },
-        requireAuth: true,
-      })
+      return lookupDuoAccountRiotRank(trimmed)
     },
     onSuccess: (result) => {
       setRiotLookupError(null)
@@ -118,17 +86,7 @@ export function AdminDuoAccountsPage() {
     },
   })
 
-  const { data: accounts, isLoading, isError, error: accountsError } = useQuery({
-    queryKey: ['admin-duo-accounts'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_duo_accounts')
-      if (error) throw error
-      const result = data as { success?: boolean; accounts?: AdminDuoAccount[]; error?: string } | null
-      if (!result?.success) throw new Error(duoAccountError(result?.error))
-      return result.accounts ?? []
-    },
-    refetchInterval: 15000,
-  })
+  const { data: accounts, isLoading, isError, error: accountsError } = useAdminDuoAccounts()
 
   useDuoAccountAutoRefresh(accounts)
 
@@ -142,73 +100,49 @@ export function AdminDuoAccountsPage() {
     setRiotLookupMessage(null)
   }, [modal])
 
-  const save = useMutation({
-    mutationFn: async () => {
-      if (!form.riot_id.trim()) throw new Error('Riot ID é obrigatório')
-      if (modal?.mode === 'create' && !riotVerified) throw new Error('Verifique o Riot ID antes de salvar')
-      if (modal?.mode === 'create' && (!form.login.trim() || !form.password.trim())) {
-        throw new Error('Login e senha são obrigatórios ao criar uma conta')
-      }
+  const saveMutation = useAdminSaveDuoAccount()
+  const save = {
+    isPending: saveMutation.isPending,
+    isError: saveMutation.isError,
+    error: saveMutation.error,
+    mutate: () => {
+      if (!form.riot_id.trim()) return
+      if (modal?.mode === 'create' && !riotVerified) return
+      if (modal?.mode === 'create' && (!form.login.trim() || !form.password.trim())) return
+      saveMutation.mutate({
+        accountId: modal?.mode === 'edit' ? modal.account?.id : undefined,
+        riotId: form.riot_id.trim(),
+        label: form.riot_id.trim(),
+        tier: form.tier,
+        division: form.division,
+        notes: form.notes.trim() || undefined,
+        isActive: form.is_active,
+        login: form.login.trim() || undefined,
+        password: form.password || undefined,
+      }, { onSuccess: () => setModal(null) })
+    },
+  }
 
-      // save_duo_account aceita NULL em p_account_id/p_notes/p_login/p_password
-      // (criação vs. edição, campos opcionais) — o tipo gerado pelo Supabase
-      // não modela isso para parâmetros escalares de RPC, daí o cast pontual
-      // para a assinatura real da função em vez de usar `any`. label = riot_id:
-      // não existe mais um identificador manual separado na UI.
-      const { data, error } = await supabase.rpc('save_duo_account', {
-        p_account_id: modal?.mode === 'edit' ? modal.account?.id ?? null : null,
-        p_riot_id: form.riot_id.trim(),
-        p_label: form.riot_id.trim(),
-        p_tier: form.tier,
-        p_division: form.division,
-        p_notes: form.notes.trim() || null,
-        p_is_active: form.is_active,
-        p_login: form.login.trim() || null,
-        p_password: form.password || null,
-      } as Database['public']['Functions']['save_duo_account']['Args'])
-      if (error) throw error
-      const result = data as { success?: boolean; error?: string } | null
-      if (!result?.success) throw new Error(duoAccountError(result?.error))
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] })
-      setModal(null)
-    },
-  })
+  const toggleActiveMutation = useAdminSetDuoAccountActive()
+  const toggleActive = {
+    isPending: toggleActiveMutation.isPending,
+    mutate: (a: AdminDuoAccount) => toggleActiveMutation.mutate({ accountId: a.id, isActive: !a.is_active }),
+  }
 
-  const toggleActive = useMutation({
-    mutationFn: async (a: AdminDuoAccount) => {
-      const { data, error } = await supabase.rpc('set_duo_account_active', { p_account_id: a.id, p_is_active: !a.is_active })
-      if (error) throw error
-      const result = data as { success?: boolean; error?: string } | null
-      if (!result?.success) throw new Error(duoAccountError(result?.error))
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] }),
-  })
-
-  const releaseReservation = useMutation({
-    mutationFn: async (accountId: string) => {
-      const { data, error } = await supabase.rpc('admin_release_duo_account', { p_account_id: accountId })
-      if (error) throw error
-      const result = data as { success?: boolean; error?: string } | null
-      if (!result?.success) throw new Error(duoAccountError(result?.error))
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] }),
-  })
+  const releaseReservationMutation = useAdminReleaseDuoAccount()
+  const releaseReservation = {
+    isPending: releaseReservationMutation.isPending,
+    mutate: (accountId: string) => releaseReservationMutation.mutate(accountId),
+  }
 
   const [deleteTarget, setDeleteTarget] = useState<AdminDuoAccount | null>(null)
-  const deleteAccount = useMutation({
-    mutationFn: async (accountId: string) => {
-      const { data, error } = await supabase.rpc('delete_duo_account', { p_account_id: accountId })
-      if (error) throw error
-      const result = data as { success?: boolean; error?: string } | null
-      if (!result?.success) throw new Error(duoAccountError(result?.error))
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-duo-accounts'] })
-      setDeleteTarget(null)
-    },
-  })
+  const deleteAccountMutation = useAdminDeleteDuoAccount()
+  const deleteAccount = {
+    isPending: deleteAccountMutation.isPending,
+    isError: deleteAccountMutation.isError,
+    error: deleteAccountMutation.error,
+    mutate: (accountId: string) => deleteAccountMutation.mutate(accountId, { onSuccess: () => setDeleteTarget(null) }),
+  }
 
   async function toggleReveal(a: AdminDuoAccount) {
     if (revealed[a.id] && revealed[a.id] !== 'error') {
@@ -216,9 +150,8 @@ export function AdminDuoAccountsPage() {
       return
     }
     setRevealed((r) => ({ ...r, [a.id]: 'loading' }))
-    const { data, error } = await supabase.rpc('get_duo_account_credentials', { p_account_id: a.id })
-    const res = data as { success: boolean; login?: string; password?: string } | null
-    if (error || !res?.success || !res.login) {
+    const res = await adminGetDuoAccountCredentials(a.id).catch(() => null)
+    if (!res?.success || !res.login) {
       setRevealed((r) => ({ ...r, [a.id]: 'error' }))
       return
     }

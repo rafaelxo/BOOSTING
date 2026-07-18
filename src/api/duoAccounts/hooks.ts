@@ -4,7 +4,7 @@ import { queryKeys } from '@/api/core/queryKeys'
 import { listAdminDuoAccounts, listDuoAccounts, lookupDuoAccountRiotRank } from './queries'
 import {
   adminDeleteDuoAccount, adminReleaseDuoAccount, adminSaveDuoAccount, adminSetDuoAccountActive,
-  getDuoAccountAccessToken, reserveDuoAccount, updateDuoAccountRank,
+  getDuoAccountAccessToken, releaseDuoAccountReservation, reserveDuoAccount, updateDuoAccountRank,
 } from './mutations'
 import type { AdminDuoAccount, BoosterVisibleDuoAccount } from './types'
 
@@ -28,6 +28,14 @@ export function useReserveDuoAccount() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: reserveDuoAccount,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.duoAccounts.list() }),
+  })
+}
+
+export function useReleaseDuoAccountReservation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: releaseDuoAccountReservation,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.duoAccounts.list() }),
   })
 }

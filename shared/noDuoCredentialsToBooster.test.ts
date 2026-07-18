@@ -17,6 +17,7 @@ describe('Contas Duo: booster nunca vê login/senha cru', () => {
   const boosterFiles = [
     'src/features/booster/pages/Accounts.tsx',
     'src/features/booster/pages/JobDetail.tsx',
+    'src/api/duoAccounts/queries.ts',
   ]
 
   for (const file of boosterFiles) {
@@ -25,10 +26,24 @@ describe('Contas Duo: booster nunca vê login/senha cru', () => {
     })
   }
 
-  it('JobDetail.tsx (booster) usa reserva + token opaco de conta Duo', () => {
-    const content = read('src/features/booster/pages/JobDetail.tsx')
-    expect(content).toContain('reserve_duo_account')
-    expect(content).toContain('get_duo_account_access_token')
+  it('src/api/duoAccounts/mutations.ts só expõe get_duo_account_credentials sob nome admin-only', () => {
+    // adminGetDuoAccountCredentials é a única função que chama essa RPC --
+    // nome explícito para deixar claro, em qualquer futuro import, que é
+    // admin-only (não deve ser importada por páginas de booster).
+    const content = read('src/api/duoAccounts/mutations.ts')
+    expect(content).toContain('adminGetDuoAccountCredentials')
+  })
+
+  it('JobDetail.tsx (booster) usa reserva + token opaco de conta Duo (camada de API)', () => {
+    // As chamadas em si vivem em src/api/duoAccounts/mutations.ts
+    // (useReserveDuoAccount/useGetDuoAccountAccessToken) desde a introdução
+    // da camada de API tipada -- JobDetail.tsx consome os hooks.
+    const page = read('src/features/booster/pages/JobDetail.tsx')
+    expect(page).toContain('useReserveDuoAccount')
+    expect(page).toContain('useGetDuoAccountAccessToken')
+    const api = read('src/api/duoAccounts/mutations.ts')
+    expect(api).toContain('reserve_duo_account')
+    expect(api).toContain('get_duo_account_access_token')
   })
 
   it('resolve_duo_account_access_token só é chamada pela edge function dedicada', () => {

@@ -9,7 +9,8 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
-import { getCustomerOrderState } from '@/lib/customerOrderState'
+import { getCustomerOrderState, savePendingOrderFromIntent, restorePendingOrder, generatePix as generatePixRequest } from '@/api/orders'
+import type { PixPaymentResponse } from '@/api/orders'
 import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus } from 'lucide-react'
 
 // PIX states
@@ -20,18 +21,6 @@ type PixState =
   | { phase: 'confirmed' }
   | { phase: 'expired'; order_id: string }
   | { phase: 'error'; message: string; order_id?: string }
-
-type PixPaymentResponse = {
-  success?: boolean
-  order_id: string
-  total_price: number
-  payment_id?: string | number
-  qr_code?: string
-  qr_code_base64?: string | null
-  expires_at: string
-  reused?: boolean
-  saved?: boolean
-}
 
 function pixErrorMessage(err: unknown) {
   if (!(err instanceof EdgeFunctionError)) {
@@ -246,15 +235,10 @@ export function StepPayment() {
     setIsSavingOrder(true)
     setSaveError(null)
     try {
-      const saved = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-        body: {
-          intent: buildIntent(),
-          idempotency_key: idempotencyKeyRef.current,
-          preferred_booster_id: store.preferredBoosterId ?? undefined,
-          save_only: true,
-        },
-        timeoutMs: 25_000,
-        requireAuth: true,
+      const saved = await savePendingOrderFromIntent({
+        intent: buildIntent(),
+        idempotencyKey: idempotencyKeyRef.current,
+        preferredBoosterId: store.preferredBoosterId ?? undefined,
       })
       restoredOrderRef.current = saved.order_id
       setSavedOrderId(saved.order_id)
@@ -286,15 +270,11 @@ export function StepPayment() {
   // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
   // partir da intenção (rank, extras selecionados, pacote de vitórias etc).
-  async function invokePix(payload: { order_id: string } | { intent: Record<string, unknown>; idempotency_key: string; preferred_booster_id?: string }) {
+  async function invokePix(orderId: string) {
     let pixData: PixPaymentResponse
 
     try {
-      pixData = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-        body: payload,
-        timeoutMs: 25_000,
-        requireAuth: true,
-      })
+      pixData = await generatePixRequest(orderId)
     } catch (err) {
       const orderId = err instanceof EdgeFunctionError && err.body && typeof err.body !== 'string'
         ? typeof err.body.order_id === 'string' ? err.body.order_id : undefined
@@ -307,8 +287,6 @@ export function StepPayment() {
       setPix({ phase: 'error', message: 'A função não retornou o código PIX. Tente novamente.', order_id: pixData.order_id })
       return
     }
-
-    const orderId: string = pixData.order_id
 
     setPix({
       phase: 'waiting',
@@ -326,11 +304,7 @@ export function StepPayment() {
     // If MP didn't return base64 yet, retry once after 3s to get it
     if (!pixData.qr_code_base64) {
       setTimeout(async () => {
-        const retry = await invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-          body: { order_id: orderId },
-          timeoutMs: 20_000,
-          requireAuth: true,
-        }).catch(() => null)
+        const retry = await generatePixRequest(orderId).catch(() => null)
         if (retry?.qr_code_base64) {
           setPix((prev) =>
             prev.phase === 'waiting' ? { ...prev, qr_base64: retry.qr_code_base64 ?? null } : prev,
@@ -349,11 +323,7 @@ export function StepPayment() {
     restoredOrderRef.current = pendingOrderId
     setSavedOrderId(pendingOrderId)
     setIsSavingOrder(true)
-    void invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-      body: { order_id: pendingOrderId, save_only: true },
-      timeoutMs: 20_000,
-      requireAuth: true,
-    }).then((saved) => {
+    void restorePendingOrder(pendingOrderId).then((saved) => {
       setSavedTotalPrice(Number(saved.total_price))
     }).catch((err) => {
       setSaveError(pixErrorMessage(err))
@@ -390,7 +360,7 @@ export function StepPayment() {
       const orderId = erroredOrderId ?? savedOrderId ?? pendingOrderId ?? await persistPendingOrder()
       if (!orderId) return
       setPix({ phase: 'generating' })
-      await invokePix({ order_id: orderId })
+      await invokePix(orderId)
     } catch (err) {
       setPix({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
     }

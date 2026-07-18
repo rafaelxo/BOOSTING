@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   Shield,
-  RefreshCw, AlertTriangle, Landmark,
+  RefreshCw, AlertTriangle, Landmark, Banknote,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
@@ -29,6 +29,7 @@ export function AdminLayout() {
       label: t('admin.nav.finance'),
       items: [
         { href: '/admin/payments', icon: DollarSign, label: t('admin.nav.payments') },
+        { href: '/admin/payouts',  icon: Banknote,    label: 'Saques' },
         { href: '/admin/refunds',  icon: RefreshCw,  label: t('admin.nav.refunds')  },
       ],
     },

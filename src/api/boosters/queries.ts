@@ -32,6 +32,14 @@ export async function getOwnBoosterProfileId(userId: string): Promise<string | n
   return data?.id ?? null
 }
 
+// Usado só pra calcular a divisão de ganhos (boosterEarningsShare) na tela de
+// job/pedidos do booster -- não precisa do restante do perfil profissional.
+export async function getOwnBoosterTop3Status(userId: string): Promise<boolean> {
+  const { data, error } = await supabase.from('booster_profiles').select('is_top3').eq('user_id', userId).maybeSingle()
+  if (error) throw normalizeApiError(error)
+  return data?.is_top3 ?? false
+}
+
 export async function listPublicBoosters(): Promise<BoosterProfile[]> {
   const { data, error } = await supabase.from('public_booster_profiles').select('*').limit(100)
   if (error) throw normalizeApiError(error)

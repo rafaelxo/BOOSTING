@@ -3,72 +3,45 @@
 @tailwind utilities;
 
 @layer base {
-  /* ── Light mode (default) ─────────────── RGB channels, sem rgb() wrapper */
+  /* Tema único, escuro — "High-Elo Operations Center". Este é um produto
+     operacional (pagamentos reais, dados ao vivo), não um site de conteúdo:
+     não há alternância clara/escura por decisão de produto. Base em preto
+     acinzentado neutro (sem tendência azulada) -- verde como marca. */
   :root {
-    color-scheme: light;
-
-    --color-bg-base:     245 248 246;  /* #F5F8F6 — Fundo */
-    --color-bg-surface:  255 255 255;  /* #FFFFFF — Cards */
-    --color-bg-card:     255 255 255;  /* #FFFFFF — Cards */
-    --color-bg-elevated: 233 238 236;  /* um degrau abaixo do branco, pra chips/divisores */
-    --color-bg-overlay:  220 228 224;
-
-    --color-ink:           13  16  14;  /* #0D100E — Texto */
-    --color-ink-secondary: 60  74  66;
-    --color-ink-muted:    138 155 145;
-    --color-ink-inverse:  245 248 246;
-
-    /* Muted tints — light versions */
-    --color-brand-muted:   223 243 233;
-    --color-brand-subtle:  190 232 211;
-    --color-success-muted: 209 250 229;
-    --color-danger-muted:  254 226 226;
-    --color-warning-muted: 254 243 199;
-    --color-accent-muted:  254 249 195;
-
-    --logo-url: url('/light.png');
-
-    --shadow-card:       0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
-    --shadow-card-hover: 0 10px 25px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
-    --shadow-brand:      0 0 24px rgba(34,197,94,0.25);
-    --shadow-accent:     0 0 20px rgba(245,184,0,0.2);
-    --shadow-glow:       0 0 60px rgba(34,197,94,0.08);
-  }
-
-  /* ── Dark mode ────────────────────────── */
-  .dark {
     color-scheme: dark;
 
-    --color-bg-base:      21  24  29;   /* #15181D — Fundo */
-    --color-bg-surface:   27  31  36;   /* #1B1F24 — Cards */
-    --color-bg-card:      27  31  36;   /* #1B1F24 — Cards */
-    --color-bg-elevated:  35  40  48;   /* um degrau acima do card, pra chips/divisores */
-    --color-bg-overlay:   44  50  60;
+    --color-bg-base:        14  14  16;   /* #0E0E10 */
+    --color-bg-surface:     20  20  23;   /* #141417 — cards */
+    --color-bg-raised:      27  27  31;   /* #1B1B1F — um degrau acima (popovers, cards aninhados) */
+    --color-bg-interactive: 35  35  40;   /* #232328 — inputs, hover */
+    --color-bg-overlay:     14  14  16;   /* usado com alpha p/ scrims de modal */
 
-    --color-ink:          231 231 228; /* #E7E7E4 — Texto */
-    --color-ink-secondary:164 168 166; /* #A4A8A6 — Texto secundário */
-    --color-ink-muted:    110 114 111;
-    --color-ink-inverse:   21  24  29;
+    --color-border-subtle: 40  40  45;    /* #28282D */
+    --color-border-strong: 60  60  67;    /* #3C3C43 */
 
-    /* Muted tints — dark versions */
-    --color-brand-muted:   15  42  29;
-    --color-brand-subtle:  27  74  50;
-    --color-success-muted: 10  46  32;
-    --color-danger-muted:  46  10  10;
-    --color-warning-muted: 46  31   0;
-    --color-accent-muted:  46  36   0;
+    --color-ink:           237 238 239;   /* #EDEEEF */
+    --color-ink-secondary: 160 163 168;   /* #A0A3A8 */
+    --color-ink-muted:     108 111 117;   /* #6C6F75 */
+    --color-ink-inverse:   14  14  16;
+
+    --color-brand-muted:   14  40  24;
+    --color-brand-subtle:  20  58  35;
+    --color-accent-muted:  46  36  0;
+    --color-success-muted: 15  43  30;
+    --color-warning-muted: 46  32  15;
+    --color-danger-muted:  46  18  18;
+    --color-info-muted:    16  30  50;
 
     --logo-url: url('/dark.png');
 
-    --shadow-card:       0 1px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
-    --shadow-card-hover: 0 8px 24px rgba(0,0,0,0.5), 0 1px 4px rgba(0,0,0,0.3);
-    --shadow-brand:      0 0 24px rgba(34,197,94,0.35);
-    --shadow-accent:     0 0 20px rgba(245,184,0,0.3);
-    --shadow-glow:       0 0 60px rgba(34,197,94,0.12);
+    --shadow-card:       0 1px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03);
+    --shadow-card-hover: 0 12px 28px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.35);
+    --shadow-brand:      0 0 24px rgba(34,197,94,0.3);
+    --shadow-accent:     0 0 20px rgba(245,184,0,0.28);
   }
 
   * {
-    @apply border-bg-elevated;
+    @apply border-border-subtle;
   }
 
   html {
@@ -84,13 +57,27 @@
     @apply font-display font-bold tracking-tight;
   }
 
-  /* Scrollbar */
+  /* Valores financeiros, LP, KDA, timers -- sempre algarismos tabulares, em
+     toda a aplicação, sem precisar lembrar de aplicar a classe caso a caso. */
+  .tabular-figures, [data-tabular] {
+    font-variant-numeric: tabular-nums;
+  }
+
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { @apply bg-bg-surface; }
   ::-webkit-scrollbar-thumb { @apply bg-bg-overlay rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-ink-muted; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-border-strong; }
 
   ::selection { @apply bg-brand/30 text-ink; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer components {
@@ -102,20 +89,23 @@
   }
 
   .card {
-    @apply bg-bg-card border border-bg-elevated/80 rounded-2xl shadow-card transition-all duration-200;
+    @apply bg-bg-surface border border-border-subtle rounded-2xl shadow-card transition-all duration-200;
   }
-  .card-elevated {
-    @apply bg-bg-elevated border border-bg-overlay rounded-2xl shadow-card-hover;
+  .card-raised {
+    @apply bg-bg-raised border border-border-strong rounded-2xl shadow-card-hover;
   }
   .card-brand {
     @apply bg-brand/10 border border-brand/25 rounded-2xl;
   }
+  .card-accent {
+    @apply bg-accent/10 border border-accent/25 rounded-2xl;
+  }
   .card-glass {
-    @apply bg-bg-card/60 backdrop-blur-md border border-bg-elevated rounded-2xl;
+    @apply bg-bg-surface/60 backdrop-blur-md border border-border-subtle rounded-2xl;
   }
 
   .input-base {
-    @apply w-full bg-bg-surface border border-bg-elevated rounded-xl px-4 py-3
+    @apply w-full bg-bg-interactive border border-border-subtle rounded-xl px-4 py-3
            text-ink placeholder:text-ink-muted
            focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand/60
            transition-all duration-150;
@@ -133,7 +123,7 @@
   }
 
   .skeleton {
-    @apply bg-gradient-to-r from-bg-card via-bg-elevated to-bg-card
+    @apply bg-gradient-to-r from-bg-surface via-bg-raised to-bg-surface
            bg-[length:200%_100%] animate-shimmer rounded-xl;
   }
 
@@ -150,6 +140,12 @@
 
   .divider-brand {
     @apply h-px bg-gradient-to-r from-transparent via-brand/30 to-transparent;
+  }
+
+  /* Foco visível consistente em toda a aplicação (WCAG 2.2 AA) -- primitivos
+     interativos usam esta classe em vez de reinventar o anel de foco. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base;
   }
 }
 

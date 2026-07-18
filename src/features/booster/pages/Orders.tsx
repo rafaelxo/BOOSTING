@@ -1,24 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { ClipboardList } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
-import { supabase } from '@/lib/supabase'
-import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
-import type { Order, OrderStatus } from '@/types'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
+import { useBoosterOrdersInfinite } from '@/api/orders'
+import type { BoosterOrdersTab } from '@/api/orders'
+import { useOwnBoosterTop3Status } from '@/api/boosters'
 
 // Agrupa o enum real de order_status em abas — nenhum status é excluído,
 // só reorganizado para o contexto de "pedidos do booster" (o pool de pedidos
 // ainda não aceitos, awaiting_assignment, é responsabilidade da página Jobs).
-const TABS = [
-  { key: 'active',    label: 'Em andamento', statuses: ['assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer'] as OrderStatus[] },
-  { key: 'completed', label: 'Concluídos',   statuses: ['completed'] as OrderStatus[] },
-  { key: 'canceled',  label: 'Cancelados',   statuses: ['canceled', 'refunded', 'disputed'] as OrderStatus[] },
-] as const
+const TABS: { key: BoosterOrdersTab; label: string }[] = [
+  { key: 'active',    label: 'Em andamento' },
+  { key: 'completed', label: 'Concluídos'   },
+  { key: 'canceled',  label: 'Cancelados'   },
+]
 
-type TabKey = typeof TABS[number]['key']
+type TabKey = BoosterOrdersTab
 
 // Page size scales with viewport so wider screens (more grid columns) load
 // proportionally more cards per batch than a single mobile column would.
@@ -35,41 +34,14 @@ export function BoosterOrdersPage() {
   const pageSize = useMemo(getPageSize, [])
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<TabKey>('active')
-  const activeTab = TABS.find(t => t.key === tab)!
 
-  const { data: boosterProfile } = useQuery({
-    queryKey: ['booster-profile-top3', profile?.id],
-    queryFn: async () => {
-      const { data } = await supabase.from('booster_profiles').select('is_top3').eq('user_id', profile!.id).maybeSingle()
-      return data
-    },
-    enabled: !!profile?.id,
-  })
+  const { data: isTop3 } = useOwnBoosterTop3Status(profile?.id)
 
   const {
     data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['booster-orders', profile?.id, tab, pageSize],
-    queryFn: async ({ pageParam }) => {
-      const from = pageParam * pageSize
-      const to = from + pageSize - 1
-      const { data, error } = await supabase
-        .from('orders')
-        .select(ORDER_SAFE_COLUMNS)
-        .eq('assigned_booster_id', profile!.id)
-        .in('status', activeTab.statuses)
-        .order('created_at', { ascending: false })
-        .range(from, to)
-      if (error) throw error
-      return data as unknown as Order[]
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage, allPages) => (lastPage.length === pageSize ? allPages.length : undefined),
-    enabled: !!profile?.id,
-    refetchInterval: 15000,
-  })
+  } = useBoosterOrdersInfinite(profile?.id, tab, pageSize)
 
-  const orders = data?.pages.flat() ?? []
+  const orders = data?.pages.flatMap((p) => p.orders) ?? []
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -116,7 +88,7 @@ export function BoosterOrdersPage() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {orders.map((order) => <CompletedOrderCard key={order.id} order={order} isTop3={boosterProfile?.is_top3} />)}
+            {orders.map((order) => <CompletedOrderCard key={order.id} order={order} isTop3={isTop3} />)}
           </div>
           <div ref={sentinelRef} className="h-4" />
           {isFetchingNextPage && (

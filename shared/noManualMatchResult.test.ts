@@ -30,8 +30,13 @@ describe('Ausência do fluxo manual de resultado de partida', () => {
     expect(content).not.toMatch(/\+1\s*Loss/i)
   })
 
-  it('JobDetail.tsx oferece sincronização via sync-order-matches', () => {
-    const content = read('src/features/booster/pages/JobDetail.tsx')
-    expect(content).toContain('sync-order-matches')
+  it('JobDetail.tsx oferece sincronização via sync-order-matches (camada de API)', () => {
+    // A chamada em si vive em src/api/orders/mutations.ts (useSyncOrderMatches)
+    // desde a introdução da camada de API tipada -- JobDetail.tsx consome o
+    // hook em vez de chamar a Edge Function diretamente.
+    const page = read('src/features/booster/pages/JobDetail.tsx')
+    expect(page).toContain('useSyncOrderMatches')
+    const api = read('src/api/orders/mutations.ts')
+    expect(api).toContain('sync-order-matches')
   })
 })
