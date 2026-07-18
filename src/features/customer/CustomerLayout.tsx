@@ -6,7 +6,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
-import { Avatar, LogoMark } from '@/components/ui'
+import { Avatar, LogoMark, ThemeToggle } from '@/components/ui'
 import { UserProfilePanel } from '@/components/UserProfilePanel'
 import { NotificationBell } from '@/components/NotificationBell'
 
@@ -72,6 +72,7 @@ export function CustomerLayout() {
           <div className="hidden md:block" />
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <NotificationBell />
             {/* Avatar — opens profile panel */}
             <button

@@ -268,15 +268,15 @@ export function AdminDuoAccountsPage() {
         onOpenChange={(open) => !open && setModal(null)}
         title={modal?.mode === 'edit' ? 'Editar Conta Duo' : 'Adicionar Conta Duo'}
         description="Login e senha são criptografados no banco e só podem ser revelados por admins e boosters aprovados."
-        maxWidth="lg"
+        maxWidth="2xl"
       >
-        <div className="space-y-5">
+        <div className="space-y-6">
           <FormField
             label="Riot ID"
             required
             hint="Consulta rank, divisão e PDL/LP atuais na Riot — nenhum campo de rank é preenchido manualmente."
           >
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 value={form.riot_id}
                 onChange={(e) => {
@@ -288,7 +288,7 @@ export function AdminDuoAccountsPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') { e.preventDefault(); lookupRiot.mutate() }
                 }}
-                className="input-base flex-1"
+                className="input-base flex-1 text-base py-3"
                 placeholder="NomeDaConta#TAG"
                 autoComplete="off"
                 disabled={modal?.mode === 'edit'}
@@ -298,7 +298,7 @@ export function AdminDuoAccountsPage() {
                 type="button"
                 onClick={() => lookupRiot.mutate()}
                 disabled={lookupRiot.isPending || !form.riot_id.trim()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed shrink-0"
               >
                 <Search className="h-4 w-4" />
                 {lookupRiot.isPending ? 'Consultando...' : 'Verificar'}
@@ -308,22 +308,22 @@ export function AdminDuoAccountsPage() {
           </FormField>
 
           {riotVerified && (
-            <div className="flex items-center gap-4 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3.5">
-              <RankBadge tier={form.tier} division={form.division} size="md" showLabel={false} />
+            <div className="flex items-center gap-5 rounded-xl border border-brand/25 bg-brand/10 px-5 py-4">
+              <RankBadge tier={form.tier} division={form.division} size="lg" showLabel={false} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-ink">
+                <p className="text-base font-bold text-ink">
                   {RANK_TIER_LABEL[form.tier]} {form.division}
                 </p>
-                <p className="text-xs text-ink-secondary flex items-center gap-1 mt-0.5">
+                <p className="text-xs text-ink-secondary flex items-center gap-1 mt-1">
                   <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                   {riotLookupMessage ?? 'Rank cadastrado — verifique novamente pra atualizar.'}
                 </p>
               </div>
               {form.leaguePoints != null && (
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-ink">{form.leaguePoints} PDL</p>
+                  <p className="text-base font-bold text-ink">{form.leaguePoints} PDL</p>
                   {form.avgGain != null && (
-                    <p className="text-[11px] text-ink-muted mt-0.5">
+                    <p className="text-xs text-ink-muted mt-1">
                       Média: +{form.avgGain}{form.avgLoss != null ? ` / −${form.avgLoss}` : ''}
                     </p>
                   )}
@@ -333,16 +333,16 @@ export function AdminDuoAccountsPage() {
           )}
 
           {!riotVerified ? (
-            <p className="text-xs text-ink-muted rounded-xl border border-bg-elevated bg-bg-elevated/40 px-4 py-3">
+            <p className="text-sm text-ink-muted rounded-xl border border-bg-elevated bg-bg-elevated/40 px-5 py-4">
               Verifique o Riot ID acima para liberar os campos de login e senha.
             </p>
           ) : (
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 gap-5">
               <FormField label={`Login${modal?.mode === 'edit' ? ' (deixe em branco p/ manter)' : ''}`}>
                 <input
                   value={form.login}
                   onChange={(e) => setForm((f) => ({ ...f, login: e.target.value }))}
-                  className="input-base w-full"
+                  className="input-base w-full py-3"
                   autoComplete="off"
                 />
               </FormField>
@@ -351,7 +351,7 @@ export function AdminDuoAccountsPage() {
                   type="text"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  className="input-base w-full"
+                  className="input-base w-full py-3"
                   autoComplete="off"
                 />
               </FormField>
@@ -362,12 +362,12 @@ export function AdminDuoAccountsPage() {
             <textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              rows={2}
+              rows={3}
               className="input-base w-full resize-none"
             />
           </FormField>
 
-          <label className="flex items-center gap-2.5 text-sm text-ink-secondary">
+          <label className="flex items-center gap-2.5 text-sm text-ink-secondary rounded-xl border border-bg-elevated bg-bg-elevated/40 px-5 py-3.5 w-fit">
             <input
               type="checkbox"
               checked={form.is_active}

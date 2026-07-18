@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { getBoostFlow, isMasterPlusCurrentTier, type BoostFlow, type BoostMode as BoostFlowMode } from '@/lib/boostDomain'
 import type { GameSlug, ServiceType, QueueType, BoostMode, Rank } from '@/types'
 
@@ -218,7 +219,16 @@ function flowFor(rank: Rank | null, mode: BoostMode): BoostFlow | null {
   return getBoostFlow(rank.tier, mode as BoostFlowMode)
 }
 
-export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
+// Persistido em sessionStorage -- não localStorage -- pra sobreviver a um
+// reload/troca de aba dentro da mesma sessão do navegador (o cenário real:
+// o refetch automático do React Query em foco de janela nunca derruba
+// estado de componente sozinho, mas o navegador pode descartar/recarregar
+// uma aba em segundo plano por pressão de memória, o que zerava todo o
+// progresso do configurador). Um pedido configurado não deve sobreviver ao
+// fechamento da aba/navegador -- por isso sessionStorage, não localStorage.
+export const useOrderBuilderStore = create<OrderBuilderState>()(
+  persist(
+    (set, get) => ({
   ...initialState,
 
   setStep: (step) => set({ step }),
@@ -367,4 +377,25 @@ export const useOrderBuilderStore = create<OrderBuilderState>((set, get) => ({
   setPdlModifierPct: (pdlModifierPct) => set({ pdlModifierPct }),
 
   reset: () => set({ ...initialState, selectedExtraIds: new Set<string>() }),
-}))
+    }),
+    {
+      name: 'eloboost-order-builder',
+      storage: createJSONStorage(() => sessionStorage, {
+        // Set não é serializável em JSON puro -- codifica/decodifica
+        // explicitamente (selectedExtraIds é o único Set no estado).
+        replacer: (_key, value) => (value instanceof Set ? { __set: [...value] } : value),
+        reviver: (_key, value) =>
+          value && typeof value === 'object' && '__set' in (value as Record<string, unknown>)
+            ? new Set((value as { __set: string[] }).__set)
+            : value,
+      }),
+      // Só os dados do pedido em construção -- exclui riotLookupLoading (flag
+      // transiente de "consulta em andamento") pra nunca restaurar travado
+      // num loading que não existe mais depois de um reload.
+      partialize: (state) => {
+        const { riotLookupLoading: _riotLookupLoading, ...persisted } = state
+        return persisted
+      },
+    },
+  ),
+)

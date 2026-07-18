@@ -92,8 +92,19 @@ serve(async (req) => {
     // vinculada e logou de novo com outra (ou tem múltiplas identidades
     // linkadas) fazia .find() pegar a identidade errada e disparar um 403
     // de "mismatch" mesmo com um token válido e pertencente ao usuário.
+    //
+    // BUG real (causa raiz do mismatch acontecer sempre, pra qualquer
+    // usuário): identity.identity_id é o uuid interno da tabela
+    // auth.identities (mesmo formato de identity.id), nunca o snowflake do
+    // Discord -- o snowflake de verdade vive dentro de identity_data
+    // (colunas provider_id/sub), confirmado direto na tabela auth.identities
+    // do banco. Comparar identity_id contra o id retornado por
+    // discord.com/users/@me nunca bate, pra ninguém -- por isso o join no
+    // servidor do Discord nunca funcionava.
     const discordIdentities = auth.user.identities?.filter((identity) => identity.provider === 'discord') ?? []
-    const matchesLinkedIdentity = discordIdentities.some((identity) => String(identity.identity_id) === discordUserId)
+    const identityDiscordId = (identity: typeof discordIdentities[number]) =>
+      String(identity.identity_data?.provider_id ?? identity.identity_data?.sub ?? '')
+    const matchesLinkedIdentity = discordIdentities.some((identity) => identityDiscordId(identity) === discordUserId)
     const matchesMetadataFallback = discordIdentities.length === 0 && (
       String(auth.user.user_metadata?.provider_id ?? '') === discordUserId
       || String(auth.user.user_metadata?.sub ?? '') === discordUserId
@@ -103,13 +114,13 @@ serve(async (req) => {
       // pra diagnosticar esse mismatch sem precisar puxar os logs da function.
       console.error('Discord identity mismatch', {
         token_discord_id: discordUserId,
-        linked_identity_ids: discordIdentities.map((i) => i.identity_id),
+        linked_identity_ids: discordIdentities.map(identityDiscordId),
         metadata_provider_id: auth.user.user_metadata?.provider_id,
         metadata_sub: auth.user.user_metadata?.sub,
       })
       return errorResponse(req, 'Discord identity mismatch', 403, 'DISCORD_IDENTITY_MISMATCH', {
         token_discord_id: discordUserId,
-        linked_identity_ids: discordIdentities.map((i) => i.identity_id),
+        linked_identity_ids: discordIdentities.map(identityDiscordId),
       })
     }
 

@@ -8,7 +8,7 @@ import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck } from 'lucide-react'
 import type { ServiceType, Rank } from '@/types'
-import { getServiceLabel } from '@/lib/utils'
+import { getServiceLabel, formatEstimatedDelivery } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getCustomerOrderState } from '@/api/orders'
@@ -314,7 +314,7 @@ export function OrderBuilderPage() {
                   <SummaryRow label="Serviço" value={getServiceLabel(serviceType)} />
                 )}
                 {estimatedHours && (
-                  <SummaryRow label="Entrega est." value={`~${estimatedHours}h`} />
+                  <SummaryRow label="Entrega est." value={formatEstimatedDelivery(estimatedHours)} />
                 )}
                 {selectedAddons.length > 0 && (
                   <div>

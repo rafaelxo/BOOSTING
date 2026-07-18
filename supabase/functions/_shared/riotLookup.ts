@@ -103,6 +103,27 @@ export type LeagueCutoffResult =
 // riot_league_cutoffs (migration 074) porque essas ligas têm centenas/
 // milhares de entries e não podem ser consultadas a cada visualização de
 // pedido.
+//
+// Riot marca contas que não jogam há um tempo com `inactive: true` -- elas
+// continuam listadas na liga (ainda não decaíram pra sair do tier) com o LP
+// congelado no último valor, frequentemente bem abaixo do corte real. Filtra
+// antes de calcular; se por acaso a liga inteira vier marcada inativa (nunca
+// visto na prática), cai pro conjunto sem filtro em vez de reportar
+// `empty_league` à toa.
+//
+// Mesmo assim sobra outro caso: um jogador PODE ficar abaixo do LP mínimo de
+// entrada depois de promovido (perde partidas e só é rebaixado ao chegar em
+// 0 LP, não ao cruzar o piso de entrada de novo) -- ele continua contando
+// como challenger/grão-mestre, mas não representa o corte real pra quem tá
+// subindo. Pelas regras oficiais da Riot (Apex Tiers), ninguém entra em
+// grão-mestre com menos de 400 LP nem em challenger com menos de 800 -- um
+// corte abaixo disso é sempre um desses jogadores "sobrando", nunca o corte
+// de fato. Usa isso como piso.
+const TIER_ENTRY_FLOOR_LP: Record<'grandmaster' | 'challenger', number> = {
+  grandmaster: 400,
+  challenger: 800,
+}
+
 export async function fetchLeagueCutoff(
   tier: 'grandmaster' | 'challenger',
   queue: 'solo_duo' | 'flex',
@@ -119,13 +140,15 @@ export async function fetchLeagueCutoff(
   if (resp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
   if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
 
-  const body = await resp.json() as { entries?: { leaguePoints?: number }[] }
-  const points = (body.entries ?? [])
+  const body = await resp.json() as { entries?: { leaguePoints?: number; inactive?: boolean }[] }
+  const entries = body.entries ?? []
+  const active = entries.filter((e) => e.inactive !== true)
+  const points = (active.length > 0 ? active : entries)
     .map((e) => e.leaguePoints)
     .filter((lp): lp is number => typeof lp === 'number')
   if (points.length === 0) return { ok: false, reason: 'empty_league', status: 502 }
 
-  return { ok: true, cutoffLp: Math.min(...points) }
+  return { ok: true, cutoffLp: Math.max(TIER_ENTRY_FLOOR_LP[tier], Math.min(...points)) }
 }
 
 export type MatchIdsResult =

@@ -615,35 +615,30 @@ export type Database = {
       }
       master_plus_pricing: {
         Row: {
+          current_tier: string
           id: string
           price: number | null
-          tier: string
+          target_tier: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          current_tier: string
           id?: string
           price?: number | null
-          tier: string
+          target_tier: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          current_tier?: string
           id?: string
           price?: number | null
-          tier?: string
+          target_tier?: string
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "master_plus_pricing_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -883,6 +878,7 @@ export type Database = {
           created_at: string
           error_reason: string | null
           fetched_division: string | null
+          fetched_lp: number | null
           fetched_tier: string | null
           id: string
           order_id: string
@@ -896,6 +892,7 @@ export type Database = {
           created_at?: string
           error_reason?: string | null
           fetched_division?: string | null
+          fetched_lp?: number | null
           fetched_tier?: string | null
           id?: string
           order_id: string
@@ -909,6 +906,7 @@ export type Database = {
           created_at?: string
           error_reason?: string | null
           fetched_division?: string | null
+          fetched_lp?: number | null
           fetched_tier?: string | null
           id?: string
           order_id?: string
@@ -938,6 +936,42 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_status_events: {
+        Row: {
+          created_at: string
+          id: number
+          order_id: string
+          status: Database["public"]["Enums"]["order_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          order_id: string
+          status: Database["public"]["Enums"]["order_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          order_id?: string
+          status?: Database["public"]["Enums"]["order_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_status_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2006,45 +2040,20 @@ export type Database = {
         | { Args: { p_booster_id: string }; Returns: boolean }
       list_duo_accounts: { Args: never; Returns: Json }
       mark_order_match_sync: { Args: { p_order_id: string }; Returns: Json }
-      onboard_booster:
-        | {
-            Args: {
-              p_bio: string
-              p_display_name: string
-              p_hours_per_day_max?: number
-              p_hours_per_day_min?: number
-              p_opgg_link?: string
-              p_peak_rank: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_bio: string
-              p_cpf?: string
-              p_display_name: string
-              p_full_name?: string
-              p_hours_per_day_max?: number
-              p_hours_per_day_min?: number
-              p_opgg_link?: string
-              p_peak_rank: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_available_days?: string[]
-              p_bio: string
-              p_cpf?: string
-              p_display_name: string
-              p_full_name?: string
-              p_hours_per_day_max?: number
-              p_hours_per_day_min?: number
-              p_opgg_link?: string
-              p_peak_rank: Json
-            }
-            Returns: Json
-          }
+      onboard_booster: {
+        Args: {
+          p_available_days?: string[]
+          p_bio: string
+          p_cpf?: string
+          p_display_name: string
+          p_full_name?: string
+          p_hours_per_day_max?: number
+          p_hours_per_day_min?: number
+          p_opgg_link?: string
+          p_peak_rank: Json
+        }
+        Returns: Json
+      }
       order_requires_access_token: {
         Args: {
           p_boost_mode: string
@@ -2144,34 +2153,20 @@ export type Database = {
         Args: { p_access_token: string; p_booster_user_id: string }
         Returns: Json
       }
-      save_duo_account:
-        | {
-            Args: {
-              p_account_id: string
-              p_division: string
-              p_is_active: boolean
-              p_label: string
-              p_login?: string
-              p_notes: string
-              p_password?: string
-              p_tier: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_account_id: string
-              p_division: string
-              p_is_active: boolean
-              p_label: string
-              p_login?: string
-              p_notes: string
-              p_password?: string
-              p_riot_id?: string
-              p_tier: string
-            }
-            Returns: Json
-          }
+      save_duo_account: {
+        Args: {
+          p_account_id: string
+          p_division: string
+          p_is_active: boolean
+          p_label: string
+          p_login?: string
+          p_notes: string
+          p_password?: string
+          p_riot_id?: string
+          p_tier: string
+        }
+        Returns: Json
+      }
       send_order_message: {
         Args: { p_content: string; p_order_id: string }
         Returns: Json

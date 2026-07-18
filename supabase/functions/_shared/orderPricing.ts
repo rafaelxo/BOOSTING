@@ -323,11 +323,12 @@ export async function validateAndPriceIntent(
     const { data: priceRow, error: priceErr } = await serviceClient
       .from('master_plus_pricing')
       .select('price')
-      .eq('tier', mp.target_rank.tier)
+      .eq('current_tier', mp.current_rank.tier)
+      .eq('target_tier', mp.target_rank.tier)
       .maybeSingle()
     if (priceErr) return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
     if (!priceRow || priceRow.price == null) {
-      return { ok: false, response: badRequest(req, 'Preço ainda não configurado para este tier. Fale com o suporte.') }
+      return { ok: false, response: badRequest(req, 'Preço ainda não configurado para essa combinação de tiers. Fale com o suporte.') }
     }
     masterPlusPrice = Number(priceRow.price)
 

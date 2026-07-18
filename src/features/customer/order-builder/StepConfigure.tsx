@@ -208,21 +208,23 @@ export function StepConfigure() {
     }
   }, [currentRank, targetRank, setTargetRank])
 
-  // Preço do Master+ vem da tabela comercial — preço fixo por tier alvo,
-  // independente de qual tier o cliente parte. Se o tier ainda não tem preço
-  // configurado, o preço fica indefinido e o pedido não avança.
+  // Preço do Master+ vem da tabela comercial — depende do par (tier atual,
+  // tier alvo), já que a distância entre tiers importa (Grão-Mestre->
+  // Challenger custa menos que Mestre->Challenger). Se a combinação ainda
+  // não tem preço configurado, o preço fica indefinido e o pedido não avança.
   const { data: masterPlusPriceRow, isFetching: loadingMasterPlusPrice } = useQuery({
-    queryKey: ['master-plus-price', targetRank?.tier],
+    queryKey: ['master-plus-price', currentRank?.tier, targetRank?.tier],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('master_plus_pricing')
         .select('price')
-        .eq('tier', targetRank!.tier)
+        .eq('current_tier', currentRank!.tier)
+        .eq('target_tier', targetRank!.tier)
         .maybeSingle()
       if (error) throw error
       return data as { price: number | null } | null
     },
-    enabled: currentIsMasterPlus && !!targetRank,
+    enabled: currentIsMasterPlus && !!currentRank && !!targetRank,
   })
 
   // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot —

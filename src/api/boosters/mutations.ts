@@ -31,10 +31,6 @@ export async function requestBoosterRole() {
 }
 
 export async function onboardBooster(params: OnboardBoosterParams) {
-  // onboard_booster tem 3 sobrecargas históricas (migrations sucessivas
-  // adicionaram full_name/cpf/available_days) -- a resolução de sobrecarga
-  // do TS não infere bem um objeto com todos os campos opcionais presentes,
-  // então o payload é montado tipado e só convertido no boundary da chamada.
   const args = {
     p_display_name: params.displayName,
     p_bio: params.bio,

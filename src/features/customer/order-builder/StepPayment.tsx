@@ -9,9 +9,9 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
-import { getCustomerOrderState, savePendingOrderFromIntent, restorePendingOrder, generatePix as generatePixRequest } from '@/api/orders'
+import { getCustomerOrderState, savePendingOrderFromIntent, generatePix as generatePixRequest } from '@/api/orders'
 import type { PixPaymentResponse } from '@/api/orders'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus } from 'lucide-react'
+import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus, Info } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -80,7 +80,6 @@ export function StepPayment() {
   const pollRef = useRef<number | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
   const restoredOrderRef = useRef<string | null>(null)
-  const autoSaveStartedRef = useRef(false)
   const expiryHandledRef = useRef(false)
 
   const flow = store.serviceType === 'elo_boost' && store.currentRank
@@ -255,17 +254,14 @@ export function StepPayment() {
     }
   }
 
-  // Ao entrar na etapa de pagamento, salva a configuração antes de qualquer
-  // interação com o Mercado Pago. Assim ela aparece imediatamente em Meus
-  // pedidos como "Aguardando pagamento".
-  useEffect(() => {
-    if (!profile || pendingOrderId || !catalogReady || !addonsReady || autoSaveStartedRef.current) return
-    autoSaveStartedRef.current = true
-    void persistPendingOrder()
-  // A configuração já está congelada ao entrar nesta etapa. Evitamos repetir
-  // o insert quando queries de catálogo atualizam o componente.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, pendingOrderId, catalogReady, addonsReady])
+  // O pedido só é criado quando o cliente clica em "Gerar PIX" (ver
+  // generatePix, que chama persistPendingOrder como parte do próprio clique)
+  // -- nunca automaticamente ao entrar nesta etapa. Antes disso existia um
+  // auto-save aqui que criava o pedido assim que a tela de pagamento abria,
+  // mesmo sem o cliente pedir pra pagar; cada reconfiguração sem clicar em
+  // "Gerar PIX" deixava um pedido órfão "Aguardando pagamento" em Meus
+  // Pedidos -- essa era a causa real da duplicação, não só um problema de
+  // exibição no dashboard.
 
   // Chama a Edge Function que cria (ou reaproveita) o pedido e gera o PIX.
   // O preço nunca é enviado pelo cliente — a function recomputa tudo a
@@ -316,20 +312,35 @@ export function StepPayment() {
     startPolling(orderId)
   }
 
-  // Recupera os dados do pedido sem gerar PIX. A cobrança continua dependendo
-  // de clique explícito em "Gerar PIX".
+  // Ao voltar pra essa tela com um pedido já criado (?order=), reexibe o
+  // MESMO qr code automaticamente em vez de exigir um novo clique em "Gerar
+  // PIX" -- create-pix-payment reaproveita o pagamento PIX pendente
+  // existente (nunca gera um segundo), então isso nunca duplica cobrança. Se
+  // o pagamento já foi confirmado enquanto a aba estava fechada/em segundo
+  // plano, pula direto pro pedido em vez de tentar gerar um PIX novo.
   useEffect(() => {
     if (!profile || !pendingOrderId || restoredOrderRef.current === pendingOrderId) return
     restoredOrderRef.current = pendingOrderId
     setSavedOrderId(pendingOrderId)
     setIsSavingOrder(true)
-    void restorePendingOrder(pendingOrderId).then((saved) => {
-      setSavedTotalPrice(Number(saved.total_price))
-    }).catch((err) => {
+    void (async () => {
+      const state = await getCustomerOrderState(pendingOrderId).catch(() => null)
+      if (state?.payment_confirmed) {
+        const requiresCredentials = state.requires_credentials === true
+        navigate(`/orders/${pendingOrderId}${requiresCredentials ? '#credentials' : ''}`, { replace: true })
+        return
+      }
+      setPix({ phase: 'generating' })
+      await invokePix(pendingOrderId)
+    })().catch((err) => {
       setSaveError(pixErrorMessage(err))
     }).finally(() => {
       setIsSavingOrder(false)
     })
+    // Só na chegada do pendingOrderId -- invokePix/navigate são estáveis o
+    // suficiente pro propósito deste efeito (roda uma vez por order id, via
+    // o guard restoredOrderRef acima).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOrderId, profile])
 
   function startNewOrder() {
@@ -341,7 +352,6 @@ export function StepPayment() {
     setSaveError(null)
     setPix({ phase: 'idle' })
     idempotencyKeyRef.current = crypto.randomUUID()
-    autoSaveStartedRef.current = false
     expiryHandledRef.current = false
     setSearchParams({ new: '1' }, { replace: true })
   }
@@ -467,15 +477,6 @@ export function StepPayment() {
           Aguardando confirmação do pagamento…
         </div>
 
-        <Button
-          className="w-full"
-          variant="secondary"
-          onClick={startNewOrder}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          Configurar novo pedido
-        </Button>
-
         <p className="text-[11px] text-center text-ink-muted">
           Este pedido continuará salvo em Meus pedidos para você pagar depois.
         </p>
@@ -484,6 +485,17 @@ export function StepPayment() {
         <div className="flex items-start gap-2.5 text-xs text-ink-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
           Pagamento processado com segurança pelo Mercado Pago. Seus dados bancários nunca passam por nossos servidores.
+        </div>
+
+        <div className="flex justify-center">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={startNewOrder}
+            leftIcon={<Plus className="h-3.5 w-3.5" />}
+          >
+            Configurar novo pedido
+          </Button>
         </div>
       </div>
     )
@@ -497,6 +509,17 @@ export function StepPayment() {
         <p className="text-sm text-ink-secondary">
           Instantâneo, gratuito e 100% seguro. Pague em segundos pelo app do seu banco.
         </p>
+      </div>
+
+      {/* Seu pedido ainda não existe no banco neste ponto -- só é criado
+          quando o cliente clica em "Gerar PIX" (ver comentário perto de
+          persistPendingOrder). Deixa isso explícito antes que ele confunda
+          "terminei de configurar" com "meu pedido tá salvo". */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 text-xs text-ink-secondary">
+        <Info className="h-4 w-4 text-brand shrink-0 mt-0.5" />
+        <span>
+          Para salvar seu pedido, clique em <strong className="text-ink">Gerar PIX</strong>. Depois disso, ele fica salvo em <strong className="text-ink">Meus Pedidos</strong>, aguardando pagamento.
+        </span>
       </div>
 
       {/* Amount summary */}
@@ -533,31 +556,32 @@ export function StepPayment() {
         </p>
       )}
 
-      <Button
-        size="lg"
-        className="w-full"
-        loading={pix.phase === 'generating'}
-        onClick={generatePix}
-        disabled={totalPrice <= 0 || !catalogReady || !addonsReady || isSavingOrder}
-        leftIcon={<QrCode className="h-5 w-5" />}
-      >
-        {!catalogReady || !addonsReady
-          ? 'Carregando catálogo…'
-          : isSavingOrder
-            ? 'Salvando pedido…'
-            : pix.phase === 'generating'
-              ? 'Gerando PIX…'
-              : `Gerar PIX — ${currency(totalPrice)}`}
-      </Button>
+      <div className="flex gap-3">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={startNewOrder}
+          leftIcon={<Plus className="h-3.5 w-3.5" />}
+        >
+          Configurar novo pedido
+        </Button>
 
-      <Button
-        className="w-full"
-        variant="secondary"
-        onClick={startNewOrder}
-        leftIcon={<Plus className="h-4 w-4" />}
-      >
-        Configurar novo pedido
-      </Button>
+        <Button
+          className="flex-1"
+          loading={pix.phase === 'generating'}
+          onClick={generatePix}
+          disabled={totalPrice <= 0 || !catalogReady || !addonsReady || isSavingOrder}
+          leftIcon={<QrCode className="h-4 w-4" />}
+        >
+          {!catalogReady || !addonsReady
+            ? 'Carregando catálogo…'
+            : isSavingOrder
+              ? 'Salvando pedido…'
+              : pix.phase === 'generating'
+                ? 'Gerando PIX…'
+                : `Gerar PIX — ${currency(totalPrice)}`}
+        </Button>
+      </div>
 
       {totalPrice <= 0 && (
         <p className="text-xs text-danger text-center">Configure seu pedido para ver o preço.</p>

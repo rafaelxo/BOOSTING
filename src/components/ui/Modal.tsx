@@ -8,10 +8,10 @@ interface ModalProps {
   title: string
   description?: React.ReactNode
   children: React.ReactNode
-  maxWidth?: 'sm' | 'md' | 'lg'
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 }
 
-const MAX_WIDTH = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg' }
+const MAX_WIDTH = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' }
 
 export function Modal({ open, onOpenChange, title, description, children, maxWidth = 'md' }: ModalProps) {
   return (

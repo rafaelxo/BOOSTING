@@ -29,9 +29,13 @@ export function TestimonialsCarousel() {
     )
   }
 
-  // Duplica a lista só pra fechar o loop visual da esteira sem emenda —
-  // os dados em si nunca são fabricados, sempre vêm de reviews reais.
-  const track = reviews.length >= 4 ? [...reviews, ...reviews] : reviews
+  // Duplica a lista sempre (mesmo com só 1-2 avaliações) pra fechar o loop
+  // visual da esteira sem emenda -- a animação desloca -50%, que só bate com
+  // um ponto real do loop quando as duas metades são idênticas; com poucas
+  // avaliações e sem duplicar, o marquee pulava/quebrava no fim do ciclo. Os
+  // dados em si nunca são fabricados, sempre vêm de reviews reais -- só
+  // repete o mesmo cartão real, nunca inventa um novo.
+  const track = [...reviews, ...reviews]
 
   return (
     <div className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">

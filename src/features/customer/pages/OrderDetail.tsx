@@ -216,6 +216,17 @@ function PendingPaymentSection({ order }: { order: Order }) {
     })
   }
 
+  // Mostra o qr code assim que a página abre, sem exigir clique em "Efetuar
+  // pagamento" -- create-pix-payment reaproveita o pagamento PIX pendente
+  // existente (nunca gera um segundo), então isso sempre reexibe o MESMO qr
+  // code de quando o pedido foi criado, nunca duplica cobrança.
+  useEffect(() => {
+    if (order.status === 'awaiting_payment') loadPix()
+    // Só na primeira renderização desta seção para este pedido -- loadPix
+    // não deve rodar de novo a cada re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id])
+
   function cancelOrder() {
     setError(null)
     cancelOrderMutation.mutate(order.id, {
@@ -517,7 +528,7 @@ export function OrderDetailPage() {
         {/* Main info */}
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
-            {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            {['awaiting_payment', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderProgress order={order} />
             )}
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>

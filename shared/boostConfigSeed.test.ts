@@ -105,63 +105,45 @@ describe('Tabela master_plus_pricing — 12 combinações válidas, sem preço f
   })
 })
 
-// A partir da migration 028 o Master+ passou a ter preço fixo por tier alvo.
-// O preço EXIBIDO na página pública vem do código (MASTER_PLUS_TIER_PRICE_CENTS)
-// enquanto o preço COBRADO vem da tabela master_plus_pricing no banco (lida em
-// StepConfigure e revalidada em orderPricing.ts). São duas fontes de verdade
-// para o mesmo valor monetário: se divergirem, o cliente vê um preço e é
-// cobrado outro. Este teste amarra a seed da migration (028 + correções
-// posteriores, ex.: 068, 078) ao constante do código — sempre o estado
-// FINAL do banco, nunca só o seed original.
-describe('master_plus_pricing (028+068+078) — seed do banco bate com o preço exibido na página pública', () => {
-  const migration028 = readFileSync(
-    join(__dirname, '..', 'supabase', 'migrations', '028_master_plus_pricing_flat_tiers.sql'),
-    'utf-8',
-  )
-  const migration068 = readFileSync(
-    join(__dirname, '..', 'supabase', 'migrations', '068_fix_master_plus_pricing_values.sql'),
-    'utf-8',
-  )
-  const migration078 = readFileSync(
-    join(__dirname, '..', 'supabase', 'migrations', '078_fix_master_plus_pricing_tiers.sql'),
+// A partir da migration 090 o preço do Master+ passou a depender do PAR
+// (tier atual, tier alvo) -- não mais só do tier alvo (028-078, superseded):
+// Grão-Mestre->Challenger (1 tier de distância) é mais barato que Mestre->
+// Challenger (2 tiers). O preço EXIBIDO na página pública vem do código
+// (MASTER_PLUS_TIER_PRICE_CENTS, que representa o custo partindo de Mestre)
+// enquanto o preço COBRADO vem da tabela master_plus_pricing no banco (lida
+// em StepConfigure e revalidada em orderPricing.ts). São duas fontes de
+// verdade pro mesmo valor monetário: se divergirem, o cliente vê um preço e
+// é cobrado outro. Este teste amarra a seed da migration 090 (estado FINAL
+// do banco) ao constante do código.
+describe('master_plus_pricing (090) — seed do banco bate com o preço exibido na página pública', () => {
+  const migration090 = readFileSync(
+    join(__dirname, '..', 'supabase', 'migrations', '090_master_plus_pricing_by_pair.sql'),
     'utf-8',
   )
 
-  function parseTierPrices(source: string): Record<string, number> {
+  function parsePairPrices(source: string): Record<string, number> {
     const insertBlock = source.match(/insert into public\.master_plus_pricing[\s\S]*?;/)
     expect(insertBlock).not.toBeNull()
     const out: Record<string, number> = {}
-    const rowRegex = /\('([a-z]+)',\s*(\d+\.\d+)\)/g
+    const rowRegex = /\('([a-z]+)',\s*'([a-z]+)',\s*(\d+\.\d+)\)/g
     let match: RegExpExecArray | null
     while ((match = rowRegex.exec(insertBlock![0]))) {
-      out[match[1]] = Number(match[2])
+      out[`${match[1]}->${match[2]}`] = Number(match[3])
     }
     return out
   }
 
-  function applyTierPriceUpdates(prices: Record<string, number>, source: string): Record<string, number> {
-    const out = { ...prices }
-    const updateRegex = /update public\.master_plus_pricing set price = (\d+\.\d+) where tier = '([a-z]+)'/g
-    let match: RegExpExecArray | null
-    while ((match = updateRegex.exec(source))) {
-      out[match[2]] = Number(match[1])
-    }
-    return out
-  }
+  const seeded = parsePairPrices(migration090)
 
-  const seeded = applyTierPriceUpdates(
-    applyTierPriceUpdates(parseTierPrices(migration028), migration068),
-    migration078,
-  )
-
-  it('semeia exatamente os 3 tiers (master, grandmaster, challenger)', () => {
-    expect(Object.keys(seeded).sort()).toEqual(['challenger', 'grandmaster', 'master'])
+  it('semeia exatamente os 3 pares válidos (master->grandmaster, grandmaster->challenger, master->challenger)', () => {
+    expect(Object.keys(seeded).sort()).toEqual(['grandmaster->challenger', 'master->challenger', 'master->grandmaster'])
   })
 
-  it.each(['master', 'grandmaster', 'challenger'] as const)(
-    'preço cobrado (banco) == preço exibido (código) para %s',
-    (tier) => {
-      expect(seeded[tier]).toBe(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier]))
-    },
-  )
+  it('preço cobrado (banco) para master->grandmaster == preço exibido (código) para grandmaster', () => {
+    expect(seeded['master->grandmaster']).toBe(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS.grandmaster))
+  })
+
+  it('preço cobrado (banco) para master->challenger == preço exibido (código) para challenger', () => {
+    expect(seeded['master->challenger']).toBe(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS.challenger))
+  })
 })
