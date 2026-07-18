@@ -4,6 +4,7 @@ import { RankBadge } from '@/components/ui/RankBadge'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
 import { listOrderRankVerifications } from '@/api/orders'
 import { queryKeys } from '@/api/core/queryKeys'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn } from '@/lib/utils'
 import type { Order, RankTier, Division } from '@/types'
 
@@ -70,12 +71,33 @@ function useLatestVerification(orderId: string, enabled: boolean) {
   })
 }
 
+// Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot --
+// mesma fonte cacheada (riot_league_cutoffs) e mesmo padrão de busca de
+// StepConfigure.tsx, aqui usado pra manter a trilha de progresso do pedido
+// em andamento com o corte ao vivo, não só o alvo fixo mostrado na hora da
+// compra.
+function useLiveCutoff(queueType: Order['queue_type'], targetTier: RankTier | null, enabled: boolean) {
+  const isMasterPlusTarget = targetTier === 'grandmaster' || targetTier === 'challenger'
+  const { data } = useQuery({
+    queryKey: ['riot-league-cutoffs', queueType],
+    queryFn: () => invokeEdgeFunction<{ grandmaster_cutoff: number | null; challenger_cutoff: number | null }>('riot-league-cutoffs', {
+      body: { queue: queueType },
+      requireAuth: true,
+    }),
+    enabled: enabled && isMasterPlusTarget,
+    staleTime: 5 * 60 * 1000,
+  })
+  if (!isMasterPlusTarget || !data) return null
+  return targetTier === 'challenger' ? data.challenger_cutoff : data.grandmaster_cutoff
+}
+
 function EloBoostProgress({ order }: { order: Order }) {
   const locked = order.status === 'awaiting_payment'
   const { data: latest } = useLatestVerification(order.id, !locked)
 
   const initial = order.current_rank as { tier: RankTier; division: Division | null } | null
   const target = order.target_rank as { tier: RankTier; division: Division | null } | null
+  const liveCutoffLp = useLiveCutoff(order.queue_type, target?.tier ?? null, !locked)
   if (!initial || !target) return null
 
   const current = latest?.fetched_tier
@@ -99,6 +121,7 @@ function EloBoostProgress({ order }: { order: Order }) {
         currentLp={locked ? null : latest?.fetched_tier ? latest.fetched_lp : null}
         targetTier={target.tier}
         targetDivision={target.division}
+        liveCutoffLp={locked ? null : liveCutoffLp}
         locked={locked}
       />
       <p className="text-xs text-ink-muted mt-3">
@@ -115,9 +138,11 @@ function EloBoostProgress({ order }: { order: Order }) {
 // Renderiza inline dentro do card de "Detalhes do Pedido" de cada papel
 // (booster/cliente/admin) -- progresso e detalhes viram uma única badge só,
 // não dois cards separados. Retorna null quando o tipo de serviço não tem
-// barra de progresso aplicável (ex.: coaching).
+// barra de progresso aplicável (ex.: coaching). Master+ (pdl_bracket
+// preenchido) também tem progresso -- a trilha mostra o corte ao vivo em vez
+// de um rank alvo fixo, então não é mais excluído aqui.
 export function OrderProgress({ order }: { order: Order }) {
   if (order.wins_purchased != null) return <WinBoostProgress order={order} />
-  if (order.target_rank && order.current_rank && !order.pdl_bracket) return <EloBoostProgress order={order} />
+  if (order.target_rank && order.current_rank) return <EloBoostProgress order={order} />
   return null
 }

@@ -224,6 +224,33 @@ function badRequest(req: Request, message: string): Response {
   return errorResponse(req, message, 400)
 }
 
+// Preço do Master+ pra (origem, destino, fila), no maior degrau de PDL
+// (master_plus_pricing.pdl_from) que não ultrapasse o PDL atual -- PDL acima
+// do último degrau cadastrado cai no preço do último (mais barato), nunca
+// fica sem preço por estourar a tabela. Usado tanto pelo fluxo Master+ (PDL
+// real do cliente) quanto pelo fluxo padrão mirando Grão-Mestre/Challenger a
+// partir de Diamond- (sempre PDL=0 -- entra em Mestre do zero).
+async function fetchMasterPlusPrice(
+  serviceClient: ReturnType<typeof supabaseAdmin>,
+  currentTier: 'master' | 'grandmaster',
+  targetTier: 'grandmaster' | 'challenger',
+  queueType: 'solo_duo' | 'flex',
+  currentPdl: number,
+): Promise<number | null> {
+  const { data, error } = await serviceClient
+    .from('master_plus_pricing')
+    .select('price')
+    .eq('current_tier', currentTier)
+    .eq('target_tier', targetTier)
+    .eq('queue_type', queueType)
+    .lte('pdl_from', Math.max(0, currentPdl))
+    .order('pdl_from', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.price != null ? Number(data.price) : null
+}
+
 // Valida (schema por fluxo + regras de negócio), reconfere elegibilidade MD5
 // direto na Riot, valida pacote de coach/addons e calcula o preço
 // autoritativo — tudo que create-pix-payment e order-quote têm em comum.
@@ -320,17 +347,18 @@ export async function validateAndPriceIntent(
     // mais na chave de preço, que agora é um valor fixo por tier alvo.
     pdlBracket = getPdlBracket(mp.current_pdl)
 
-    const { data: priceRow, error: priceErr } = await serviceClient
-      .from('master_plus_pricing')
-      .select('price')
-      .eq('current_tier', mp.current_rank.tier)
-      .eq('target_tier', mp.target_rank.tier)
-      .maybeSingle()
-    if (priceErr) return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
-    if (!priceRow || priceRow.price == null) {
+    let masterPlusPriceValue: number | null
+    try {
+      masterPlusPriceValue = await fetchMasterPlusPrice(
+        serviceClient, mp.current_rank.tier, mp.target_rank.tier, mp.queue_type, mp.current_pdl,
+      )
+    } catch {
+      return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
+    }
+    if (masterPlusPriceValue == null) {
       return { ok: false, response: badRequest(req, 'Preço ainda não configurado para essa combinação de tiers. Fale com o suporte.') }
     }
-    masterPlusPrice = Number(priceRow.price)
+    masterPlusPrice = masterPlusPriceValue
 
     // Corte atual de GM/Challenger, se já cacheado (riot-league-cutoffs) —
     // só afeta a estimativa de horas exibida/gravada, nunca o preço acima.
@@ -398,6 +426,24 @@ export async function validateAndPriceIntent(
       avgPdlLoss: null,
       riotId: std.riot_id,
       boosterServiceId: null,
+    }
+
+    // Diamond- mirando Grão-Mestre/Challenger direto: o trecho Mestre->alvo
+    // usa o mesmo preço por PDL do fluxo Master+, sempre a partir do PDL=0
+    // (quem vem do fluxo padrão entra em Mestre do zero). "master" como alvo
+    // exato não entra aqui -- já fica totalmente coberto pelo preço por
+    // divisão (calcEloPrice) em computeOrderPrice.
+    if (std.target_rank.tier === 'grandmaster' || std.target_rank.tier === 'challenger') {
+      let priceValue: number | null
+      try {
+        priceValue = await fetchMasterPlusPrice(serviceClient, 'master', std.target_rank.tier, std.queue_type, 0)
+      } catch {
+        return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
+      }
+      if (priceValue == null) {
+        return { ok: false, response: badRequest(req, 'Preço ainda não configurado para essa combinação de tiers. Fale com o suporte.') }
+      }
+      masterPlusPrice = priceValue
     }
   } else if (routed.data.service_type === 'md5') {
     const md5 = parsedIntent.data as z.infer<typeof md5IntentSchema>

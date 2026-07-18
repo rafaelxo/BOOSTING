@@ -101,13 +101,19 @@ function divPriceCentsForStep(queue: QueueType, step: number): number {
   return ELO_DIV_PRICE_CENTS[queue][TIER_NAMES[ti]] ?? ELO_DIV_PRICE_CENTS[queue].diamond
 }
 
+// Degrau de "entrar em Mestre" (rankStep('master', null)) -- calcEloPrice
+// nunca cobra por divisão além dele. O trecho Mestre->Grão-Mestre/Challenger
+// tem preço próprio, por PDL (master_plus_pricing, ver computeOrderPrice),
+// não a taxa fixa de divisão do Diamond repetida pros degraus 29/30.
+const MASTER_STEP = 28
+
 export function calcEloPrice(
   queue: QueueType,
   fTier: RankTier, fDiv: Division | null,
   tTier: RankTier, tDiv: Division | null,
 ): { price: number } {
   const from = rankStep(fTier, fDiv)
-  const to = rankStep(tTier, tDiv)
+  const to = Math.min(rankStep(tTier, tDiv), MASTER_STEP)
   if (to <= from) return { price: 0 }
 
   let priceCents = 0
@@ -147,7 +153,7 @@ export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenge
   challenger: 2_200,
 }
 
-const MASTER_START_ABSOLUTE_LP = 28 * 100
+const MASTER_START_ABSOLUTE_LP = MASTER_STEP * 100
 
 // Corte real (PDL do último colocado) das ligas Grão-Mestre/Challenger na
 // Riot, quando disponível (riot_league_cutoffs, atualizado pela edge
@@ -168,12 +174,32 @@ function masterPlusTargetLp(
   return MASTER_PLUS_TARGET_LP[tier]
 }
 
+// Partidas de 30 PDL até ULTRAPASSAR o corte -- nunca parar exatamente NO
+// corte (empatar com o último colocado da liga não garante a promoção). O
+// ganho é sempre quantizado em MASTER_PLUS_LP_PER_GAME, então "passar o
+// corte" na prática é parar no primeiro múltiplo de 30 acima dele. Já começa
+// acima do corte (pedido raro/quase concluído) não precisa de partida
+// nenhuma pra esse trecho.
+function gamesToPassMasterPlusCutoff(currentPdl: number, cutoffLp: number): number {
+  if (currentPdl > cutoffLp) return 0
+  return Math.floor((cutoffLp - currentPdl) / MASTER_PLUS_LP_PER_GAME) + 1
+}
+
+// Partidas esperadas pra fechar N vitórias líquidas no win rate do serviço
+// (mesma taxa usada no LP médio do Elo Boost) -- nem toda partida jogada é
+// uma vitória, então o número de partidas é sempre maior que o de vitórias
+// compradas.
+export function expectedMatchesForWins(winsNeeded: number): number {
+  return Math.ceil(winsNeeded / EXPECTED_BOOST_WIN_RATE)
+}
+
 /**
  * Estima somente tempo efetivo de jogo. Abaixo de Master, percorre os 100 LP
  * de cada divisão e considera ganho/perda esperados com 80% de win rate do
  * serviço. Em Master+, usa a progressão fixa de 30 PDL por partida definida
- * pelo produto, até o corte atual de GM/Challenger (masterPlusCutoffs, com
- * fallback pros alvos fixos de MASTER_PLUS_TARGET_LP quando indisponível).
+ * pelo produto, até ultrapassar o corte atual de GM/Challenger
+ * (masterPlusCutoffs, com fallback pros alvos fixos de MASTER_PLUS_TARGET_LP
+ * quando indisponível).
  */
 export function estimateEloBoostHours(input: {
   currentRank: { tier: RankTier; division: Division | null }
@@ -210,13 +236,14 @@ export function estimateEloBoostHours(input: {
     standardGames = Math.ceil(requiredStandardLp / expectedNetLpPerGame)
 
     if (isMasterPlus(targetRank.tier)) {
-      masterPlusGames = Math.ceil(masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs) / MASTER_PLUS_LP_PER_GAME)
+      // Entra em Master com 0 PDL (mesma referência de MASTER_START_ABSOLUTE_LP
+      // acima) e sobe de 30 em 30 até passar o corte de GM/Challenger.
+      masterPlusGames = gamesToPassMasterPlusCutoff(0, masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs))
     }
   } else {
     if (!isMasterPlus(targetRank.tier)) return null
     const currentMasterPlusLp = Math.max(0, input.currentPdl ?? 0)
-    const requiredMasterPlusLp = Math.max(0, masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs) - currentMasterPlusLp)
-    masterPlusGames = Math.max(1, Math.ceil(requiredMasterPlusLp / MASTER_PLUS_LP_PER_GAME))
+    masterPlusGames = gamesToPassMasterPlusCutoff(currentMasterPlusLp, masterPlusTargetLp(targetRank.tier, input.masterPlusCutoffs))
   }
 
   const games = standardGames + masterPlusGames
@@ -340,11 +367,13 @@ export interface OrderPriceInput {
   avgLpGain: number
   avgLpLoss: number
   currentPdl: number | null
-  // Preço já consultado em `master_plus_pricing` para a combinação
-  // (origem, destino, faixa de PDL atual) — null quando a faixa ainda não
-  // tem preço configurado (pedido deve ser bloqueado, nunca com valor
-  // inventado). Ignorado para qualquer serviceType/rank que não seja
-  // elo_boost com rank atual Master+/Grão-Mestre.
+  // Preço já consultado em `master_plus_pricing` para a combinação (origem,
+  // destino, fila, degrau de PDL atual) — null quando a faixa ainda não tem
+  // preço configurado (pedido deve ser bloqueado, nunca com valor
+  // inventado). Usado tanto quando o rank ATUAL já é Master+/Grão-Mestre
+  // (preço total do pedido) quanto no fluxo padrão mirando Grão-Mestre/
+  // Challenger a partir de Diamond- (somado ao preço por divisão até
+  // Mestre). Ignorado para qualquer outro serviceType/alvo.
   masterPlusPrice: number | null
   // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot,
   // quando disponível — ver MasterPlusCutoffs. Afeta só estimatedHours,
@@ -417,9 +446,21 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
           targetRank.tier, targetRank.division,
         )
         const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, avgLpLoss, input.queueType)
+        let combinedCents = moneyToCents(withLp)
+
+        // Diamond- mirando Grão-Mestre/Challenger direto: calcEloPrice acima
+        // já parou em Mestre (MASTER_STEP) -- o trecho Mestre->alvo soma o
+        // preço por PDL de master_plus_pricing (sempre no PDL=0, quem vem do
+        // fluxo padrão entra em Mestre do zero). "master" como alvo exato
+        // não entra aqui: já está totalmente coberto pelo calcEloPrice acima.
+        if (targetRank.tier === 'grandmaster' || targetRank.tier === 'challenger') {
+          if (input.masterPlusPrice == null) { basePrice = 0; break }
+          combinedCents += moneyToCents(input.masterPlusPrice)
+        }
+
         basePrice = boostMode === 'duo'
-          ? centsToMoney(moneyToCents(withLp) + percentageOfCents(moneyToCents(withLp), DUO_BOOST_PCT))
-          : centsToMoney(moneyToCents(withLp))
+          ? centsToMoney(combinedCents + percentageOfCents(combinedCents, DUO_BOOST_PCT))
+          : centsToMoney(combinedCents)
         estimatedHours = estimateEloBoostHours({
           currentRank,
           targetRank,
@@ -444,7 +485,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
-      estimatedHours = input.winsPurchased * MATCH_DURATION_HOURS
+      estimatedHours = expectedMatchesForWins(input.winsPurchased) * MATCH_DURATION_HOURS
       break
     }
     case 'md5': {
@@ -452,7 +493,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getMd5WinPrice(input.queueType, input.currentRank.tier)
       basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
-      estimatedHours = input.winsPurchased * MATCH_DURATION_HOURS
+      estimatedHours = expectedMatchesForWins(input.winsPurchased) * MATCH_DURATION_HOURS
       break
     }
     case 'coaching': {
@@ -483,7 +524,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
   }
 
   if (estimatedHours != null && input.winPackage) {
-    estimatedHours += input.winPackage * MATCH_DURATION_HOURS
+    estimatedHours += expectedMatchesForWins(input.winPackage) * MATCH_DURATION_HOURS
   }
 
   // Prazo real de entrega: dobra a estimativa de horas de jogo puro. Só se

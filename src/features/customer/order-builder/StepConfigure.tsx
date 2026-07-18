@@ -6,7 +6,7 @@ import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/compon
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER } from '@/lib/pricing'
+import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER, expectedMatchesForWins } from '@/lib/pricing'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Check, Search, Info, Lock } from 'lucide-react'
@@ -208,23 +208,38 @@ export function StepConfigure() {
     }
   }, [currentRank, targetRank, setTargetRank])
 
+  // Diamond- mirando Grão-Mestre/Challenger direto (fluxo padrão): o trecho
+  // Mestre->alvo usa o mesmo preço por PDL do Master+, sempre a partir do
+  // PDL=0 (entra em Mestre do zero). "master" como alvo exato não entra
+  // aqui — já fica coberto pelo preço por divisão (calcEloPrice) abaixo.
+  const isStandardToMasterPlus = !currentIsMasterPlus
+    && (targetRank?.tier === 'grandmaster' || targetRank?.tier === 'challenger')
+
   // Preço do Master+ vem da tabela comercial — depende do par (tier atual,
-  // tier alvo), já que a distância entre tiers importa (Grão-Mestre->
-  // Challenger custa menos que Mestre->Challenger). Se a combinação ainda
+  // tier alvo), da fila e do degrau de PDL atual (varia a cada 100 PDL,
+  // mais barato quanto mais perto do corte do próximo tier). Pega o maior
+  // degrau que não ultrapassa o PDL atual; acima do último degrau
+  // cadastrado usa o preço do último (mais barato). Se a combinação ainda
   // não tem preço configurado, o preço fica indefinido e o pedido não avança.
+  const masterPlusPriceCurrentTier = currentIsMasterPlus ? currentRank?.tier : 'master'
+  const masterPlusPricePdl = Math.max(0, currentIsMasterPlus ? currentPdl : 0)
   const { data: masterPlusPriceRow, isFetching: loadingMasterPlusPrice } = useQuery({
-    queryKey: ['master-plus-price', currentRank?.tier, targetRank?.tier],
+    queryKey: ['master-plus-price', masterPlusPriceCurrentTier, targetRank?.tier, queueType, masterPlusPricePdl],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('master_plus_pricing')
         .select('price')
-        .eq('current_tier', currentRank!.tier)
+        .eq('current_tier', masterPlusPriceCurrentTier!)
         .eq('target_tier', targetRank!.tier)
+        .eq('queue_type', queueType)
+        .lte('pdl_from', masterPlusPricePdl)
+        .order('pdl_from', { ascending: false })
+        .limit(1)
         .maybeSingle()
       if (error) throw error
       return data as { price: number | null } | null
     },
-    enabled: currentIsMasterPlus && !!currentRank && !!targetRank,
+    enabled: (currentIsMasterPlus || isStandardToMasterPlus) && !!currentRank && !!targetRank,
   })
 
   // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot —
@@ -282,9 +297,19 @@ export function StepConfigure() {
         targetRank.tier, targetRank.division ?? null,
       )
       const withLp = applyLpModifier(price, currentRank.tier, currentLp, avgLpGain, undefined, queueType)
+      let combined = withLp
+      if (isStandardToMasterPlus) {
+        if (masterPlusPriceRow?.price == null) {
+          setBasePrice(0)
+          setEstimatedHours(null)
+          setPdlModifierPct(null)
+          return
+        }
+        combined = Math.round((withLp + masterPlusPriceRow.price) * 100) / 100
+      }
       const finalPrice = boostMode === 'duo'
-        ? Math.round(withLp * (1 + DUO_BOOST_PCT / 100) * 100) / 100
-        : withLp
+        ? Math.round(combined * (1 + DUO_BOOST_PCT / 100) * 100) / 100
+        : combined
       setBasePrice(finalPrice)
       const eloHours = estimateEloBoostHours({
         currentRank,
@@ -307,14 +332,14 @@ export function StepConfigure() {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
       setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
-      setEstimatedHours(winsPurchased * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
+      setEstimatedHours(expectedMatchesForWins(winsPurchased) * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
       const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
       setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
-      setEstimatedHours(cappedWins * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
+      setEstimatedHours(expectedMatchesForWins(cappedWins) * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'coaching') {
       // Preço vem do pacote escolhido em CoachPackagePicker (setBasePrice
@@ -325,7 +350,8 @@ export function StepConfigure() {
     }
   }, [
     serviceType, currentRank, targetRank, boostMode, winsPurchased, queueType,
-    currentLp, avgLpGain, avgLpLoss, currentPdl, currentIsMasterPlus, masterPlusPriceRow, masterPlusCutoffs,
+    currentLp, avgLpGain, avgLpLoss, currentPdl, currentIsMasterPlus, isStandardToMasterPlus,
+    masterPlusPriceRow, masterPlusCutoffs,
     setBasePrice, setEstimatedHours, setPdlModifierPct,
   ])
 
@@ -613,9 +639,6 @@ export function StepConfigure() {
                         { label: 'Média PDL', value: avgLpGain, min: 1, max: 50, onChange: setAvgLpGain, disabled: true },
                       ]} />
                     )}
-                    <p className="text-[10px] text-ink-muted">
-                      Consultado na Riot. A estimativa usa as últimas 10 partidas ranqueadas e é recalculada pelo servidor no pagamento.
-                    </p>
                   </div>
                 )}
               </div>
@@ -643,20 +666,22 @@ export function StepConfigure() {
                 )}
                 {currentIsMasterPlus && (
                   <>
-                    {currentRank?.tier === 'grandmaster' && (
-                      <p className="text-[11px] text-ink-muted">Único destino possível a partir de Grão-Mestre.</p>
-                    )}
                     {loadingMasterPlusPrice && <p className="text-[11px] text-ink-muted">Calculando preço…</p>}
                     {!loadingMasterPlusPrice && targetRank && masterPlusPriceRow?.price == null && (
                       <p className="text-[11px] text-warning">Preço ainda não configurado para esse tier. Fale com o suporte.</p>
                     )}
-                    {targetRank?.tier === 'grandmaster' && leagueCutoffs?.grandmaster_cutoff != null && (
-                      <p className="text-[11px] text-ink-muted">Corte atual do Grão-Mestre: {leagueCutoffs.grandmaster_cutoff} PDL (atualizado automaticamente)</p>
-                    )}
-                    {targetRank?.tier === 'challenger' && leagueCutoffs?.challenger_cutoff != null && (
-                      <p className="text-[11px] text-ink-muted">Corte atual do Challenger: {leagueCutoffs.challenger_cutoff} PDL (atualizado automaticamente)</p>
-                    )}
                   </>
+                )}
+                {/* Corte ao vivo de GM/Challenger — vale pro fluxo Master+
+                    (rank atual já é Master/GM) E pro fluxo padrão mirando
+                    GM/Challenger direto de Diamond ou abaixo (progressão por
+                    degrau, mesma RankLockGrid acima). Não depende de
+                    currentIsMasterPlus, só do rank alvo escolhido. */}
+                {targetRank?.tier === 'grandmaster' && leagueCutoffs?.grandmaster_cutoff != null && (
+                  <p className="text-[11px] text-ink-muted">Corte atual do Grão-Mestre: {leagueCutoffs.grandmaster_cutoff} PDL (atualizado automaticamente)</p>
+                )}
+                {targetRank?.tier === 'challenger' && leagueCutoffs?.challenger_cutoff != null && (
+                  <p className="text-[11px] text-ink-muted">Corte atual do Challenger: {leagueCutoffs.challenger_cutoff} PDL (atualizado automaticamente)</p>
                 )}
                 {stepAttempted && currentRank && !targetRank && (
                   <p className="text-xs text-danger">Selecione o rank alvo</p>

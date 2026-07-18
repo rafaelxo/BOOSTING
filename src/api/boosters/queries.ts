@@ -100,18 +100,6 @@ export async function getAdminBoosterDetail(boosterId: string): Promise<BoosterP
   return data as unknown as BoosterProfile
 }
 
-export async function listBoosterAuditLog(boosterProfileId: string, limit = 20) {
-  const { data, error } = await supabase
-    .from('audit_logs')
-    .select('id, actor_id, actor_role, action, created_at')
-    .eq('entity_type', 'booster_profile')
-    .eq('entity_id', boosterProfileId)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw normalizeApiError(error)
-  return data ?? []
-}
-
 export async function listBoosterNames(boosterUserIds: string[]): Promise<Map<string, { id: string; user_id: string; display_name: string }>> {
   if (boosterUserIds.length === 0) return new Map()
   const { data, error } = await supabase

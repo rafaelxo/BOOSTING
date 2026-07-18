@@ -119,14 +119,6 @@ export async function savePendingOrderFromIntent(params: {
   })
 }
 
-export async function restorePendingOrder(orderId: string): Promise<PixPaymentResponse> {
-  return invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
-    body: { order_id: orderId, save_only: true },
-    timeoutMs: 20_000,
-    requireAuth: true,
-  })
-}
-
 export async function generatePix(orderId: string): Promise<PixPaymentResponse> {
   return invokeEdgeFunction<PixPaymentResponse>('create-pix-payment', {
     body: { order_id: orderId },

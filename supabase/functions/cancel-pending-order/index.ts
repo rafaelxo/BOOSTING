@@ -1,10 +1,11 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { z } from 'https://esm.sh/zod@3.23.8'
 import { handleCors } from '../_shared/cors.ts'
-import { errorResponse, jsonResponse } from '../_shared/responses.ts'
+import { errorResponse, jsonResponse, rateLimitResponse } from '../_shared/responses.ts'
 import { getAuthUser } from '../_shared/authUser.ts'
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
+import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 
 const MP_ACCESS_TOKEN = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ?? ''
 const MP_API_BASE = 'https://api.mercadopago.com'
@@ -50,6 +51,9 @@ serve(async (req) => {
 
     const auth = await getAuthUser(req.headers.get('Authorization'))
     if (!auth) return errorResponse(req, 'Unauthorized', 401, 'UNAUTHORIZED')
+
+    const rateLimit = await consumeUserRateLimit('cancel-pending-order', auth.user.id, 10, 60)
+    if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
 
     const parsedBody = bodySchema.safeParse(await readJsonBody(req, 8 * 1024))
     if (!parsedBody.success) {

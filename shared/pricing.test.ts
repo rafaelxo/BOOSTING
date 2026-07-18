@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeOrderPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
+  computeOrderPrice, calcEloPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
   estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, type OrderPriceInput, type RankTier,
 } from './pricing'
 
@@ -93,14 +93,16 @@ describe('Master+ — preço vem exclusivamente da tabela comercial (seção 14)
     expect(priced.basePrice).toBe(0) // bloqueado, não "250 * 1.5"
   })
 
-  it('estima Master até Challenger usando 30 PDL por partida e alvo de 2200', () => {
+  it('estima Master até Challenger usando 30 PDL por partida, ultrapassando o alvo de 2200', () => {
     const priced = computeOrderPrice(baseInput({
       currentRank: { tier: 'master', division: null },
       targetRank: { tier: 'challenger', division: null },
       masterPlusPrice: 250,
       currentPdl: 100,
     }))
-    expect(priced.estimatedHours).toBe(175)
+    // (2200-100)/30 = 70 partidas exatas fica EM 2200, não acima — precisa de
+    // 71 pra ultrapassar. 71 * 0.5h * multiplicador 5 = 177.5.
+    expect(priced.estimatedHours).toBe(177.5)
   })
 })
 
@@ -117,6 +119,9 @@ describe('Estimativa dinâmica de entrega', () => {
   })
 
   it('soma a subida padrão com o trecho Master+ ao mirar Grão-Mestre', () => {
+    // Diamond I -> Master: 3 partidas (17 PDL líquido/partida, 50 PDL faltando).
+    // Master (0 PDL) -> Grão-Mestre (alvo fixo 1200): 1200/30 = 40 exatas fica
+    // EM 1200, precisa de 41 pra ultrapassar. Total: 3 + 41 = 44 partidas * 0.5h.
     expect(estimateEloBoostHours({
       currentRank: { tier: 'diamond', division: 'I' },
       targetRank: { tier: 'grandmaster', division: null },
@@ -124,10 +129,12 @@ describe('Estimativa dinâmica de entrega', () => {
       avgLpGain: 25,
       avgLpLoss: 15,
       currentPdl: null,
-    })).toBe(21.5)
+    })).toBe(22)
   })
 
   it('usa o PDL atual em Master+ e a referência de 1200 para Grão-Mestre', () => {
+    // (1200-900)/30 = 10 partidas exatas fica EM 1200, precisa de 11 pra
+    // ultrapassar. 11 * 0.5h = 5.5.
     expect(estimateEloBoostHours({
       currentRank: { tier: 'master', division: null },
       targetRank: { tier: 'grandmaster', division: null },
@@ -135,7 +142,34 @@ describe('Estimativa dinâmica de entrega', () => {
       avgLpGain: 30,
       avgLpLoss: 30,
       currentPdl: 900,
-    })).toBe(5)
+    })).toBe(5.5)
+  })
+
+  it('Master+ nunca para exatamente NO corte -- mesmo quando falta menos de 30 PDL, ultrapassa por pelo menos 1', () => {
+    // corte 1200, atual 1185: uma partida de 30 PDL chega a 1215 (ultrapassa
+    // por 15) -- 1 partida basta, não fica preso tentando "acertar" o corte.
+    expect(estimateEloBoostHours({
+      currentRank: { tier: 'grandmaster', division: null },
+      targetRank: { tier: 'challenger', division: null },
+      currentLp: 0,
+      avgLpGain: 30,
+      avgLpLoss: 30,
+      currentPdl: 1185,
+      masterPlusCutoffs: { challenger: 1200 },
+    })).toBe(0.5)
+  })
+
+  it('corte ao vivo (masterPlusCutoffs) substitui o alvo fixo quando disponível', () => {
+    expect(estimateEloBoostHours({
+      currentRank: { tier: 'master', division: null },
+      targetRank: { tier: 'grandmaster', division: null },
+      currentLp: 0,
+      avgLpGain: 30,
+      avgLpLoss: 30,
+      currentPdl: 0,
+      masterPlusCutoffs: { grandmaster: 60 },
+    // corte ao vivo 60 (não o alvo fixo 1200): floor(60/30)+1 = 3 partidas.
+    })).toBe(1.5)
   })
 })
 
@@ -160,6 +194,63 @@ describe('Fluxo padrão (Iron–Diamond) — Duo aplica +50% sobre o preço com 
       targetRank: { tier: 'iron', division: 'IV' },
     }))
     expect(priced.basePrice).toBe(0)
+  })
+})
+
+describe('Fluxo padrão mirando Master+ (Diamond- -> Grão-Mestre/Challenger direto)', () => {
+  it('calcEloPrice para no degrau de Mestre -- não cobra taxa de divisão pelos degraus de GM/Challenger', () => {
+    const toMaster = calcEloPrice('solo_duo', 'diamond', 'I', 'master', null)
+    const toGrandmaster = calcEloPrice('solo_duo', 'diamond', 'I', 'grandmaster', null)
+    const toChallenger = calcEloPrice('solo_duo', 'diamond', 'I', 'challenger', null)
+    // Os 3 custam o mesmo por divisão -- o trecho Mestre->GM/Challenger tem
+    // preço próprio (master_plus_pricing), somado por fora em computeOrderPrice.
+    expect(toGrandmaster.price).toBe(toMaster.price)
+    expect(toChallenger.price).toBe(toMaster.price)
+  })
+
+  it('soma o preço por divisão (até Mestre) com o preço do Master+ informado', () => {
+    const { price: toMaster } = calcEloPrice('solo_duo', 'diamond', 'I', 'master', null)
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'grandmaster', division: null },
+      masterPlusPrice: 899.90,
+    }))
+    expect(priced.basePrice).toBeCloseTo(toMaster + 899.90, 2)
+  })
+
+  it('sem masterPlusPrice configurado pro alvo, bloqueia o pedido (basePrice zerado) em vez de inventar preço', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'grandmaster', division: null },
+      masterPlusPrice: null,
+    }))
+    expect(priced.basePrice).toBe(0)
+  })
+
+  it('Duo Boost aplica +50% sobre o preço combinado (divisão + Master+), não só sobre o trecho de divisão', () => {
+    const solo = computeOrderPrice(baseInput({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'grandmaster', division: null },
+      masterPlusPrice: 899.90,
+      boostMode: 'solo',
+    }))
+    const duo = computeOrderPrice(baseInput({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'grandmaster', division: null },
+      masterPlusPrice: 899.90,
+      boostMode: 'duo',
+    }))
+    expect(duo.basePrice).toBeCloseTo(Math.round(solo.basePrice * 1.5 * 100) / 100, 2)
+  })
+
+  it('alvo "master" exato não soma masterPlusPrice -- já coberto pelo preço por divisão', () => {
+    const { price: expected } = calcEloPrice('solo_duo', 'diamond', 'I', 'master', null)
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'diamond', division: 'I' },
+      targetRank: { tier: 'master', division: null },
+      masterPlusPrice: null, // nem deveria ser consultado pra esse alvo
+    }))
+    expect(priced.basePrice).toBeCloseTo(expected, 2)
   })
 })
 
@@ -463,6 +554,8 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
   })
 
   it('multiplica por DELIVERY_ESTIMATE_MULTIPLIER a estimativa de horas de jogo puro nas estimativas de Vitória e MD5', () => {
+    // 3 vitórias líquidas a 80% de win rate => ceil(3/0.8) = 4 partidas
+    // esperadas (nem toda partida jogada é vitória). 4 * 0.5h * 5 = 10.
     const wins = computeOrderPrice(baseInput({
       serviceType: 'win_boost',
       currentRank: { tier: 'gold', division: 'II' },
@@ -474,7 +567,21 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
       winsPurchased: 3,
     }))
 
-    expect(wins.estimatedHours).toBe(7.5)
-    expect(md5.estimatedHours).toBe(7.5)
+    expect(wins.estimatedHours).toBe(10)
+    expect(md5.estimatedHours).toBe(10)
+  })
+
+  it('pacote de vitórias extra (addon) soma partidas pelo mesmo win rate, não 1 partida por vitória', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'iron', division: 'IV' },
+      targetRank: { tier: 'iron', division: 'III' },
+      currentLp: 50,
+      avgLpGain: 20,
+      avgLpLoss: 10,
+      winPackage: 3,
+    }))
+    // Elo boost: 4 partidas (mesmo cálculo do teste "considera LP atual...").
+    // + pacote de 3 vitórias: ceil(3/0.8) = 4 partidas. Total 8 * 0.5h * 5 = 20.
+    expect(priced.estimatedHours).toBe(20)
   })
 })

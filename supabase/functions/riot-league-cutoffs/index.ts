@@ -10,7 +10,11 @@ import { fetchLeagueCutoff } from '../_shared/riotLookup.ts'
 
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const PLATFORM_ROUTE = 'br1'
-const STALE_AFTER_MS = 6 * 60 * 60 * 1000 // 6h — ligas GM/Challenger têm milhares de entries, não vale a pena consultar mais que isso.
+// 1h — split novo começou há poucos dias (LOL_SPLIT_START_TIMESTAMP), corte
+// de GM/Challenger ainda pode se mover rápido; ligas grandes o bastante pra
+// não valer consultar a cada visualização, mas também não tão devagar a
+// ponto de defasar visivelmente o corte durante esse período.
+const STALE_AFTER_MS = 60 * 60 * 1000
 
 const bodySchema = z.object({
   queue: z.enum(['solo_duo', 'flex']).default('solo_duo'),

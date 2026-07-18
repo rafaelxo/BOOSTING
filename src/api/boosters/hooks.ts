@@ -4,9 +4,9 @@ import { queryKeys } from '@/api/core/queryKeys'
 import {
   getAdminBoosterDetail, getBoosterAccessState, getBoosterPerformanceByRank, getOwnBoosterProfileId,
   getOwnBoosterTop3Status, getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters,
-  listBoosterAuditLog, listBoostersPerformance, listBoosterNames, listPublicBoosters,
+  listBoostersPerformance, listBoosterNames, listPublicBoosters,
 } from './queries'
-import { adminApproveBooster, adminToggleBoosterTop3, boosterHeartbeat, onboardBooster, requestBoosterRole, updateProfessionalProfile } from './mutations'
+import { adminApproveBooster, adminToggleBoosterTop3, boosterHeartbeat, onboardBooster, updateProfessionalProfile } from './mutations'
 
 export function useBoosterStatus(userId: string | undefined) {
   return useQuery({
@@ -106,14 +106,6 @@ export function useBoosterNames(boosterUserIds: string[]) {
   })
 }
 
-export function useBoosterAuditLog(boosterProfileId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.boosters.adminDetail(boosterProfileId ?? '').concat(['audit']),
-    queryFn: () => listBoosterAuditLog(boosterProfileId!),
-    enabled: !!boosterProfileId,
-  })
-}
-
 export function useBoosterHeartbeat(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return
@@ -126,10 +118,6 @@ export function useBoosterHeartbeat(enabled: boolean) {
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [enabled])
-}
-
-export function useRequestBoosterRole() {
-  return useMutation({ mutationFn: requestBoosterRole })
 }
 
 export function useOnboardBooster(userId: string | undefined) {

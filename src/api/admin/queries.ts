@@ -31,15 +31,6 @@ export async function listAdminDropRequests(limit = 100): Promise<OrderDropReque
   return (data ?? []) as unknown as OrderDropRequest[]
 }
 
-export async function listAuditLog(params: { entityType?: string; entityId?: string; limit?: number } = {}) {
-  let query = supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(params.limit ?? 100)
-  if (params.entityType) query = query.eq('entity_type', params.entityType)
-  if (params.entityId) query = query.eq('entity_id', params.entityId)
-  const { data, error } = await query
-  if (error) throw normalizeApiError(error)
-  return data ?? []
-}
-
 export async function getOrderSupportEscalation(orderId: string) {
   const { data, error } = await supabase
     .from('order_support_escalations')

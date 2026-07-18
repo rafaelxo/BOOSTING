@@ -5,12 +5,12 @@ import type { OrderStatus } from '@/types'
 import {
   getBoosterOrder, getBoosterSlotInfo, getCustomerOrderState, getOrder, getPendingDropRequest,
   listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderMatches,
-  listOrderPayments, listOrderRankVerifications, listOrderStatusHistory,
+  listOrderPayments, listOrderStatusHistory,
 } from './queries'
 import {
   acceptBoostOrder, adminDropOrder, adminOverrideOrderStatus, cancelPendingOrder, confirmOrderCompletion,
-  disputeOrderCompletion, generatePix, requestOrderDrop, requestOrderSupport, restorePendingOrder,
-  revealOrderCredentials, savePendingOrderFromIntent, setOrderCredentials, syncOrderMatches, updateOrderStatus,
+  disputeOrderCompletion, generatePix, requestOrderDrop, requestOrderSupport,
+  revealOrderCredentials, setOrderCredentials, syncOrderMatches, updateOrderStatus,
   verifyOrderRank,
 } from './mutations'
 import type { BoosterOrdersTab } from './types'
@@ -143,14 +143,6 @@ export function usePendingDropRequest(orderId: string | undefined) {
   })
 }
 
-export function useOrderRankVerifications(orderId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.orders.detail(orderId ?? '').concat(['rank-verifications']),
-    queryFn: () => listOrderRankVerifications(orderId!),
-    enabled: !!orderId,
-  })
-}
-
 export function useOrderPayments(orderId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? '').concat(['payments']),
@@ -254,14 +246,6 @@ export function useAcceptBoostOrder() {
       void queryClient.invalidateQueries({ queryKey: ['orders', 'booster'] })
     },
   })
-}
-
-export function useSavePendingOrderFromIntent() {
-  return useMutation({ mutationFn: savePendingOrderFromIntent })
-}
-
-export function useRestorePendingOrder() {
-  return useMutation({ mutationFn: restorePendingOrder })
 }
 
 export function useGeneratePix(orderId: string) {

@@ -46,7 +46,11 @@ serve(async (req) => {
     const auth = await getAuthUser(req.headers.get('Authorization'))
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
 
-    const rateLimit = await consumeUserRateLimit('create-pix-payment', auth.user.id, 12, 60)
+    // Endpoint mais caro do sistema (cria pedido, gera QR PIX na Mercado Pago,
+    // pode consultar a Riot) — limite mais apertado que os outros endpoints
+    // autenticados, mas ainda folgado o bastante pra um retry legítimo depois
+    // de falha de rede.
+    const rateLimit = await consumeUserRateLimit('create-pix-payment', auth.user.id, 6, 60)
     if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
 
     const rawBody = await readJsonBody(req)

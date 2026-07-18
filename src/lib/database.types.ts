@@ -617,7 +617,9 @@ export type Database = {
         Row: {
           current_tier: string
           id: string
+          pdl_from: number
           price: number | null
+          queue_type: Database["public"]["Enums"]["queue_type"]
           target_tier: string
           updated_at: string
           updated_by: string | null
@@ -625,7 +627,9 @@ export type Database = {
         Insert: {
           current_tier: string
           id?: string
+          pdl_from: number
           price?: number | null
+          queue_type: Database["public"]["Enums"]["queue_type"]
           target_tier: string
           updated_at?: string
           updated_by?: string | null
@@ -633,7 +637,9 @@ export type Database = {
         Update: {
           current_tier?: string
           id?: string
+          pdl_from?: number
           price?: number | null
+          queue_type?: Database["public"]["Enums"]["queue_type"]
           target_tier?: string
           updated_at?: string
           updated_by?: string | null
