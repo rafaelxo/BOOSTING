@@ -4,7 +4,7 @@ import {
   Briefcase, Clock, Swords, Users, CalendarClock,
   Trophy, Target, Star, CheckCircle2, TrendingUp,
 } from 'lucide-react'
-import { Button, Card, Skeleton, StatCard, EmptyState } from '@/components/ui'
+import { Button, Card, Skeleton, StatCard, EmptyState, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { useAuthStore } from '@/stores/authStore'
@@ -80,9 +80,9 @@ function useAssignedOrders(boosterUserId: string | undefined) {
 export function BoosterDashboard() {
   const { profile } = useAuthStore()
   const { t } = useTranslation()
-  const { data: boosterProfile, isLoading: profileLoading } = useBoosterProfile(profile?.id ?? '')
-  const { data: activeOrders } = useAssignedOrders(profile?.id)
-  const { data: performance, isLoading: loadingPerformance } = usePerformanceSummary(
+  const { data: boosterProfile, isLoading: profileLoading, isError: profileError } = useBoosterProfile(profile?.id ?? '')
+  const { data: activeOrders, isError: activeOrdersError } = useAssignedOrders(profile?.id)
+  const { data: performance, isLoading: loadingPerformance, isError: performanceError } = usePerformanceSummary(
     boosterProfile?.status === 'approved' ? profile?.id : undefined,
   )
 
@@ -90,7 +90,7 @@ export function BoosterDashboard() {
 
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
-  const { data: monthOrders, isLoading: loadingMonthOrders } = useQuery({
+  const { data: monthOrders, isLoading: loadingMonthOrders, isError: monthOrdersError } = useQuery({
     queryKey: ['booster-month-orders', profile?.id, monthStart],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -108,6 +108,7 @@ export function BoosterDashboard() {
   })
 
   if (profileLoading) return <Skeleton className="h-64 w-full" />
+  if (profileError) return <ErrorAlert message="Não foi possível carregar seu perfil de booster. Tente recarregar a página." />
 
   // If not yet approved, show onboarding notice
   if (boosterProfile?.status !== 'approved') {
@@ -133,9 +134,11 @@ export function BoosterDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-ink">{t('booster.nav.dashboard')}</h1>
           <p className="text-ink-secondary mt-1">
-            {activeOrders?.length
-              ? t('booster.dashboard.activeCount', { count: activeOrders.length })
-              : t('booster.dashboard.noActive')}
+            {activeOrdersError
+              ? 'Não foi possível carregar seus pedidos ativos.'
+              : activeOrders?.length
+                ? t('booster.dashboard.activeCount', { count: activeOrders.length })
+                : t('booster.dashboard.noActive')}
           </p>
         </div>
         <Button asChild>
@@ -156,6 +159,8 @@ export function BoosterDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
           </div>
+        ) : performanceError ? (
+          <ErrorAlert message="Não foi possível carregar suas estatísticas de performance." />
         ) : !performance || performance.total_matches === 0 ? (
           <Card padding="md">
             <EmptyState
@@ -249,6 +254,8 @@ export function BoosterDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
           </div>
+        ) : monthOrdersError ? (
+          <ErrorAlert message="Não foi possível carregar os serviços concluídos deste mês." />
         ) : !monthOrders?.length ? (
           <Card padding="md">
             <p className="text-sm text-ink-muted text-center py-4">Nenhum serviço concluído neste mês ainda.</p>

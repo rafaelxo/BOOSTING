@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
@@ -99,9 +99,10 @@ export function OrderBuilderPage() {
   const currency = useCurrency()
   const pendingOrderId = searchParams.get('order')
   const explicitlyStartingNewOrder = searchParams.get('new') === '1'
-  const hasCatalogEntryIntent = Boolean(
-    searchParams.get('service') || searchParams.get('booster') || searchParams.get('coach_package'),
-  )
+  const serviceParam = searchParams.get('service')
+  const boosterParam = searchParams.get('booster')
+  const coachPackageParam = searchParams.get('coach_package')
+  const hasCatalogEntryIntent = Boolean(serviceParam || boosterParam || coachPackageParam)
 
   // A cobrança é persistida no banco antes de o QR ser exibido. Ao voltar
   // para /orders/new (inclusive depois de reload/fechar o navegador), procure
@@ -171,18 +172,39 @@ export function OrderBuilderPage() {
     if (serviceRow?.id && serviceRow.id !== serviceId) setServiceId(serviceRow.id)
   }, [serviceRow, serviceId, setServiceId])
 
+  // `?new=1` sozinho (sem parâmetro de catálogo) só significa "descarte a
+  // configuração em memória e volte pro primeiro passo" -- usado depois de um
+  // PIX expirado ou ao voltar de "Meus pedidos"/detalhe do pedido. Roda uma
+  // vez por chegada nessa condição; `startNewOrder()` (StepPayment.tsx) já
+  // faz o reset diretamente pro clique em "Configurar novo pedido", então
+  // isto cobre só quem chega aqui via navegação de fora (rota diferente).
   useEffect(() => {
-    const service = searchParams.get('service') as ServiceType | null
-    const boosterId = searchParams.get('booster')
-    const coachPackageId = searchParams.get('coach_package')
-
-    // `?new=1` is also used after an expired PIX. With no catalog entry
-    // parameters it must always discard the previous in-memory configuration
-    // and return to the first step.
-    if (searchParams.get('new') === '1' && !service && !boosterId && !coachPackageId) {
+    if (explicitlyStartingNewOrder && !hasCatalogEntryIntent) {
       reset()
       setStep('service')
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Processa um link de entrada de catálogo (?service=/?booster=/?coach_package=)
+  // -- reage a MUDANÇAS nesses parâmetros, não só ao mount. Antes rodava com
+  // deps: [] (uma vez só), então navegar para outro link de catálogo (ex.:
+  // trocar de serviço, ou escolher outro booster) enquanto esta página já
+  // estava montada (React Router não remonta a rota só porque a query string
+  // mudou) deixava a configuração antiga intacta -- inclusive um pedido
+  // "aguardando pagamento" anterior continuava aparecendo na etapa de
+  // pagamento com o QR/valor do pedido errado. Guard via ref evita reprocessar
+  // o mesmo parâmetro assim que ele é consumido/limpo abaixo.
+  const processedCatalogIntentRef = useRef<string | null>(null)
+  useEffect(() => {
+    const service = serviceParam as ServiceType | null
+    const boosterId = boosterParam
+    const coachPackageId = coachPackageParam
+    if (!service && !boosterId && !coachPackageId) return
+
+    const signature = `${service ?? ''}|${boosterId ?? ''}|${coachPackageId ?? ''}`
+    if (processedCatalogIntentRef.current === signature) return
+    processedCatalogIntentRef.current = signature
 
     if (service && VALID_SERVICES.includes(service)) {
       reset()
@@ -229,12 +251,15 @@ export function OrderBuilderPage() {
         })
     }
 
-    // Mantém um marcador após consumir os parâmetros de entrada. Sem ele, a
-    // query de retomada poderia encontrar um pedido antigo pendente no render
-    // seguinte e tirar o usuário deste novo fluxo que ele acabou de escolher.
-    if (service || boosterId || coachPackageId) setSearchParams({ new: '1' }, { replace: true })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Mantém um marcador após consumir os parâmetros de entrada (e derruba um
+    // eventual ?order= de um pedido pendente anterior) -- sem ele, a query de
+    // retomada poderia encontrar aquele pedido antigo e tirar o usuário deste
+    // novo fluxo que ele acabou de escolher.
+    setSearchParams({ new: '1' }, { replace: true })
+  }, [
+    serviceParam, boosterParam, coachPackageParam,
+    reset, setStep, setService, setPreferredBooster, setSelectedCoachPackage, setBasePrice, setSearchParams,
+  ])
 
   const currentIdx = steps.indexOf(step)
   const completedSteps = steps.slice(0, currentIdx)

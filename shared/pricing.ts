@@ -280,17 +280,19 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 
 // ── Elo Boost Master+ — resumo pra página pública de preços ─────────────────
 // Fonte de referência apenas — o preço autoritativo do pedido vem da tabela
-// `master_plus_pricing` (ver migration 090), chaveada por (tier atual, tier
-// alvo): a distância entre tiers importa (Grão-Mestre->Challenger custa
-// menos que Mestre->Challenger). Estes valores representam o custo partindo
-// de Mestre (o ponto de entrada natural do fluxo), pra caber num resumo de
-// uma linha por tier na página pública. "master" existe aqui só pra exibição
-// — o fluxo Master+ só existe quando o rank ATUAL já é Master/Grão-Mestre
-// (ver shared/boostDomain.ts::isMasterPlusCurrentTier), então ninguém
-// efetivamente "compra" o tier Master através dele.
+// `master_plus_pricing` (ver migrations 090/093), chaveada por (tier atual,
+// tier alvo, fila, faixa de PDL). Cada chave aqui é o custo de AVANÇAR a
+// partir do tier atual daquela linha da página pública — mesmo significado
+// usado pelas linhas de Iron–Diamond (preço "tier completo" partindo daquele
+// tier), não um custo acumulado desde Mestre:
+//   master      -> avançar de Mestre para Grão-Mestre    (R$   899,90)
+//   grandmaster -> avançar de Grão-Mestre para Challenger (R$ 1.249,90)
+//   challenger  -> Mestre->Challenger direto (pula Grão-Mestre) — único caso
+//                  sem "tier atual == linha", mantido só como referência
+//                  (não é exibido na página pública hoje)
 export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
   master: 89990,
-  grandmaster: 89990,
+  grandmaster: 124990,
   challenger: 214990,
 } as const
 

@@ -78,6 +78,7 @@ export function StepPayment() {
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
+  const qrRetryTimeoutRef = useRef<number | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
   const restoredOrderRef = useRef<string | null>(null)
   const expiryHandledRef = useRef(false)
@@ -157,6 +158,13 @@ export function StepPayment() {
     }
   }
 
+  function stopQrRetry() {
+    if (qrRetryTimeoutRef.current !== null) {
+      clearTimeout(qrRetryTimeoutRef.current)
+      qrRetryTimeoutRef.current = null
+    }
+  }
+
   // Poll order status every 5s until confirmed or expired
   function startPolling(orderId: string) {
     stopPolling()
@@ -174,7 +182,7 @@ export function StepPayment() {
   }
 
 
-  useEffect(() => () => stopPolling(), [])
+  useEffect(() => () => { stopPolling(); stopQrRetry() }, [])
 
   function buildIntent(): Record<string, unknown> {
     const base = {
@@ -297,13 +305,20 @@ export function StepPayment() {
     queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
     queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
 
-    // If MP didn't return base64 yet, retry once after 3s to get it
+    // If MP didn't return base64 yet, retry once after 3s to get it. Scoped
+    // to this order (tracked in a ref, cancelled on unmount/next invokePix)
+    // and only ever applied if the UI is still waiting on THIS SAME order --
+    // a stray timer from a previous order's PIX must never patch whatever
+    // order is currently being displayed.
+    stopQrRetry()
     if (!pixData.qr_code_base64) {
-      setTimeout(async () => {
+      qrRetryTimeoutRef.current = window.setTimeout(async () => {
         const retry = await generatePixRequest(orderId).catch(() => null)
         if (retry?.qr_code_base64) {
           setPix((prev) =>
-            prev.phase === 'waiting' ? { ...prev, qr_base64: retry.qr_code_base64 ?? null } : prev,
+            prev.phase === 'waiting' && prev.order_id === orderId
+              ? { ...prev, qr_base64: retry.qr_code_base64 ?? null }
+              : prev,
           )
         }
       }, 3000)
@@ -345,6 +360,7 @@ export function StepPayment() {
 
   function startNewOrder() {
     stopPolling()
+    stopQrRetry()
     store.reset()
     store.setStep('service')
     setSavedOrderId(null)

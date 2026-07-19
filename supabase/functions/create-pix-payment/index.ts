@@ -233,6 +233,16 @@ serve(async (req) => {
             reused: true,
           })
         }
+        // MP already shows this payment as approved but our webhook hasn't
+        // landed yet (delivery lag) — the order row can still read
+        // 'awaiting_payment' in this exact window. Falling through to
+        // "create new PIX payment" below would re-POST with the same
+        // idempotency key (no double charge, MP replays the approved
+        // payment) but hand the client a stale/misleading "unpaid" response.
+        // Tell the truth instead: this order is already paid.
+        if (mp.status === 'approved') {
+          return errorResponse(req, 'Este pedido já foi pago — atualize a página.', 409, 'ALREADY_PAID', { order_id: orderId })
+        }
       }
     }
 

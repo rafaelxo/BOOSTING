@@ -44,6 +44,14 @@ export type NotificationType =
   | 'review_received'
   | 'booster_approved'
   | 'exclusive_job'
+  | 'order_support_escalated'
+  | 'payout_request_created'
+  | 'payout_request_paid'
+  | 'payout_request_rejected'
+  | 'commission_clawed_back'
+  | 'commission_clawed_back_admin'
+  | 'drop_penalty_applied'
+  | 'payment_amount_mismatch'
 
 // ─── Rank / Tier system ───────────────────────────────────────────────────────
 

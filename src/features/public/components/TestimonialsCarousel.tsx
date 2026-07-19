@@ -1,15 +1,25 @@
 import { MessageSquareText } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { usePublicReviews } from '@/api/reviews'
+import { PLACEHOLDER_TESTIMONIALS } from '../data/placeholderTestimonials'
 import { TestimonialCard } from './TestimonialCard'
 
 // Avaliações reais e públicas (reviews.is_public = true) -- nunca depoimentos
 // inventados. Se ainda não houver avaliações suficientes, mostra um estado
 // vazio explícito em vez de inventar conteúdo (ver master-prompt seção 28.1).
-export function TestimonialsCarousel() {
-  const { data: reviews, isLoading } = usePublicReviews()
+//
+// TEMP: site ainda em fase de testes, sem clientes reais -- usando
+// depoimentos fictícios (ver ../data/placeholderTestimonials.ts) só pro
+// carrossel não ficar vazio. Antes de qualquer lançamento real, apagar
+// USE_PLACEHOLDER abaixo (e o arquivo de dados) e voltar a depender só de
+// `usePublicReviews`.
+const USE_PLACEHOLDER = true
 
-  if (isLoading) {
+export function TestimonialsCarousel() {
+  const { data: realReviews, isLoading } = usePublicReviews()
+  const reviews = USE_PLACEHOLDER ? PLACEHOLDER_TESTIMONIALS : realReviews
+
+  if (!USE_PLACEHOLDER && isLoading) {
     return (
       <div className="max-w-screen-xl mx-auto px-5 sm:px-8 flex gap-5 overflow-hidden">
         {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-40 w-80 shrink-0 rounded-2xl" />)}
@@ -32,9 +42,7 @@ export function TestimonialsCarousel() {
   // Duplica a lista sempre (mesmo com só 1-2 avaliações) pra fechar o loop
   // visual da esteira sem emenda -- a animação desloca -50%, que só bate com
   // um ponto real do loop quando as duas metades são idênticas; com poucas
-  // avaliações e sem duplicar, o marquee pulava/quebrava no fim do ciclo. Os
-  // dados em si nunca são fabricados, sempre vêm de reviews reais -- só
-  // repete o mesmo cartão real, nunca inventa um novo.
+  // avaliações e sem duplicar, o marquee pulava/quebrava no fim do ciclo.
   const track = [...reviews, ...reviews]
 
   return (

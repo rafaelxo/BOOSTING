@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { normalizeApiError } from '@/api/core/errors'
+import { queryKeys } from '@/api/core/queryKeys'
 import { listBoosterNames } from '@/api/boosters'
 
 export interface PublicReview {
@@ -43,7 +44,7 @@ export async function listPublicReviews(limit = 24): Promise<PublicReview[]> {
 
 export function usePublicReviews(limit = 24) {
   return useQuery({
-    queryKey: ['reviews', 'public', limit],
+    queryKey: queryKeys.reviews.public(limit),
     queryFn: () => listPublicReviews(limit),
     staleTime: 60_000,
   })
@@ -70,7 +71,7 @@ export async function listBoosterReviews(boosterUserId: string, limit = 50): Pro
 
 export function useBoosterReviews(boosterUserId: string | undefined) {
   return useQuery({
-    queryKey: ['reviews', 'booster', boosterUserId ?? ''],
+    queryKey: queryKeys.reviews.forBooster(boosterUserId ?? ''),
     queryFn: () => listBoosterReviews(boosterUserId!),
     enabled: !!boosterUserId,
   })

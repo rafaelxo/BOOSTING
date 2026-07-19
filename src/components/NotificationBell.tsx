@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck, MessageCircle, Trophy, CreditCard, Star, UserCheck, Briefcase, RefreshCw } from 'lucide-react'
+import { Bell, CheckCheck, MessageCircle, Trophy, CreditCard, Star, UserCheck, Briefcase, RefreshCw, LifeBuoy, Wallet, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import type { Notification, NotificationType } from '@/types'
@@ -16,6 +16,14 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   review_received: Star,
   booster_approved: UserCheck,
   exclusive_job: Briefcase,
+  order_support_escalated: LifeBuoy,
+  payout_request_created: Wallet,
+  payout_request_paid: Wallet,
+  payout_request_rejected: Wallet,
+  commission_clawed_back: AlertTriangle,
+  commission_clawed_back_admin: AlertTriangle,
+  drop_penalty_applied: AlertTriangle,
+  payment_amount_mismatch: AlertTriangle,
 }
 
 function timeAgo(iso: string): string {

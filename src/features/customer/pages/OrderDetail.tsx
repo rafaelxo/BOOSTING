@@ -222,10 +222,13 @@ function PendingPaymentSection({ order }: { order: Order }) {
   // code de quando o pedido foi criado, nunca duplica cobrança.
   useEffect(() => {
     if (order.status === 'awaiting_payment') loadPix()
-    // Só na primeira renderização desta seção para este pedido -- loadPix
-    // não deve rodar de novo a cada re-render.
+    // Refaz a chamada sempre que o pedido (re)entra em 'awaiting_payment' --
+    // não só na primeira renderização deste pedido. Sem `order.status` aqui,
+    // se o status saísse e voltasse a 'awaiting_payment' com o mesmo
+    // order.id (esta seção não desmonta nesse caso), o QR nunca recarregava
+    // sozinho. loadPix fica de fora de propósito (recriada a cada render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [order.id])
+  }, [order.id, order.status])
 
   function cancelOrder() {
     setError(null)

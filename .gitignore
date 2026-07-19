@@ -54,6 +54,7 @@ supabase/functions/.env.local
 docs/
 .claude/
 .agents/
+graphify-out/
 
 .vercel
 .env*

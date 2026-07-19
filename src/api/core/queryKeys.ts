@@ -58,6 +58,7 @@ export const queryKeys = {
     payments: () => ['admin', 'payments'] as const,
   },
   reviews: {
+    public: (limit: number) => ['reviews', 'public', limit] as const,
     forBooster: (boosterId: string) => ['reviews', 'booster', boosterId] as const,
   },
 } as const

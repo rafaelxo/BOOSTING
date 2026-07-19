@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { ShoppingBag, Users, TrendingUp } from 'lucide-react'
-import { Card, OrderStatusBadge, Skeleton, StatCard } from '@/components/ui'
+import { Card, OrderStatusBadge, Skeleton, StatCard, ErrorAlert } from '@/components/ui'
 import { timeAgo } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
@@ -9,7 +9,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useAdminDashboardStats } from '@/api/admin'
 
 export function AdminOverview() {
-  const { data: stats, isLoading } = useAdminDashboardStats()
+  const { data: stats, isLoading, isError } = useAdminDashboardStats()
   const { t } = useTranslation()
   const currency = useCurrency()
 
@@ -31,6 +31,10 @@ export function AdminOverview() {
           {t('admin.overview.live')}
         </div>
       </div>
+
+      {isError && (
+        <ErrorAlert message="Não foi possível carregar as estatísticas do painel. Os valores abaixo podem estar incompletos ou desatualizados." />
+      )}
 
       {/* KPI cards */}
       {isLoading ? (
