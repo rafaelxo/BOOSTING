@@ -5,7 +5,13 @@ node_modules/
 
 # Build output
 dist/
+dist_new/
+dist_v2/
 build/
+
+# Booster Launcher desktop app (built binary, not source)
+Booster Launcher/
+launcher
 
 # Environment - NEVER commit secrets
 .env
