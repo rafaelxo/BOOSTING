@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Shield, CheckCircle2, XCircle, Trophy, Star } from 'lucide-react'
-import { Button, BoosterStatusBadge, EmptyState, Skeleton } from '@/components/ui'
+import { Button, BoosterStatusBadge, EmptyState, Skeleton, ErrorAlert } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { formatDate } from '@/lib/utils'
 import type { BoosterProfile } from '@/types'
@@ -43,6 +43,14 @@ export function AdminBoostersPage() {
           ))}
         </div>
       </div>
+
+      {filtered.length >= 100 && (
+        <p className="text-xs text-warning">Mostrando os 100 boosters mais recentes deste filtro — pode haver mais.</p>
+      )}
+
+      {updateBoosterStatusMutation.isError && (
+        <ErrorAlert message={(updateBoosterStatusMutation.error as Error).message} />
+      )}
 
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
@@ -89,21 +97,25 @@ export function AdminBoostersPage() {
                       {b.status === 'pending' || b.status === 'under_review' ? (
                         <>
                           <Button size="xs" variant="success" leftIcon={<CheckCircle2 className="h-3 w-3" />}
+                            loading={updateBoosterStatusMutation.isPending}
                             onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
                             {t('admin.boosters.approve')}
                           </Button>
                           <Button size="xs" variant="danger" leftIcon={<XCircle className="h-3 w-3" />}
+                            loading={updateBoosterStatusMutation.isPending}
                             onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'rejected' })}>
                             {t('admin.boosters.reject')}
                           </Button>
                         </>
                       ) : b.status === 'approved' ? (
                         <Button size="xs" variant="danger-ghost"
+                          loading={updateBoosterStatusMutation.isPending}
                           onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'suspended' })}>
                           {t('admin.boosters.suspend')}
                         </Button>
                       ) : b.status === 'suspended' ? (
                         <Button size="xs" variant="secondary"
+                          loading={updateBoosterStatusMutation.isPending}
                           onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
                           {t('admin.boosters.reinstate')}
                         </Button>

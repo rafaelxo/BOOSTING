@@ -15,8 +15,14 @@ serve(async (req) => {
     // invocação/custo à toa; o resultado em si já é cacheado 6h em memória
     // (ver _shared/ddragon.ts), então isso nunca vira consulta repetida à
     // Riot/CommunityDragon, só protege a function em si.
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || req.headers.get('cf-connecting-ip')
+    // cf-connecting-ip (quando presente) é setado pela borda da Cloudflare e
+    // não pode ser forjado pelo cliente; x-forwarded-for é enviado pelo
+    // próprio cliente, então o primeiro valor da lista é livremente
+    // controlável por quem faz a chamada — usamos o ÚLTIMO valor (o hop mais
+    // próximo do nosso proxy confiável) como fallback, nunca o primeiro.
+    const forwardedFor = req.headers.get('x-forwarded-for')?.split(',').map((v) => v.trim()).filter(Boolean) ?? []
+    const clientIp = req.headers.get('cf-connecting-ip')
+      || forwardedFor[forwardedFor.length - 1]
       || 'unknown'
     const rateLimit = await consumeUserRateLimit('riot-profile-icons', clientIp, 30, 60)
     if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)

@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
-import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert } from '@/components/ui'
+import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert, Skeleton } from '@/components/ui'
 import { formatDate, formatRank, formatLastSeen } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
@@ -53,7 +53,7 @@ export function AdminBoosterDetailPage() {
 
   const toggleTop3Mutation = useAdminToggleBoosterTop3()
 
-  if (isLoading) return null
+  if (isLoading) return <Skeleton className="h-48 w-full" />
   if (!booster) return <p className="text-ink-muted">Booster não encontrado.</p>
 
   const isPending = booster.status === 'pending' || booster.status === 'under_review'

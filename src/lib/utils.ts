@@ -3,6 +3,7 @@ import { twMerge } from 'tailwind-merge'
 import { format, formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { Order, OrderStatus, PaymentStatus, RankTier, BoosterStatus, OrderExtra } from '@/types'
+import type { PayoutRequestStatus } from '@/api/payouts'
 
 export { RANK_TIER_ORDER } from '../../shared/pricing'
 
@@ -153,6 +154,30 @@ export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
   approved: 'text-success bg-success/10',
   suspended: 'text-danger bg-danger/10',
   rejected: 'text-ink-muted bg-bg-overlay',
+}
+
+// ─── Payout request status ──────────────────────────────────────────────────
+// Fonte única -- antes duplicado (e já divergente) entre as telas de admin e
+// de booster; mantém os 3 estados de "aguardando" distintos, já que a versão
+// mais granular (usada antes só pelo booster) nunca perde informação pro
+// admin, e é o admin quem mais se beneficia de saber se algo já está em
+// revisão vs. só acabou de ser pedido.
+export const PAYOUT_REQUEST_STATUS_LABEL: Record<PayoutRequestStatus, string> = {
+  requested: 'Aguardando análise',
+  under_review: 'Em revisão',
+  approved: 'Aprovado — a pagar',
+  paid: 'Pago',
+  rejected: 'Rejeitado',
+  canceled: 'Cancelado',
+}
+
+export const PAYOUT_REQUEST_STATUS_COLOR: Record<PayoutRequestStatus, string> = {
+  requested: 'text-warning bg-warning/10',
+  under_review: 'text-info bg-info/10',
+  approved: 'text-brand bg-brand/10',
+  paid: 'text-success bg-success/10',
+  rejected: 'text-danger bg-danger/10',
+  canceled: 'text-ink-muted bg-bg-elevated',
 }
 
 // ─── Service label ────────────────────────────────────────────────────────────

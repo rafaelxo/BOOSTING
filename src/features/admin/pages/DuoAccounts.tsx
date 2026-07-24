@@ -217,7 +217,8 @@ export function AdminDuoAccountsPage() {
                     <TableCell>
                       <button
                         onClick={() => toggleActive.mutate(a)}
-                        className={`badge text-xs ${a.is_active ? 'text-success bg-success/10' : 'text-ink-muted bg-bg-overlay'}`}
+                        disabled={toggleActive.isPending}
+                        className={`badge text-xs disabled:opacity-50 disabled:cursor-not-allowed ${a.is_active ? 'text-success bg-success/10' : 'text-ink-muted bg-bg-overlay'}`}
                       >
                         {a.is_active ? 'Ativa' : 'Inativa'}
                       </button>

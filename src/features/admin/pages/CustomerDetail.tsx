@@ -14,7 +14,7 @@ export function AdminCustomerDetailPage() {
   const { data: orders, isLoading: loadingOrders } = useAdminCustomerOrders(customer?.user_id)
   const { data: reviews, isLoading: loadingReviews } = useAdminCustomerReviews(customer?.user_id)
 
-  if (isLoading) return null
+  if (isLoading) return <Skeleton className="h-48 w-full" />
   if (!customer) return <p className="text-ink-muted">Cliente não encontrado.</p>
 
   return (

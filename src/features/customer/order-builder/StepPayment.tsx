@@ -73,6 +73,7 @@ export function StepPayment() {
   const currency = useCurrency()
   const [pix, setPix] = useState<PixState>({ phase: 'idle' })
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState<string | null>(null)
   const [savedOrderId, setSavedOrderId] = useState<string | null>(pendingOrderId)
   const [savedTotalPrice, setSavedTotalPrice] = useState<number | null>(null)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
@@ -394,9 +395,14 @@ export function StepPayment() {
 
   async function copyPix() {
     if (pix.phase !== 'waiting') return
-    await navigator.clipboard.writeText(pix.qr_code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 3000)
+    try {
+      await navigator.clipboard.writeText(pix.qr_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    } catch {
+      setCopyError('Não foi possível copiar automaticamente. Selecione o código acima e copie manualmente.')
+      setTimeout(() => setCopyError(null), 4000)
+    }
   }
 
   // ── Confirmed ────────────────────────────────────────────────────────────────
@@ -485,6 +491,7 @@ export function StepPayment() {
               {copied ? 'Copiado!' : 'Copiar'}
             </Button>
           </div>
+          {copyError && <p className="text-xs text-danger">{copyError}</p>}
         </div>
 
         {/* Status indicator */}

@@ -72,6 +72,7 @@ export function StepConfigure() {
   }
 
   async function lookupRiotRank() {
+    if (riotLookupLoading) return
     const trimmed = riotId.trim()
     resetLookupMessages()
     if (!RIOT_ID_FORMAT.test(trimmed)) {
@@ -146,6 +147,7 @@ export function StepConfigure() {
   }
 
   async function lookupForWinBoost() {
+    if (riotLookupLoading) return
     const trimmed = riotId.trim()
     resetLookupMessages()
     if (!RIOT_ID_FORMAT.test(trimmed)) {

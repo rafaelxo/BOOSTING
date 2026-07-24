@@ -36,6 +36,9 @@ export function AdminDropsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">Solicitações de Drop</h1>
+      {(requests?.length ?? 0) >= 100 && (
+        <p className="text-xs text-warning">Mostrando as 100 solicitações mais recentes — pode haver mais.</p>
+      )}
 
       {/* Pending */}
       <section>

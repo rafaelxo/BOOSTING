@@ -22,6 +22,9 @@ export function AdminRefundsPage() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.refunds.title')}</h1>
+      {(refunds?.length ?? 0) >= 100 && (
+        <p className="text-xs text-warning">Mostrando os 100 reembolsos mais recentes — pode haver mais.</p>
+      )}
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
           !refunds?.length ? <EmptyState icon={RefreshCw} title={t('admin.refunds.empty')} /> : (

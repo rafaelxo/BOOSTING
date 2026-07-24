@@ -16,6 +16,9 @@ export function AdminCustomersPage() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.customers.title')}</h1>
+      {(customers?.length ?? 0) >= 100 && (
+        <p className="text-xs text-warning">Mostrando os 100 clientes mais recentes — pode haver mais.</p>
+      )}
       <div className="card p-0">
         {isLoading ? <div className="p-4"><Skeleton className="h-48 w-full" /></div> :
           !customers?.length ? <EmptyState icon={Users} title={t('admin.customers.empty')} /> : (

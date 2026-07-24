@@ -32,6 +32,9 @@ export function AdminOrdersPage() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.orders.title')}</h1>
+      {(orders?.length ?? 0) >= 100 && (
+        <p className="text-xs text-warning">Mostrando os 100 pedidos mais recentes deste filtro — pode haver mais.</p>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">

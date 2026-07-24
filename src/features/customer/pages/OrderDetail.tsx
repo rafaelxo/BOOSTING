@@ -181,6 +181,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const currency = useCurrency()
   const [pix, setPix] = useState<{ qr_code?: string; qr_code_base64?: string | null; total_price: number; expires_at: string } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { remaining, label } = useCountdown(pix?.expires_at ?? null)
 
@@ -261,9 +262,14 @@ function PendingPaymentSection({ order }: { order: Order }) {
 
   async function copyPix() {
     if (!pix?.qr_code) return
-    await navigator.clipboard.writeText(pix.qr_code)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2500)
+    try {
+      await navigator.clipboard.writeText(pix.qr_code)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2500)
+    } catch {
+      setCopyError('Não foi possível copiar automaticamente. Selecione o código acima e copie manualmente.')
+      window.setTimeout(() => setCopyError(null), 4000)
+    }
   }
 
   if (order.status !== 'awaiting_payment') return null
@@ -326,6 +332,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
           <Button className="w-full" variant={copied ? 'success' : 'secondary'} onClick={copyPix} leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
             {copied ? 'Copiado' : 'Copiar'}
           </Button>
+          {copyError && <p className="text-xs text-danger">{copyError}</p>}
 
           <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
             Cancelar pedido

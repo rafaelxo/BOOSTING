@@ -39,7 +39,7 @@ async function fetchOrderProfiles(orderId: string) {
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, customer_id, assigned_booster_id, service_id, discord_voice_channel_id')
+    .select('id, status, customer_id, assigned_booster_id, service_id, discord_voice_channel_id')
     .eq('id', orderId)
     .single()
 
@@ -156,6 +156,14 @@ serve(async (req) => {
     if (newStatus === 'in_progress' && oldStatus !== 'in_progress' && !existingChannelId) {
       const { order, customer, booster } = await fetchOrderProfiles(orderId)
 
+      // O payload do webhook não é reconferido contra o banco em nenhum outro
+      // ponto — sem isso, a posse do DISCORD_WEBHOOK_SECRET (compartilhado com
+      // discord-init-channels) seria suficiente pra forjar `status` e criar/
+      // apagar canais fora de sincronia com o estado real do pedido.
+      if (order.status !== 'in_progress') {
+        return jsonResponse(req, { ok: false, reason: 'order status mismatch, ignoring stale/forged payload' })
+      }
+
       if (!customer?.discord_id && !booster?.discord_id) {
         return jsonResponse(req, { ok: false, reason: 'no discord_ids found for customer or booster' })
       }
@@ -172,6 +180,11 @@ serve(async (req) => {
 
     // ── Delete channel when order is terminated ──────────────────────────────
     if (TERMINAL.includes(newStatus) && existingChannelId) {
+      const { order } = await fetchOrderProfiles(orderId)
+      if (!TERMINAL.includes(order.status)) {
+        return jsonResponse(req, { ok: false, reason: 'order status mismatch, ignoring stale/forged payload' })
+      }
+
       await deleteVoiceChannel(existingChannelId)
       await saveChannelId(orderId, null)
 

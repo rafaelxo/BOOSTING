@@ -53,6 +53,11 @@ export function AdminPaymentsPage() {
         <p className="mt-1 max-w-2xl text-sm text-ink-secondary">
           Cobranças PIX recebidas via Mercado Pago. Para repasses aos boosters, veja Solicitações de saque.
         </p>
+        {(payments?.length ?? 0) >= 150 && (
+          <p className="mt-1 text-xs text-warning">
+            Mostrando os 150 pagamentos mais recentes — "Recebido do cliente" reflete só essa lista, não o total histórico.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

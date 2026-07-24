@@ -1,24 +1,16 @@
 import { useState } from 'react'
 import { Wallet, Banknote, PiggyBank, Hourglass, Send, FileText, XCircle } from 'lucide-react'
 import { Button, Card, Skeleton, EmptyState, StatCard, ErrorAlert, CurrencyMaskedInput } from '@/components/ui'
-import { formatDateTime, cn } from '@/lib/utils'
+import { formatDateTime, cn, PAYOUT_REQUEST_STATUS_LABEL, PAYOUT_REQUEST_STATUS_COLOR } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
   useBoosterPayoutTotals, useBoosterPayoutRequests, useRequestPayout, useCancelPayoutRequest,
   getPayoutProofSignedUrl, MIN_PAYOUT_AMOUNT,
 } from '@/api/payouts'
-import type { PayoutRequestStatus } from '@/api/payouts'
 
-const STATUS_LABEL: Record<PayoutRequestStatus, string> = {
-  requested: 'Aguardando análise', under_review: 'Em revisão', approved: 'Aprovado — a pagar',
-  paid: 'Pago', rejected: 'Rejeitado', canceled: 'Cancelado',
-}
-const STATUS_COLOR: Record<PayoutRequestStatus, string> = {
-  requested: 'text-warning bg-warning/10', under_review: 'text-info bg-info/10',
-  approved: 'text-brand bg-brand/10', paid: 'text-success bg-success/10',
-  rejected: 'text-danger bg-danger/10', canceled: 'text-ink-muted bg-bg-elevated',
-}
+const STATUS_LABEL = PAYOUT_REQUEST_STATUS_LABEL
+const STATUS_COLOR = PAYOUT_REQUEST_STATUS_COLOR
 
 function RequestPayoutCard({ available }: { available: number }) {
   const { profile } = useAuthStore()

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Banknote, CheckCircle2, Clock3, FileText, ShieldCheck, Upload, XCircle } from 'lucide-react'
 import { Button, Card, EmptyState, Modal, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { cn, formatDateTime } from '@/lib/utils'
+import { cn, formatDateTime, PAYOUT_REQUEST_STATUS_LABEL } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
   useAdminPayoutRequests, useAdminReviewPayoutRequest, useAdminMarkPayoutPaid, usePayoutRequestBreakdown,
@@ -10,10 +10,7 @@ import {
 import { uploadPayoutProof, getPayoutProofSignedUrl } from '@/api/payouts'
 import type { PayoutRequestRow, PayoutRequestStatus } from '@/api/payouts'
 
-const STATUS_LABEL: Record<PayoutRequestStatus, string> = {
-  requested: 'Aguardando', under_review: 'Aguardando', approved: 'Aguardando',
-  paid: 'Pago', rejected: 'Rejeitado', canceled: 'Cancelado',
-}
+const STATUS_LABEL = PAYOUT_REQUEST_STATUS_LABEL
 const STATUS_COLOR: Record<PayoutRequestStatus, string> = {
   requested: 'text-warning bg-warning/10 border-warning/20',
   under_review: 'text-warning bg-warning/10 border-warning/20',

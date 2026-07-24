@@ -40,6 +40,7 @@ export function BoosterServiceForm({
     data.description.trim().length > 0 &&
     data.tempo.trim().length > 0 &&
     parseFloat(data.price) > 0 &&
+    parseFloat(data.price) <= 10000 &&
     data.lanes.length > 0 &&
     data.specialties.length > 0
 
@@ -89,6 +90,7 @@ export function BoosterServiceForm({
             onChange={field('price')}
             type="number"
             min="0"
+            max="10000"
             step="0.01"
             placeholder="0,00"
             className="input-base w-full text-sm"
