@@ -73,8 +73,8 @@ const ELO_DIV_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
     platinum: 2390, emerald: 4690, diamond: 7490,
   },
   flex: {
-    iron: 800, bronze: 940, silver: 1280, gold: 1590,
-    platinum: 2270, emerald: 4450, diamond: 7110,
+    iron: 850, bronze: 990, silver: 1350, gold: 1690,
+    platinum: 2390, emerald: 4690, diamond: 7490,
   },
 }
 
@@ -138,13 +138,13 @@ export const MATCH_DURATION_HOURS = 0.5
 // Fonte única de verdade do prazo de entrega mostrado ao cliente. A
 // estimativa de horas de jogo puro (estimateEloBoostHours / partidas * 0.5h)
 // nunca reflete a realidade — booster também dorme, tem outros pedidos, faz
-// pausas. Multiplicamos por 5 aqui, uma única vez, no fechamento de
+// pausas. Multiplicamos por 10 aqui, uma única vez, no fechamento de
 // computeOrderPrice() — nunca no frontend, nunca em cada serviceType
 // separadamente. Aplica-se a TODO pedido medido em partidas (win_boost,
 // md5, placement_matches e elo_boost — tanto o fluxo padrão com LP médio
 // quanto o Master+ com PDL médio); coaching é a única exceção, pois usa a
 // duração real do pacote/sessões, não contagem de partidas.
-export const DELIVERY_ESTIMATE_MULTIPLIER = 5
+export const DELIVERY_ESTIMATE_MULTIPLIER = 10
 export const EXPECTED_BOOST_WIN_RATE = 0.8
 export const MASTER_PLUS_LP_PER_GAME = 30
 export const MASTER_PLUS_TARGET_LP: Record<'master' | 'grandmaster' | 'challenger', number> = {
@@ -280,20 +280,21 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 
 // ── Elo Boost Master+ — resumo pra página pública de preços ─────────────────
 // Fonte de referência apenas — o preço autoritativo do pedido vem da tabela
-// `master_plus_pricing` (ver migrations 090/093), chaveada por (tier atual,
-// tier alvo, fila, faixa de PDL). Cada chave aqui é o custo de AVANÇAR a
-// partir do tier atual daquela linha da página pública — mesmo significado
-// usado pelas linhas de Iron–Diamond (preço "tier completo" partindo daquele
-// tier), não um custo acumulado desde Mestre:
-//   master      -> avançar de Mestre para Grão-Mestre    (R$   899,90)
+// `master_plus_pricing` (ver migration 099), chaveada por (tier atual, tier
+// alvo, fila, faixa de PDL). Cada chave aqui é o preço do PRIMEIRO degrau de
+// PDL (0 do tier atual) daquela progressão — mesmo significado usado pelas
+// linhas de Iron–Diamond (preço "tier completo" partindo daquele tier), não
+// um custo acumulado desde Mestre:
+//   master      -> avançar de Mestre para Grão-Mestre     (R$   899,90)
 //   grandmaster -> avançar de Grão-Mestre para Challenger (R$ 1.249,90)
-//   challenger  -> Mestre->Challenger direto (pula Grão-Mestre) — único caso
-//                  sem "tier atual == linha", mantido só como referência
-//                  (não é exibido na página pública hoje)
+//   challenger  -> Mestre->Challenger direto (pula Grão-Mestre), soma dos
+//                  dois primeiros degraus acima — único caso sem "tier
+//                  atual == linha", mantido só como referência (não é
+//                  exibido na página pública hoje)                (R$ 2.149,80)
 export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
   master: 89990,
   grandmaster: 124990,
-  challenger: 214990,
+  challenger: 214980,
 } as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────

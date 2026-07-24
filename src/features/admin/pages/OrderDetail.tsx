@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw, Clock, XOctagon, MessageCircleWarning } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { supabase } from '@/lib/supabase'
@@ -37,11 +38,7 @@ const DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 
 const FORWARD_STATUS: Partial<Record<OrderStatus, { value: OrderStatus; label: string }[]>> = {
   awaiting_assignment: [{ value: 'assigned', label: 'Marcar como atribuído' }],
   assigned: [{ value: 'in_progress', label: 'Iniciar pedido' }],
-  in_progress: [
-    { value: 'paused', label: 'Pausar' },
-    { value: 'awaiting_customer', label: 'Marcar objetivo alcançado' },
-  ],
-  paused: [{ value: 'in_progress', label: 'Retomar' }],
+  in_progress: [{ value: 'awaiting_customer', label: 'Marcar objetivo alcançado' }],
   awaiting_customer: [{ value: 'completed', label: 'Confirmar conclusão' }],
   disputed: [
     { value: 'in_progress', label: 'Reabrir pedido' },
@@ -85,6 +82,10 @@ export function AdminOrderDetailPage() {
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
+  // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
+  // loadingOrder resolver pra só então montar <OrderChat> -- mesma query key
+  // do hook interno dele, então o resultado já vem do cache quando ele monta.
+  useOrderChat(id)
 
   const { data: parties } = useQuery({
     queryKey: ['admin', 'order-parties', order?.customer_id, order?.assigned_booster_id, order?.preferred_booster_id],

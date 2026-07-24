@@ -52,6 +52,8 @@ export type NotificationType =
   | 'commission_clawed_back_admin'
   | 'drop_penalty_applied'
   | 'payment_amount_mismatch'
+  | 'order_reassigned'
+  | 'order_dropped_by_admin'
 
 // ─── Rank / Tier system ───────────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
@@ -463,6 +464,10 @@ export function OrderDetailPage() {
   const { data: order, isLoading, isError, refetch } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
   const { data: customerState } = useCustomerOrderState(id)
+  // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
+  // isLoading resolver pra só então montar <OrderChat> -- mesma query key do
+  // hook interno dele, então o resultado já vem do cache quando ele monta.
+  useOrderChat(id)
 
   useEffect(() => {
     if (!order || window.location.hash !== '#credentials' || !customerState?.requires_credentials) return

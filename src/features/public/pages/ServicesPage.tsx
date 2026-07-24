@@ -53,9 +53,10 @@ const SERVICES = [
       'Sessões 1-a-1 ao vivo com coaches de alto ELO. Revisão de VOD, coaching em jogo, fundamentos de campeão, estratégia macro e gestão mental — tudo coberto.',
     rankRange: RANK_TIER_ORDER,
     highlights: [
-      'Opções de sessão de 1h ou 2h',
-      'Revisão de VOD inclusa',
+      'Opções de sessão de horário predefinido',
+      'Aula estruturada para evolução do jogador',
       'Coach combinado com sua função principal',
+      'Aula com foco em otimização da performance',
       'Plano de melhoria personalizado',
     ],
     color: 'text-success',

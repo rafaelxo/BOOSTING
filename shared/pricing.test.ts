@@ -101,8 +101,8 @@ describe('Master+ — preço vem exclusivamente da tabela comercial (seção 14)
       currentPdl: 100,
     }))
     // (2200-100)/30 = 70 partidas exatas fica EM 2200, não acima — precisa de
-    // 71 pra ultrapassar. 71 * 0.5h * multiplicador 5 = 177.5.
-    expect(priced.estimatedHours).toBe(177.5)
+    // 71 pra ultrapassar. 71 * 0.5h * multiplicador 10 = 355.
+    expect(priced.estimatedHours).toBe(355)
   })
 })
 
@@ -409,7 +409,7 @@ describe('placement_matches (MD5 Completo, legado) — PLACEMENT_PRICE segue com
       currentRank: { tier: 'gold', division: null },
     }))
     expect(priced.basePrice).toBe(PLACEMENT_PRICE.gold)
-    expect(priced.estimatedHours).toBe(12.5)
+    expect(priced.estimatedHours).toBe(25)
   })
 
   it('sem currentRank, preço fica zero (pedido bloqueado, mesma regra dos outros serviceTypes)', () => {
@@ -458,9 +458,10 @@ describe('Preços por fila — Elo Boost (por divisão)', () => {
     ['iron', 850], ['bronze', 990], ['silver', 1350], ['gold', 1690],
     ['platinum', 2390], ['emerald', 4690], ['diamond', 7490],
   ]
+  // Flex deixou de ter desconto sobre solo_duo -- mesmos valores das duas filas.
   const flex: [RankTier, number][] = [
-    ['iron', 800], ['bronze', 940], ['silver', 1280], ['gold', 1590],
-    ['platinum', 2270], ['emerald', 4450], ['diamond', 7110],
+    ['iron', 850], ['bronze', 990], ['silver', 1350], ['gold', 1690],
+    ['platinum', 2390], ['emerald', 4690], ['diamond', 7490],
   ]
   it.each(soloDuo)('solo_duo %s = %i centavos/divisão', (tier, cents) => {
     expect(moneyToCents(getEloDivPrice('solo_duo', tier))).toBe(cents)
@@ -555,7 +556,7 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
 
   it('multiplica por DELIVERY_ESTIMATE_MULTIPLIER a estimativa de horas de jogo puro nas estimativas de Vitória e MD5', () => {
     // 3 vitórias líquidas a 80% de win rate => ceil(3/0.8) = 4 partidas
-    // esperadas (nem toda partida jogada é vitória). 4 * 0.5h * 5 = 10.
+    // esperadas (nem toda partida jogada é vitória). 4 * 0.5h * 10 = 20.
     const wins = computeOrderPrice(baseInput({
       serviceType: 'win_boost',
       currentRank: { tier: 'gold', division: 'II' },
@@ -567,8 +568,8 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
       winsPurchased: 3,
     }))
 
-    expect(wins.estimatedHours).toBe(10)
-    expect(md5.estimatedHours).toBe(10)
+    expect(wins.estimatedHours).toBe(20)
+    expect(md5.estimatedHours).toBe(20)
   })
 
   it('pacote de vitórias extra (addon) soma partidas pelo mesmo win rate, não 1 partida por vitória', () => {
@@ -581,7 +582,7 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
       winPackage: 3,
     }))
     // Elo boost: 4 partidas (mesmo cálculo do teste "considera LP atual...").
-    // + pacote de 3 vitórias: ceil(3/0.8) = 4 partidas. Total 8 * 0.5h * 5 = 20.
-    expect(priced.estimatedHours).toBe(20)
+    // + pacote de 3 vitórias: ceil(3/0.8) = 4 partidas. Total 8 * 0.5h * 10 = 40.
+    expect(priced.estimatedHours).toBe(40)
   })
 })

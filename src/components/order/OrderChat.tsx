@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Lock, MessageCircle, Send, ShieldCheck, Unlock } from 'lucide-react'
 import { Avatar, Button, Card, ErrorAlert, Skeleton } from '@/components/ui'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -20,6 +20,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
   const { profile } = useAuthStore()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const chat = useOrderChat(orderId)
   const sendMessage = useSendOrderMessage(orderId)
@@ -29,10 +30,30 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [chat.data?.messages.length])
 
+  // Caixa cresce junto com o texto (até um teto) em vez de ficar fixa em 2
+  // linhas -- sem isso, Shift+Enter já quebra a linha (handleKeyDown abaixo),
+  // mas a quebra some rolando pra fora da caixa em vez de aparecer.
+  const TEXTAREA_MAX_HEIGHT_PX = 160
+
+  function autoGrowTextarea(el: HTMLTextAreaElement) {
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`
+  }
+
+  function handleMessageChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    setMessage(event.target.value)
+    autoGrowTextarea(event.target)
+  }
+
   function submitMessage() {
     const content = message.trim()
     if (!content || sendMessage.isPending || !chat.data?.can_send) return
-    sendMessage.mutate(content, { onSuccess: () => setMessage('') })
+    sendMessage.mutate(content, {
+      onSuccess: () => {
+        setMessage('')
+        if (textareaRef.current) textareaRef.current.style.height = ''
+      },
+    })
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -145,14 +166,16 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
           {canSend ? (
             <div className="flex items-end gap-2 border-t border-border-subtle p-3">
               <textarea
+                ref={textareaRef}
                 value={message}
-                onChange={(event) => setMessage(event.target.value)}
+                onChange={handleMessageChange}
                 onKeyDown={handleKeyDown}
                 maxLength={4000}
-                rows={2}
+                rows={1}
                 placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
                 aria-label="Escrever mensagem"
-                className="input-base min-h-11 flex-1 resize-y py-2.5 text-sm"
+                style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
+                className="input-base min-h-11 flex-1 resize-none overflow-y-auto py-2.5 text-sm"
                 disabled={sendMessage.isPending}
               />
               <Button

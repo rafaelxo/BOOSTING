@@ -1,9 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Play, Pause, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw } from 'lucide-react'
+import { ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
+import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
@@ -183,15 +184,17 @@ export function JobDetailPage() {
 
   const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
     { from: ['assigned'], to: 'in_progress', label: t('booster.job.startOrder'), icon: Play, variant: 'primary' },
-    { from: ['in_progress'], to: 'paused', label: t('booster.job.pause'), icon: Pause, variant: 'secondary' },
-    { from: ['paused'], to: 'in_progress', label: t('booster.job.resume'), icon: Play, variant: 'primary' },
-    { from: ['in_progress', 'paused'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
+    { from: ['in_progress'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
   ]
 
   const { data: isTop3 } = useOwnBoosterTop3Status(profile?.id)
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useBoosterOrder(id)
   const { data: pendingDrop } = usePendingDropRequest(id)
+  // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
+  // loadingOrder resolver pra só então montar <OrderChat> -- mesma query key
+  // do hook interno dele, então o resultado já vem do cache quando ele monta.
+  useOrderChat(id)
 
   const updateStatus = useUpdateOrderStatus(id ?? '')
   const syncMatches = useSyncOrderMatches(id ?? '')

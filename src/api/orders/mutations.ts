@@ -92,6 +92,7 @@ const ACCEPT_ORDER_MESSAGES: Record<string, string> = {
   duo_slot_limit_reached: 'Você atingiu o limite de pedidos Duo ativos.',
   exclusive_slot_already_used: 'Sua vaga exclusiva do mês já foi usada.',
   order_exclusive_to_another_booster: 'Este pedido é exclusivo para outro booster no momento.',
+  previously_dropped_by_you: 'Você já dropou este pedido antes — ele não pode ser aceito novamente por você.',
   booster_not_approved: 'Sua conta de booster ainda não está aprovada.',
   unauthorized: 'Sua sessão expirou. Entre novamente para continuar.',
 }
