@@ -1,19 +1,23 @@
 import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw } from 'lucide-react'
+import {
+  ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
+  Gamepad2, Users, Shuffle, TrendingUp, Trophy, Wallet,
+} from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
+import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import {
   useBoosterOrder, usePendingDropRequest, useUpdateOrderStatus, useSyncOrderMatches, useVerifyOrderRank,
-  useRevealOrderCredentials, useRequestOrderDrop,
+  useRevealOrderCredentials, useRequestOrderDrop, useOrderStatusHistory,
 } from '@/api/orders'
 import { useOwnBoosterTop3Status } from '@/api/boosters'
 import { useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation } from '@/api/duoAccounts'
@@ -193,6 +197,7 @@ export function JobDetailPage() {
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useBoosterOrder(id)
   const { data: pendingDrop } = usePendingDropRequest(id)
+  const { data: history } = useOrderStatusHistory(id)
   // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
   // loadingOrder resolver pra só então montar <OrderChat> -- mesma query key
   // do hook interno dele, então o resultado já vem do cache quando ele monta.
@@ -277,18 +282,18 @@ export function JobDetailPage() {
             <OrderProgress order={order} />
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div><p className="text-xs text-ink-muted">Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
-              <div><p className="text-xs text-ink-muted">Tipo</p><p className="text-sm font-semibold text-ink">{getOrderModeType(order)}</p></div>
+              <div><p className="text-xs text-ink-muted flex items-center gap-1"><Gamepad2 className="h-3 w-3 shrink-0" />Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
+              <div><p className="text-xs text-ink-muted flex items-center gap-1"><Shuffle className="h-3 w-3 shrink-0" />Tipo</p><p className="text-sm font-semibold text-ink">{getOrderModeType(order)}</p></div>
               {(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5') && (
-                <div><p className="text-xs text-ink-muted">{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
+                <div><p className="text-xs text-ink-muted flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{t('booster.job.queue')}</p><p className="text-sm font-semibold text-ink">{order.queue_type === 'solo_duo' ? t('booster.job.soloQueue') : t('booster.job.flexQueue')}</p></div>
               )}
               {(order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null && (
-                <div><p className="text-xs text-ink-muted">Vitórias Compradas</p><p className="text-sm font-semibold text-ink">{order.wins_purchased}</p></div>
+                <div><p className="text-xs text-ink-muted flex items-center gap-1"><Trophy className="h-3 w-3 shrink-0" />Vitórias Compradas</p><p className="text-sm font-semibold text-ink">{order.wins_purchased}</p></div>
               )}
               {order.pdl_bracket && (
                 <>
-                  <div><p className="text-xs text-ink-muted">PDL Atual</p><p className="text-sm font-semibold text-ink">{order.current_pdl ?? '—'} PDL</p></div>
-                  <div><p className="text-xs text-ink-muted">Méd. Ganho/Perda</p><p className="text-sm font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</p></div>
+                  <div><p className="text-xs text-ink-muted flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" />PDL Atual</p><p className="text-sm font-semibold text-ink">{order.current_pdl ?? '—'} PDL</p></div>
+                  <div><p className="text-xs text-ink-muted flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" />Méd. Ganho/Perda</p><p className="text-sm font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</p></div>
                 </>
               )}
               {!hasRankRail && order.current_rank && (
@@ -326,6 +331,16 @@ export function JobDetailPage() {
                 <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
               </div>
             )}
+
+            {/* Ganhos mesclado aqui -- só a comissão, sem total do pedido
+                (isso é exclusivo do cliente) e sem label de percentual. */}
+            <div className="mt-4 pt-4 border-t border-border-subtle flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-success shrink-0" />
+              <div>
+                <p className="text-xs text-ink-muted">{t('booster.job.earnings')}</p>
+                <p className="text-lg font-bold text-success" data-tabular>{currency(order.total_price * boosterEarningsShare(isTop3))}</p>
+              </div>
+            </div>
           </Card>
 
           {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
@@ -346,12 +361,6 @@ export function JobDetailPage() {
         </div>
 
         <div className="space-y-4">
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.earnings')}</h3>
-            <p className="text-2xl font-bold text-success" data-tabular>{currency(order.total_price * boosterEarningsShare(isTop3))}</p>
-            <p className="text-xs text-ink-muted mt-0.5">{t('booster.job.yourCutOf', { pct: Math.round(boosterEarningsShare(isTop3) * 100) })}</p>
-          </Card>
-
           {order.status === 'awaiting_customer' && (
             <Card padding="md" className="ring-1 ring-accent/20">
               <div className="flex items-center gap-2">
@@ -373,48 +382,6 @@ export function JobDetailPage() {
           {order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
             && ['assigned', 'in_progress', 'paused'].includes(order.status) && (
             <DuoAccountSection order={order} />
-          )}
-
-          <OrderChat orderId={order.id} viewerRole="booster" orderStatus={order.status} />
-
-          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
-            && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-brand" />
-                Token de acesso
-              </h3>
-              <p className="text-xs text-ink-secondary mb-3">
-                Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
-              </p>
-
-              {!order.credentials_set ? (
-                <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
-                  O cliente ainda não cadastrou as credenciais de acesso.
-                </div>
-              ) : accessToken ? (
-                <div className="space-y-2">
-                  <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
-                  <p className="text-[11px] text-ink-muted text-center">
-                    Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
-                  </p>
-                  <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
-                    {tokenCopied ? 'Copiado' : 'Copiar token'}
-                  </Button>
-                  <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                    Criar novo token
-                  </Button>
-                </div>
-              ) : (
-                <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                  Criar token
-                </Button>
-              )}
-
-              {revealAccessToken.isError && (
-                <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
-              )}
-            </Card>
           )}
 
           {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (
@@ -485,6 +452,50 @@ export function JobDetailPage() {
               <p className="text-xs text-ink-secondary mt-1">Aguardando aprovação do admin.</p>
             </div>
           )}
+
+          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
+            && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-brand" />
+                Token de acesso
+              </h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
+              </p>
+
+              {!order.credentials_set ? (
+                <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                  O cliente ainda não cadastrou as credenciais de acesso.
+                </div>
+              ) : accessToken ? (
+                <div className="space-y-2">
+                  <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
+                  <p className="text-[11px] text-ink-muted text-center">
+                    Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
+                  </p>
+                  <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
+                    {tokenCopied ? 'Copiado' : 'Copiar token'}
+                  </Button>
+                  <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                    Criar novo token
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                  Criar token
+                </Button>
+              )}
+
+              {revealAccessToken.isError && (
+                <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
+              )}
+            </Card>
+          )}
+
+          <OrderChat orderId={order.id} viewerRole="booster" orderStatus={order.status} />
+
+          <OrderTimeline history={history} />
         </div>
       </div>
 

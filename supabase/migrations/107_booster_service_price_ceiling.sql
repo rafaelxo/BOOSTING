@@ -9,14 +9,15 @@
 -- coaching legítimo (o preço mais alto hoje no catálogo -- Master+ no tier
 -- mais caro -- é ~R$ 2.150), mas fecha o caso degenerado.
 --
--- ATENÇÃO: esta migration ainda NÃO foi aplicada ao banco. Rodando contra o
--- banco real, o ALTER TABLE recusou o CHECK porque já existe uma linha ativa
--- violando o teto (booster_services.id = da7869c3-c51c-4afa-b7c3-16c8b911c8f0,
--- título "asf357735", price R$ 357.735,00, booster_id
--- c7bdcdf8-1ec4-43a1-9826-5ade231b85c0). Decidimos não mexer nessa linha sem
--- confirmação humana -- fica pra quem for aplicar esta migration revisar e
--- resolver a linha (desativar, apagar ou ajustar o preço) antes de rodar
--- `supabase db push`.
+-- Rodando contra o banco real, o ALTER TABLE recusou o CHECK porque já
+-- existia uma linha violando o teto (booster_services.id =
+-- da7869c3-c51c-4afa-b7c3-16c8b911c8f0, título "asf357735", price
+-- R$ 357.735,00). Um CHECK vale pra toda linha independente de is_active, então
+-- só desativar não bastava. Confirmado que é dado de teste da própria equipe
+-- (banco ainda em ambiente de testes) -- apagamos a linha.
+
+delete from public.booster_services
+where id = 'da7869c3-c51c-4afa-b7c3-16c8b911c8f0' and price > 10000;
 
 alter table public.booster_services
   drop constraint if exists booster_services_price_ceiling,

@@ -44,22 +44,36 @@ serve(async (req) => {
     if (!parsedBody.success) return badRequest(req, 'Body inválido')
     const { order_id: orderId } = parsedBody.data
 
-    // RLS (orders_customer_read/booster equivalent) já restringe a leitura ao
-    // pedido do próprio booster — a checagem de assigned_booster_id abaixo é
-    // defesa em profundidade, mesmo padrão da verify-order-rank.
+    // RLS (orders_customer_read/booster/admin) já restringe a leitura ao
+    // cliente dono, ao booster designado ou a um admin — a checagem de
+    // identidade abaixo é defesa em profundidade, mesmo padrão da
+    // verify-order-rank. O botão "Sincronizar" agora aparece nas 3 telas de
+    // detalhe do pedido (cliente/booster/admin), então a autorização precisa
+    // aceitar qualquer um dos três, não só o booster.
     const { data: order, error: orderErr } = await userClient
       .from('orders')
-      .select('id, status, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased')
+      .select('id, status, customer_id, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased')
       .eq('id', orderId)
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
-    if (!order || order.assigned_booster_id !== user.id) return errorResponse(req, 'Order not found', 404)
+    if (!order) return errorResponse(req, 'Order not found', 404)
+
+    const serviceClient = supabaseAdmin()
+
+    const isBooster = order.assigned_booster_id === user.id
+    const isCustomer = order.customer_id === user.id
+    let isAdmin = false
+    if (!isBooster && !isCustomer) {
+      const { data: profile } = await serviceClient.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      isAdmin = profile?.role === 'admin'
+    }
+    if (!isBooster && !isCustomer && !isAdmin) {
+      return errorResponse(req, 'Order not found', 404)
+    }
 
     if (!['in_progress', 'paused'].includes(order.status as string)) {
       return badRequest(req, 'Pedido não está em um status sincronizável')
     }
-
-    const serviceClient = supabaseAdmin()
 
     // Duo Boost: o booster joga com uma conta Duo separada, não a conta do
     // cliente (order.riot_id) -- as partidas de verdade acontecem nessa
@@ -167,9 +181,12 @@ serve(async (req) => {
     await serviceClient.rpc('mark_order_match_sync', { p_order_id: orderId })
 
     // Um recálculo ao final do lote, não por partida — sync-order-matches
-    // pode registrar várias partidas numa única chamada.
+    // pode registrar várias partidas numa única chamada. Usa o booster REAL
+    // do pedido (order.assigned_booster_id), não user.id — o chamador pode
+    // ser o cliente ou um admin disparando o sync manualmente, não só o
+    // próprio booster.
     if (recorded.length > 0) {
-      await serviceClient.rpc('refresh_booster_performance_segments', { p_booster_id: user.id })
+      await serviceClient.rpc('refresh_booster_performance_segments', { p_booster_id: order.assigned_booster_id })
     }
 
     return jsonResponse(req, {

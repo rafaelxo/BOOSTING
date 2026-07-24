@@ -4,22 +4,23 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle, Receipt,
-  MessageCircleWarning,
+  MessageCircleWarning, Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, UserCheck,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
+import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, timeAgo, formatRank, formatLastSeen, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, formatRank, formatLastSeen, getServiceLabel, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
   useOrder, useOrderStatusHistory, useCustomerOrderState, useOrderPayments, useSetOrderCredentials,
   useConfirmOrderCompletion, useDisputeOrderCompletion, useGeneratePix, useCancelPendingOrder,
-  useRequestOrderSupport, getCustomerOrderState,
+  useRequestOrderSupport, useSyncOrderMatches, getCustomerOrderState,
 } from '@/api/orders'
 import { useOrderSupportEscalation } from '@/api/admin'
 import type { Order, BoosterProfile } from '@/types'
@@ -79,16 +80,18 @@ function useAssignedBooster(boosterId: string | null) {
   })
 }
 
-function AssignedBoosterCard({ order }: { order: Order }) {
+// Bloco inline (sem Card próprio) -- mesclado dentro do card "Detalhes do
+// Pedido" em vez de ser um card separado na sidebar.
+function AssignedBoosterBlock({ order }: { order: Order }) {
   const { data: booster, isLoading } = useAssignedBooster(order.assigned_booster_id)
 
   if (!order.assigned_booster_id) return null
-  if (isLoading) return <Card padding="md"><Skeleton className="h-14 w-full" /></Card>
+  if (isLoading) return <div className="mt-4 pt-4 border-t border-border-subtle"><Skeleton className="h-14 w-full" /></div>
   if (!booster) return null
 
   return (
-    <Card padding="md">
-      <h3 className="text-sm font-semibold text-ink mb-3">Seu booster</h3>
+    <div className="mt-4 pt-4 border-t border-border-subtle">
+      <p className="text-xs text-ink-muted mb-2 flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5" />Seu booster</p>
       <Link to={`/boosters/${booster.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
         <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
         <div className="min-w-0 flex-1">
@@ -99,12 +102,7 @@ function AssignedBoosterCard({ order }: { order: Order }) {
           <span className="text-xs font-semibold text-ink shrink-0" data-tabular>★ {booster.rating.toFixed(1)}</span>
         )}
       </Link>
-      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-        <div className="mt-3">
-          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
-        </div>
-      )}
-    </Card>
+    </div>
   )
 }
 
@@ -471,6 +469,7 @@ export function OrderDetailPage() {
   const { data: order, isLoading, isError, refetch } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
   const { data: customerState } = useCustomerOrderState(id)
+  const syncMatches = useSyncOrderMatches(id ?? '')
   // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
   // isLoading resolver pra só então montar <OrderChat> -- mesma query key do
   // hook interno dele, então o resultado já vem do cache quando ele monta.
@@ -533,6 +532,9 @@ export function OrderDetailPage() {
             {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
           </p>
         </div>
+        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+        )}
       </div>
 
       {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
@@ -549,36 +551,36 @@ export function OrderDetailPage() {
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: t('customer.order.service'), value: getServiceLabel(order.service_type) },
+                { icon: Gamepad2, label: t('customer.order.service'), value: getServiceLabel(order.service_type) },
                 ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
-                  ? [{ label: t('customer.order.queue'), value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') }]
+                  ? [{ icon: Users, label: t('customer.order.queue'), value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') }]
                   : []),
                 ...(order.service_type === 'elo_boost' && !order.pdl_bracket
-                  ? [{ label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
+                  ? [{ icon: Shuffle, label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
                   : []),
                 ...(!hasRankRail && order.current_rank ? [{
-                  label: t('customer.order.currentRank'),
+                  icon: TrendingUp, label: t('customer.order.currentRank'),
                   value: formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division),
                 }] : []),
                 ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank ? [{
-                  label: t('customer.order.targetRank'),
+                  icon: TrendingUp, label: t('customer.order.targetRank'),
                   value: formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division),
                 }] : []),
                 ...(order.pdl_bracket ? [
-                  { label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
-                  { label: 'Méd. PDL Ganho/Vitória', value: order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—' },
-                  { label: 'Méd. PDL Perdido/Derrota', value: order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—' },
+                  { icon: TrendingUp, label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
+                  { icon: TrendingUp, label: 'Méd. PDL Ganho/Vitória', value: order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—' },
+                  { icon: TrendingUp, label: 'Méd. PDL Perdido/Derrota', value: order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—' },
                 ] : []),
                 ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
-                  ? [{ label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+                  ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
                   : []),
                 ...(order.service_type === 'coaching' && order.sessions_purchased
-                  ? [{ label: 'Sessões', value: `${order.sessions_purchased}` }]
+                  ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
                   : []),
-                { label: t('customer.order.totalPaid'), value: currency(order.total_price) },
-              ].map(({ label, value }) => (
+                { icon: Wallet, label: t('customer.order.totalPaid'), value: currency(order.total_price) },
+              ].map(({ icon: Icon, label, value }) => (
                 <div key={label}>
-                  <p className="text-xs text-ink-muted">{label}</p>
+                  <p className="text-xs text-ink-muted flex items-center gap-1"><Icon className="h-3 w-3 shrink-0" />{label}</p>
                   <p className="text-sm font-semibold text-ink mt-0.5 capitalize" data-tabular>{value}</p>
                 </div>
               ))}
@@ -604,20 +606,33 @@ export function OrderDetailPage() {
                 <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
               </div>
             )}
+
+            <AssignedBoosterBlock order={order} />
           </Card>
 
           {order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderMatchHistory orderId={order.id} />
+            <OrderMatchHistory
+              orderId={order.id}
+              sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                onSync: () => syncMatches.mutate(),
+                syncing: syncMatches.isPending,
+                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                resultMessage: syncMatches.data
+                  ? (syncMatches.data.synced
+                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                  : null,
+              } : undefined}
+            />
           )}
-
-          <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar -- ordem padronizada com booster/admin: ações do papel,
+            depois o card mais "sensível" (aqui, credenciais) logo acima do
+            chat, depois chat, depois histórico do pedido. */}
         <div className="space-y-4">
           <PendingPaymentSection order={order} />
-          <PaymentSummarySection orderId={order.id} />
-          <AssignedBoosterCard order={order} />
+          <CompletionConfirmationSection order={order} state={customerState} />
 
           {order.status === 'completed' && (
             <Card padding="md" className="ring-1 ring-success/20">
@@ -628,37 +643,12 @@ export function OrderDetailPage() {
             </Card>
           )}
 
-          <CompletionConfirmationSection order={order} state={customerState} />
+          <PaymentSummarySection orderId={order.id} />
           <CredentialsSection order={order} state={customerState} />
 
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.timeline')}</h3>
-            {!history?.length ? (
-              <p className="text-xs text-ink-muted">{t('customer.order.noHistory')}</p>
-            ) : (
-              <div className="relative">
-                <div className="absolute left-3.5 top-4 bottom-4 w-px bg-border-subtle" />
-                <div className="space-y-4">
-                  {history.map((entry, idx) => (
-                    <div key={entry.id} className="flex items-start gap-4 relative">
-                      <div className={`h-7 w-7 rounded-full border-2 flex items-center justify-center shrink-0 z-10 ${
-                        idx === history.length - 1 ? 'border-brand bg-brand' : 'border-border-subtle bg-bg-surface'
-                      }`}>
-                        <Clock className="h-3 w-3 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-ink">
-                          {ORDER_STATUS_LABEL[entry.to_status] ?? entry.to_status.replace(/_/g, ' ')}
-                        </p>
-                        <p className="text-[10px] text-ink-muted mt-0.5">{timeAgo(entry.created_at)}</p>
-                        {entry.reason && <p className="text-xs text-ink-secondary mt-0.5">{entry.reason}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
+          <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
+
+          <OrderTimeline history={history} />
         </div>
       </div>
     </div>

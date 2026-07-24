@@ -1,16 +1,21 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, RefreshCw, Clock, XOctagon, MessageCircleWarning } from 'lucide-react'
+import {
+  ArrowLeft, RefreshCw, XOctagon, MessageCircleWarning,
+  Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, User,
+} from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
+import { OrderTimeline } from '@/components/order/OrderTimeline'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
-import { formatDateTime, timeAgo, getServiceLabel, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, timeAgo, getServiceLabel, PAYMENT_STATUS_LABEL, formatRank, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder } from '@/api/orders'
+import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder, useSyncOrderMatches } from '@/api/orders'
 import { useOrderSupportEscalation, useAdminResolveOrderSupport } from '@/api/admin'
 import type { OrderStatus } from '@/types'
 
@@ -107,6 +112,7 @@ export function AdminOrderDetailPage() {
 
   const updateStatus = useAdminOverrideOrderStatus(id ?? '')
   const dropOrder = useAdminDropOrder(id ?? '')
+  const syncMatches = useSyncOrderMatches(id ?? '')
 
   if (loadingOrder) return <PageLoader />
 
@@ -136,9 +142,10 @@ export function AdminOrderDetailPage() {
           </div>
           <p className="text-xs text-ink-muted mt-0.5">Criado em {formatDateTime(order.created_at)}</p>
         </div>
+        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+        )}
       </div>
-
-      <SupportEscalationCard orderId={order.id} />
 
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
@@ -148,39 +155,41 @@ export function AdminOrderDetailPage() {
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
-                  ['Cliente', parties?.customerUsername ?? '…'],
-                  ['Serviço', getServiceLabel(order.service_type)],
+                  [User, 'Cliente', parties?.customerUsername ?? '…'],
+                  [Gamepad2, 'Serviço', getServiceLabel(order.service_type)],
                   ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
-                    ? [['Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex']]
+                    ? [[Users, 'Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex']]
                     : []),
                   ...(order.service_type === 'elo_boost' && !order.pdl_bracket
-                    ? [['Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]
+                    ? [[Shuffle, 'Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]
                     : []),
-                  ...(!hasRankRail && order.current_rank ? [['Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
+                  ...(!hasRankRail && order.current_rank ? [[TrendingUp, 'Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
                   ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank
-                    ? [['Rank Alvo', formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)]]
+                    ? [[TrendingUp, 'Rank Alvo', formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)]]
                     : []),
                   ...(order.pdl_bracket ? [
-                    ['PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
-                    ['Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
-                    ['Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
+                    [TrendingUp, 'PDL Atual', `${order.current_pdl ?? '—'} PDL (faixa ${order.pdl_bracket})`],
+                    [TrendingUp, 'Méd. PDL Ganho/Vitória', order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—'],
+                    [TrendingUp, 'Méd. PDL Perdido/Derrota', order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—'],
                   ] : []),
                   ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
-                    ? [['Vitórias Compradas', `${order.wins_purchased}`]]
+                    ? [[Trophy, 'Vitórias Compradas', `${order.wins_purchased}`]]
                     : []),
                   ...(order.service_type === 'coaching' && order.sessions_purchased
-                    ? [['Sessões', `${order.sessions_purchased}`]]
+                    ? [[CalendarDays, 'Sessões', `${order.sessions_purchased}`]]
                     : []),
-                  ['Base', currency(order.base_price)],
-                  ['Extras', currency(order.extras_price)],
-                  ['Total', currency(order.total_price)],
+                  [Wallet, 'Base', currency(order.base_price)],
+                  [Wallet, 'Extras', currency(order.extras_price)],
+                  [Wallet, 'Total', currency(order.total_price)],
                   [
+                    User,
                     'Booster',
                     order.assigned_booster_id
                       ? <BoosterLink userId={order.assigned_booster_id} booster={parties?.boosterByUserId.get(order.assigned_booster_id)} />
                       : 'Não atribuído',
                   ],
                   ...(order.preferred_booster_id ? [[
+                    User,
                     'Pedido direto',
                     <span key="preferred-booster" className="inline-flex items-center gap-1">
                       <BoosterLink userId={order.preferred_booster_id} booster={parties?.boosterByUserId.get(order.preferred_booster_id)} />
@@ -189,11 +198,11 @@ export function AdminOrderDetailPage() {
                         : ' (exclusividade expirada)'}
                     </span>,
                   ]] : []),
-                  ['Pag.', order.payment_status ? PAYMENT_STATUS_LABEL[order.payment_status] : '—'],
-                ] as [string, React.ReactNode][]
-              ).map(([l, v]) => (
+                  [Wallet, 'Pag.', order.payment_status ? PAYMENT_STATUS_LABEL[order.payment_status] : '—'],
+                ] as [React.ElementType, string, React.ReactNode][]
+              ).map(([Icon, l, v]) => (
                 <div key={l as string}>
-                  <p className="text-xs text-ink-muted">{l as string}</p>
+                  <p className="text-xs text-ink-muted flex items-center gap-1"><Icon className="h-3 w-3 shrink-0" />{l as string}</p>
                   <p className="text-sm font-semibold text-ink" data-tabular>{v}</p>
                 </div>
               ))}
@@ -215,12 +224,37 @@ export function AdminOrderDetailPage() {
           </Card>
 
           {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderMatchHistory orderId={order.id} />
+            <OrderMatchHistory
+              orderId={order.id}
+              sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                onSync: () => syncMatches.mutate(),
+                syncing: syncMatches.isPending,
+                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                resultMessage: syncMatches.data
+                  ? (syncMatches.data.synced
+                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                  : null,
+              } : undefined}
+            />
           )}
         </div>
 
         <div className="space-y-4">
-          <OrderChat orderId={order.id} viewerRole="admin" orderStatus={order.status} />
+          <SupportEscalationCard orderId={order.id} />
+
+          {DROPPABLE_STATUSES.includes(order.status) && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-2 flex items-center gap-2">
+                <XOctagon className="h-4 w-4 text-danger" />
+                Dropar Pedido
+              </h3>
+              <p className="text-xs text-ink-muted mb-3">Cancela o pedido imediatamente. Não aplica penalidade ao booster.</p>
+              <Button variant="danger" size="sm" className="w-full" onClick={() => setShowDropModal(true)}>
+                Dropar Pedido
+              </Button>
+            </Card>
+          )}
 
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
@@ -261,41 +295,9 @@ export function AdminOrderDetailPage() {
             )}
           </Card>
 
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-ink-secondary" />
-              Histórico de Status
-            </h3>
-            {!history?.length ? (
-              <p className="text-xs text-ink-muted">Sem histórico.</p>
-            ) : (
-              <div className="space-y-3">
-                {history.map((entry) => (
-                  <div key={entry.id} className="flex gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-ink-muted mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-ink">{ORDER_STATUS_LABEL[entry.to_status] ?? entry.to_status}</p>
-                      <p className="text-[10px] text-ink-muted">{timeAgo(entry.created_at)}</p>
-                      {entry.reason && <p className="text-[10px] text-ink-secondary mt-0.5">{entry.reason}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+          <OrderChat orderId={order.id} viewerRole="admin" orderStatus={order.status} />
 
-          {DROPPABLE_STATUSES.includes(order.status) && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-2 flex items-center gap-2">
-                <XOctagon className="h-4 w-4 text-danger" />
-                Dropar Pedido
-              </h3>
-              <p className="text-xs text-ink-muted mb-3">Cancela o pedido imediatamente. Não aplica penalidade ao booster.</p>
-              <Button variant="danger" size="sm" className="w-full" onClick={() => setShowDropModal(true)}>
-                Dropar Pedido
-              </Button>
-            </Card>
-          )}
+          <OrderTimeline history={history} />
         </div>
       </div>
 
