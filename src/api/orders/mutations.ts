@@ -83,7 +83,7 @@ export async function requestOrderSupport(orderId: string): Promise<RequestOrder
 export async function revealOrderCredentials(orderId: string) {
   const { data, error } = await supabase.rpc('get_order_credentials', { p_order_id: orderId })
   if (error) throw normalizeApiError(error)
-  return assertRpcSuccess(data as { success: boolean; error?: string; access_token?: string })
+  return assertRpcSuccess(data as { success: boolean; error?: string; access_token?: string; expires_at?: string })
 }
 
 const ACCEPT_ORDER_MESSAGES: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
@@ -178,6 +178,8 @@ export function JobDetailPage() {
   const [dropReason, setDropReason] = useState('')
   const [showDropModal, setShowDropModal] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null)
+  const [tokenSecondsLeft, setTokenSecondsLeft] = useState(0)
   const [tokenCopied, setTokenCopied] = useState(false)
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -203,8 +205,28 @@ export function JobDetailPage() {
   const requestDrop = useRequestOrderDrop(id ?? '')
 
   function doRevealToken() {
-    revealAccessToken.mutate(id!, { onSuccess: (result) => setAccessToken(result.access_token ?? null) })
+    revealAccessToken.mutate(id!, {
+      onSuccess: (result) => {
+        setAccessToken(result.access_token ?? null)
+        setTokenExpiresAt(result.expires_at ?? null)
+      },
+    })
   }
+
+  // Contagem regressiva dos 5 minutos de validade do token -- ao zerar, o
+  // token some da tela e só um novo clique em "Criar token" gera outro
+  // (uso único, nunca mostra o mesmo token duas vezes).
+  useEffect(() => {
+    if (!tokenExpiresAt) { setTokenSecondsLeft(0); return }
+    function tick() {
+      const secondsLeft = Math.max(0, Math.round((new Date(tokenExpiresAt!).getTime() - Date.now()) / 1000))
+      setTokenSecondsLeft(secondsLeft)
+      if (secondsLeft <= 0) { setAccessToken(null); setTokenExpiresAt(null) }
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [tokenExpiresAt])
 
   async function copyAccessToken() {
     if (!accessToken) return
@@ -363,23 +385,29 @@ export function JobDetailPage() {
                 Token de acesso
               </h3>
               <p className="text-xs text-ink-secondary mb-3">
-                Use este token apenas no aplicativo autorizado para inicializar o client. Login e senha não são exibidos.
+                Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
               </p>
 
               {!order.credentials_set ? (
                 <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
-                  O cliente ainda não gerou o token de acesso.
+                  O cliente ainda não cadastrou as credenciais de acesso.
                 </div>
               ) : accessToken ? (
                 <div className="space-y-2">
                   <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
+                  <p className="text-[11px] text-ink-muted text-center">
+                    Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
+                  </p>
                   <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
                     {tokenCopied ? 'Copiado' : 'Copiar token'}
+                  </Button>
+                  <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                    Criar novo token
                   </Button>
                 </div>
               ) : (
                 <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                  Mostrar token
+                  Criar token
                 </Button>
               )}
 
