@@ -30,19 +30,39 @@ export function useRealtimeInvalidate({
 
   useEffect(() => {
     if (!enabled) return
+    let cancelled = false
+    let subscription: ReturnType<typeof supabase.channel> | null = null
 
-    const config: RealtimePostgresChangesFilter<typeof event> = filter
-      ? { event, schema: 'public', table, filter }
-      : { event, schema: 'public', table }
+    async function setup() {
+      // React StrictMode roda effect -> cleanup -> effect de novo em dev.
+      // removeChannel() é assíncrono (espera unsubscribe() antes de tirar o
+      // canal do registro do client) -- sem esperar essa remoção aqui, a
+      // segunda montagem pega de volta o MESMO objeto de canal da primeira
+      // (supabase.channel() reaproveita por nome de tópico) já com
+      // subscribe() chamado, e o .on() seguinte lança "cannot add
+      // postgres_changes callbacks ... after subscribe()".
+      const stale = supabase.getChannels().find((c) => c.topic === `realtime:${channel}`)
+      if (stale) await supabase.removeChannel(stale)
+      if (cancelled) return
 
-    const subscription = supabase
-      .channel(channel)
-      .on('postgres_changes', config, () => {
-        for (const key of queryKeys) void queryClient.invalidateQueries({ queryKey: key })
-      })
-      .subscribe()
+      const config: RealtimePostgresChangesFilter<typeof event> = filter
+        ? { event, schema: 'public', table, filter }
+        : { event, schema: 'public', table }
 
-    return () => void supabase.removeChannel(subscription)
+      subscription = supabase
+        .channel(channel)
+        .on('postgres_changes', config, () => {
+          for (const key of queryKeys) void queryClient.invalidateQueries({ queryKey: key })
+        })
+        .subscribe()
+    }
+
+    void setup()
+
+    return () => {
+      cancelled = true
+      if (subscription) void supabase.removeChannel(subscription)
+    }
     // queryKeys é recriado a cada render por design (chaves derivadas de
     // ids/filtros) -- serializar pra string evita reassinar o canal à toa.
     // eslint-disable-next-line react-hooks/exhaustive-deps

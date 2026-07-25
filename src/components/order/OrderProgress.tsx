@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { X } from 'lucide-react'
 import { RankBadge } from '@/components/ui/RankBadge'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
 import { listOrderRankVerifications } from '@/api/orders'
@@ -18,19 +17,12 @@ function ProgressBar({ percent, tone = 'brand', locked = false }: { percent: num
           style={{ width: `${clamped}%` }}
         />
       </div>
-      {locked && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-5 w-5 rounded-full bg-bg-base/80 flex items-center justify-center shadow-card">
-            <X className="h-3 w-3 text-ink-muted" />
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 function WinBoostProgress({ order }: { order: Order }) {
-  const locked = order.status === 'awaiting_payment'
+  const locked = !order.match_sync_started_at
   const purchased = order.wins_purchased ?? 0
   const completed = Math.min(order.wins_played, purchased)
   const remaining = Math.max(0, purchased - order.wins_played)
@@ -40,7 +32,6 @@ function WinBoostProgress({ order }: { order: Order }) {
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
-      <h3 className="text-sm font-semibold text-ink mb-3">Progresso</h3>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           {rank && <RankBadge tier={rank.tier} division={rank.division} size="xs" showLabel={false} />}
@@ -91,8 +82,8 @@ function useLiveCutoff(queueType: Order['queue_type'], targetTier: RankTier | nu
   return targetTier === 'challenger' ? data.challenger_cutoff : data.grandmaster_cutoff
 }
 
-function EloBoostProgress({ order }: { order: Order }) {
-  const locked = order.status === 'awaiting_payment'
+function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hideRankBadges?: boolean }) {
+  const locked = !order.match_sync_started_at
   const { data: latest } = useLatestVerification(order.id, !locked)
 
   const initial = order.current_rank as { tier: RankTier; division: Division | null } | null
@@ -107,14 +98,13 @@ function EloBoostProgress({ order }: { order: Order }) {
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-ink">Progresso</h3>
-        {done && (
+      {done && (
+        <div className="flex justify-end mb-3">
           <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-bold text-success">
             Rank alvo atingido!
           </span>
-        )}
-      </div>
+        </div>
+      )}
       <RankProgressionRail
         currentTier={current.tier}
         currentDivision={current.division}
@@ -123,6 +113,7 @@ function EloBoostProgress({ order }: { order: Order }) {
         targetDivision={target.division}
         liveCutoffLp={locked ? null : liveCutoffLp}
         locked={locked}
+        showBadges={!hideRankBadges}
       />
       <p className="text-xs text-ink-muted mt-3">
         {locked
@@ -141,8 +132,8 @@ function EloBoostProgress({ order }: { order: Order }) {
 // barra de progresso aplicável (ex.: coaching). Master+ (pdl_bracket
 // preenchido) também tem progresso -- a trilha mostra o corte ao vivo em vez
 // de um rank alvo fixo, então não é mais excluído aqui.
-export function OrderProgress({ order }: { order: Order }) {
+export function OrderProgress({ order, hideRankBadges = false }: { order: Order; hideRankBadges?: boolean }) {
   if (order.wins_purchased != null) return <WinBoostProgress order={order} />
-  if (order.target_rank && order.current_rank) return <EloBoostProgress order={order} />
+  if (order.target_rank && order.current_rank) return <EloBoostProgress order={order} hideRankBadges={hideRankBadges} />
   return null
 }

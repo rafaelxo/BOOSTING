@@ -12,7 +12,7 @@ import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
 import { getCustomerOrderState, savePendingOrderFromIntent, generatePix as generatePixRequest } from '@/api/orders'
 import type { PixPaymentResponse } from '@/api/orders'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus, Info, ChevronLeft } from 'lucide-react'
+import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Info, ChevronLeft, X } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -79,6 +79,7 @@ export function StepPayment() {
   const [savedTotalPrice, setSavedTotalPrice] = useState<number | null>(null)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
   const pollRef = useRef<number | null>(null)
   const qrRetryTimeoutRef = useRef<number | null>(null)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
@@ -149,7 +150,7 @@ export function StepPayment() {
         return false
       }).then((paymentConfirmed) => {
         if (paymentConfirmed === true) return
-        queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+        queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
         queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
         startNewOrder()
       })
@@ -189,6 +190,42 @@ export function StepPayment() {
 
 
   useEffect(() => () => { stopPolling(); stopQrRetry() }, [])
+
+  // Cancela o pedido pendente no servidor (mesma edge function usada quando
+  // o PIX expira sozinho) em vez de só abandonar o wizard localmente --
+  // "Cancelar" aqui precisa realmente liberar o pedido, não só sair da tela.
+  async function handleCancelOrder() {
+    if (pix.phase !== 'waiting' || isCancelling) return
+    const orderId = pix.order_id
+    setIsCancelling(true)
+    stopPolling()
+
+    try {
+      await invokeEdgeFunction('cancel-pending-order', {
+        body: { order_id: orderId },
+        timeoutMs: 20_000,
+        requireAuth: true,
+      })
+    } catch {
+      // Mesma checagem defensiva do fluxo de expiração: uma confirmação de
+      // pagamento pode ter chegado bem na hora do cancelamento -- nunca
+      // descarta um pagamento que o backend já marcou como aprovado.
+      const state = await getCustomerOrderState(orderId).catch(() => null)
+      if (state?.payment_confirmed) {
+        const requiresCredentials = state.requires_credentials === true
+        setPix({ phase: 'confirmed' })
+        store.reset()
+        navigate(`/orders/${orderId}${requiresCredentials ? '#credentials' : ''}`, { replace: true })
+        return
+      }
+    } finally {
+      setIsCancelling(false)
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
+    queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
+    startNewOrder()
+  }
 
   function buildIntent(): Record<string, unknown> {
     const base = {
@@ -258,7 +295,7 @@ export function StepPayment() {
       setSavedOrderId(saved.order_id)
       setSavedTotalPrice(Number(saved.total_price))
       setSearchParams({ order: saved.order_id }, { replace: true })
-      queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
       queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
       return saved.order_id
     } catch (err) {
@@ -309,7 +346,7 @@ export function StepPayment() {
       total_price: Number(pixData.total_price),
     })
     setSearchParams({ order: orderId }, { replace: true })
-    queryClient.invalidateQueries({ queryKey: ['customer-orders'] })
+    queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
     queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
 
     // If MP didn't return base64 yet, retry once after 3s to get it. Scoped
@@ -441,13 +478,6 @@ export function StepPayment() {
   if (pix.phase === 'waiting') {
     return (
       <div className="space-y-5">
-        <div>
-          <h2 className="text-lg font-bold text-ink mb-1">Pagar via PIX</h2>
-          <p className="text-sm text-ink-secondary">
-            Escaneie o QR code ou copie o código PIX no seu app de banco.
-          </p>
-        </div>
-
         {/* Amount + timer */}
         <div className="flex items-center justify-between bg-bg-elevated rounded-2xl px-5 py-4">
           <div>
@@ -484,18 +514,8 @@ export function StepPayment() {
           <p className="text-xs font-semibold text-ink-secondary uppercase tracking-wide">
             Ou copie o código PIX Copia e Cola
           </p>
-          <div className="flex gap-2">
-            <div className="flex-1 bg-bg-elevated rounded-xl px-3 py-2.5 text-xs font-mono text-ink-secondary truncate">
-              {pix.qr_code.slice(0, 60)}…
-            </div>
-            <Button
-              size="sm"
-              variant={copied ? 'success' : 'secondary'}
-              leftIcon={copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              onClick={copyPix}
-            >
-              {copied ? 'Copiado!' : 'Copiar'}
-            </Button>
+          <div className="bg-bg-elevated rounded-xl px-3 py-2.5 text-xs font-mono text-ink-secondary truncate">
+            {pix.qr_code.slice(0, 60)}…
           </div>
           {copyError && <p className="text-xs text-danger">{copyError}</p>}
         </div>
@@ -516,14 +536,25 @@ export function StepPayment() {
           Pagamento processado com segurança pelo Mercado Pago. Seus dados bancários nunca passam por nossos servidores.
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex items-center justify-between">
           <Button
-            size="sm"
-            variant="secondary"
-            onClick={startNewOrder}
-            leftIcon={<Plus className="h-3.5 w-3.5" />}
+            size="lg"
+            variant="danger-ghost"
+            onClick={handleCancelOrder}
+            loading={isCancelling}
+            leftIcon={<X className="h-4 w-4" />}
+            className="w-40 shrink-0"
           >
-            Configurar novo pedido
+            Cancelar
+          </Button>
+          <Button
+            size="lg"
+            variant={copied ? 'success' : 'secondary'}
+            leftIcon={copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            onClick={copyPix}
+            className="w-40 shrink-0"
+          >
+            {copied ? 'Copiado!' : 'Copiar'}
           </Button>
         </div>
       </div>

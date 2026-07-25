@@ -1,4 +1,3 @@
-import { X } from 'lucide-react'
 import { rankStep } from '@/lib/pricing'
 import { cn } from '@/lib/utils'
 import type { Division, RankTier } from '@/types'
@@ -23,6 +22,9 @@ export interface RankProgressionRailProps {
    * mostra só os badges de rank atual/alvo, sem barra nem corte ao vivo,
    * já que não há progresso real nenhum pra medir. */
   showBar?: boolean
+  /** Oculta os badges quando o consumidor renderiza o mesmo resumo de ranks
+   * em um bloco próprio logo abaixo da barra. */
+  showBadges?: boolean
 }
 
 // Componente-assinatura do produto: a "trilha de ascensão" -- usada no hero
@@ -31,7 +33,7 @@ export interface RankProgressionRailProps {
 // preenchimento é sempre derivada do rank real (rankStep), nunca estética.
 export function RankProgressionRail({
   currentTier, currentDivision, currentLp, targetTier, targetDivision, liveCutoffLp,
-  size = 'full', className, locked = false, showBar = true,
+  size = 'full', className, locked = false, showBar = true, showBadges = true,
 }: RankProgressionRailProps) {
   const currentPct = Math.min(100, (rankStep(currentTier, currentDivision) / MAX_STEP) * 100)
   const targetPct = targetTier != null
@@ -43,28 +45,31 @@ export function RankProgressionRail({
 
   return (
     <div className={cn('w-full', className)}>
-      <div className={cn('flex items-end', targetTier != null ? 'justify-between' : 'justify-start')}>
-        <div className="flex flex-col items-center gap-1.5">
-          <RankBadge tier={currentTier} division={currentDivision} size={badgeSize} />
-          {currentLp != null && (
-            <span className="text-xs font-semibold text-brand tabular-figures" data-tabular>
-              {currentLp} PDL
-            </span>
+      {showBadges && (
+        <div className={cn('flex items-end', targetTier != null ? 'justify-between' : 'justify-start')}>
+          <div className="flex flex-col items-center gap-1.5">
+            <RankBadge tier={currentTier} division={currentDivision} size={badgeSize} />
+            {currentLp != null && (
+              <span className="text-xs font-semibold text-brand tabular-figures" data-tabular>
+                {currentLp} PDL
+              </span>
+            )}
+          </div>
+          {targetTier != null && (
+            <div className="flex flex-col items-center gap-1.5">
+            <RankBadge tier={targetTier} division={targetDivision ?? null} size={badgeSize} />
+            </div>
           )}
         </div>
-        {targetTier != null && (
-          <div className="flex flex-col items-center gap-1.5">
-            <RankBadge tier={targetTier} division={targetDivision ?? null} size={badgeSize} />
-          </div>
-        )}
-      </div>
+      )}
 
       {showBar && (
         <>
           <div className="relative">
             <div
               className={cn(
-                'relative mt-3 w-full rounded-full bg-bg-interactive overflow-hidden',
+                'relative w-full rounded-full bg-bg-interactive overflow-hidden',
+                showBadges && 'mt-3',
                 railHeight,
                 locked && 'blur-[3px] opacity-60',
               )}
@@ -92,14 +97,6 @@ export function RankProgressionRail({
                 />
               )}
             </div>
-
-            {locked && (
-              <div className="absolute inset-0 mt-3 flex items-center justify-center">
-                <div className="h-5 w-5 rounded-full bg-bg-base/80 flex items-center justify-center shadow-card">
-                  <X className="h-3 w-3 text-ink-muted" />
-                </div>
-              </div>
-            )}
           </div>
 
           {liveCutoffLp != null && (

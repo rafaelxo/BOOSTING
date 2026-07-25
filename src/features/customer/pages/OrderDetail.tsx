@@ -3,10 +3,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle, Receipt,
-  MessageCircleWarning, Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, UserCheck,
+  ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
+  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight,
 } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, Avatar } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
@@ -15,10 +15,10 @@ import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, formatRank, formatLastSeen, getServiceLabel, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, formatRank, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
-  useOrder, useOrderStatusHistory, useCustomerOrderState, useOrderPayments, useSetOrderCredentials,
+  useOrder, useOrderStatusHistory, useCustomerOrderState, useSetOrderCredentials,
   useConfirmOrderCompletion, useDisputeOrderCompletion, useGeneratePix, useCancelPendingOrder,
   useRequestOrderSupport, useSyncOrderMatches, getCustomerOrderState,
 } from '@/api/orders'
@@ -26,43 +26,6 @@ import { useOrderSupportEscalation } from '@/api/admin'
 import type { Order, BoosterProfile } from '@/types'
 import type { CustomerOrderState } from '@/api/orders'
 import { useQuery } from '@tanstack/react-query'
-
-function PaymentSummarySection({ orderId }: { orderId: string }) {
-  const currency = useCurrency()
-  const { data: payments } = useOrderPayments(orderId)
-
-  if (!payments?.length) return null
-
-  return (
-    <Card padding="md">
-      <div className="flex items-center gap-2 mb-4">
-        <Receipt className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold text-ink">Pagamento</h3>
-      </div>
-      <div className="space-y-3">
-        {payments.map((p) => (
-          <div key={p.id} className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-ink" data-tabular>{currency(p.amount)}</p>
-              <p className="text-[11px] text-ink-muted mt-0.5">
-                {formatDateTime(p.created_at)}
-                {p.payment_method_type === 'pix' && ' · Pix'}
-              </p>
-              {p.refunded_amount > 0 && (
-                <p className="text-[11px] text-ink-secondary mt-0.5">
-                  Reembolsado: {currency(p.refunded_amount)}
-                </p>
-              )}
-            </div>
-            <span className={`shrink-0 inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${PAYMENT_STATUS_COLOR[p.status] ?? ''}`}>
-              {PAYMENT_STATUS_LABEL[p.status] ?? p.status}
-            </span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  )
-}
 
 function useAssignedBooster(boosterId: string | null) {
   return useQuery({
@@ -80,28 +43,24 @@ function useAssignedBooster(boosterId: string | null) {
   })
 }
 
-// Bloco inline (sem Card próprio) -- mesclado dentro do card "Detalhes do
-// Pedido" em vez de ser um card separado na sidebar.
-function AssignedBoosterBlock({ order }: { order: Order }) {
+function AssignedBoosterStat({ order }: { order: Order }) {
   const { data: booster, isLoading } = useAssignedBooster(order.assigned_booster_id)
 
-  if (!order.assigned_booster_id) return null
-  if (isLoading) return <div className="mt-4 pt-4 border-t border-border-subtle"><Skeleton className="h-14 w-full" /></div>
-  if (!booster) return null
-
   return (
-    <div className="mt-4 pt-4 border-t border-border-subtle">
-      <p className="text-xs text-ink-muted mb-2 flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5" />Seu booster</p>
-      <Link to={`/boosters/${booster.id}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-        <Avatar src={booster.avatar_url} name={booster.display_name} size="md" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-ink truncate">{booster.display_name}</p>
-          <p className="text-xs text-ink-muted">{formatLastSeen(booster.last_active_at)}</p>
-        </div>
-        {booster.rating_count > 0 && (
-          <span className="text-xs font-semibold text-ink shrink-0" data-tabular>★ {booster.rating.toFixed(1)}</span>
-        )}
-      </Link>
+    <div>
+      <p className="text-xs text-ink-muted flex items-center justify-center gap-1">
+        <UserCheck className="h-3 w-3 shrink-0" />
+        Booster associado
+      </p>
+      {isLoading ? (
+        <Skeleton className="h-5 w-20 mx-auto mt-0.5" />
+      ) : booster ? (
+        <Link to={`/boosters/${booster.id}`} className="block text-sm font-semibold text-ink mt-0.5 truncate hover:text-brand transition-colors">
+          {booster.display_name}
+        </Link>
+      ) : (
+        <p className="text-sm font-semibold text-ink mt-0.5">---</p>
+      )}
     </div>
   )
 }
@@ -286,7 +245,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
       </p>
 
       {!pix ? (
-        <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
           <Button className="w-full" loading={generatePix.isPending} onClick={loadPix} leftIcon={<QrCode className="h-4 w-4" />}>
             Efetuar pagamento
           </Button>
@@ -327,14 +286,15 @@ function PendingPaymentSection({ order }: { order: Order }) {
             <textarea className="input-base min-h-24 w-full resize-none font-mono text-xs" value={pix.qr_code ?? ''} readOnly />
           </div>
 
-          <Button className="w-full" variant={copied ? 'success' : 'secondary'} onClick={copyPix} leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
-            {copied ? 'Copiado' : 'Copiar'}
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Button className="w-full" variant={copied ? 'success' : 'secondary'} onClick={copyPix} leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
+              {copied ? 'Copiado' : 'Copiar'}
+            </Button>
+            <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
+              Cancelar pedido
+            </Button>
+          </div>
           {copyError && <p className="text-xs text-danger">{copyError}</p>}
-
-          <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
-            Cancelar pedido
-          </Button>
         </div>
       )}
 
@@ -512,7 +472,27 @@ export function OrderDetailPage() {
     )
   }
 
-  const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
+  const currentRank = order.current_rank as { tier: Parameters<typeof RankBadge>[0]['tier']; division: Parameters<typeof RankBadge>[0]['division']; lp?: number } | null
+  const targetRank = order.target_rank as { tier: Parameters<typeof RankBadge>[0]['tier']; division: Parameters<typeof RankBadge>[0]['division'] } | null
+  const isBoostFlow = order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
+  const progressLocked = !order.match_sync_started_at
+  const currentPoints = order.pdl_bracket ? order.current_pdl : currentRank?.lp
+  const pointsLabel = order.pdl_bracket ? 'PDL' : 'LP'
+  const modeLabel = order.service_type === 'elo_boost'
+    ? (order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost')
+    : order.service_type === 'md5' ? 'MD5'
+    : order.service_type === 'win_boost' ? 'Vitórias'
+    : getServiceLabel(order.service_type)
+  const detailStats = [
+    ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo', value: modeLabel }] : []),
+    ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
+    ...(isBoostFlow && order.riot_id ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id }] : []),
+    ...(order.estimated_hours ? [{ icon: Clock, label: 'Entrega Estimada', value: formatEstimatedDelivery(order.estimated_hours) }] : []),
+    ...(order.service_type === 'coaching' && order.sessions_purchased
+      ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
+      : []),
+    { icon: Wallet, label: t('customer.order.totalPaid'), value: currency(order.total_price) },
+  ]
 
   return (
     <div className="space-y-6">
@@ -545,46 +525,58 @@ export function OrderDetailPage() {
         {/* Main info */}
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
-            {['awaiting_payment', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-              <OrderProgress order={order} />
-            )}
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { icon: Gamepad2, label: t('customer.order.service'), value: getServiceLabel(order.service_type) },
-                ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
-                  ? [{ icon: Users, label: t('customer.order.queue'), value: order.queue_type === 'solo_duo' ? t('customer.order.soloQueue') : t('customer.order.flexQueue') }]
-                  : []),
-                ...(order.service_type === 'elo_boost' && !order.pdl_bracket
-                  ? [{ icon: Shuffle, label: 'Modo', value: order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost' }]
-                  : []),
-                ...(!hasRankRail && order.current_rank ? [{
-                  icon: TrendingUp, label: t('customer.order.currentRank'),
-                  value: formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division),
-                }] : []),
-                ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank ? [{
-                  icon: TrendingUp, label: t('customer.order.targetRank'),
-                  value: formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division),
-                }] : []),
-                ...(order.pdl_bracket ? [
-                  { icon: TrendingUp, label: 'PDL Atual', value: `${order.current_pdl ?? '—'} PDL` },
-                  { icon: TrendingUp, label: 'Méd. PDL Ganho/Vitória', value: order.avg_pdl_gain != null ? `+${order.avg_pdl_gain} PDL` : '—' },
-                  { icon: TrendingUp, label: 'Méd. PDL Perdido/Derrota', value: order.avg_pdl_loss != null ? `−${order.avg_pdl_loss} PDL` : '—' },
-                ] : []),
-                ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
-                  ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
-                  : []),
-                ...(order.service_type === 'coaching' && order.sessions_purchased
-                  ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
-                  : []),
-                { icon: Wallet, label: t('customer.order.totalPaid'), value: currency(order.total_price) },
-              ].map(({ icon: Icon, label, value }) => (
-                <div key={label}>
-                  <p className="text-xs text-ink-muted flex items-center gap-1"><Icon className="h-3 w-3 shrink-0" />{label}</p>
-                  <p className="text-sm font-semibold text-ink mt-0.5 capitalize" data-tabular>{value}</p>
+
+            {currentRank && (
+              <div className="mb-4">
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <RankBadge tier={currentRank.tier} division={currentRank.division} size="lg" showLabel={false} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Atual</p>
+                      <p className="text-base font-bold text-ink truncate">{formatRank(currentRank.tier, currentRank.division)}</p>
+                    </div>
+                  </div>
+
+                  {order.service_type === 'elo_boost' && targetRank && (
+                    <>
+                      <div className="flex flex-col items-center gap-1 shrink-0">
+                        <ChevronRight className="h-5 w-5 text-ink-muted" />
+                        <span className={`text-sm font-bold text-brand whitespace-nowrap ${progressLocked ? 'blur-[3px] opacity-60 select-none' : ''}`} data-tabular>
+                          {currentPoints ?? '—'} {pointsLabel}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <RankBadge tier={targetRank.tier} division={targetRank.division} size="lg" showLabel={false} />
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Alvo</p>
+                          <p className="text-base font-bold text-ink truncate">{formatRank(targetRank.tier, targetRank.division)}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
+              <OrderProgress order={order} hideRankBadges />
+            )}
+
+            {detailStats.length > 0 && (
+              <div className="flex justify-center">
+                <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-center">
+                  {detailStats.map(({ icon: Icon, label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-ink-muted flex items-center justify-center gap-1"><Icon className="h-3 w-3 shrink-0" />{label}</p>
+                      <p className="text-sm font-semibold text-ink mt-0.5" data-tabular>{value}</p>
+                    </div>
+                  ))}
+                  <AssignedBoosterStat order={order} />
+                </div>
+              </div>
+            )}
 
             {order.extras?.length > 0 && (
               <div className="mt-4 pt-4 border-t border-border-subtle">
@@ -606,8 +598,6 @@ export function OrderDetailPage() {
                 <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
               </div>
             )}
-
-            <AssignedBoosterBlock order={order} />
           </Card>
 
           {order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
@@ -643,7 +633,6 @@ export function OrderDetailPage() {
             </Card>
           )}
 
-          <PaymentSummarySection orderId={order.id} />
           <CredentialsSection order={order} state={customerState} />
 
           <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
