@@ -7,7 +7,13 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { RankTier, ServiceExtra } from '@/types'
 
-const COACHING_HIGHLIGHTS = ['Análise de gameplay', 'Revisão de replays', 'Posicionamento e mapa', 'Mentalidade competitiva']
+const COACHING_HIGHLIGHTS = [
+  'Opções de sessão de horário predefinido',
+  'Aula estruturada para evolução do jogador',
+  'Coach combinado com sua função principal',
+  'Aula com foco em otimização da performance',
+  'Plano de melhoria personalizado',
+]
 
 function CoachingPricingSection() {
   return (
@@ -17,12 +23,14 @@ function CoachingPricingSection() {
         Sessões individuais com nossos coaches — o valor de cada pacote é definido pelo coach escolhido.
       </p>
 
-      <div className="flex flex-col gap-1.5">
-        {COACHING_HIGHLIGHTS.map(item => (
-          <span key={item} className="flex items-center gap-2 text-sm text-ink-secondary">
-            <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
-          </span>
-        ))}
+      <div className="card p-5">
+        <div className="flex flex-col gap-2.5">
+          {COACHING_HIGHLIGHTS.map(item => (
+            <span key={item} className="flex items-center gap-2 text-sm text-ink-secondary">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />{item}
+            </span>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -210,7 +218,7 @@ export function PricingPage() {
             <h2 className="text-xl font-bold text-ink mb-1">Extras Opcionais</h2>
             <p className="text-sm text-ink-secondary">Os extras disponíveis dependem da modalidade escolhida no configurador.</p>
           </div>
-          <AddonGroup title="Solo Boost" flow="solo_standard" currency={currency} />
+          <AddonGroup title="Solo Boost / Wins" flow="solo_standard" currency={currency} />
           <AddonGroup title="Duo Boost" flow="duo_standard" currency={currency} />
           <AddonGroup title="Boost Master+" flow="master_plus" currency={currency} />
         </section>
