@@ -91,6 +91,12 @@ const routingSchema = z.object({
 // tagLine é 2-5 alfanuméricos.
 const riotIdSchema = z.string().regex(/^.{3,16}#[A-Za-z0-9]{2,5}$/, 'Riot ID inválido (formato: nome#tag)')
 
+// Cupom de desconto — só o CÓDIGO vem do cliente, nunca um percentual/valor.
+// O percentual é sempre resolvido server-side contra a whitelist fixa em
+// applyCoupon() (shared/pricing.ts); um código inválido/inelegível aqui
+// simplesmente não gera desconto, não é um erro de validação.
+const couponCodeSchema = z.string().trim().max(32).nullable().default(null)
+
 // Solo Boost / Duo Boost padrão — Iron a Diamond.
 const standardEloIntentSchema = z.object({
   service_type: z.literal('elo_boost'),
@@ -109,6 +115,7 @@ const standardEloIntentSchema = z.object({
   win_package: z.union([z.literal(1), z.literal(3), z.literal(5)]).nullable().default(null),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
+  coupon_code: couponCodeSchema,
 }).strict()
 
 // Boost Master+ — rank atual Master ou Grão-Mestre. Sem PDL alvo: o preço
@@ -130,6 +137,7 @@ const masterPlusIntentSchema = z.object({
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
+  coupon_code: couponCodeSchema,
 }).strict()
 
 // Win Boost / Placement Matches / Coaching — fora do escopo desta reforma
@@ -162,6 +170,7 @@ const otherServiceIntentSchema = z.object({
   // cumprir o pedido); placement_matches/coaching sempre mandam null aqui
   // (reforçado pelas checagens de negócio abaixo).
   riot_id: riotIdSchema.nullable().default(null),
+  coupon_code: couponCodeSchema,
 }).strict()
 
 // MD5 — "Rank da última temporada": Iron–Challenger valid, no LP/PDL/target
@@ -178,6 +187,7 @@ const md5IntentSchema = z.object({
   wins_purchased: z.number().int().min(1).max(5),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
+  coupon_code: couponCodeSchema,
 }).strict()
 
 // Forma normalizada usada pelo resto do handler, independente de qual dos 3
@@ -205,6 +215,7 @@ export interface NormalizedIntent {
   avgPdlLoss: number | null
   riotId: string | null
   boosterServiceId: string | null
+  couponCode: string | null
 }
 
 export interface QuoteResult {
@@ -398,6 +409,7 @@ export async function validateAndPriceIntent(
       avgPdlLoss: 30,
       riotId: mp.riot_id,
       boosterServiceId: null,
+      couponCode: mp.coupon_code,
     }
   } else if (flow) {
     const std = parsedIntent.data as z.infer<typeof standardEloIntentSchema>
@@ -426,6 +438,7 @@ export async function validateAndPriceIntent(
       avgPdlLoss: null,
       riotId: std.riot_id,
       boosterServiceId: null,
+      couponCode: std.coupon_code,
     }
 
     // Diamond- mirando Grão-Mestre/Challenger direto: o trecho Mestre->alvo
@@ -469,6 +482,7 @@ export async function validateAndPriceIntent(
       avgPdlLoss: null,
       riotId: md5.riot_id,
       boosterServiceId: null,
+      couponCode: md5.coupon_code,
     }
   } else {
     const other = parsedIntent.data as z.infer<typeof otherServiceIntentSchema>
@@ -514,6 +528,7 @@ export async function validateAndPriceIntent(
       avgPdlLoss: null,
       riotId: other.riot_id,
       boosterServiceId: other.booster_service_id,
+      couponCode: other.coupon_code,
     }
   }
 
@@ -736,6 +751,7 @@ export async function validateAndPriceIntent(
     extras: extras.map((e) => ({ id: e.id, priceModifier: Number(e.price_modifier), priceModifierPct: Number(e.price_modifier_pct) })),
     winPackage: normalized.winPackage,
     coachPackagePrice,
+    couponCode: normalized.couponCode,
   }
 
   const priced = computeOrderPrice(priceInput)

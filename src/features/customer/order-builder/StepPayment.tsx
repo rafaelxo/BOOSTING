@@ -7,11 +7,12 @@ import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { Button, ErrorAlert } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
+import { applyCoupon } from '@/lib/pricing'
 import { getBoostFlow } from '@/lib/boostDomain'
 import { isUuid } from '@/lib/utils'
 import { getCustomerOrderState, savePendingOrderFromIntent, generatePix as generatePixRequest } from '@/api/orders'
 import type { PixPaymentResponse } from '@/api/orders'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus, Info } from 'lucide-react'
+import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Plus, Info, ChevronLeft } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -103,7 +104,11 @@ export function StepPayment() {
   // Estimativa exibida antes de gerar o PIX (mesma conta que StepReview já
   // mostrou ao cliente). O valor cobrado de fato é sempre o que a Edge
   // Function retorna, recomputado no servidor a partir de shared/pricing.ts.
-  const estimatedTotal = store.basePrice + store.extrasPrice
+  const estimatedSubtotal = store.basePrice + store.extrasPrice
+  const estimatedCoupon = store.couponCode && store.serviceType
+    ? applyCoupon(estimatedSubtotal, store.couponCode, store.serviceType)
+    : null
+  const estimatedTotal = estimatedSubtotal - (estimatedCoupon?.couponApplied ? estimatedCoupon.discountPrice : 0)
   const totalPrice = pix.phase === 'waiting' ? pix.total_price : savedTotalPrice ?? estimatedTotal
 
   // OrderBuilder.tsx grava store.gameId/serviceId com o slug/tipo cru
@@ -194,6 +199,7 @@ export function StepPayment() {
       server: store.server,
       current_rank: store.currentRank,
       customer_notes: store.customerNotes || null,
+      coupon_code: store.couponCode,
     }
 
     if (store.serviceType === 'elo_boost') {
@@ -579,30 +585,32 @@ export function StepPayment() {
         </p>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex items-center justify-between">
         <Button
-          size="sm"
-          variant="secondary"
-          onClick={startNewOrder}
-          leftIcon={<Plus className="h-3.5 w-3.5" />}
+          size="lg"
+          variant="ghost"
+          onClick={store.prevStep}
+          leftIcon={<ChevronLeft className="h-4 w-4" />}
+          className="w-40 shrink-0"
         >
-          Configurar novo pedido
+          Voltar
         </Button>
 
         <Button
-          className="flex-1"
+          size="lg"
           loading={pix.phase === 'generating'}
           onClick={generatePix}
           disabled={totalPrice <= 0 || !catalogReady || !addonsReady || isSavingOrder}
           leftIcon={<QrCode className="h-4 w-4" />}
+          className="w-40 shrink-0"
         >
           {!catalogReady || !addonsReady
-            ? 'Carregando catálogo…'
+            ? 'Carregando…'
             : isSavingOrder
-              ? 'Salvando pedido…'
+              ? 'Salvando…'
               : pix.phase === 'generating'
-                ? 'Gerando PIX…'
-                : `Gerar PIX — ${currency(totalPrice)}`}
+                ? 'Gerando…'
+                : 'Gerar PIX'}
         </Button>
       </div>
 

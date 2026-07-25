@@ -20,7 +20,7 @@ export type RankTier =
 
 export type Division = 'I' | 'II' | 'III' | 'IV'
 
-type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
+export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
 
 export const RANK_TIER_ORDER: RankTier[] = [
   'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
@@ -250,6 +250,53 @@ export function estimateEloBoostHours(input: {
   return games > 0 ? games * MATCH_DURATION_HOURS : null
 }
 
+// ── Cupom de desconto ────────────────────────────────────────────────────────
+// Mesmo padrão das tabelas hardcoded acima (WIN_PACKAGE_DISCOUNTS/
+// MD5_DISCOUNT_PCT): whitelist fixa em código, não uma tabela editável em
+// runtime. O cliente só envia o CÓDIGO digitado -- o percentual de desconto
+// nunca vem do cliente, é sempre resolvido aqui contra esta lista. Qualquer
+// código fora dela (typo, cupom expirado inventado, string arbitrária)
+// resulta em desconto zero, nunca em erro -- o pedido segue sem desconto.
+interface CouponDefinition {
+  discountPct: number
+}
+
+const VALID_COUPONS: Record<string, CouponDefinition> = Object.freeze({
+  ELOPEAK30: { discountPct: 30 },
+})
+
+// Não usa "elo_boost" isoladamente: Vitória Avulsa e MD5 também entram.
+// Coaching fica de fora -- preço já vem do pacote do booster, não da
+// tabela de preços do produto.
+export const COUPON_ELIGIBLE_SERVICE_TYPES: ServiceType[] = ['elo_boost', 'win_boost', 'md5']
+
+export interface CouponOutcome {
+  couponApplied: boolean
+  discountPct: number
+  discountPrice: number
+}
+
+const NO_DISCOUNT: CouponOutcome = { couponApplied: false, discountPct: 0, discountPrice: 0 }
+
+// Resolve um código de cupom contra a subtotal (basePrice + extrasPrice) já
+// calculada. Case-sensitive de propósito -- só o texto exato cadastrado em
+// VALID_COUPONS (ex.: "ELOPEAK30") aplica; "elopeak30"/"Elopeak30" não batem.
+// `Object.prototype.hasOwnProperty.call` em vez de `in`/acesso direto --
+// evita que um código como "__proto__" ou "constructor" resolva para algo
+// herdado de Object.prototype em vez de "não encontrado".
+export function applyCoupon(subtotal: number, code: string | null | undefined, serviceType: ServiceType): CouponOutcome {
+  if (!code) return NO_DISCOUNT
+  const normalized = code.trim()
+  if (!normalized || normalized.length > 32) return NO_DISCOUNT
+  if (!Object.prototype.hasOwnProperty.call(VALID_COUPONS, normalized)) return NO_DISCOUNT
+  if (!COUPON_ELIGIBLE_SERVICE_TYPES.includes(serviceType)) return NO_DISCOUNT
+
+  const { discountPct } = VALID_COUPONS[normalized]
+  const subtotalCents = moneyToCents(subtotal)
+  const discountCents = percentageOfCents(subtotalCents, discountPct)
+  return { couponApplied: true, discountPct, discountPrice: centsToMoney(discountCents) }
+}
+
 const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
 
 export function getWinBoostPrice(queue: QueueType, tier: RankTier, _div?: Division | null): number {
@@ -390,6 +437,11 @@ export interface OrderPriceInput {
   // já validado server-side contra o booster_service_id do intent — nunca
   // inventado. Ignorado para qualquer serviceType que não seja 'coaching'.
   coachPackagePrice: number | null
+  // Código de cupom digitado pelo cliente — nunca um percentual/valor de
+  // desconto. O percentual é sempre resolvido contra a whitelist fixa em
+  // applyCoupon(), nunca aceito do cliente. Ignorado (sem efeito) para
+  // serviceType fora de COUPON_ELIGIBLE_SERVICE_TYPES (ex.: coaching).
+  couponCode: string | null
 }
 
 export interface OrderPriceResult {
@@ -403,6 +455,12 @@ export interface OrderPriceResult {
   // só existe no fluxo padrão elo_boost (Iron–Diamond); `null` para Master+
   // e para qualquer outro serviceType, onde este modificador nunca se aplica.
   pdlModifierPct: number | null
+  // Resultado da resolução do cupom (ver applyCoupon) — discountPrice sempre
+  // 0 quando não há cupom válido/aplicável, nunca negativo, nunca maior que
+  // basePrice + extrasPrice.
+  couponApplied: boolean
+  discountPct: number
+  discountPrice: number
 }
 
 export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
@@ -539,7 +597,13 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
 
   const extrasPriceCents = extrasRawCents + moneyToCents(winPackagePrice)
   const extrasPrice = centsToMoney(extrasPriceCents)
-  const totalPrice = centsToMoney(basePriceCents + extrasPriceCents)
+  const subtotalCents = basePriceCents + extrasPriceCents
 
-  return { basePrice, extrasPrice, totalPrice, estimatedHours, winPackagePrice, extrasBreakdown, pdlModifierPct }
+  const coupon = applyCoupon(centsToMoney(subtotalCents), input.couponCode, input.serviceType)
+  const totalPrice = centsToMoney(subtotalCents - moneyToCents(coupon.discountPrice))
+
+  return {
+    basePrice, extrasPrice, totalPrice, estimatedHours, winPackagePrice, extrasBreakdown, pdlModifierPct,
+    couponApplied: coupon.couponApplied, discountPct: coupon.discountPct, discountPrice: coupon.discountPrice,
+  }
 }

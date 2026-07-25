@@ -90,6 +90,11 @@ interface OrderBuilderState {
   avgPdlGain: number
   avgPdlLoss: number
 
+  // Cupom de desconto — só o código digitado, aplicado depois de validado
+  // client-side (shared/pricing.ts::applyCoupon, exibição/estimativa
+  // apenas). O valor cobrado de fato sempre vem recomputado no servidor.
+  couponCode: string | null
+
   // Computed
   basePrice: number
   extrasPrice: number
@@ -141,6 +146,7 @@ interface OrderBuilderState {
   setCurrentPdl: (pdl: number) => void
   setAvgPdlGain: (pdl: number) => void
   setAvgPdlLoss: (pdl: number) => void
+  setCouponCode: (code: string | null) => void
   setBasePrice: (price: number) => void
   setExtrasPrice: (price: number) => void
   setEstimatedHours: (hours: number | null) => void
@@ -185,6 +191,7 @@ const initialState = {
   currentPdl: 0,
   avgPdlGain: 30,
   avgPdlLoss: 30,
+  couponCode: null as string | null,
   basePrice: 0,
   extrasPrice: 0,
   estimatedHours: null,
@@ -219,13 +226,12 @@ function flowFor(rank: Rank | null, mode: BoostMode): BoostFlow | null {
   return getBoostFlow(rank.tier, mode as BoostFlowMode)
 }
 
-// Persistido em sessionStorage -- não localStorage -- pra sobreviver a um
-// reload/troca de aba dentro da mesma sessão do navegador (o cenário real:
-// o refetch automático do React Query em foco de janela nunca derruba
-// estado de componente sozinho, mas o navegador pode descartar/recarregar
-// uma aba em segundo plano por pressão de memória, o que zerava todo o
-// progresso do configurador). Um pedido configurado não deve sobreviver ao
-// fechamento da aba/navegador -- por isso sessionStorage, não localStorage.
+// Persistido em localStorage -- pra sobreviver a fechar a aba/navegador, não
+// só a um reload/troca de aba. O cliente pode configurar um pedido, sair do
+// site (fechar a aba, trocar de app, etc.) e retomar exatamente de onde
+// parou dias depois. Continua limpo nos pontos certos do ciclo de vida
+// (reset() roda ao confirmar pagamento e ao clicar em "Configurar novo
+// pedido"/"Voltar" para começar do zero), então não acumula lixo indefinido.
 export const useOrderBuilderStore = create<OrderBuilderState>()(
   persist(
     (set, get) => ({
@@ -371,6 +377,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
   setCurrentPdl: (currentPdl) => set({ currentPdl }),
   setAvgPdlGain: (avgPdlGain) => set({ avgPdlGain }),
   setAvgPdlLoss: (avgPdlLoss) => set({ avgPdlLoss }),
+  setCouponCode: (couponCode) => set({ couponCode }),
   setBasePrice: (basePrice) => set({ basePrice }),
   setExtrasPrice: (extrasPrice) => set({ extrasPrice }),
   setEstimatedHours: (estimatedHours) => set({ estimatedHours }),
@@ -380,7 +387,7 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
     }),
     {
       name: 'eloboost-order-builder',
-      storage: createJSONStorage(() => sessionStorage, {
+      storage: createJSONStorage(() => localStorage, {
         // Set não é serializável em JSON puro -- codifica/decodifica
         // explicitamente (selectedExtraIds é o único Set no estado).
         replacer: (_key, value) => (value instanceof Set ? { __set: [...value] } : value),

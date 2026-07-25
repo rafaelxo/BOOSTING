@@ -144,6 +144,12 @@ serve(async (req) => {
           win_package: normalized.winPackage,
           base_price: priced.basePrice,
           extras_price: priced.extrasPrice,
+          // coupon_code é gravado só quando o desconto foi de fato aplicado
+          // (nunca a partir do que o cliente digitou/tentou) -- case-sensitive,
+          // então o valor gravado aqui é sempre o texto exato cadastrado em
+          // VALID_COUPONS (applyCoupon já rejeitou qualquer variação de caixa).
+          coupon_code: priced.couponApplied ? normalized.couponCode!.trim() : null,
+          discount_price: priced.discountPrice,
           total_price: priced.totalPrice,
           estimated_hours: priced.estimatedHours,
           customer_notes: normalized.customerNotes || null,

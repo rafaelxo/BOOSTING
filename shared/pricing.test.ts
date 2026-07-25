@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOrderPrice, calcEloPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
-  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, type OrderPriceInput, type RankTier,
+  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, applyCoupon, type OrderPriceInput, type RankTier,
 } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
@@ -21,6 +21,7 @@ function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
     extras: [],
     winPackage: null,
     coachPackagePrice: null,
+    couponCode: null,
     ...overrides,
   }
 }
@@ -584,5 +585,106 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
     // Elo boost: 4 partidas (mesmo cálculo do teste "considera LP atual...").
     // + pacote de 3 vitórias: ceil(3/0.8) = 4 partidas. Total 8 * 0.5h * 10 = 40.
     expect(priced.estimatedHours).toBe(40)
+  })
+})
+
+describe('Cupom de desconto (applyCoupon) — só ELOPEAK30, 30%, nunca em coaching', () => {
+  it('ELOPEAK30 aplica 30% de desconto para elo_boost/win_boost/md5', () => {
+    for (const serviceType of ['elo_boost', 'win_boost', 'md5'] as const) {
+      const result = applyCoupon(200, 'ELOPEAK30', serviceType)
+      expect(result.couponApplied).toBe(true)
+      expect(result.discountPct).toBe(30)
+      expect(result.discountPrice).toBeCloseTo(60, 2)
+    }
+  })
+
+  it('nunca aplica a coaching, mesmo com o código correto', () => {
+    const result = applyCoupon(200, 'ELOPEAK30', 'coaching')
+    expect(result.couponApplied).toBe(false)
+    expect(result.discountPrice).toBe(0)
+  })
+
+  it('nunca aplica a placement_matches (legado, fora da whitelist de elegibilidade)', () => {
+    const result = applyCoupon(200, 'ELOPEAK30', 'placement_matches')
+    expect(result.couponApplied).toBe(false)
+    expect(result.discountPrice).toBe(0)
+  })
+
+  it('aceita espaços ao redor (trim), mas exige a caixa exata', () => {
+    const result = applyCoupon(200, '  ELOPEAK30  ', 'elo_boost')
+    expect(result.couponApplied).toBe(true)
+    expect(result.discountPrice).toBeCloseTo(60, 2)
+  })
+
+  it('é case-sensitive -- variações de caixa do código correto são rejeitadas', () => {
+    for (const code of ['elopeak30', 'Elopeak30', 'ElopEAK30', 'ELOPEAk30']) {
+      const result = applyCoupon(200, code, 'elo_boost')
+      expect(result.couponApplied).toBe(false)
+      expect(result.discountPrice).toBe(0)
+    }
+  })
+
+  it('rejeita qualquer código que não seja ELOPEAK30 exatamente', () => {
+    for (const code of ['ELOPEAK3', 'ELOPEAK300', 'ELOPEAK', 'ELOPEAK30X', 'PEAK30', ' ', '']) {
+      const result = applyCoupon(200, code, 'elo_boost')
+      expect(result.couponApplied).toBe(false)
+      expect(result.discountPrice).toBe(0)
+    }
+  })
+
+  it('rejeita null/undefined sem lançar', () => {
+    expect(applyCoupon(200, null, 'elo_boost').couponApplied).toBe(false)
+    expect(applyCoupon(200, undefined, 'elo_boost').couponApplied).toBe(false)
+  })
+
+  it('resiste a tentativas de poluição de protótipo (__proto__, constructor, toString)', () => {
+    for (const code of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+      const result = applyCoupon(200, code, 'elo_boost')
+      expect(result.couponApplied).toBe(false)
+      expect(result.discountPrice).toBe(0)
+    }
+  })
+
+  it('rejeita strings hostis/muito longas sem lançar', () => {
+    const huge = 'A'.repeat(10_000)
+    expect(() => applyCoupon(200, huge, 'elo_boost')).not.toThrow()
+    expect(applyCoupon(200, huge, 'elo_boost').couponApplied).toBe(false)
+  })
+
+  it('computeOrderPrice aplica o desconto sobre basePrice + extrasPrice, arredondando uma única vez', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'iron', division: 'I' },
+      targetRank: { tier: 'bronze', division: 'IV' },
+      extras: [{ id: 'gameplay', priceModifier: 0, priceModifierPct: 30 }],
+      couponCode: 'ELOPEAK30',
+    }))
+    const subtotal = priced.basePrice + priced.extrasPrice
+    const expectedDiscount = Math.round(subtotal * 100 * 0.30) / 100
+    expect(priced.couponApplied).toBe(true)
+    expect(priced.discountPct).toBe(30)
+    expect(priced.discountPrice).toBeCloseTo(expectedDiscount, 2)
+    expect(priced.totalPrice).toBeCloseTo(subtotal - expectedDiscount, 2)
+  })
+
+  it('computeOrderPrice ignora o cupom em coaching -- totalPrice não muda', () => {
+    const withoutCoupon = computeOrderPrice(baseInput({
+      serviceType: 'coaching', coachPackagePrice: 100, sessionsPurchased: 1,
+    }))
+    const withCoupon = computeOrderPrice(baseInput({
+      serviceType: 'coaching', coachPackagePrice: 100, sessionsPurchased: 1, couponCode: 'ELOPEAK30',
+    }))
+    expect(withCoupon.couponApplied).toBe(false)
+    expect(withCoupon.discountPrice).toBe(0)
+    expect(withCoupon.totalPrice).toBe(withoutCoupon.totalPrice)
+  })
+
+  it('sem couponCode, totalPrice é idêntico ao comportamento pré-cupom (basePrice + extrasPrice)', () => {
+    const priced = computeOrderPrice(baseInput({
+      currentRank: { tier: 'iron', division: 'I' },
+      targetRank: { tier: 'bronze', division: 'IV' },
+    }))
+    expect(priced.couponApplied).toBe(false)
+    expect(priced.discountPrice).toBe(0)
+    expect(priced.totalPrice).toBeCloseTo(priced.basePrice + priced.extrasPrice, 2)
   })
 })

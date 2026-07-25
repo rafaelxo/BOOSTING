@@ -1,14 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
 import { Stepper, Button, Card } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
+import { applyCoupon, getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow } from '@/lib/boostDomain'
-import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag, X } from 'lucide-react'
 import type { ServiceType, Rank } from '@/types'
-import { getServiceLabel, formatEstimatedDelivery } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getCustomerOrderState } from '@/api/orders'
@@ -88,14 +88,16 @@ function isStepComplete(
 export function OrderBuilderPage() {
   const { profile } = useAuthStore()
   const {
-    step, steps, nextStep, prevStep, basePrice, extrasPrice, estimatedHours,
+    step, steps, nextStep, prevStep, basePrice, extrasPrice,
     selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType, serviceId,
     setGame, setService, setServiceId, setStep, reset, preferredBoosterName, setPreferredBooster,
-    setSelectedCoachPackage, setBasePrice,
+    setSelectedCoachPackage, setBasePrice, couponCode, setCouponCode,
     winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading, riotVerified,
-    selectedCoachPackage, setStepAttempted,
+    selectedCoachPackage, setStepAttempted, winPackage, queueType,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [couponInput, setCouponInput] = useState('')
+  const [couponError, setCouponError] = useState<string | null>(null)
   const currency = useCurrency()
   const pendingOrderId = searchParams.get('order')
   const explicitlyStartingNewOrder = searchParams.get('new') === '1'
@@ -264,12 +266,47 @@ export function OrderBuilderPage() {
   const currentIdx = steps.indexOf(step)
   const completedSteps = steps.slice(0, currentIdx)
   const StepContent = STEP_COMPONENTS[step]
-  const totalPrice = basePrice + extrasPrice
+  const WIN_PACKAGE_DISCOUNTS: Record<number, number> = { 1: 10, 3: 20, 5: 30 }
+  const winPackagePrice = winPackage && currentRank
+    ? Math.round(
+        getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
+        * winPackage
+        * (1 - (WIN_PACKAGE_DISCOUNTS[winPackage] ?? 0) / 100)
+        * 100
+      ) / 100
+    : 0
+  const subtotal = basePrice + extrasPrice
+  // Estimativa de exibição -- o mesmo cupom aplicado em StepReview, refletido
+  // aqui pra o resumo persistente não ficar desatualizado nos outros passos.
+  // O valor cobrado de fato é sempre recomputado no servidor.
+  const coupon = couponCode && serviceType ? applyCoupon(subtotal, couponCode, serviceType) : null
+  const discountPrice = coupon?.couponApplied ? coupon.discountPrice : 0
+  const totalPrice = subtotal - discountPrice
   const canGoBack = currentIdx > 0 && step !== 'payment'
   const stepComplete = isStepComplete(step, {
     serviceType, selectedCoachPackage, currentRank, targetRank,
     winsPurchased, riotId, isMd5, riotVerified, riotLookupLoading, md5MatchesRemaining,
   })
+
+  function handleApplyCoupon() {
+    const trimmed = couponInput.trim()
+    if (!trimmed || !serviceType) return
+    const result = applyCoupon(subtotal, trimmed, serviceType)
+    if (!result.couponApplied) {
+      setCouponError('Cupom inválido ou não aplicável a este serviço.')
+      setCouponCode(null)
+      return
+    }
+    setCouponError(null)
+    setCouponInput('')
+    setCouponCode(trimmed)
+  }
+
+  function handleRemoveCoupon() {
+    setCouponCode(null)
+    setCouponInput('')
+    setCouponError(null)
+  }
 
   return (
     <div>
@@ -325,66 +362,108 @@ export function OrderBuilderPage() {
           </Card>
         </div>
 
-        {/* Summary panel */}
-        <aside className="lg:w-72 shrink-0 space-y-4">
-          <Card padding="md" className="sticky top-6">
-            <h3 className="text-sm font-semibold text-ink mb-4">Resumo do Pedido</h3>
-
-            {gameSlug || serviceType ? (
-              <div className="space-y-3 mb-4">
-                {gameSlug && (
-                  <SummaryRow label="Jogo" value={gameSlug === 'lol' ? 'League of Legends' : gameSlug.toUpperCase()} />
-                )}
-                {serviceType && (
-                  <SummaryRow label="Serviço" value={getServiceLabel(serviceType)} />
-                )}
-                {estimatedHours && (
-                  <SummaryRow label="Entrega est." value={formatEstimatedDelivery(estimatedHours)} />
-                )}
-                {selectedAddons.length > 0 && (
-                  <div>
-                    <p className="text-xs text-ink-muted mb-1.5">Extras</p>
-                    <div className="space-y-1">
-                      {selectedAddons.map((extra) => (
-                        <div key={extra.id} className="flex justify-between text-xs">
-                          <span className="text-ink-secondary">{extra.name}</span>
-                          <span className="text-ink font-medium">
-                            {extra.price_modifier > 0 ? `+${currency(extra.price_modifier)}` :
-                             extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Grátis'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+        {/* Summary panel — só aparece na revisão final, junto do cupom;
+            nos passos anteriores o pedido ainda não tem preço/cupom pra
+            mostrar, então a coluna some e o conteúdo principal ocupa tudo. */}
+        {step === 'review' && (
+        <aside className="lg:w-72 shrink-0 space-y-5">
+          <Card padding="lg" className="sticky top-6">
+            <div className="space-y-2.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-ink-secondary">Preço base</span>
+                <span className="text-ink">{currency(basePrice)}</span>
               </div>
-            ) : (
-              <p className="text-xs text-ink-muted mb-4">Configure seu pedido para ver o preço.</p>
-            )}
 
-            <div className="border-t border-bg-elevated pt-3 space-y-1.5">
-              {extrasPrice > 0 && (
-                <>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-ink-secondary">Preço base</span>
-                    <span className="text-ink">{currency(basePrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-ink-secondary">Extras</span>
-                    <span className="text-ink">+{currency(extrasPrice)}</span>
-                  </div>
-                </>
+              {winPackage && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-ink-secondary">Pacote {winPackage} {winPackage === 1 ? 'vitória' : 'vitórias'} (-{WIN_PACKAGE_DISCOUNTS[winPackage]}%)</span>
+                  <span className="text-ink">+{currency(winPackagePrice)}</span>
+                </div>
               )}
-              <div className="flex justify-between pt-1">
+              {selectedAddons.map((extra) => (
+                <div key={extra.id} className="flex justify-between text-xs">
+                  <span className="text-ink-secondary">{extra.name}</span>
+                  <span className="text-ink">
+                    {extra.price_modifier > 0 ? `+${currency(extra.price_modifier)}` :
+                     extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Grátis'}
+                  </span>
+                </div>
+              ))}
+
+              {/* Cupom — só pra serviços elegíveis (elo boost, vitórias, md5). */}
+              {serviceType && serviceType !== 'coaching' && (
+                <div className="py-2">
+                  {!coupon?.couponApplied ? (
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted pointer-events-none" />
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => { setCouponInput(e.target.value); setCouponError(null) }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon() } }}
+                          placeholder="Cupom"
+                          maxLength={32}
+                          className="input-base w-full pl-8 py-2 text-xs"
+                        />
+                      </div>
+                      <Button type="button" variant="secondary" size="sm" onClick={handleApplyCoupon} disabled={!couponInput.trim()}>
+                        Aplicar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-success font-medium">
+                        Cupom {couponCode} · -{coupon.discountPct}%
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="p-1 rounded-md text-ink-muted hover:text-ink hover:bg-bg-elevated transition-colors shrink-0"
+                        aria-label="Remover cupom"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                  {couponError && <p className="text-[11px] text-danger mt-2">{couponError}</p>}
+                </div>
+              )}
+
+              {discountPrice > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-success font-medium">Desconto (-{coupon?.discountPct}%)</span>
+                  <span className="text-success font-medium">-{currency(discountPrice)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-end pt-2">
                 <span className="text-sm font-semibold text-ink">Total</span>
-                <span className="text-base font-bold text-brand">{currency(totalPrice)}</span>
+                {discountPrice > 0 ? (
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xs text-ink-muted line-through">{currency(subtotal)}</span>
+                    <span className="text-lg font-extrabold text-success">{currency(totalPrice)}</span>
+                  </div>
+                ) : (
+                  <span className="text-base font-bold text-brand">{currency(totalPrice)}</span>
+                )}
               </div>
+
+              {step === 'review' && (
+                <div className="flex gap-2.5 pt-4">
+                  <Button variant="ghost" onClick={prevStep} className="shrink-0">
+                    Voltar
+                  </Button>
+                  <Button onClick={nextStep} className="flex-1" rightIcon={<ChevronRight className="h-4 w-4" />}>
+                    {serviceType === 'coaching' ? 'Confirmar' : 'Ir para Pagamento'}
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
 
           {/* Trust badges */}
-          <Card padding="md" variant="brand">
-            <div className="space-y-3">
+          <Card padding="lg" variant="brand">
+            <div className="space-y-4">
               {[
                 { icon: Shield, text: 'VPN & proteção offline' },
                 { icon: Star, text: 'Garantia 100% de conclusão' },
@@ -398,16 +477,8 @@ export function OrderBuilderPage() {
             </div>
           </Card>
         </aside>
+        )}
       </div>
-    </div>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-xs">
-      <span className="text-ink-muted">{label}</span>
-      <span className="text-ink font-medium">{value}</span>
     </div>
   )
 }

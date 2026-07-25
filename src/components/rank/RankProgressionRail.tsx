@@ -19,6 +19,10 @@ export interface RankProgressionRailProps {
   /** Pedido ainda não pago: os badges de rank continuam nítidos, só a barra
    * fica desfocada com um X -- não existe progresso real pra mostrar ainda. */
   locked?: boolean
+  /** Pedido ainda sendo configurado (configurador, nem existe ainda) --
+   * mostra só os badges de rank atual/alvo, sem barra nem corte ao vivo,
+   * já que não há progresso real nenhum pra medir. */
+  showBar?: boolean
 }
 
 // Componente-assinatura do produto: a "trilha de ascensão" -- usada no hero
@@ -27,7 +31,7 @@ export interface RankProgressionRailProps {
 // preenchimento é sempre derivada do rank real (rankStep), nunca estética.
 export function RankProgressionRail({
   currentTier, currentDivision, currentLp, targetTier, targetDivision, liveCutoffLp,
-  size = 'full', className, locked = false,
+  size = 'full', className, locked = false, showBar = true,
 }: RankProgressionRailProps) {
   const currentPct = Math.min(100, (rankStep(currentTier, currentDivision) / MAX_STEP) * 100)
   const targetPct = targetTier != null
@@ -55,51 +59,55 @@ export function RankProgressionRail({
         )}
       </div>
 
-      <div className="relative">
-        <div
-          className={cn(
-            'relative mt-3 w-full rounded-full bg-bg-interactive overflow-hidden',
-            railHeight,
-            locked && 'blur-[3px] opacity-60',
-          )}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(currentPct)}
-          aria-label={`Progresso de ${currentTier} até ${targetTier ?? 'o topo do ranqueado'}`}
-        >
-          {/* Trilha de fundo -- gradiente sutil que percorre todos os tiers,
-              sempre visível como referência do caminho inteiro. */}
-          <div className="absolute inset-0 bg-gradient-rail opacity-20" />
-
-          {/* Preenchimento até a posição atual -- verde (marca, progresso ao vivo). */}
-          <div
-            className="absolute inset-y-0 left-0 origin-left rounded-full bg-gradient-brand shadow-brand motion-safe:animate-rail-fill"
-            style={{ width: `${currentPct}%` }}
-          />
-
-          {/* Marcador da meta -- dourado (acento, conquista). */}
-          {targetPct != null && (
+      {showBar && (
+        <>
+          <div className="relative">
             <div
-              className="absolute inset-y-0 w-0.5 bg-accent shadow-accent"
-              style={{ left: `${targetPct}%` }}
-            />
-          )}
-        </div>
+              className={cn(
+                'relative mt-3 w-full rounded-full bg-bg-interactive overflow-hidden',
+                railHeight,
+                locked && 'blur-[3px] opacity-60',
+              )}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(currentPct)}
+              aria-label={`Progresso de ${currentTier} até ${targetTier ?? 'o topo do ranqueado'}`}
+            >
+              {/* Trilha de fundo -- gradiente sutil que percorre todos os tiers,
+                  sempre visível como referência do caminho inteiro. */}
+              <div className="absolute inset-0 bg-gradient-rail opacity-20" />
 
-        {locked && (
-          <div className="absolute inset-0 mt-3 flex items-center justify-center">
-            <div className="h-5 w-5 rounded-full bg-bg-base/80 flex items-center justify-center shadow-card">
-              <X className="h-3 w-3 text-ink-muted" />
+              {/* Preenchimento até a posição atual -- verde (marca, progresso ao vivo). */}
+              <div
+                className="absolute inset-y-0 left-0 origin-left rounded-full bg-gradient-brand shadow-brand motion-safe:animate-rail-fill"
+                style={{ width: `${currentPct}%` }}
+              />
+
+              {/* Marcador da meta -- dourado (acento, conquista). */}
+              {targetPct != null && (
+                <div
+                  className="absolute inset-y-0 w-0.5 bg-accent shadow-accent"
+                  style={{ left: `${targetPct}%` }}
+                />
+              )}
             </div>
-          </div>
-        )}
-      </div>
 
-      {liveCutoffLp != null && (
-        <p className="mt-2 text-xs text-ink-muted">
-          Corte ao vivo: <span className="font-semibold text-ink-secondary tabular-figures" data-tabular>{liveCutoffLp} LP</span>
-        </p>
+            {locked && (
+              <div className="absolute inset-0 mt-3 flex items-center justify-center">
+                <div className="h-5 w-5 rounded-full bg-bg-base/80 flex items-center justify-center shadow-card">
+                  <X className="h-3 w-3 text-ink-muted" />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {liveCutoffLp != null && (
+            <p className="mt-2 text-xs text-ink-muted">
+              Corte ao vivo: <span className="font-semibold text-ink-secondary tabular-figures" data-tabular>{liveCutoffLp} LP</span>
+            </p>
+          )}
+        </>
       )}
     </div>
   )
