@@ -23,9 +23,9 @@ export function CustomerLayout() {
   ]
 
   return (
-    <div className="min-h-screen flex bg-bg-base">
+    <div className="min-h-screen flex">
       {/* ── Sidebar ────────────────────────────────────────────────── */}
-      <aside className="hidden md:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface shrink-0">
+      <aside className="hidden md:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
         {/* Logo */}
         <div className="h-[68px] flex items-center px-6 border-b border-bg-elevated shrink-0">
           <Link to="/" className="flex items-center gap-2.5">
@@ -63,7 +63,7 @@ export function CustomerLayout() {
       {/* ── Main area ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
+        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
           {/* Mobile logo */}
           <Link to="/" className="md:hidden flex items-center gap-2">
             <LogoMark className="h-7 w-7" />
@@ -94,7 +94,7 @@ export function CustomerLayout() {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0">
+        <nav className="md:hidden border-t border-bg-elevated bg-bg-surface/90 backdrop-blur-xl flex shrink-0">
           {NAV_ITEMS.filter(i => i.href !== '/orders/new').map(({ href, icon: Icon, label }) => {
             const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
             return (

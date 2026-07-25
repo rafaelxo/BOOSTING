@@ -34,7 +34,7 @@ export function AdminBoostersPage() {
       <h1 className="text-2xl font-bold text-ink">{t('admin.boosters.title')}</h1>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1 w-fit">
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 w-fit">
           {(['all', 'pending', 'under_review', 'approved', 'suspended'] as const).map((s) => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>

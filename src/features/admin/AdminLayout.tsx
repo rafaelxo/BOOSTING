@@ -38,9 +38,9 @@ export function AdminLayout() {
   const isActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`))
 
   return (
-    <div className="min-h-screen flex bg-bg-base">
+    <div className="min-h-screen flex">
       {/* ── Sidebar ────────────────────────────────────────────────── */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface shrink-0">
+      <aside className="hidden lg:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
         {/* Logo */}
         <div className="h-[68px] flex items-center px-6 border-b border-bg-elevated gap-3 shrink-0">
           <Link to="/" className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -86,12 +86,12 @@ export function AdminLayout() {
 
       {/* ── Main area ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
+        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
           <p className="text-sm text-ink-muted font-medium">{t('admin.nav.panel')}</p>
           <UserAccountBadge />
         </header>
 
-        <nav className="lg:hidden overflow-x-auto border-b border-bg-elevated bg-bg-surface shrink-0" aria-label="Navegação administrativa">
+        <nav className="lg:hidden overflow-x-auto border-b border-bg-elevated bg-bg-surface/90 backdrop-blur-xl shrink-0" aria-label="Navegação administrativa">
           <div className="flex min-w-max gap-1 px-3 py-2">
             {navItems.map(({ href, icon: Icon, label }) => (
               <Link

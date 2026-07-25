@@ -76,7 +76,7 @@ export function HomePage() {
   return (
     <div>
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative bg-bg-base overflow-hidden">
+      <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
         <HexGridBackground />
         <div className="absolute -top-60 right-0 w-[700px] h-[700px] rounded-full bg-brand/6 blur-[140px] pointer-events-none" />
@@ -122,7 +122,7 @@ export function HomePage() {
       </section>
 
       {/* ── SERVICES ─────────────────────────────────────────────────────── */}
-      <section id="services" className="py-16 lg:py-20 bg-bg-surface scroll-mt-20">
+      <section id="services" className="py-16 lg:py-20 bg-bg-surface/35 backdrop-blur-sm scroll-mt-20">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -179,7 +179,7 @@ export function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────────────────────── */}
-      <section className="py-16 lg:py-20 bg-bg-base relative overflow-hidden">
+      <section className="py-16 lg:py-20 relative overflow-hidden">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -214,7 +214,7 @@ export function HomePage() {
       </section>
 
       {/* ── TRUST & SECURITY ─────────────────────────────────────────────── */}
-      <section className="py-16 lg:py-20 bg-bg-surface">
+      <section className="py-16 lg:py-20 bg-bg-surface/35 backdrop-blur-sm">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
 
@@ -260,7 +260,7 @@ export function HomePage() {
 
       {/* ── BOOSTERS ─────────────────────────────────────────────────────── */}
       {featuredBoosters.length > 0 && (
-        <section className="py-16 lg:py-20 bg-bg-base">
+        <section className="py-16 lg:py-20">
           <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -333,7 +333,7 @@ export function HomePage() {
       )}
 
       {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
-      <section className={`py-16 lg:py-20 overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-surface' : 'bg-bg-base'}`}>
+      <section className={`py-16 lg:py-20 overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-surface/35 backdrop-blur-sm' : ''}`}>
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -349,7 +349,7 @@ export function HomePage() {
       </section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
-      <section className={`py-16 lg:py-20 relative overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-base' : 'bg-bg-surface'}`}>
+      <section className={`py-16 lg:py-20 relative overflow-hidden ${featuredBoosters.length > 0 ? '' : 'bg-bg-surface/35 backdrop-blur-sm'}`}>
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
         <HexGridBackground />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">

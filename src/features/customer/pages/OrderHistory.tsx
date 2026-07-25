@@ -48,7 +48,7 @@ export function OrderHistoryPage() {
             className="input-base pl-9"
           />
         </div>
-        <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1">
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1">
           {STATUS_FILTERS.map(({ label, value }) => (
             <button
               key={value}

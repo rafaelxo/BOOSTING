@@ -99,7 +99,7 @@ export function PublicLayout() {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="lg:hidden border-t border-bg-elevated bg-bg-surface px-5 py-5 space-y-1 animate-slide-down">
+          <div className="lg:hidden border-t border-bg-elevated bg-bg-surface/90 backdrop-blur-xl px-5 py-5 space-y-1 animate-slide-down">
             <button
               onClick={handleServicesClick}
               className="w-full text-left block px-3 py-2.5 rounded-xl text-sm text-ink-secondary hover:text-ink hover:bg-bg-elevated"
@@ -134,7 +134,7 @@ export function PublicLayout() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-bg-elevated bg-bg-surface">
+      <footer className="border-t border-bg-elevated bg-bg-surface/80 backdrop-blur-md">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-14">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             <div className="col-span-2 md:col-span-2">

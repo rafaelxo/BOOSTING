@@ -171,7 +171,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
-      <aside className="fixed right-0 top-0 h-full w-80 bg-bg-surface border-l border-bg-elevated z-50 flex flex-col shadow-2xl">
+      <aside className="fixed right-0 top-0 h-full w-80 bg-bg-surface/90 backdrop-blur-xl border-l border-bg-elevated z-50 flex flex-col shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-bg-elevated shrink-0">
           <h2 className="text-sm font-bold text-ink">Minha Conta</h2>

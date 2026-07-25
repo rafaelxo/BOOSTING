@@ -25,8 +25,8 @@ function ApprovedBoosterPanel() {
   ]
 
   return (
-    <div className="min-h-screen flex bg-bg-base">
-      <aside className="hidden md:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface shrink-0">
+    <div className="min-h-screen flex">
+      <aside className="hidden md:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
         <div className="h-[68px] flex items-center px-6 border-b border-bg-elevated gap-3 shrink-0">
           <Link to="/" className="flex items-center gap-2.5 flex-1 min-w-0">
             <LogoMark className="h-8 w-8 shrink-0" />
@@ -60,7 +60,7 @@ function ApprovedBoosterPanel() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
+        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
           <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Peak</span></div>
           <div className="hidden md:block" />
           <UserAccountBadge />
@@ -72,7 +72,7 @@ function ApprovedBoosterPanel() {
           </div>
         </main>
 
-        <nav className="md:hidden border-t border-bg-elevated bg-bg-surface flex shrink-0" aria-label="Navegação do booster">
+        <nav className="md:hidden border-t border-bg-elevated bg-bg-surface/90 backdrop-blur-xl flex shrink-0" aria-label="Navegação do booster">
           {navItems.map(({ href, icon: Icon, label }) => {
             const active = pathname === href || (href !== '/booster' && pathname.startsWith(href))
             return (
@@ -108,8 +108,8 @@ export function BoosterLayout() {
 
   // Common app shell (header only for restricted states)
   const shell = (content: React.ReactNode) => (
-    <div className="min-h-screen flex flex-col bg-bg-base">
-      <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface shrink-0">
+    <div className="min-h-screen flex flex-col">
+      <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
         <Link to="/" className="flex items-center gap-2.5">
           <LogoMark className="h-8 w-8 shrink-0" />
           <span className="font-bold text-ink">Elo<span className="text-brand">Peak</span></span>

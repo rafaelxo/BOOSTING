@@ -28,7 +28,7 @@ function SlotIndicator({ slots }: { slots: SlotInfo }) {
   const color = remaining === 0 ? 'text-danger' : remaining === 1 ? 'text-warning' : 'text-success'
 
   return (
-    <div className="flex items-center gap-3 bg-bg-surface border border-bg-elevated rounded-xl px-4 py-2.5">
+    <div className="flex items-center gap-3 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl px-4 py-2.5">
       {is_top3 && (
         <span className="text-[10px] font-bold bg-warning/10 text-warning border border-warning/20 rounded-lg px-2 py-0.5 uppercase tracking-wide">
           TOP 3
@@ -175,7 +175,7 @@ export function AvailableJobsPage() {
 
       {/* Filters */}
       <div className="flex gap-3">
-        <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1">
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1">
           {QUEUE_OPTIONS.map(({ label, value }) => (
             <button
               key={value}

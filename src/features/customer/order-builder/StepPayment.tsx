@@ -495,7 +495,7 @@ export function StepPayment() {
         </div>
 
         {/* Status indicator */}
-        <div className="flex items-center gap-2 text-xs text-ink-secondary bg-bg-surface border border-bg-elevated rounded-xl px-4 py-3">
+        <div className="flex items-center gap-2 text-xs text-ink-secondary bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl px-4 py-3">
           <div className="h-2 w-2 rounded-full bg-brand animate-pulse" />
           Aguardando confirmação do pagamento…
         </div>

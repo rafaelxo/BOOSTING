@@ -41,7 +41,7 @@ export function AdminOrdersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
           <input className="input-base pl-9" placeholder={t('admin.orders.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1 bg-bg-surface border border-bg-elevated rounded-xl p-1">
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1">
           {STATUS_OPTS.map(({ label, value }) => (
             <button
               key={value}

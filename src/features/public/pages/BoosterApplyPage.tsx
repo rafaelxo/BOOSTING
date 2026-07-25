@@ -57,7 +57,7 @@ export function BoosterApplyPage() {
   // funciona como rota de recuperação.
   if (isAlreadyBooster && state !== 'no_application') {
     return (
-      <div className="min-h-screen bg-bg-base px-4 py-10 flex flex-col">
+      <div className="min-h-screen px-4 py-10 flex flex-col">
         <div className="mx-auto w-full max-w-lg space-y-8">{header}</div>
         <div className="flex-1 flex items-center justify-center">
           {state === 'loading' && <PageLoader />}
@@ -70,7 +70,7 @@ export function BoosterApplyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-base px-4 py-10">
+    <div className="min-h-screen px-4 py-10">
       <div className="mx-auto w-full max-w-lg space-y-8">
         {header}
 
