@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { getBoostFlow, isMasterPlusCurrentTier, type BoostFlow, type BoostMode as BoostFlowMode } from '@/lib/boostDomain'
-import type { GameSlug, ServiceType, QueueType, BoostMode, Rank } from '@/types'
+import type { GameSlug, ServiceType, QueueType, BoostMode, Rank, ClashTier, ClashDay } from '@/types'
 
 export type OrderBuilderStep = 'service' | 'configure' | 'extras' | 'review' | 'payment'
 
@@ -27,6 +27,11 @@ interface OrderBuilderState {
   // chega ordenado por sort_order). Ver shared/boostDomain.ts::sortAddonsBySortOrder.
   selectedExtraIds: Set<string>
   winPackage: number | null   // 1, 3 or 5 extra wins; null = none
+
+  // Clash: tier fixo (Iron–Diamond/Master+ agrupados em 4 faixas) e dia
+  // agendado — nenhum dos dois existe pra outro serviceType.
+  clashTier: ClashTier | null
+  clashDay: ClashDay | null
 
   // Pedido direto: booster escolhido no perfil público (via ?booster= na URL
   // de entrada). Só exibição/roteamento — a validação real acontece no
@@ -128,6 +133,8 @@ interface OrderBuilderState {
   setNotes: (notes: string) => void
   toggleExtra: (extraId: string) => void
   setWinPackage: (wins: number | null) => void
+  setClashTier: (tier: ClashTier | null) => void
+  setClashDay: (day: ClashDay | null) => void
   setPreferredBooster: (id: string, name: string) => void
   setRiotId: (riotId: string) => void
   setRiotAutoFilled: (v: boolean) => void
@@ -176,6 +183,8 @@ const initialState = {
   md5MatchesRemainingCeiling: null as number | null,
   selectedExtraIds: new Set<string>(),
   winPackage: null,
+  clashTier: null as ClashTier | null,
+  clashDay: null as ClashDay | null,
   preferredBoosterId: null,
   preferredBoosterName: null,
   riotId: '',
@@ -263,6 +272,13 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
     winsPurchased: serviceType === 'win_boost' || serviceType === 'md5' ? 5 : null,
     md5MatchesRemaining: serviceType === 'md5' ? null : null,
     md5MatchesRemainingCeiling: serviceType === 'md5' ? null : null,
+    // Trocar de serviço nunca deve deixar dados de rank/tier de outra
+    // modalidade vazarem pro intent -- Clash não usa rank, e nenhum outro
+    // fluxo usa clashTier/clashDay.
+    currentRank: null,
+    targetRank: null,
+    clashTier: null,
+    clashDay: null,
   }),
 
   setCurrentRank: (currentRank) => set((state) => {
@@ -360,6 +376,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
     }),
 
   setWinPackage: (winPackage) => set({ winPackage }),
+  setClashTier: (clashTier) => set({ clashTier }),
+  setClashDay: (clashDay) => set({ clashDay }),
   setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
   // Editar o Riot ID invalida a verificação (form volta a travar) — mas NÃO
   // limpa o rank já preenchido a cada tecla; a limpeza completa acontece no
