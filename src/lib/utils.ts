@@ -188,6 +188,7 @@ const SERVICE_LABEL_MAP: Record<string, string> = {
   placement_matches: 'MD5 Completo (legado)',
   coaching:          'Coaching',
   md5:               'Vitórias / MD5',
+  clash:             'Clash',
 }
 
 export function getServiceLabel(serviceId: string | null | undefined): string {
@@ -206,6 +207,7 @@ export function getOrderModeType(order: Pick<Order, 'service_type' | 'boost_mode
   if (order.service_type === 'md5') return 'MD5'
   if (order.service_type === 'coaching') return 'Coaching'
   if (order.service_type === 'placement_matches') return 'MD5 Completo'
+  if (order.service_type === 'clash') return order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'
   return getServiceLabel(order.service_type)
 }
 
@@ -218,7 +220,8 @@ export function orderRequiresAccountAccess(order: Order): boolean {
   return (
     (order.service_type === "elo_boost" && (order.boost_mode ?? "solo") === "solo") ||
     order.service_type === "win_boost" ||
-    order.service_type === "md5"
+    order.service_type === "md5" ||
+    (order.service_type === "clash" && (order.boost_mode ?? "solo") === "solo")
   );
 }
 
