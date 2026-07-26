@@ -3,10 +3,12 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
+import { useClashAddons, EMPTY_CLASH_ADDONS } from '@/hooks/useClashAddons'
 import { CheckCircle2, Zap, Tv, Crosshair, User, Trophy, Shield, Lightbulb, Mic } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
+import { getClashFlow } from '@/lib/clashDomain'
 import type { ServiceExtra } from '@/types'
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -32,9 +34,11 @@ export function StepExtras() {
   } = useOrderBuilderStore()
   const currency = useCurrency()
 
-  const flow = serviceType === 'elo_boost' && currentRank
+  const isClash = serviceType === 'clash'
+
+  const flow = !isClash && serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
-    : serviceType === 'win_boost' || serviceType === 'md5'
+    : !isClash && (serviceType === 'win_boost' || serviceType === 'md5')
       ? 'solo_standard'
       : null
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -55,8 +59,10 @@ export function StepExtras() {
   // a query já vem filtrada por `flow`, nunca é a lista inteira escondida
   // por tipo de modalidade. A ordem vem de `sort_order` (Acesso Prioritário
   // sempre por último — ver a seed em supabase/migrations).
-  const { data, isLoading } = useBoostAddons(flow)
-  const extras = data ?? EMPTY_ADDONS
+  const { data: boostData, isLoading: boostLoading } = useBoostAddons(flow)
+  const { data: clashData, isLoading: clashLoading } = useClashAddons(isClash ? getClashFlow(boostMode) : null)
+  const extras = isClash ? (clashData ?? EMPTY_CLASH_ADDONS) : (boostData ?? EMPTY_ADDONS)
+  const isLoading = isClash ? clashLoading : boostLoading
 
   useEffect(() => {
     const selected = extras.filter(e => selectedExtraIds.has(e.id))
@@ -95,7 +101,7 @@ export function StepExtras() {
       </p>
 
       <div className="space-y-6">
-        {!['elo_boost', 'win_boost', 'md5'].includes(serviceType ?? '') ? null : !currentRank ? (
+        {!['elo_boost', 'win_boost', 'md5', 'clash'].includes(serviceType ?? '') ? null : (!isClash && !currentRank) ? (
           <p className="text-sm text-ink-muted text-center py-8">
             Selecione o rank atual na etapa anterior para ver os extras disponíveis.
           </p>
