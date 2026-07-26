@@ -17,6 +17,7 @@ import { formatDateTime, timeAgo, getServiceLabel, PAYMENT_STATUS_LABEL, formatR
 import { useCurrency } from '@/hooks/useCurrency'
 import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder, useSyncOrderMatches } from '@/api/orders'
 import { useOrderSupportEscalation, useAdminResolveOrderSupport } from '@/api/admin'
+import { useAdminDuoAccounts } from '@/api/duoAccounts'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import type { OrderStatus } from '@/types'
 
@@ -111,18 +112,8 @@ export function AdminOrderDetailPage() {
     enabled: !!order,
   })
 
-  const { data: reservedDuoAccount } = useQuery({
-    queryKey: ['admin', 'order-duo-account', order?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('duo_accounts')
-        .select('id, label, riot_id')
-        .eq('reserved_order_id', order!.id)
-        .maybeSingle()
-      return data
-    },
-    enabled: !!order && order.boost_mode === 'duo',
-  })
+  const { data: allDuoAccounts } = useAdminDuoAccounts()
+  const reservedDuoAccount = allDuoAccounts?.find((a) => a.reserved_order_id === order?.id)
 
   const updateStatus = useAdminOverrideOrderStatus(id ?? '')
   const dropOrder = useAdminDropOrder(id ?? '')
