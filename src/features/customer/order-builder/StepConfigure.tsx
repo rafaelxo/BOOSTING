@@ -11,6 +11,7 @@ import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Check, Search, Info, Lock } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
+import { ClashConfigPicker } from './ClashConfigPicker'
 
 // Mesmo formato aceito pelo backend (riot-account-rank bodySchema): 1-16 chars
 // antes do #, 2-5 alfanuméricos depois. Validar no cliente evita um 400
@@ -348,6 +349,12 @@ export function StepConfigure() {
       // chamado lá, não recalculado aqui) — mas o modificador de PDL de uma
       // configuração elo_boost anterior na mesma sessão não pode vazar para
       // o resumo de um pedido de coaching.
+      setPdlModifierPct(null)
+    } else if (serviceType === 'clash') {
+      // Preço/estimativa vêm de ClashConfigPicker (que já chama
+      // setBasePrice/setEstimatedHours diretamente) — só garante que o
+      // modificador de PDL de uma configuração elo_boost anterior não vaza
+      // pro resumo de um pedido de Clash.
       setPdlModifierPct(null)
     }
   }, [
@@ -728,6 +735,10 @@ export function StepConfigure() {
         {/* Coaching — escolhe um pacote real de um booster; preço vem do
             pacote, nunca é combinado depois. */}
         {serviceType === 'coaching' && <CoachPackagePicker />}
+
+        {/* Clash — modalidade, tier fixo e dia; preço vem da tabela fixa
+            (mode × tier), setado dentro do próprio picker. */}
+        {serviceType === 'clash' && <ClashConfigPicker />}
       </div>
     </div>
   )
