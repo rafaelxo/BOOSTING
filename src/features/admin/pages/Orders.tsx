@@ -4,13 +4,22 @@ import { Search } from 'lucide-react'
 import { OrderStatusBadge, Skeleton, EmptyState, ErrorAlert, Button } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { timeAgo, getServiceLabel } from '@/lib/utils'
-import type { OrderStatus } from '@/types'
+import type { OrderStatus, ServiceType } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useAdminOrders } from '@/api/orders'
 
+const SERVICE_TYPE_OPTS: { label: string; value: ServiceType | 'all' }[] = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Elo Boost', value: 'elo_boost' },
+  { label: 'Vitórias / MD5', value: 'win_boost' },
+  { label: 'Coaching', value: 'coaching' },
+  { label: 'Clash', value: 'clash' },
+]
+
 export function AdminOrdersPage() {
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
+  const [serviceType, setServiceType] = useState<ServiceType | 'all'>('all')
   const [search, setSearch] = useState('')
   const { t } = useTranslation()
   const currency = useCurrency()
@@ -23,7 +32,7 @@ export function AdminOrdersPage() {
     { label: t('admin.orders.filters.completed'), value: 'completed' },
   ]
 
-  const { data: orders, isLoading, isError, refetch } = useAdminOrders(status)
+  const { data: orders, isLoading, isError, refetch } = useAdminOrders(status, serviceType)
 
   const filtered = orders?.filter((o) =>
     !search || o.id.toLowerCase().includes(search.toLowerCase())
@@ -41,12 +50,23 @@ export function AdminOrdersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
           <input className="input-base pl-9" placeholder={t('admin.orders.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1">
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 overflow-x-auto">
           {STATUS_OPTS.map(({ label, value }) => (
             <button
               key={value}
               onClick={() => setStatus(value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${status === value ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 ${status === value ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 overflow-x-auto">
+          {SERVICE_TYPE_OPTS.map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => setServiceType(value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 ${serviceType === value ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}
             >
               {label}
             </button>

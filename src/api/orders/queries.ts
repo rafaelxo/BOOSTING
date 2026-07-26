@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { normalizeApiError } from '@/api/core/errors'
-import type { OrderStatus } from '@/types'
+import type { OrderStatus, ServiceType } from '@/types'
 import type {
   BoosterOrdersPage, BoosterOrdersTab, CustomerOrderState, Order, OrderCoachingTopic, OrderDropRequest, OrderMatch,
   OrderRankVerification, OrderStatusHistory, SlotInfo,
@@ -67,9 +67,10 @@ export async function listBoosterOrdersPage(params: {
   return { orders, nextOffset: orders.length === pageSize ? offset + 1 : undefined }
 }
 
-export async function listAdminOrders(status?: OrderStatus | 'all', limit = 100): Promise<Order[]> {
+export async function listAdminOrders(status?: OrderStatus | 'all', serviceType?: ServiceType | 'all', limit = 100): Promise<Order[]> {
   let query = supabase.from('orders').select(ORDER_SAFE_COLUMNS).order('created_at', { ascending: false }).limit(limit)
   if (status && status !== 'all') query = query.eq('status', status)
+  if (serviceType && serviceType !== 'all') query = query.eq('service_type', serviceType)
   const { data, error } = await query
   if (error) throw normalizeApiError(error, 'Não foi possível carregar os pedidos.')
   return (data ?? []) as unknown as Order[]

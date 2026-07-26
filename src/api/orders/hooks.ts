@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import { useRealtimeInvalidate } from '@/api/core/realtime'
-import type { OrderStatus } from '@/types'
+import type { OrderStatus, ServiceType } from '@/types'
 import {
   getBoosterOrder, getBoosterSlotInfo, getCustomerOrderState, getOrder, getPendingDropRequest,
   listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderCoachingTopics,
@@ -103,17 +103,17 @@ export function useBoosterOrdersInfinite(boosterId: string | undefined, tab: Boo
   })
 }
 
-export function useAdminOrders(status?: OrderStatus | 'all') {
+export function useAdminOrders(status?: OrderStatus | 'all', serviceType?: ServiceType | 'all') {
   const query = useQuery({
-    queryKey: queryKeys.orders.adminList({ status }),
-    queryFn: () => listAdminOrders(status),
+    queryKey: queryKeys.orders.adminList({ status, serviceType }),
+    queryFn: () => listAdminOrders(status, serviceType),
     refetchInterval: 30_000,
   })
   useRealtimeInvalidate({
     channel: 'admin-orders',
     table: 'order_status_events',
     event: 'INSERT',
-    queryKeys: [queryKeys.orders.adminList({ status })],
+    queryKeys: [queryKeys.orders.adminList({ status, serviceType })],
   })
   return query
 }
