@@ -62,5 +62,12 @@ docs/
 .agents/
 graphify-out/
 
-.vercel
-.env*
+# Keys and certs — never commit
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa*
+id_ed25519*
+*.mobileprovision

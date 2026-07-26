@@ -5,7 +5,7 @@ import type { OrderStatus } from '@/types'
 import {
   getBoosterOrder, getBoosterSlotInfo, getCustomerOrderState, getOrder, getPendingDropRequest,
   listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderMatches,
-  listOrderPayments, listOrderStatusHistory,
+  listOrderStatusHistory,
 } from './queries'
 import {
   acceptBoostOrder, adminDropOrder, adminOverrideOrderStatus, cancelPendingOrder, confirmOrderCompletion,
@@ -140,14 +140,6 @@ export function usePendingDropRequest(orderId: string | undefined) {
     queryFn: () => getPendingDropRequest(orderId!),
     enabled: !!orderId,
     refetchInterval: 30_000,
-  })
-}
-
-export function useOrderPayments(orderId: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.orders.detail(orderId ?? '').concat(['payments']),
-    queryFn: () => listOrderPayments(orderId!),
-    enabled: !!orderId,
   })
 }
 

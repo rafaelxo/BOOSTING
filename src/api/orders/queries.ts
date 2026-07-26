@@ -4,7 +4,7 @@ import { normalizeApiError } from '@/api/core/errors'
 import type { OrderStatus } from '@/types'
 import type {
   BoosterOrdersPage, BoosterOrdersTab, CustomerOrderState, Order, OrderDropRequest, OrderMatch,
-  OrderRankVerification, OrderStatusHistory, Payment, SlotInfo,
+  OrderRankVerification, OrderStatusHistory, SlotInfo,
 } from './types'
 import { BOOSTER_ORDER_TAB_STATUSES } from './types'
 
@@ -115,16 +115,6 @@ export async function listOrderRankVerifications(orderId: string, limit = 10): P
     .limit(limit)
   if (error) throw normalizeApiError(error)
   return (data ?? []) as unknown as OrderRankVerification[]
-}
-
-export async function listOrderPayments(orderId: string): Promise<Payment[]> {
-  const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('order_id', orderId)
-    .order('created_at', { ascending: false })
-  if (error) throw normalizeApiError(error)
-  return (data ?? []) as unknown as Payment[]
 }
 
 export async function getCustomerOrderState(orderId?: string): Promise<CustomerOrderState> {
