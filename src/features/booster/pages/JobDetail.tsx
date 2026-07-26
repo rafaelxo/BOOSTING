@@ -16,6 +16,7 @@ import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
+import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import {
   useBoosterOrder, usePendingDropRequest, useUpdateOrderStatus, useSyncOrderMatches, useVerifyOrderRank,
   useRevealOrderCredentials, useRequestOrderDrop, useOrderStatusHistory,
@@ -296,6 +297,24 @@ export function JobDetailPage() {
                 {coachPackage.tempo && (
                   <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
                 )}
+              </div>
+            )}
+
+            {order.service_type === 'clash' && order.clash_tier && (
+              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+                <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+                <p className="text-sm text-ink-secondary leading-relaxed">
+                  {order.boost_mode === 'duo'
+                    ? 'Cliente joga junto com você — monte o restante do time dentro do jogo.'
+                    : 'Você entra na conta do cliente e monta o time dentro do jogo.'}
+                </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                  <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+                  {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+                </div>
+                <p className="text-xs font-semibold text-brand pt-1">
+                  A montagem do time é sua responsabilidade — organize dentro do League of Legends.
+                </p>
               </div>
             )}
 
