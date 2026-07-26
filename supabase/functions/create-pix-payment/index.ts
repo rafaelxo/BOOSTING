@@ -138,6 +138,8 @@ serve(async (req) => {
           server: normalized.server,
           current_rank: normalized.currentRank as never,
           target_rank: normalized.targetRank as never,
+          clash_tier: normalized.clashTier,
+          clash_day: normalized.clashDay,
           wins_purchased: normalized.winsPurchased,
           sessions_purchased: normalized.sessionsPurchased,
           extras: extrasJson as never,
