@@ -1162,12 +1162,14 @@ export type Database = {
           chat_locked: boolean
           chat_locked_at: string | null
           chat_locked_by: string | null
+          clash_day: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier: Database["public"]["Enums"]["clash_tier"] | null
           completed_at: string | null
           created_at: string
           credential_expires_at: string | null
           credentials_set: boolean
           current_pdl: number | null
-          current_rank: Json
+          current_rank: Json | null
           customer_id: string
           customer_notes: string | null
           discord_voice_channel_id: string | null
@@ -1214,12 +1216,14 @@ export type Database = {
           chat_locked?: boolean
           chat_locked_at?: string | null
           chat_locked_by?: string | null
+          clash_day?: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           completed_at?: string | null
           created_at?: string
           credential_expires_at?: string | null
           credentials_set?: boolean
           current_pdl?: number | null
-          current_rank: Json
+          current_rank?: Json | null
           customer_id: string
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
@@ -1266,12 +1270,14 @@ export type Database = {
           chat_locked?: boolean
           chat_locked_at?: string | null
           chat_locked_by?: string | null
+          clash_day?: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           completed_at?: string | null
           created_at?: string
           credential_expires_at?: string | null
           credentials_set?: boolean
           current_pdl?: number | null
-          current_rank?: Json
+          current_rank?: Json | null
           customer_id?: string
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
@@ -2285,6 +2291,8 @@ export type Database = {
         | "approved"
         | "suspended"
         | "rejected"
+      clash_day: "saturday" | "sunday"
+      clash_tier: "tier_4" | "tier_3" | "tier_2" | "tier_1"
       ledger_entry_type:
         | "commission_credit"
         | "commission_adjustment"
@@ -2330,6 +2338,7 @@ export type Database = {
         | "coaching"
         | "placement_matches"
         | "md5"
+        | "clash"
       user_role: "customer" | "booster" | "admin"
     }
     CompositeTypes: {
@@ -2918,6 +2927,8 @@ export const Constants = {
         "suspended",
         "rejected",
       ],
+      clash_day: ["saturday", "sunday"],
+      clash_tier: ["tier_4", "tier_3", "tier_2", "tier_1"],
       ledger_entry_type: [
         "commission_credit",
         "commission_adjustment",
@@ -2967,6 +2978,7 @@ export const Constants = {
         "coaching",
         "placement_matches",
         "md5",
+        "clash",
       ],
       user_role: ["customer", "booster", "admin"],
     },
