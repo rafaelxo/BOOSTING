@@ -1,5 +1,5 @@
 import { z } from 'https://esm.sh/zod@3.23.8'
-import { computeOrderPrice, rankStep, type MasterPlusCutoffs, type OrderPriceInput, type RankValue, type ServiceType } from '../../../shared/pricing.ts'
+import { computeOrderPrice, rankStep, type MasterPlusCutoffs, type OrderPriceInput, type RankValue, type ServiceType, type ClashTier, type ClashDay } from '../../../shared/pricing.ts'
 import {
   type BoostFlow,
   isAddonCodeValidForFlow,
@@ -9,6 +9,7 @@ import {
   getPdlBracket,
   NO_DIVISION_TIERS,
 } from '../../../shared/boostDomain.ts'
+import { getClashFlow, isClashAddonCodeValidForFlow, type ClashFlow } from '../../../shared/clashDomain.ts'
 import { errorResponse, jsonResponse } from './responses.ts'
 import type { supabaseAdmin } from './supabaseAdmin.ts'
 import {
@@ -82,7 +83,7 @@ const genericRankSchema = z.object({
 // Parse leve, só para decidir qual schema estrito aplicar em seguida. Não é
 // usado para nada além de roteamento.
 const routingSchema = z.object({
-  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching', 'md5']),
+  service_type: z.enum(['elo_boost', 'win_boost', 'placement_matches', 'coaching', 'md5', 'clash']),
   current_rank: genericRankSchema.nullable().optional(),
   boost_mode: z.enum(['solo', 'duo']).optional(),
 }).passthrough()
@@ -190,6 +191,22 @@ const md5IntentSchema = z.object({
   coupon_code: couponCodeSchema,
 }).strict()
 
+// Solo Clash / Duo Clash — sem rank+divisão específico (só o tier), sem
+// LP/PDL, sem vitórias, sem Riot ID. Dia é obrigatório e restrito a sábado
+// ou domingo -- qualquer outro valor é rejeitado pelo próprio z.enum.
+const clashIntentSchema = z.object({
+  service_type: z.literal('clash'),
+  service_id: z.string().uuid(),
+  game_id: z.string().uuid(),
+  boost_mode: z.enum(['solo', 'duo']),
+  server: z.string().trim().min(2).max(16),
+  clash_tier: z.enum(['tier_4', 'tier_3', 'tier_2', 'tier_1']),
+  clash_day: z.enum(['saturday', 'sunday']),
+  addon_codes: z.array(z.string().min(1)).max(10).default([]),
+  customer_notes: z.string().max(500).nullable().default(null),
+  coupon_code: couponCodeSchema,
+}).strict()
+
 // Forma normalizada usada pelo resto do handler, independente de qual dos 3
 // schemas estritos validou o intent — evita espalhar `'campo' in intent`
 // pelo código abaixo.
@@ -200,7 +217,7 @@ export interface NormalizedIntent {
   queueType: 'solo_duo' | 'flex'
   boostMode: 'solo' | 'duo'
   server: string
-  currentRank: RankValue
+  currentRank: RankValue | null
   targetRank: RankValue | null
   currentLp: number
   avgLpGain: number
@@ -216,6 +233,9 @@ export interface NormalizedIntent {
   riotId: string | null
   boosterServiceId: string | null
   couponCode: string | null
+  // Clash — null para qualquer outro serviceType.
+  clashTier: ClashTier | null
+  clashDay: ClashDay | null
 }
 
 export interface QuoteResult {
@@ -328,7 +348,9 @@ export async function validateAndPriceIntent(
       ? standardEloIntentSchema
       : routed.data.service_type === 'md5'
         ? md5IntentSchema
-        : otherServiceIntentSchema
+        : routed.data.service_type === 'clash'
+          ? clashIntentSchema
+          : otherServiceIntentSchema
 
   const parsedIntent = schema.safeParse(intent)
   if (!parsedIntent.success) {
@@ -410,6 +432,8 @@ export async function validateAndPriceIntent(
       riotId: mp.riot_id,
       boosterServiceId: null,
       couponCode: mp.coupon_code,
+      clashTier: null,
+      clashDay: null,
     }
   } else if (flow) {
     const std = parsedIntent.data as z.infer<typeof standardEloIntentSchema>
@@ -439,6 +463,8 @@ export async function validateAndPriceIntent(
       riotId: std.riot_id,
       boosterServiceId: null,
       couponCode: std.coupon_code,
+      clashTier: null,
+      clashDay: null,
     }
 
     // Diamond- mirando Grão-Mestre/Challenger direto: o trecho Mestre->alvo
@@ -483,6 +509,39 @@ export async function validateAndPriceIntent(
       riotId: md5.riot_id,
       boosterServiceId: null,
       couponCode: md5.coupon_code,
+      clashTier: null,
+      clashDay: null,
+    }
+  } else if (routed.data.service_type === 'clash') {
+    const clash = parsedIntent.data as z.infer<typeof clashIntentSchema>
+    normalized = {
+      serviceType: 'clash',
+      serviceId: clash.service_id,
+      gameId: clash.game_id,
+      // Clash não usa fila ranqueada -- 'solo_duo' é só o valor default de
+      // orders.queue_type (coluna NOT NULL com default), nunca lido de
+      // volta pra nada específico de Clash.
+      queueType: 'solo_duo',
+      boostMode: clash.boost_mode,
+      server: clash.server,
+      currentRank: null,
+      targetRank: null,
+      currentLp: 0,
+      avgLpGain: 20,
+      avgLpLoss: 15,
+      winsPurchased: null,
+      sessionsPurchased: null,
+      addonCodes: clash.addon_codes,
+      winPackage: null,
+      customerNotes: clash.customer_notes,
+      currentPdl: null,
+      avgPdlGain: null,
+      avgPdlLoss: null,
+      riotId: null,
+      boosterServiceId: null,
+      couponCode: clash.coupon_code,
+      clashTier: clash.clash_tier,
+      clashDay: clash.clash_day,
     }
   } else {
     const other = parsedIntent.data as z.infer<typeof otherServiceIntentSchema>
@@ -529,6 +588,8 @@ export async function validateAndPriceIntent(
       riotId: other.riot_id,
       boosterServiceId: other.booster_service_id,
       couponCode: other.coupon_code,
+      clashTier: null,
+      clashDay: null,
     }
   }
 
@@ -711,27 +772,45 @@ export async function validateAndPriceIntent(
 
   if (hasDuplicateAddonCodes(normalized.addonCodes)) return { ok: false, response: badRequest(req, 'Addon duplicado') }
 
-  const addonFlow: BoostFlow | null = flow ?? (
-    normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard' : null
-  )
-
-  if (addonFlow) {
+  if (normalized.serviceType === 'clash') {
+    const clashFlow: ClashFlow = getClashFlow(normalized.boostMode)
     for (const code of addonCodes) {
-      if (!isAddonCodeValidForFlow(addonFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
+      if (!isClashAddonCodeValidForFlow(clashFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
     }
     if (addonCodes.length > 0) {
       const { data: rows, error: extraErr } = await serviceClient
         .from('service_extras')
         .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
-        .eq('flow', addonFlow)
+        .eq('flow', clashFlow)
         .eq('is_active', true)
         .in('code', addonCodes)
       if (extraErr) return { ok: false, response: errorResponse(req, 'Failed to load extras', 500) }
       if (!rows || rows.length !== addonCodes.length) return { ok: false, response: badRequest(req, 'Addon inexistente ou inativo') }
       extras = rows
     }
-  } else if (addonCodes.length > 0) {
-    return { ok: false, response: badRequest(req, 'Addons não são aceitos para este tipo de serviço') }
+  } else {
+    const addonFlow: BoostFlow | null = flow ?? (
+      normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard' : null
+    )
+
+    if (addonFlow) {
+      for (const code of addonCodes) {
+        if (!isAddonCodeValidForFlow(addonFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
+      }
+      if (addonCodes.length > 0) {
+        const { data: rows, error: extraErr } = await serviceClient
+          .from('service_extras')
+          .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
+          .eq('flow', addonFlow)
+          .eq('is_active', true)
+          .in('code', addonCodes)
+        if (extraErr) return { ok: false, response: errorResponse(req, 'Failed to load extras', 500) }
+        if (!rows || rows.length !== addonCodes.length) return { ok: false, response: badRequest(req, 'Addon inexistente ou inativo') }
+        extras = rows
+      }
+    } else if (addonCodes.length > 0) {
+      return { ok: false, response: badRequest(req, 'Addons não são aceitos para este tipo de serviço') }
+    }
   }
 
   const priceInput: OrderPriceInput = {
@@ -750,6 +829,7 @@ export async function validateAndPriceIntent(
     sessionsPurchased: normalized.sessionsPurchased,
     extras: extras.map((e) => ({ id: e.id, priceModifier: Number(e.price_modifier), priceModifierPct: Number(e.price_modifier_pct) })),
     winPackage: normalized.winPackage,
+    clashTier: normalized.clashTier,
     coachPackagePrice,
     couponCode: normalized.couponCode,
   }
