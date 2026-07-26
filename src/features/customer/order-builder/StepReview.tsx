@@ -1,6 +1,7 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { formatEstimatedDelivery, formatRank } from '@/lib/utils'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
+import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { RankBadge } from '@/components/ui'
 import { Shuffle, Users, Hash, Clock, ChevronRight } from 'lucide-react'
 import { GuaranteeNotice } from './GuaranteeNotice'
@@ -12,6 +13,7 @@ export function StepReview() {
     currentLp, currentPdl,
     estimatedHours, customerNotes,
     setNotes, selectedCoachPackage, sessionsPurchased,
+    clashTier, clashDay,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -57,6 +59,21 @@ export function StepReview() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
                   {selectedCoachPackage.tempo && <span>Duração: <span className="font-semibold text-ink">{selectedCoachPackage.tempo}</span></span>}
                   {sessionsPurchased && <span>Sessões: <span className="font-semibold text-ink">{sessionsPurchased}</span></span>}
+                </div>
+              </div>
+            )}
+
+            {serviceType === 'clash' && clashTier && (
+              <div className="space-y-2 pb-4 mb-4 border-b border-border-subtle">
+                <p className="text-base font-bold text-ink">{boostMode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+                <p className="text-sm text-ink-secondary leading-relaxed">
+                  {boostMode === 'duo'
+                    ? 'Você joga junto com o booster — ele monta o restante do time.'
+                    : 'O booster entra na sua conta e monta o time dentro do jogo.'}
+                </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                  <span>{CLASH_TIER_LABEL[clashTier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[clashTier]}</span></span>
+                  {clashDay && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[clashDay]}</span></span>}
                 </div>
               </div>
             )}
