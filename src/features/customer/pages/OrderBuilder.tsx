@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getCustomerOrderState } from '@/api/orders'
 
-const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching']
+const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'clash']
 
 // Step components
 import { StepService } from '../order-builder/StepService'
@@ -62,6 +62,8 @@ function isStepComplete(
     riotVerified: boolean
     riotLookupLoading: boolean
     md5MatchesRemaining: number | null
+    clashTier: string | null
+    clashDay: string | null
   },
 ): boolean {
   if (state.riotLookupLoading) return false
@@ -81,6 +83,7 @@ function isStepComplete(
     }
     if (state.serviceType === 'placement_matches') return !!state.currentRank
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
+    if (state.serviceType === 'clash') return !!state.clashTier && !!state.clashDay
   }
   return true
 }
@@ -94,6 +97,7 @@ export function OrderBuilderPage() {
     setSelectedCoachPackage, setBasePrice, couponCode, setCouponCode,
     winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading, riotVerified,
     selectedCoachPackage, setStepAttempted, winPackage, queueType,
+    clashTier, clashDay,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const [couponInput, setCouponInput] = useState('')
@@ -289,6 +293,7 @@ export function OrderBuilderPage() {
   const stepComplete = isStepComplete(step, {
     serviceType, selectedCoachPackage, currentRank, targetRank,
     winsPurchased, riotId, isMd5, riotVerified, riotLookupLoading, md5MatchesRemaining,
+    clashTier, clashDay,
   })
 
   function handleApplyCoupon() {
