@@ -10,6 +10,9 @@
 
 import type { ClashDay, ClashTier, RankTier } from './pricing.ts'
 import type { BoostMode } from './boostDomain.ts'
+import { sortAddonsBySortOrder } from './boostDomain.ts'
+
+export { sortAddonsBySortOrder }
 
 export const CLASH_TIER_LABEL: Record<ClashTier, string> = {
   tier_4: 'Tier 4',
