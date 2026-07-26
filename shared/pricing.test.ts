@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOrderPrice, calcEloPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
-  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, applyCoupon, type OrderPriceInput, type RankTier,
+  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, applyCoupon, getClashBasePrice, CLASH_ESTIMATED_HOURS,
+  type OrderPriceInput, type RankTier,
 } from './pricing'
 
 function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
@@ -21,6 +22,7 @@ function baseInput(overrides: Partial<OrderPriceInput> = {}): OrderPriceInput {
     extras: [],
     winPackage: null,
     coachPackagePrice: null,
+    clashTier: null,
     couponCode: null,
     ...overrides,
   }
@@ -686,5 +688,42 @@ describe('Cupom de desconto (applyCoupon) — só ELOPEAK30, 30%, nunca em coach
     expect(priced.couponApplied).toBe(false)
     expect(priced.discountPrice).toBe(0)
     expect(priced.totalPrice).toBeCloseTo(priced.basePrice + priced.extrasPrice, 2)
+  })
+})
+
+describe('Clash — preço fixo por modalidade × tier (seção 3 da spec)', () => {
+  it.each([
+    ['solo', 'tier_4', 20.00],
+    ['solo', 'tier_3', 33.90],
+    ['solo', 'tier_2', 39.90],
+    ['solo', 'tier_1', 65.00],
+    ['duo', 'tier_4', 59.90],
+    ['duo', 'tier_3', 66.90],
+    ['duo', 'tier_2', 100.00],
+    ['duo', 'tier_1', 165.90],
+  ] as const)('%s + %s = R$ %d', (mode, tier, expected) => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'clash', boostMode: mode, clashTier: tier }))
+    expect(priced.basePrice).toBeCloseTo(expected, 2)
+    expect(priced.totalPrice).toBeCloseTo(expected, 2)
+  })
+
+  it('getClashBasePrice bate com a tabela de centavos', () => {
+    expect(moneyToCents(getClashBasePrice('solo', 'tier_1'))).toBe(6500)
+    expect(moneyToCents(getClashBasePrice('duo', 'tier_2'))).toBe(10000)
+  })
+
+  it('sem clashTier selecionado, preço fica 0 (pedido não avança)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'clash', clashTier: null }))
+    expect(priced.basePrice).toBe(0)
+  })
+
+  it('estimatedHours é o valor fixo de uma noite de Clash, sem o multiplicador de entrega (mesma exceção do coaching)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'clash', clashTier: 'tier_2' }))
+    expect(priced.estimatedHours).toBe(CLASH_ESTIMATED_HOURS)
+  })
+
+  it('Clash nunca recebe o modificador de PDL (pdlModifierPct fica null)', () => {
+    const priced = computeOrderPrice(baseInput({ serviceType: 'clash', clashTier: 'tier_1' }))
+    expect(priced.pdlModifierPct).toBeNull()
   })
 })

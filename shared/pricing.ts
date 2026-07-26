@@ -20,7 +20,7 @@ export type RankTier =
 
 export type Division = 'I' | 'II' | 'III' | 'IV'
 
-export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5'
+export type ServiceType = 'elo_boost' | 'win_boost' | 'placement_matches' | 'coaching' | 'md5' | 'clash'
 
 export const RANK_TIER_ORDER: RankTier[] = [
   'iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond', 'master', 'grandmaster', 'challenger',
@@ -316,6 +316,28 @@ export function getMd5WinPrice(queue: QueueType, tier: RankTier): number {
   return centsToMoney(Math.round(winPriceCents * (1 - MD5_DISCOUNT_PCT / 100)))
 }
 
+export type ClashTier = 'tier_4' | 'tier_3' | 'tier_2' | 'tier_1'
+export type ClashDay = 'saturday' | 'sunday'
+
+// ── Clash — preço fixo por modalidade × tier, em CENTAVOS ──────────────────
+// Diferente do Elo Boost: não há origem/destino, o cliente só escolhe o
+// tier correspondente ao elo atual da conta (ver shared/clashDomain.ts para
+// o mapeamento tier -> faixa de RankTier).
+export const CLASH_PRICE_CENTS: Record<'solo' | 'duo', Record<ClashTier, number>> = {
+  solo: { tier_4: 2000, tier_3: 3390, tier_2: 3990, tier_1: 6500 },
+  duo: { tier_4: 5990, tier_3: 6690, tier_2: 10000, tier_1: 16590 },
+}
+
+export function getClashBasePrice(mode: 'solo' | 'duo', tier: ClashTier): number {
+  return centsToMoney(CLASH_PRICE_CENTS[mode][tier])
+}
+
+// Duração fixa de uma "noite de Clash" (o pedido já tem um dia agendado —
+// sábado/domingo — não uma progressão medida em partidas), então nunca passa
+// pelo DELIVERY_ESTIMATE_MULTIPLIER abaixo — mesma razão da exceção do
+// coaching (duração real do compromisso, não estimativa de jogo puro).
+export const CLASH_ESTIMATED_HOURS = 4
+
 // ── MD5 Completo (placement_matches) — legado, mantido só para pedidos
 // antigos e cálculo de preço histórico. Não oferecido como serviço novo
 // (StepService.tsx não lista mais este tile) — ver Task 6.
@@ -433,6 +455,9 @@ export interface OrderPriceInput {
   sessionsPurchased: number | null
   extras: OrderExtraInput[]
   winPackage: 1 | 3 | 5 | null
+  // Tier fixo escolhido pelo cliente (Clash) — null pra qualquer outro
+  // serviceType. Ignorado fora do case 'clash' em computeOrderPrice.
+  clashTier: ClashTier | null
   // Preço do pacote de coach escolhido (booster_services.price),
   // já validado server-side contra o booster_service_id do intent — nunca
   // inventado. Ignorado para qualquer serviceType que não seja 'coaching'.
@@ -562,6 +587,12 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       estimatedHours = input.sessionsPurchased ?? 1
       break
     }
+    case 'clash': {
+      if (!input.clashTier) break
+      basePrice = getClashBasePrice(input.boostMode, input.clashTier)
+      estimatedHours = CLASH_ESTIMATED_HOURS
+      break
+    }
   }
 
   const basePriceCents = moneyToCents(basePrice)
@@ -591,7 +622,7 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
   // Prazo real de entrega: dobra a estimativa de horas de jogo puro. Só se
   // aplica a serviços cuja duração é calculada em partidas; coaching continua
   // usando a duração real do pacote/sessões (não é jogo ranqueado).
-  if (estimatedHours != null && input.serviceType !== 'coaching') {
+  if (estimatedHours != null && input.serviceType !== 'coaching' && input.serviceType !== 'clash') {
     estimatedHours *= DELIVERY_ESTIMATE_MULTIPLIER
   }
 
