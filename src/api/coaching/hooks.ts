@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
-import { listAllActiveCoachingPackages, listCoachBoosterInfo, listOwnCoachingPackages, listPublicCoachingPackages } from './queries'
+import {
+  getBoosterServiceById, listAllActiveCoachingPackages, listCoachBoosterInfo, listOwnCoachingPackages,
+  listPublicCoachingPackages,
+} from './queries'
 import { createCoachingPackage, deleteCoachingPackage, toggleCoachingPackageActive, updateCoachingPackage } from './mutations'
 
 export function useOwnCoachingPackages(boosterId: string | undefined) {
@@ -23,6 +26,14 @@ export function useAllCoachingPackages() {
   return useQuery({
     queryKey: queryKeys.coaching.packages(),
     queryFn: () => listAllActiveCoachingPackages(),
+  })
+}
+
+export function useBoosterServiceDetails(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.coaching.boosterService(id ?? ''),
+    queryFn: () => getBoosterServiceById(id!),
+    enabled: !!id,
   })
 }
 

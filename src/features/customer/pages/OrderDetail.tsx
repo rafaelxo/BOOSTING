@@ -10,6 +10,7 @@ import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge 
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
@@ -23,6 +24,7 @@ import {
   useRequestOrderSupport, useSyncOrderMatches, getCustomerOrderState,
 } from '@/api/orders'
 import { useOrderSupportEscalation } from '@/api/admin'
+import { useBoosterServiceDetails } from '@/api/coaching'
 import type { Order, BoosterProfile } from '@/types'
 import type { CustomerOrderState } from '@/api/orders'
 import { useQuery } from '@tanstack/react-query'
@@ -434,6 +436,9 @@ export function OrderDetailPage() {
   // isLoading resolver pra só então montar <OrderChat> -- mesma query key do
   // hook interno dele, então o resultado já vem do cache quando ele monta.
   useOrderChat(id)
+  // Chamado incondicionalmente (regra dos hooks) mesmo antes de `order`
+  // existir -- enabled: !!id internamente cobre o caso undefined.
+  const { data: coachPackage } = useBoosterServiceDetails(order?.booster_service_id ?? undefined)
 
   useEffect(() => {
     if (!order || window.location.hash !== '#credentials' || !customerState?.requires_credentials) return
@@ -527,6 +532,18 @@ export function OrderDetailPage() {
           <Card padding="md">
             <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
 
+            {order.service_type === 'coaching' && coachPackage && (
+              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+                <p className="text-base font-bold text-ink">{coachPackage.title}</p>
+                {coachPackage.description && (
+                  <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
+                )}
+                {coachPackage.tempo && (
+                  <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
+                )}
+              </div>
+            )}
+
             {currentRank && (
               <div className="mb-4">
                 <div className="flex items-center justify-center gap-4">
@@ -600,21 +617,25 @@ export function OrderDetailPage() {
             )}
           </Card>
 
-          {order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderMatchHistory
-              orderId={order.id}
-              sync={order.status === 'in_progress' || order.status === 'paused' ? {
-                onSync: () => syncMatches.mutate(),
-                syncing: syncMatches.isPending,
-                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
-                resultMessage: syncMatches.data
-                  ? (syncMatches.data.synced
-                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
-                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
-                  : null,
-              } : undefined}
-            />
-          )}
+          {order.service_type === 'coaching'
+            ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+              <OrderCoachingTopics orderId={order.id} />
+            )
+            : order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+              <OrderMatchHistory
+                orderId={order.id}
+                sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                  onSync: () => syncMatches.mutate(),
+                  syncing: syncMatches.isPending,
+                  error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                  resultMessage: syncMatches.data
+                    ? (syncMatches.data.synced
+                      ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                      : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                    : null,
+                } : undefined}
+              />
+            )}
         </div>
 
         {/* Sidebar -- ordem padronizada com booster/admin: ações do papel,

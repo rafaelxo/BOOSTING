@@ -9,6 +9,7 @@ import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoade
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
@@ -20,6 +21,7 @@ import {
   useRevealOrderCredentials, useRequestOrderDrop, useOrderStatusHistory,
 } from '@/api/orders'
 import { useOwnBoosterTop3Status } from '@/api/boosters'
+import { useBoosterServiceDetails } from '@/api/coaching'
 import { useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation } from '@/api/duoAccounts'
 import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
 import type { Division, Order, OrderStatus, RankTier } from '@/types'
@@ -202,6 +204,9 @@ export function JobDetailPage() {
   // loadingOrder resolver pra só então montar <OrderChat> -- mesma query key
   // do hook interno dele, então o resultado já vem do cache quando ele monta.
   useOrderChat(id)
+  // Chamado incondicionalmente (regra dos hooks) mesmo antes de `order`
+  // existir -- enabled: !!id internamente cobre o caso undefined.
+  const { data: coachPackage } = useBoosterServiceDetails(order?.booster_service_id ?? undefined)
 
   const updateStatus = useUpdateOrderStatus(id ?? '')
   const syncMatches = useSyncOrderMatches(id ?? '')
@@ -281,6 +286,19 @@ export function JobDetailPage() {
           <Card padding="md">
             <OrderProgress order={order} />
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
+
+            {order.service_type === 'coaching' && coachPackage && (
+              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+                <p className="text-base font-bold text-ink">{coachPackage.title}</p>
+                {coachPackage.description && (
+                  <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
+                )}
+                {coachPackage.tempo && (
+                  <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div><p className="text-xs text-ink-muted flex items-center gap-1"><Gamepad2 className="h-3 w-3 shrink-0" />Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
               <div><p className="text-xs text-ink-muted flex items-center gap-1"><Shuffle className="h-3 w-3 shrink-0" />Tipo</p><p className="text-sm font-semibold text-ink">{getOrderModeType(order)}</p></div>
@@ -343,21 +361,25 @@ export function JobDetailPage() {
             </div>
           </Card>
 
-          {['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <OrderMatchHistory
-              orderId={order.id}
-              sync={order.status === 'in_progress' || order.status === 'paused' ? {
-                onSync: () => syncMatches.mutate(),
-                syncing: syncMatches.isPending,
-                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
-                resultMessage: syncMatches.data
-                  ? (syncMatches.data.synced
-                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
-                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
-                  : null,
-              } : undefined}
-            />
-          )}
+          {order.service_type === 'coaching'
+            ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+              <OrderCoachingTopics orderId={order.id} />
+            )
+            : ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+              <OrderMatchHistory
+                orderId={order.id}
+                sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                  onSync: () => syncMatches.mutate(),
+                  syncing: syncMatches.isPending,
+                  error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                  resultMessage: syncMatches.data
+                    ? (syncMatches.data.synced
+                      ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                      : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                    : null,
+                } : undefined}
+              />
+            )}
         </div>
 
         <div className="space-y-4">

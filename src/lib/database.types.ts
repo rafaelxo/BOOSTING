@@ -824,6 +824,57 @@ export type Database = {
           },
         ]
       }
+      order_coaching_topics: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          content: string
+          created_at: string
+          created_by: string
+          created_by_role: Database["public"]["Enums"]["user_role"]
+          id: string
+          is_done: boolean
+          order_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          content: string
+          created_at?: string
+          created_by: string
+          created_by_role: Database["public"]["Enums"]["user_role"]
+          id?: string
+          is_done?: boolean
+          order_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
+          created_by_role?: Database["public"]["Enums"]["user_role"]
+          id?: string
+          is_done?: boolean
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_coaching_topics_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_coaching_topics_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_messages: {
         Row: {
           attachment_url: string | null
@@ -1923,6 +1974,10 @@ export type Database = {
         Args: { p_booster_user_id: string; p_order_id: string }
         Returns: Json
       }
+      add_order_coaching_topic: {
+        Args: { p_content: string; p_order_id: string }
+        Returns: Json
+      }
       admin_dashboard_stats: { Args: never; Returns: Json }
       admin_drop_order: {
         Args: { p_order_id: string; p_reason: string }
@@ -2175,6 +2230,10 @@ export type Database = {
       }
       send_order_message: {
         Args: { p_content: string; p_order_id: string }
+        Returns: Json
+      }
+      set_order_coaching_topic_done: {
+        Args: { p_done: boolean; p_order_id: string; p_topic_id: string }
         Returns: Json
       }
       set_duo_account_active: {

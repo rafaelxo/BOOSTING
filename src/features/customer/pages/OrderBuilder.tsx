@@ -233,14 +233,17 @@ export function OrderBuilderPage() {
       // ignorado silenciosamente; a validação que importa é server-side.
       supabase
         .from('booster_services')
-        .select('id, title, price, tempo, booster_id, is_active, service_type')
+        .select('id, title, description, requirements, price, tempo, booster_id, is_active, service_type')
         .eq('id', coachPackageId)
         .eq('service_type', 'coaching')
         .eq('is_active', true)
         .maybeSingle()
         .then(async ({ data: pkg }) => {
           if (!pkg) return
-          setSelectedCoachPackage({ id: pkg.id, title: pkg.title, price: pkg.price, tempo: pkg.tempo })
+          setSelectedCoachPackage({
+            id: pkg.id, title: pkg.title, price: pkg.price, tempo: pkg.tempo,
+            description: pkg.description, requirements: pkg.requirements,
+          })
           setBasePrice(pkg.price)
           if (!boosterId) {
             const { data: boosterRow } = await supabase
@@ -318,12 +321,12 @@ export function OrderBuilderPage() {
         {preferredBoosterName && (
           <div className="flex items-center gap-2.5 mb-6 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 text-sm text-ink">
             <UserCheck className="h-4 w-4 text-brand shrink-0" />
-            Pedido vinculado a <span className="font-semibold">{preferredBoosterName}</span> — ele(a) poderá aceitar com exclusividade por 3 horas após o pagamento.
+            Pedido vinculado a <span className="font-semibold">{preferredBoosterName}</span> — ele(a) poderá aceitar com exclusividade por 12 horas após o pagamento.
           </div>
         )}
 
         <Stepper
-          steps={STEPS}
+          steps={STEPS.filter((s) => steps.includes(s.id))}
           currentStep={step}
           completedSteps={completedSteps}
         />

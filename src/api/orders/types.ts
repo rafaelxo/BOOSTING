@@ -1,8 +1,8 @@
 import type {
-  Order, OrderDropRequest, OrderMatch, OrderRankVerification, OrderStatus, OrderStatusHistory, Payment,
+  Order, OrderCoachingTopic, OrderDropRequest, OrderMatch, OrderRankVerification, OrderStatus, OrderStatusHistory, Payment,
 } from '@/types'
 
-export type { Order, OrderDropRequest, OrderMatch, OrderRankVerification, OrderStatusHistory, Payment }
+export type { Order, OrderCoachingTopic, OrderDropRequest, OrderMatch, OrderRankVerification, OrderStatusHistory, Payment }
 
 export interface CustomerOrderState {
   success: boolean

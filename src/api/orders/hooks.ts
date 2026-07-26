@@ -4,13 +4,13 @@ import { useRealtimeInvalidate } from '@/api/core/realtime'
 import type { OrderStatus } from '@/types'
 import {
   getBoosterOrder, getBoosterSlotInfo, getCustomerOrderState, getOrder, getPendingDropRequest,
-  listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderMatches,
-  listOrderStatusHistory,
+  listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderCoachingTopics,
+  listOrderMatches, listOrderStatusHistory,
 } from './queries'
 import {
-  acceptBoostOrder, adminDropOrder, adminOverrideOrderStatus, cancelPendingOrder, confirmOrderCompletion,
-  disputeOrderCompletion, generatePix, requestOrderDrop, requestOrderSupport,
-  revealOrderCredentials, setOrderCredentials, syncOrderMatches, updateOrderStatus,
+  acceptBoostOrder, addOrderCoachingTopic, adminDropOrder, adminOverrideOrderStatus, cancelPendingOrder,
+  confirmOrderCompletion, disputeOrderCompletion, generatePix, requestOrderDrop, requestOrderSupport,
+  revealOrderCredentials, setOrderCoachingTopicDone, setOrderCredentials, syncOrderMatches, updateOrderStatus,
   verifyOrderRank,
 } from './mutations'
 import type { BoosterOrdersTab } from './types'
@@ -131,6 +131,40 @@ export function useOrderMatches(orderId: string | undefined) {
     queryKey: queryKeys.orders.matches(orderId ?? ''),
     queryFn: () => listOrderMatches(orderId!),
     enabled: !!orderId,
+  })
+}
+
+export function useOrderCoachingTopics(orderId: string | undefined) {
+  const query = useQuery({
+    queryKey: queryKeys.orders.topics(orderId ?? ''),
+    queryFn: () => listOrderCoachingTopics(orderId!),
+    enabled: !!orderId,
+  })
+
+  useRealtimeInvalidate({
+    channel: `order-coaching-topics-${orderId ?? 'none'}`,
+    table: 'order_coaching_topics',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.topics(orderId)] : [],
+    enabled: !!orderId,
+  })
+
+  return query
+}
+
+export function useAddOrderCoachingTopic(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (content: string) => addOrderCoachingTopic({ orderId, content }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.topics(orderId) }),
+  })
+}
+
+export function useSetOrderCoachingTopicDone(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ topicId, done }: { topicId: string; done: boolean }) => setOrderCoachingTopicDone({ orderId, topicId, done }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.topics(orderId) }),
   })
 }
 

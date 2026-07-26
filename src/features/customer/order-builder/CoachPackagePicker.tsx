@@ -54,7 +54,10 @@ export function CoachPackagePicker() {
 
   function selectPackage(p: BoosterService) {
     const boosterName = boosterMap[p.booster_id]?.display_name ?? 'Booster'
-    setSelectedCoachPackage({ id: p.id, title: p.title, price: p.price, tempo: p.tempo })
+    setSelectedCoachPackage({
+      id: p.id, title: p.title, price: p.price, tempo: p.tempo,
+      description: p.description, requirements: p.requirements,
+    })
     setPreferredBooster(p.booster_id, boosterName)
     setBasePrice(p.price)
   }

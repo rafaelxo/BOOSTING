@@ -11,7 +11,7 @@ export function StepReview() {
     isMd5, riotId,
     currentLp, currentPdl,
     estimatedHours, customerNotes,
-    setNotes,
+    setNotes, selectedCoachPackage, sessionsPurchased,
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
@@ -48,6 +48,19 @@ export function StepReview() {
         <div>
           <p className="section-label mb-3">Detalhes do Pedido</p>
           <div className="card p-4">
+            {serviceType === 'coaching' && selectedCoachPackage && (
+              <div className="space-y-2">
+                <p className="text-base font-bold text-ink">{selectedCoachPackage.title}</p>
+                {selectedCoachPackage.description && (
+                  <p className="text-sm text-ink-secondary leading-relaxed">{selectedCoachPackage.description}</p>
+                )}
+                <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                  {selectedCoachPackage.tempo && <span>Duração: <span className="font-semibold text-ink">{selectedCoachPackage.tempo}</span></span>}
+                  {sessionsPurchased && <span>Sessões: <span className="font-semibold text-ink">{sessionsPurchased}</span></span>}
+                </div>
+              </div>
+            )}
+
             {currentRank && (
               <div className="mb-4 pb-5 border-b border-border-subtle">
                 <div className="flex items-center justify-center gap-4">

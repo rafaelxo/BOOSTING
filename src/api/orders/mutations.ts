@@ -1,8 +1,18 @@
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
-import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
+import { ApiError, assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
 import type { OrderStatus } from '@/types'
 import type { OrderIntent, PixPaymentResponse } from './types'
+
+// add_order_coaching_topic/set_order_coaching_topic_done já devolvem uma
+// mensagem amigável em português (result.message) -- sem precisar de um mapa
+// de erros client-side como o do chat.
+function assertTopicSuccess(result: { success: boolean; code?: string; message?: string }) {
+  if (!result.success) {
+    throw new ApiError(result.message ?? 'Não foi possível completar a ação.', { code: result.code ?? 'unknown_error' })
+  }
+  return result
+}
 
 export async function setOrderCredentials(params: { orderId: string; login: string; password: string }) {
   const { data, error } = await supabase.rpc('set_order_credentials', {
@@ -36,6 +46,22 @@ export async function updateOrderStatus(params: { orderId: string; newStatus: Or
   return assertRpcSuccess(data as { success: boolean; error?: string }, {
     objective_not_reached: 'O rank alvo ainda não foi atingido.',
   })
+}
+
+export async function addOrderCoachingTopic(params: { orderId: string; content: string }) {
+  const { data, error } = await supabase.rpc('add_order_coaching_topic', {
+    p_order_id: params.orderId, p_content: params.content,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertTopicSuccess(data as { success: boolean; code?: string; message?: string; topic_id?: string })
+}
+
+export async function setOrderCoachingTopicDone(params: { orderId: string; topicId: string; done: boolean }) {
+  const { data, error } = await supabase.rpc('set_order_coaching_topic_done', {
+    p_order_id: params.orderId, p_topic_id: params.topicId, p_done: params.done,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertTopicSuccess(data as { success: boolean; code?: string; message?: string })
 }
 
 export async function adminOverrideOrderStatus(params: { orderId: string; newStatus: OrderStatus; reason?: string }) {

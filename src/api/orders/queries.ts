@@ -3,7 +3,7 @@ import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
 import { normalizeApiError } from '@/api/core/errors'
 import type { OrderStatus } from '@/types'
 import type {
-  BoosterOrdersPage, BoosterOrdersTab, CustomerOrderState, Order, OrderDropRequest, OrderMatch,
+  BoosterOrdersPage, BoosterOrdersTab, CustomerOrderState, Order, OrderCoachingTopic, OrderDropRequest, OrderMatch,
   OrderRankVerification, OrderStatusHistory, SlotInfo,
 } from './types'
 import { BOOSTER_ORDER_TAB_STATUSES } from './types'
@@ -93,6 +93,16 @@ export async function listOrderMatches(orderId: string): Promise<OrderMatch[]> {
     .order('played_at', { ascending: false })
   if (error) throw normalizeApiError(error, 'Não foi possível carregar as partidas do pedido.')
   return (data ?? []) as unknown as OrderMatch[]
+}
+
+export async function listOrderCoachingTopics(orderId: string): Promise<OrderCoachingTopic[]> {
+  const { data, error } = await supabase
+    .from('order_coaching_topics')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true })
+  if (error) throw normalizeApiError(error, 'Não foi possível carregar os tópicos do pedido.')
+  return (data ?? []) as unknown as OrderCoachingTopic[]
 }
 
 export async function getPendingDropRequest(orderId: string): Promise<OrderDropRequest | null> {

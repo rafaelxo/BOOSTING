@@ -35,6 +35,16 @@ export async function listAllActiveCoachingPackages(limit = 100): Promise<Booste
   return (data ?? []) as unknown as BoosterService[]
 }
 
+export async function getBoosterServiceById(id: string): Promise<BoosterService | null> {
+  const { data, error } = await supabase
+    .from('booster_services')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw normalizeApiError(error)
+  return data as unknown as BoosterService | null
+}
+
 export async function listCoachBoosterInfo(boosterIds: string[]): Promise<CoachBoosterInfo[]> {
   if (boosterIds.length === 0) return []
   const { data, error } = await supabase

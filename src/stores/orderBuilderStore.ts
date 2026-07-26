@@ -77,7 +77,7 @@ interface OrderBuilderState {
   // Pacote de coach escolhido (booster_services) — preço vem sempre daqui,
   // nunca editável pelo cliente. Selecionar um pacote também vincula o
   // pedido ao booster dono dele via setPreferredBooster.
-  selectedCoachPackage: { id: string; title: string; price: number; tempo: string | null } | null
+  selectedCoachPackage: { id: string; title: string; price: number; tempo: string | null; description: string | null; requirements: string | null } | null
 
   // LP (PDL) — fluxo padrão (Solo/Duo, Iron–Diamond)
   currentLp: number
@@ -139,7 +139,7 @@ interface OrderBuilderState {
   clearRiotLookup: () => void
   setRiotLookupLoading: (v: boolean) => void
   setStepAttempted: (v: boolean) => void
-  setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null } | null) => void
+  setSelectedCoachPackage: (pkg: { id: string; title: string; price: number; tempo: string | null; description: string | null; requirements: string | null } | null) => void
   setCurrentLp: (lp: number) => void
   setAvgLpGain: (lp: number) => void
   setAvgLpLoss: (lp: number) => void
@@ -256,6 +256,9 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
   setService: (serviceType, serviceId) => set({
     serviceType,
     serviceId,
+    // Coaching não tem addons/pacotes de vitórias -- o step "Extras" ficaria
+    // vazio (só o cabeçalho), então nem entra na lista de steps.
+    steps: serviceType === 'coaching' ? INITIAL_STEPS.filter((s) => s !== 'extras') : INITIAL_STEPS,
     isMd5: serviceType === 'md5',
     winsPurchased: serviceType === 'win_boost' || serviceType === 'md5' ? 5 : null,
     md5MatchesRemaining: serviceType === 'md5' ? null : null,

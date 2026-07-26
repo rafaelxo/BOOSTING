@@ -16,6 +16,7 @@ export const queryKeys = {
     availableJobs: () => ['orders', 'available-jobs'] as const,
     chat: (orderId: string) => ['orders', 'chat', orderId] as const,
     matches: (orderId: string) => ['orders', 'matches', orderId] as const,
+    topics: (orderId: string) => ['orders', 'topics', orderId] as const,
     supportEscalation: (orderId: string) => ['orders', 'support-escalation', orderId] as const,
     latestRankVerification: (orderId: string) => ['orders', 'detail', orderId, 'rank-verifications', 'latest'] as const,
   },
@@ -41,6 +42,7 @@ export const queryKeys = {
   },
   coaching: {
     packages: (filters?: Record<string, unknown>) => ['coaching', 'packages', filters ?? {}] as const,
+    boosterService: (id: string) => ['coaching', 'booster-service', id] as const,
   },
   notifications: {
     list: (userId: string) => ['notifications', 'list', userId] as const,

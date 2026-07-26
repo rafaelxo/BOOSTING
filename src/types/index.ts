@@ -279,6 +279,18 @@ export interface OrderMatch {
   created_at: string
 }
 
+export interface OrderCoachingTopic {
+  id: string
+  order_id: string
+  content: string
+  is_done: boolean
+  created_by: string
+  created_by_role: 'customer' | 'booster' | 'admin'
+  completed_by: string | null
+  completed_at: string | null
+  created_at: string
+}
+
 export interface OrderChatMessage {
   id: string
   order_id: string
