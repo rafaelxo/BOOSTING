@@ -12,6 +12,7 @@ export type ServiceType =
   | 'coaching'
   | 'placement_matches'
   | 'md5'
+  | 'clash'
 
 export type QueueType = 'solo_duo' | 'flex'
 
@@ -132,6 +133,10 @@ export interface BoosterProfile {
 // nunca oferecido no configurador atual.
 export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
 
+export type ClashTier = 'tier_4' | 'tier_3' | 'tier_2' | 'tier_1'
+export type ClashDay = 'saturday' | 'sunday'
+export type ClashFlow = 'clash_solo' | 'clash_duo'
+
 export interface ServiceExtra {
   id: string
   service_id: string | null  // null = applies to all
@@ -142,7 +147,7 @@ export interface ServiceExtra {
   is_active: boolean
   sort_order: number
   icon: string | null
-  flow: BoostFlow | null
+  flow: BoostFlow | ClashFlow | null
   code: string | null          // identificador estável — nunca o label
 }
 
@@ -174,8 +179,12 @@ export interface Order {
   queue_type: QueueType
   boost_mode: BoostMode
   server: string
-  current_rank: Rank
+  current_rank: Rank | null
   target_rank: Rank | null
+  // Clash: tier fixo escolhido (não um rank+divisão) e dia agendado — null
+  // para qualquer outro service_type.
+  clash_tier: ClashTier | null
+  clash_day: ClashDay | null
   wins_purchased: number | null       // for win boost
   sessions_purchased: number | null   // for coaching
   extras: OrderExtra[]
