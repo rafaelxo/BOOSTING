@@ -17,6 +17,7 @@ import { formatDateTime, timeAgo, getServiceLabel, PAYMENT_STATUS_LABEL, formatR
 import { useCurrency } from '@/hooks/useCurrency'
 import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder, useSyncOrderMatches } from '@/api/orders'
 import { useOrderSupportEscalation, useAdminResolveOrderSupport } from '@/api/admin'
+import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import type { OrderStatus } from '@/types'
 
 type BoosterRef = { id: string; user_id: string; display_name: string } | undefined
@@ -110,6 +111,19 @@ export function AdminOrderDetailPage() {
     enabled: !!order,
   })
 
+  const { data: reservedDuoAccount } = useQuery({
+    queryKey: ['admin', 'order-duo-account', order?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('duo_accounts')
+        .select('id, label, riot_id')
+        .eq('reserved_order_id', order!.id)
+        .maybeSingle()
+      return data
+    },
+    enabled: !!order && order.boost_mode === 'duo',
+  })
+
   const updateStatus = useAdminOverrideOrderStatus(id ?? '')
   const dropOrder = useAdminDropOrder(id ?? '')
   const syncMatches = useSyncOrderMatches(id ?? '')
@@ -177,6 +191,12 @@ export function AdminOrderDetailPage() {
                     : []),
                   ...(order.service_type === 'coaching' && order.sessions_purchased
                     ? [[CalendarDays, 'Sessões', `${order.sessions_purchased}`]]
+                    : []),
+                  ...(order.service_type === 'clash' && order.clash_tier
+                    ? [[TrendingUp, `${CLASH_TIER_LABEL[order.clash_tier]} (${CLASH_TIER_RANGE_LABEL[order.clash_tier]})`, order.clash_day ? CLASH_DAY_LABEL[order.clash_day] : '—']]
+                    : []),
+                  ...(order.service_type === 'clash' && order.boost_mode === 'duo'
+                    ? [[User, 'Conta Duo', reservedDuoAccount ? reservedDuoAccount.label : 'Não reservada']]
                     : []),
                   [Wallet, 'Base', currency(order.base_price)],
                   [Wallet, 'Extras', currency(order.extras_price)],
