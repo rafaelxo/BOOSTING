@@ -155,7 +155,7 @@ export function BoosterApplicationForm({
             {errors.full_name && <p className="text-xs text-danger">{errors.full_name.message}</p>}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs text-ink-muted">CPF</label>
+            <label className="block text-xs text-ink-muted">CPF</label>
             <input
               value={cpfValue}
               onChange={(event) => handleCpfChange(event.target.value)}
