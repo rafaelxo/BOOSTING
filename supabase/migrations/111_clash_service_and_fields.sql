@@ -38,9 +38,8 @@ alter table public.orders
 
 -- ── 4) Credenciais protegidas: Solo Clash usa o mesmo fluxo de token
 -- (set_order_credentials/get_order_credentials/resolve_order_access_token)
--- de solo elo_boost/win_boost/md5/placement_matches -- só precisa entrar
--- nesta função-gate. Mudança aditiva: nenhum outro serviço muda de
--- comportamento.
+-- de solo elo_boost/win_boost/md5 -- só precisa entrar nesta função-gate.
+-- Mudança aditiva: nenhum outro serviço muda de comportamento.
 create or replace function public.order_requires_access_token(
   p_service_type public.service_type,
   p_boost_mode text
@@ -50,7 +49,7 @@ immutable
 set search_path = public as $$
   select
     (p_service_type = 'elo_boost' and coalesce(p_boost_mode, 'solo') = 'solo')
-    or p_service_type in ('win_boost', 'placement_matches', 'md5')
+    or p_service_type in ('win_boost', 'md5')
     or (p_service_type = 'clash' and coalesce(p_boost_mode, 'solo') = 'solo')
 $$;
 
