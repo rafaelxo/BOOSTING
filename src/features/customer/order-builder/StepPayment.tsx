@@ -7,10 +7,8 @@ import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { Button, ErrorAlert } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import { useClashAddons, EMPTY_CLASH_ADDONS } from '@/hooks/useClashAddons'
 import { applyCoupon } from '@/lib/pricing'
 import { getBoostFlow } from '@/lib/boostDomain'
-import { getClashFlow } from '@/lib/clashDomain'
 import { isUuid } from '@/lib/utils'
 import { getCustomerOrderState, savePendingOrderFromIntent, generatePix as generatePixRequest } from '@/api/orders'
 import type { PixPaymentResponse } from '@/api/orders'
@@ -89,22 +87,25 @@ export function StepPayment() {
   const expiryHandledRef = useRef(false)
 
   const isClash = store.serviceType === 'clash'
-  const flow = !isClash && store.serviceType === 'elo_boost' && store.currentRank
+  // Clash reaproveita o mesmo catálogo do Elo Boost (ver StepExtras.tsx):
+  // Solo Clash usa 'solo_standard', Duo Clash usa 'duo_standard'.
+  const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
-    : !isClash && (store.serviceType === 'win_boost' || store.serviceType === 'md5')
+    : store.serviceType === 'win_boost' || store.serviceType === 'md5'
       ? 'solo_standard'
-      : null
+      : isClash
+        ? (store.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+        : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache. Precisamos
   // do catálogo aqui só para traduzir os ids selecionados em códigos
   // estáveis (addon_codes) — o payload nunca envia o id interno do banco.
-  const { data: boostAddonData } = useBoostAddons(flow)
-  const { data: clashAddonData } = useClashAddons(isClash ? getClashFlow(store.boostMode) : null)
-  const addonCatalog = isClash ? (clashAddonData ?? EMPTY_CLASH_ADDONS) : (boostAddonData ?? EMPTY_ADDONS)
+  const { data: addonData } = useBoostAddons(flow)
+  const addonCatalog = addonData ?? EMPTY_ADDONS
   const addonCodes = addonCatalog
     .filter(e => store.selectedExtraIds.has(e.id))
     .map(e => e.code)
     .filter((code): code is string => !!code)
-  const addonsReady = store.selectedExtraIds.size === 0 || (isClash ? clashAddonData !== undefined : boostAddonData !== undefined)
+  const addonsReady = store.selectedExtraIds.size === 0 || addonData !== undefined
 
   // Estimativa exibida antes de gerar o PIX (mesma conta que StepReview já
   // mostrou ao cliente). O valor cobrado de fato é sempre o que a Edge

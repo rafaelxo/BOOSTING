@@ -1,15 +1,17 @@
 // shared/clashDomain.ts
-// Domínio do serviço Clash (Solo Clash / Duo Clash) — mesmo papel que
-// shared/boostDomain.ts tem para o Elo Boost: fluxos, addons válidos por
-// fluxo, e rótulos de exibição. O preço em si (tabela + computeOrderPrice)
-// vive em shared/pricing.ts, igual ao Elo Boost.
+// Domínio do serviço Clash (Solo Clash / Duo Clash) — tier/dia e rótulos de
+// exibição. O preço em si (tabela + computeOrderPrice) vive em
+// shared/pricing.ts, igual ao Elo Boost. Addons do Clash NÃO têm um
+// namespace próprio — Solo Clash reaproveita o catálogo 'solo_standard'
+// (mesmo de Solo Boost/Vitórias/MD5) e Duo Clash reaproveita 'duo_standard'
+// (mesmo de Duo Boost), por decisão de produto: são os mesmos extras. Ver
+// shared/boostDomain.ts (BoostFlow/BOOST_ADDON_CODES).
 //
 // Roda nos dois runtimes (Vite/React e a Edge Function Deno
 // create-pix-payment) — não importe nada de `@/...` nem de APIs específicas
 // de browser/Deno aqui.
 
 import type { ClashDay, ClashTier, RankTier } from './pricing.ts'
-import type { BoostMode } from './boostDomain.ts'
 import { sortAddonsBySortOrder } from './boostDomain.ts'
 
 export { sortAddonsBySortOrder }
@@ -50,30 +52,4 @@ export const CLASH_TIER_BOUNDARY_RANKS: Record<ClashTier, { low: RankTier; high:
 export const CLASH_DAY_LABEL: Record<ClashDay, string> = {
   saturday: 'Sábado',
   sunday: 'Domingo',
-}
-
-// Namespace de addons do Clash, deliberadamente separado de BoostFlow
-// (shared/boostDomain.ts). BoostFlow é uma union fechada (Record-keyed) só
-// para lógica exclusiva do elo_boost (Master+, modificador de LP) —
-// misturar Clash ali obrigaria todo switch sobre BoostFlow a ganhar um
-// branch irrelevante. Mesma "whitelist estrutural + service_extras como
-// conteúdo" que BOOST_ADDON_CODES já usa (ver boostDomain.ts).
-export type ClashFlow = 'clash_solo' | 'clash_duo'
-
-export function getClashFlow(mode: BoostMode): ClashFlow {
-  return mode === 'duo' ? 'clash_duo' : 'clash_solo'
-}
-
-// Vazio nas duas modalidades no lançamento — nenhum addon de Clash foi
-// definido ainda. Preparado pra receber códigos depois (nova linha em
-// service_extras com flow='clash_solo'/'clash_duo' + o code adicionado
-// aqui) — mesma dupla trava que BOOST_ADDON_CODES: um código só é aceito se
-// estiver aqui E existir uma linha ativa em service_extras.
-export const CLASH_ADDON_CODES: Record<ClashFlow, readonly string[]> = {
-  clash_solo: [],
-  clash_duo: [],
-}
-
-export function isClashAddonCodeValidForFlow(flow: ClashFlow, code: string): boolean {
-  return CLASH_ADDON_CODES[flow].includes(code)
 }

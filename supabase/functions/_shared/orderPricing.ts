@@ -9,7 +9,6 @@ import {
   getPdlBracket,
   NO_DIVISION_TIERS,
 } from '../../../shared/boostDomain.ts'
-import { getClashFlow, isClashAddonCodeValidForFlow, type ClashFlow } from '../../../shared/clashDomain.ts'
 import { errorResponse, jsonResponse } from './responses.ts'
 import type { supabaseAdmin } from './supabaseAdmin.ts'
 import {
@@ -772,45 +771,33 @@ export async function validateAndPriceIntent(
 
   if (hasDuplicateAddonCodes(normalized.addonCodes)) return { ok: false, response: badRequest(req, 'Addon duplicado') }
 
-  if (normalized.serviceType === 'clash') {
-    const clashFlow: ClashFlow = getClashFlow(normalized.boostMode)
+  // Clash reaproveita o mesmo catálogo do Elo Boost: Solo Clash valida
+  // contra 'solo_standard' (mesmo de Solo Boost/Vitórias/MD5), Duo Clash
+  // contra 'duo_standard' (mesmo de Duo Boost) — mesmos extras, decisão de
+  // produto (não tem whitelist própria de Clash).
+  const addonFlow: BoostFlow | null = flow ?? (
+    normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard'
+    : normalized.serviceType === 'clash' ? (normalized.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+    : null
+  )
+
+  if (addonFlow) {
     for (const code of addonCodes) {
-      if (!isClashAddonCodeValidForFlow(clashFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
+      if (!isAddonCodeValidForFlow(addonFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
     }
     if (addonCodes.length > 0) {
       const { data: rows, error: extraErr } = await serviceClient
         .from('service_extras')
         .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
-        .eq('flow', clashFlow)
+        .eq('flow', addonFlow)
         .eq('is_active', true)
         .in('code', addonCodes)
       if (extraErr) return { ok: false, response: errorResponse(req, 'Failed to load extras', 500) }
       if (!rows || rows.length !== addonCodes.length) return { ok: false, response: badRequest(req, 'Addon inexistente ou inativo') }
       extras = rows
     }
-  } else {
-    const addonFlow: BoostFlow | null = flow ?? (
-      normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard' : null
-    )
-
-    if (addonFlow) {
-      for (const code of addonCodes) {
-        if (!isAddonCodeValidForFlow(addonFlow, code)) return { ok: false, response: badRequest(req, `Addon inválido para este fluxo: ${code}`) }
-      }
-      if (addonCodes.length > 0) {
-        const { data: rows, error: extraErr } = await serviceClient
-          .from('service_extras')
-          .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
-          .eq('flow', addonFlow)
-          .eq('is_active', true)
-          .in('code', addonCodes)
-        if (extraErr) return { ok: false, response: errorResponse(req, 'Failed to load extras', 500) }
-        if (!rows || rows.length !== addonCodes.length) return { ok: false, response: badRequest(req, 'Addon inexistente ou inativo') }
-        extras = rows
-      }
-    } else if (addonCodes.length > 0) {
-      return { ok: false, response: badRequest(req, 'Addons não são aceitos para este tipo de serviço') }
-    }
+  } else if (addonCodes.length > 0) {
+    return { ok: false, response: badRequest(req, 'Addons não são aceitos para este tipo de serviço') }
   }
 
   const priceInput: OrderPriceInput = {

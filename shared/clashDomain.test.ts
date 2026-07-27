@@ -1,20 +1,6 @@
 // shared/clashDomain.test.ts
 import { describe, it, expect } from 'vitest'
-import { getClashFlow, isClashAddonCodeValidForFlow, CLASH_TIER_RANK_TIERS, CLASH_TIER_BOUNDARY_RANKS } from './clashDomain'
-
-describe('getClashFlow', () => {
-  it('solo -> clash_solo, duo -> clash_duo', () => {
-    expect(getClashFlow('solo')).toBe('clash_solo')
-    expect(getClashFlow('duo')).toBe('clash_duo')
-  })
-})
-
-describe('isClashAddonCodeValidForFlow', () => {
-  it('rejeita qualquer código (whitelist vazia no lançamento)', () => {
-    expect(isClashAddonCodeValidForFlow('clash_solo', 'priority')).toBe(false)
-    expect(isClashAddonCodeValidForFlow('clash_duo', 'anything')).toBe(false)
-  })
-})
+import { CLASH_TIER_RANK_TIERS, CLASH_TIER_BOUNDARY_RANKS } from './clashDomain'
 
 describe('CLASH_TIER_RANK_TIERS / CLASH_TIER_BOUNDARY_RANKS', () => {
   it('cobre os 10 RankTier exatamente uma vez, em ordem crescente por tier', () => {

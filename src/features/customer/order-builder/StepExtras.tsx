@@ -3,12 +3,10 @@ import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import { useClashAddons, EMPTY_CLASH_ADDONS } from '@/hooks/useClashAddons'
 import { CheckCircle2, Zap, Tv, Crosshair, User, Trophy, Shield, Lightbulb, Mic } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
-import { getClashFlow } from '@/lib/clashDomain'
 import type { ServiceExtra } from '@/types'
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -36,11 +34,16 @@ export function StepExtras() {
 
   const isClash = serviceType === 'clash'
 
-  const flow = !isClash && serviceType === 'elo_boost' && currentRank
+  // Clash reaproveita o mesmo catálogo do Elo Boost: Solo Clash usa
+  // 'solo_standard' (mesmo de Solo Boost/Vitórias/MD5), Duo Clash usa
+  // 'duo_standard' (mesmo de Duo Boost) — mesmos extras, decisão de produto.
+  const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
-    : !isClash && (serviceType === 'win_boost' || serviceType === 'md5')
+    : serviceType === 'win_boost' || serviceType === 'md5'
       ? 'solo_standard'
-      : null
+      : isClash
+        ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+        : null
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
 
   // Pacote de vitórias não existe no Master+ — o preço lá vem da tabela
@@ -59,10 +62,8 @@ export function StepExtras() {
   // a query já vem filtrada por `flow`, nunca é a lista inteira escondida
   // por tipo de modalidade. A ordem vem de `sort_order` (Acesso Prioritário
   // sempre por último — ver a seed em supabase/migrations).
-  const { data: boostData, isLoading: boostLoading } = useBoostAddons(flow)
-  const { data: clashData, isLoading: clashLoading } = useClashAddons(isClash ? getClashFlow(boostMode) : null)
-  const extras = isClash ? (clashData ?? EMPTY_CLASH_ADDONS) : (boostData ?? EMPTY_ADDONS)
-  const isLoading = isClash ? clashLoading : boostLoading
+  const { data, isLoading } = useBoostAddons(flow)
+  const extras = data ?? EMPTY_ADDONS
 
   useEffect(() => {
     const selected = extras.filter(e => selectedExtraIds.has(e.id))

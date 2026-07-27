@@ -218,8 +218,8 @@ export function PricingPage() {
             <h2 className="text-xl font-bold text-ink mb-1">Extras Opcionais</h2>
             <p className="text-sm text-ink-secondary">Os extras disponíveis dependem da modalidade escolhida no configurador.</p>
           </div>
-          <AddonGroup title="Solo Boost / Wins" flow="solo_standard" currency={currency} />
-          <AddonGroup title="Duo Boost" flow="duo_standard" currency={currency} />
+          <AddonGroup title="Solo Boost / Wins / MD5 / Solo Clash" flow="solo_standard" currency={currency} />
+          <AddonGroup title="Duo Boost / Duo Clash" flow="duo_standard" currency={currency} />
           <AddonGroup title="Boost Master+" flow="master_plus" currency={currency} />
         </section>
 

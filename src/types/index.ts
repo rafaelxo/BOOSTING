@@ -135,7 +135,6 @@ export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
 
 export type ClashTier = 'tier_4' | 'tier_3' | 'tier_2' | 'tier_1'
 export type ClashDay = 'saturday' | 'sunday'
-export type ClashFlow = 'clash_solo' | 'clash_duo'
 
 export interface ServiceExtra {
   id: string
@@ -147,7 +146,7 @@ export interface ServiceExtra {
   is_active: boolean
   sort_order: number
   icon: string | null
-  flow: BoostFlow | ClashFlow | null
+  flow: BoostFlow | null
   code: string | null          // identificador estável — nunca o label
 }
 
