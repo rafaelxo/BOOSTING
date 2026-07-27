@@ -56,12 +56,15 @@
       "mostPopular": "Mais Popular",
       "fast": "Rápido",
       "pro": "Pro",
+      "weekend": "Fim de Semana",
       "eloBoostTitle": "Solo Boost / Duo Boost",
       "eloBoostDesc": "Nossos boosters jogam na sua conta (Solo) ou ao seu lado (Duo) e sobem do seu rank atual até o rank desejado, divisão por divisão.",
       "winBoostTitle": "Vitórias / MD5",
       "winBoostDesc": "Compre um número fixo de vitórias para ganhar LP rápido — ou, se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente.",
       "coachingTitle": "Coaching",
-      "coachingDesc": "Sessões 1-a-1 ao vivo. Seu coach analisa seus VODs, identifica erros e cria um plano de melhoria personalizado."
+      "coachingDesc": "Sessões 1-a-1 ao vivo. Seu coach analisa seus VODs, identifica erros e cria um plano de melhoria personalizado.",
+      "clashTitle": "Clash",
+      "clashDesc": "Solo Clash ou Duo Clash aos sábados e domingos — o booster monta o time e garante sua participação no torneio."
     },
     "howItWorks": {
       "sectionLabel": "Processo simples",

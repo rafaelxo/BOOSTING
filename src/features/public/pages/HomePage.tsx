@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import {
   Shield, Zap, Clock, Users, ChevronRight,
-  TrendingUp, MessageCircle,
+  TrendingUp, MessageCircle, Swords,
   ArrowRight, Lock, Star,
 } from 'lucide-react'
 import { Avatar, Button, RankBadge, HexGridBackground } from '@/components/ui'
@@ -63,6 +63,14 @@ export function HomePage() {
       badge: t('home.services.pro'),
       color: 'text-success bg-success/10',
       desc: t('home.services.coachingDesc'),
+    },
+    {
+      icon: Swords,
+      title: t('home.services.clashTitle'),
+      href: '/orders/new?service=clash',
+      badge: t('home.services.weekend'),
+      color: 'text-warning bg-warning/10',
+      desc: t('home.services.clashDesc'),
     },
   ]
 
@@ -134,7 +142,7 @@ export function HomePage() {
             <p className="mt-4 text-ink-secondary text-lg max-w-xl mx-auto">{t('home.services.desc')}</p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-3 gap-5">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {SERVICES.map(({ icon: Icon, title, href, badge, color, desc }, i) => (
               <motion.div key={title}
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}

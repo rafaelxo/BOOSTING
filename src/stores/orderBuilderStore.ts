@@ -228,9 +228,12 @@ const CLEARED_LOOKUP_STATE = {
 }
 
 // Fluxo do configurador (solo_standard/duo_standard/master_plus) para o
-// (rank atual, modalidade) combinados — null se a combinação for inválida
-// (ex.: rank ainda não escolhido).
-function flowFor(rank: Rank | null, mode: BoostMode): BoostFlow | null {
+// (serviço, rank atual, modalidade) combinados — null se a combinação for
+// inválida (ex.: rank ainda não escolhido). Clash nunca tem rank (não usa
+// currentRank) mas ainda tem fluxo — reaproveita solo_standard/duo_standard
+// direto da modalidade, mesma regra de StepExtras.tsx/StepPayment.tsx.
+function flowFor(serviceType: ServiceType | null, rank: Rank | null, mode: BoostMode): BoostFlow | null {
+  if (serviceType === 'clash') return mode === 'duo' ? 'duo_standard' : 'solo_standard'
   if (!rank) return null
   return getBoostFlow(rank.tier, mode as BoostFlowMode)
 }
@@ -284,8 +287,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
   setCurrentRank: (currentRank) => set((state) => {
     const forcedMasterPlus = isMasterPlusCurrentTier(currentRank.tier)
     const nextMode: BoostMode = forcedMasterPlus ? 'solo' : state.boostMode
-    const prevFlow = flowFor(state.currentRank, state.boostMode)
-    const nextFlow = flowFor(currentRank, nextMode)
+    const prevFlow = flowFor(state.serviceType, state.currentRank, state.boostMode)
+    const nextFlow = flowFor(state.serviceType, currentRank, nextMode)
     const flowChanged = prevFlow !== nextFlow
 
     return {
@@ -312,8 +315,8 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
     if (boostMode === 'duo' && state.currentRank && isMasterPlusCurrentTier(state.currentRank.tier)) {
       return {}
     }
-    const prevFlow = flowFor(state.currentRank, state.boostMode)
-    const nextFlow = flowFor(state.currentRank, boostMode)
+    const prevFlow = flowFor(state.serviceType, state.currentRank, state.boostMode)
+    const nextFlow = flowFor(state.serviceType, state.currentRank, boostMode)
     const flowChanged = prevFlow !== nextFlow
 
     return {

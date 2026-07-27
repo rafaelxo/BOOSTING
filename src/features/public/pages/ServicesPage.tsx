@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { TrendingUp, Zap, Users, CheckCircle2, ChevronRight } from 'lucide-react'
+import { TrendingUp, Zap, Users, Swords, CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
@@ -63,11 +63,30 @@ const SERVICES = [
     bgColor: 'bg-success/10',
     cta: '/orders/new?service=coaching',
   },
+  {
+    icon: Swords,
+    slug: 'clash',
+    title: 'Clash',
+    tagline: 'Solo Clash ou Duo Clash, sempre no fim de semana.',
+    description:
+      'Participe do torneio Clash com um booster no seu time (Solo Clash, jogando na sua conta) ou ao seu lado (Duo Clash). Preço fixo por tier, agendado sempre para sábado ou domingo — o booster monta o restante do time dentro do jogo.',
+    rankRange: RANK_TIER_ORDER,
+    highlights: [
+      'Solo Clash ou Duo Clash — você escolhe',
+      '4 tiers fixos, do Ferro ao Desafiante',
+      'Agendado sempre para sábado ou domingo',
+      'Booster monta o time necessário dentro do jogo',
+      'Preço fixo, sem surpresa na hora de pagar',
+    ],
+    color: 'text-success',
+    bgColor: 'bg-warning/10',
+    cta: '/orders/new?service=clash',
+  },
 ]
 
 const EXTRA_GROUPS: { flow: BoostFlow; label: string }[] = [
-  { flow: 'solo_standard', label: 'Solo Boost' },
-  { flow: 'duo_standard', label: 'Duo Boost' },
+  { flow: 'solo_standard', label: 'Solo Boost / Wins / MD5 / Solo Clash' },
+  { flow: 'duo_standard', label: 'Duo Boost / Duo Clash' },
   { flow: 'master_plus', label: 'Boost Master+' },
 ]
 

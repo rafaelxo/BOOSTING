@@ -2,10 +2,11 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, ChevronRight } from 'lucide-react'
 import { Button, Skeleton, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney } from '@/lib/pricing'
+import { getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney, getClashBasePrice } from '@/lib/pricing'
+import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_TIER_BOUNDARY_RANKS, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import type { RankTier, ServiceExtra } from '@/types'
+import type { ClashDay, ClashTier, RankTier, ServiceExtra } from '@/types'
 
 const COACHING_HIGHLIGHTS = [
   'Opções de sessão de horário predefinido',
@@ -43,6 +44,9 @@ const WIN_TIERS: RankTier[] = [
 ]
 
 const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger']
+
+const CLASH_TIERS: ClashTier[] = ['tier_4', 'tier_3', 'tier_2', 'tier_1']
+const CLASH_DAYS: ClashDay[] = ['saturday', 'sunday']
 
 function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string): string {
   if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
@@ -97,6 +101,58 @@ function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_stan
         </div>
       )}
     </div>
+  )
+}
+
+function ClashPricingSection({ currency }: { currency: (n: number) => string }) {
+  return (
+    <section>
+      <h2 className="text-xl font-bold text-ink mb-1">Clash</h2>
+      <p className="text-sm text-ink-secondary mb-4">
+        Preço fixo por tier — Solo Clash o booster joga na sua conta, Duo Clash você joga junto. Agendado sempre para {CLASH_DAYS.map(d => CLASH_DAY_LABEL[d]).join(' ou ')}.
+      </p>
+      <div className="card overflow-hidden p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b border-bg-elevated">
+            <tr>
+              <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Tier</th>
+              <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Solo Clash</th>
+              <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Duo Clash</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-bg-elevated">
+            {CLASH_TIERS.map((tier) => {
+              const { low, high } = CLASH_TIER_BOUNDARY_RANKS[tier]
+              const soloPrice = getClashBasePrice('solo', tier)
+              const duoPrice = getClashBasePrice('duo', tier)
+              const duoIncreasePct = Math.round(((duoPrice - soloPrice) / soloPrice) * 100)
+              return (
+                <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
+                  <td className="py-3 px-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center shrink-0">
+                        <RankBadge tier={low} size="xs" showDivision={false} showLabel={false} />
+                        {high !== low && <RankBadge tier={high} size="xs" showDivision={false} showLabel={false} className="-ml-2" />}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-ink">{CLASH_TIER_LABEL[tier]}</p>
+                        <p className="text-xs text-ink-muted">{CLASH_TIER_RANGE_LABEL[tier]}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(soloPrice)}</td>
+                  <td className="py-3.5 px-5 text-right">
+                    <span className="text-ink font-semibold">{currency(duoPrice)}</span>
+                    <span className="block text-[10px] text-brand font-normal">+{duoIncreasePct}%</span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-ink-muted mt-2">O booster é responsável por organizar e montar o time necessário para a participação no Clash.</p>
+    </section>
   )
 }
 
@@ -211,6 +267,9 @@ export function PricingPage() {
             </div>
           </div>
         </section>
+
+        {/* ── Clash ── */}
+        <ClashPricingSection currency={currency} />
 
         {/* ── Extras ── */}
         <section className="space-y-6">

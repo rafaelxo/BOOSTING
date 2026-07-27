@@ -127,3 +127,29 @@ describe('orderBuilderStore — verificação Riot por conta/fila (trava do form
     expect(after.isMd5).toBe(true)
   })
 })
+
+describe('orderBuilderStore — troca de modalidade limpa addons incompatíveis (por fluxo)', () => {
+  beforeEach(() => useOrderBuilderStore.getState().reset())
+
+  it('Elo Boost: solo -> duo com rank definido limpa os addons selecionados', () => {
+    const s = useOrderBuilderStore.getState()
+    s.setService('elo_boost', 'elo_boost')
+    s.setCurrentRank({ tier: 'gold', division: 'II' })
+    s.toggleExtra('extra-solo')
+    expect(useOrderBuilderStore.getState().selectedExtraIds.size).toBe(1)
+
+    s.setBoostMode('duo')
+    expect(useOrderBuilderStore.getState().selectedExtraIds.size).toBe(0)
+  })
+
+  it('Clash: solo -> duo limpa os addons selecionados mesmo sem currentRank (Clash nunca seta rank)', () => {
+    const s = useOrderBuilderStore.getState()
+    s.setService('clash', 'clash')
+    expect(useOrderBuilderStore.getState().currentRank).toBeNull()
+    s.toggleExtra('extra-clash-solo')
+    expect(useOrderBuilderStore.getState().selectedExtraIds.size).toBe(1)
+
+    s.setBoostMode('duo')
+    expect(useOrderBuilderStore.getState().selectedExtraIds.size).toBe(0)
+  })
+})

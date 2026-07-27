@@ -265,10 +265,11 @@ const VALID_COUPONS: Record<string, CouponDefinition> = Object.freeze({
   ELOPEAK30: { discountPct: 30 },
 })
 
-// Não usa "elo_boost" isoladamente: Vitória Avulsa e MD5 também entram.
-// Coaching fica de fora -- preço já vem do pacote do booster, não da
-// tabela de preços do produto.
-export const COUPON_ELIGIBLE_SERVICE_TYPES: ServiceType[] = ['elo_boost', 'win_boost', 'md5']
+// Todo serviço com preço de tabela aceita cupom. Só Coaching fica de fora --
+// preço já vem do pacote que o próprio booster cadastra, não da tabela de
+// preços do produto (nada pra descontar contra o catálogo). placement_matches
+// (legado) não entra porque não é mais oferecido como serviço novo.
+export const COUPON_ELIGIBLE_SERVICE_TYPES: ServiceType[] = ['elo_boost', 'win_boost', 'md5', 'clash']
 
 export interface CouponOutcome {
   couponApplied: boolean
@@ -309,7 +310,7 @@ export function getWinBoostPrice(queue: QueueType, tier: RankTier, _div?: Divisi
 // placement é só 5× esse preço por vitória; comprar menos vitórias (4, 3...)
 // desconta proporcionalmente, nunca cobra o pacote inteiro (a soma acontece
 // em computeOrderPrice, multiplicando por winsPurchased).
-const MD5_DISCOUNT_PCT = 50
+export const MD5_DISCOUNT_PCT = 50
 
 export function getMd5WinPrice(queue: QueueType, tier: RankTier): number {
   const winPriceCents = moneyToCents(getWinBoostPrice(queue, tier))

@@ -134,11 +134,15 @@ export function OrderBuilderPage() {
     setStep, setSearchParams,
   ])
 
+  // Mesma regra de StepExtras.tsx/StepPayment.tsx — Clash reaproveita
+  // solo_standard/duo_standard pela modalidade, sem currentRank envolvido.
   const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
     : serviceType === 'win_boost' || serviceType === 'md5'
       ? 'solo_standard'
-      : null
+      : serviceType === 'clash'
+        ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+        : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache.
   const { data: addonData } = useBoostAddons(flow)
   const addonCatalog = addonData ?? EMPTY_ADDONS
@@ -398,7 +402,12 @@ export function OrderBuilderPage() {
                 </div>
               ))}
 
-              {/* Cupom — só pra serviços elegíveis (elo boost, vitórias, md5). */}
+              {/* Cupom — todo serviço com preço de tabela aceita (elo boost,
+                  vitórias, md5, clash). Só Coaching fica de fora, já que o
+                  preço é o pacote que o próprio booster cadastra (ver
+                  COUPON_ELIGIBLE_SERVICE_TYPES, que é a autoridade real —
+                  este `!== 'coaching'` aqui é só pra decidir se o campo
+                  aparece; applyCoupon() abaixo é quem decide se aplica). */}
               {serviceType && serviceType !== 'coaching' && (
                 <div className="py-2">
                   {!coupon?.couponApplied ? (

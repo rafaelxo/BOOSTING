@@ -6,10 +6,10 @@ import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/compon
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER, expectedMatchesForWins } from '@/lib/pricing'
+import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, MD5_DISCOUNT_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER, expectedMatchesForWins } from '@/lib/pricing'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
-import { Check, Search, Info, Lock } from 'lucide-react'
+import { Search, Info, Lock } from 'lucide-react'
 import { CoachPackagePicker } from './CoachPackagePicker'
 import { ClashConfigPicker } from './ClashConfigPicker'
 
@@ -47,7 +47,7 @@ export function StepConfigure() {
     isMd5, md5MatchesRemaining,
     currentLp, avgLpGain, avgLpLoss,
     currentPdl,
-    riotId, riotAutoFilled, riotVerified, md5Blocked, riotLookupLoading, stepAttempted,
+    riotId, riotAutoFilled, riotVerified, riotLookupLoading, stepAttempted,
     setService, setCurrentRank, setTargetRank, setQueueType, setBoostMode,
     setWinsPurchased,
     setIsMd5, setMd5MatchesRemainingFromApi,
@@ -370,6 +370,100 @@ export function StepConfigure() {
       <p className="text-sm text-ink-secondary mb-6">Defina seus ranks e preferências.</p>
 
       <div className="space-y-6">
+        {/* Modalidade (Solo/Duo Boost) — escolha livre do cliente, mesmo
+            padrão visual do seletor de Tipo de Fila logo abaixo. Fica antes
+            de tudo porque não depende do Riot ID. Duo não existe no Master+,
+            mas isso só se sabe depois de verificar o elo — o próprio store
+            (setCurrentRank/setBoostMode) já força 'solo' e recusa 'duo'
+            nesse caso, então o botão só some/trava quando descobrimos. */}
+        {serviceType === 'elo_boost' && (
+          <FormField label="Modalidade">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBoostMode('solo')}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                  boostMode === 'solo'
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                )}
+              >
+                Solo Boost
+              </button>
+              <button
+                type="button"
+                onClick={() => setBoostMode('duo')}
+                disabled={currentIsMasterPlus}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                  boostMode === 'duo'
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                  currentIsMasterPlus && 'opacity-50 cursor-not-allowed hover:border-bg-elevated',
+                )}
+              >
+                Duo Boost <span className="font-normal opacity-70">(+{DUO_BOOST_PCT}%)</span>
+              </button>
+            </div>
+            <p className="text-xs text-ink-muted mt-1.5">
+              {currentIsMasterPlus
+                ? 'Duo Boost indisponível para Mestre ou superior.'
+                : 'Duo Boost: você joga junto com o booster na duo queue.'}
+            </p>
+          </FormField>
+        )}
+
+        {/* Vitórias ou MD5 — NUNCA é escolha livre, o próprio Riot ID abaixo
+            decide: conta sem rank nesta fila vira MD5 automaticamente, conta
+            já rankeada trava em Vitórias (anti-fraude, o backend rejeita MD5
+            de conta que já saiu do posicionamento de qualquer jeito). Antes
+            de verificar, mostra o estado default (Vitórias) sem travar
+            ainda. Mesmo padrão visual do seletor de Tipo de Fila abaixo. */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Vitórias ou MD5">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-not-allowed',
+                  !isMd5
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary opacity-50',
+                )}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  Vitórias
+                  {riotVerified && isMd5 && <Lock className="h-3 w-3 opacity-60" />}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all cursor-not-allowed',
+                  isMd5
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary opacity-50',
+                )}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  MD5 <span className="font-normal opacity-70">(-{MD5_DISCOUNT_PCT}%)</span>
+                  {riotVerified && !isMd5 && <Lock className="h-3 w-3 opacity-60" />}
+                </span>
+              </button>
+            </div>
+            <p className="text-xs text-ink-muted mt-1.5">
+              {!riotVerified
+                ? 'Detectado automaticamente ao verificar seu Riot ID abaixo.'
+                : isMd5
+                  ? 'Conta ainda no posicionamento nesta fila — MD5 ativado, garantia de 80%+ de win rate.'
+                  : 'Conta já possui rank nesta fila — MD5 indisponível (anti-fraude).'}
+            </p>
+          </FormField>
+        )}
+
         {/* Tipo de fila vem antes do Riot ID — a busca na Riot precisa saber
             qual fila consultar (Solo/Duo ou Flex) antes de rodar, senão o
             rank/PDL preenchido pode vir da fila errada. Compartilhado entre
@@ -471,33 +565,6 @@ export function StepConfigure() {
           </div>
         )}
 
-        {/* Duo Boost toggle — não existe no fluxo Master+; só após verificar o elo */}
-        {serviceType === 'elo_boost' && riotVerified && !currentIsMasterPlus && (
-          <FormField label="Extras" hint="Duo Boost: você joga junto ao booster na duo queue (+50% no preço).">
-            <button
-              type="button"
-              onClick={() => setBoostMode(boostMode === 'duo' ? 'solo' : 'duo')}
-              className={cn(
-                'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
-                boostMode === 'duo'
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
-              )}
-            >
-              <div>
-                <p className="text-sm font-bold">Duo Boost <span className="text-xs font-normal opacity-70">(+50%)</span></p>
-                <p className="text-[11px] font-normal mt-0.5 opacity-70">Você joga junto com o booster na duo queue</p>
-              </div>
-              <div className={cn(
-                'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
-                boostMode === 'duo' ? 'border-brand bg-brand' : 'border-bg-overlay',
-              )}>
-                {boostMode === 'duo' && <Check className="h-3 w-3 text-white" />}
-              </div>
-            </button>
-          </FormField>
-        )}
-
         {/* Vitórias/MD5: Riot ID vem logo após o Tipo de Fila — a consulta
             usa a fila marcada acima, e a checagem de elegibilidade MD5
             precisa acontecer antes de qualquer outro campo. */}
@@ -542,51 +609,6 @@ export function StepConfigure() {
             {md5Message && <p className="mt-2 text-xs text-success">{md5Message}</p>}
             {riotLookupMessage && !md5Message && <p className="mt-2 text-xs text-success">{riotLookupMessage}</p>}
             {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
-          </FormField>
-        )}
-
-        {/* MD5 toggle — só após verificar o elo. Depois da verificação o MD5 é
-            DETERMINADO pela conta, não é escolha livre: se a conta está no
-            posicionamento (unranked na fila) o MD5 é marcado e TRAVADO (serviço
-            = md5); se já tem rank, o MD5 fica travado e desmarcado (anti-fraude).
-            O backend valida os dois casos de qualquer forma. */}
-        {(serviceType === 'win_boost' || serviceType === 'md5') && riotVerified && (
-          <FormField label="Extras" hint="MD5: garantimos 80%+ de win rate nas suas partidas de posicionamento restantes, com desconto no preço por vitória.">
-            <button
-              type="button"
-              // Sempre travado após a verificação: marcado (detectado) ou
-              // desmarcado (conta já rankeada). Nunca é um clique livre.
-              disabled={md5Blocked || isMd5}
-              onClick={() => { if (!md5Blocked && !isMd5) setIsMd5(true) }}
-              className={cn(
-                'w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left',
-                md5Blocked
-                  ? 'border-bg-elevated bg-bg-elevated/40 text-ink-muted cursor-not-allowed opacity-70'
-                  : isMd5
-                    ? 'border-brand bg-brand/10 text-brand cursor-not-allowed'
-                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30 hover:text-ink',
-              )}
-            >
-              <div>
-                <p className="text-sm font-bold flex items-center gap-1.5">
-                  MD5 <span className="text-xs font-normal opacity-70">(garantia de win rate)</span>
-                  {(md5Blocked || isMd5) && <Lock className="h-3 w-3 opacity-60" />}
-                </p>
-                <p className="text-[11px] font-normal mt-0.5 opacity-70">
-                  {md5Blocked
-                    ? 'Indisponível — sua conta já tem rank nesta fila.'
-                    : isMd5
-                      ? 'Detectado automaticamente — sua conta está no posicionamento. Serviço definido como MD5.'
-                      : 'Garantia de win rate nas suas partidas de posicionamento restantes.'}
-                </p>
-              </div>
-              <div className={cn(
-                'h-5 w-5 rounded border-2 flex items-center justify-center shrink-0',
-                isMd5 && !md5Blocked ? 'border-brand bg-brand' : 'border-bg-overlay',
-              )}>
-                {isMd5 && !md5Blocked && <Check className="h-3 w-3 text-white" />}
-              </div>
-            </button>
           </FormField>
         )}
 

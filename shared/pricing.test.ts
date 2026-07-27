@@ -590,9 +590,9 @@ describe('computeOrderPrice — pdlModifierPct exposto no resultado (fluxo padr�
   })
 })
 
-describe('Cupom de desconto (applyCoupon) — só ELOPEAK30, 30%, nunca em coaching', () => {
-  it('ELOPEAK30 aplica 30% de desconto para elo_boost/win_boost/md5', () => {
-    for (const serviceType of ['elo_boost', 'win_boost', 'md5'] as const) {
+describe('Cupom de desconto (applyCoupon) — só ELOPEAK30, 30%, todo serviço de tabela menos coaching', () => {
+  it('ELOPEAK30 aplica 30% de desconto para elo_boost/win_boost/md5/clash', () => {
+    for (const serviceType of ['elo_boost', 'win_boost', 'md5', 'clash'] as const) {
       const result = applyCoupon(200, 'ELOPEAK30', serviceType)
       expect(result.couponApplied).toBe(true)
       expect(result.discountPct).toBe(30)
