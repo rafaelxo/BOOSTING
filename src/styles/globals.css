@@ -31,7 +31,7 @@
     --color-danger-muted:  254 226 226;
     --color-info-muted:    219 234 254;
 
-    --logo-url: url('/light.png');
+    --logo-url: url('/images/logo.png');
     --ambient-url: url('/images/site-ambient-light.png');
     /* Scrim claro: clareia a imagem (em vez de escurecer) pra texto escuro
        (--color-ink) permanecer legível sobre a arte, mesmo que na versão
@@ -73,7 +73,7 @@
     --color-danger-muted:  46  18  18;
     --color-info-muted:    16  30  50;
 
-    --logo-url: url('/dark.png');
+    --logo-url: url('/images/logo.png');
     --ambient-url: url('/images/site-ambient-dark.png');
     /* Scrim escuro original: escurece a imagem pra texto claro (--color-ink)
        permanecer legível sobre a arte. */
