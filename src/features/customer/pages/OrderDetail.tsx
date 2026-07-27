@@ -17,6 +17,7 @@ import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
 import { formatDateTime, formatRank, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
+import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
   useOrder, useOrderStatusHistory, useCustomerOrderState, useSetOrderCredentials,
@@ -541,6 +542,21 @@ export function OrderDetailPage() {
                 {coachPackage.tempo && (
                   <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
                 )}
+              </div>
+            )}
+
+            {order.service_type === 'clash' && order.clash_tier && (
+              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+                <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+                <p className="text-sm text-ink-secondary leading-relaxed">
+                  {order.boost_mode === 'duo'
+                    ? 'Você vai jogar junto com o booster.'
+                    : 'O booster vai jogar na sua conta.'}
+                </p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                  <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+                  {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+                </div>
               </div>
             )}
 
