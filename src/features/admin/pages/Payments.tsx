@@ -1,4 +1,4 @@
-import { CreditCard, DollarSign, ReceiptText, CheckCircle2, Clock3, XCircle } from 'lucide-react'
+import { CreditCard, DollarSign, ReceiptText } from 'lucide-react'
 import { Card, EmptyState, Skeleton } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { cn, formatDateTime, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_COLOR } from '@/lib/utils'
@@ -35,15 +35,8 @@ function StatCard({ label, value, icon: Icon, tone }: { label: string; value: st
 export function AdminPaymentsPage() {
   const currency = useCurrency()
 
-  const { data: payments, isLoading } = useAdminPayments()
-
-  const collectedTotal = payments?.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0) ?? 0
-  // "Cancelado" não é um status de payments à parte -- o webhook do Mercado
-  // Pago (rejected/cancelled) grava ambos como 'failed' (ver
-  // mercadopago-webhook), então é essa a contagem que representa cancelados.
-  const paidCount = payments?.filter((p) => p.status === 'paid').length ?? 0
-  const pendingCount = payments?.filter((p) => p.status === 'pending').length ?? 0
-  const canceledCount = payments?.filter((p) => p.status === 'failed').length ?? 0
+  const { data: paymentSummary, isLoading } = useAdminPayments()
+  const payments = paymentSummary?.payments
 
   return (
     <div className="space-y-6">
@@ -53,29 +46,23 @@ export function AdminPaymentsPage() {
         <p className="mt-1 max-w-2xl text-sm text-ink-secondary">
           Cobranças PIX recebidas via Mercado Pago. Para repasses aos boosters, veja Solicitações de saque.
         </p>
-        {(payments?.length ?? 0) >= 150 && (
+        {(paymentSummary?.paidOrderCount ?? 0) > (payments?.length ?? 0) && (
           <p className="mt-1 text-xs text-warning">
-            Mostrando os 150 pagamentos mais recentes — "Recebido do cliente" reflete só essa lista, não o total histórico.
+            Mostrando os 150 pedidos pagos mais recentes. Os indicadores consideram todo o histórico.
           </p>
         )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <StatCard label="Recebido do cliente" value={currency(collectedTotal)} icon={DollarSign} tone="bg-success/10 text-success" />
-        <StatCard label="Pagamentos listados" value={String(payments?.length ?? 0)} icon={ReceiptText} tone="bg-brand/10 text-brand" />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="Pagamentos realizados" value={String(paidCount)} icon={CheckCircle2} tone="bg-success/10 text-success" />
-        <StatCard label="Pendentes" value={String(pendingCount)} icon={Clock3} tone="bg-warning/10 text-warning" />
-        <StatCard label="Cancelados" value={String(canceledCount)} icon={XCircle} tone="bg-danger/10 text-danger" />
+        <StatCard label="Total recebido" value={currency(paymentSummary?.totalReceived ?? 0)} icon={DollarSign} tone="bg-success/10 text-success" />
+        <StatCard label="Pedidos realizados" value={String(paymentSummary?.paidOrderCount ?? 0)} icon={ReceiptText} tone="bg-brand/10 text-brand" />
       </div>
 
       <Card padding="none">
         {isLoading ? (
           <div className="p-4"><Skeleton className="h-48 w-full" /></div>
         ) : !payments?.length ? (
-          <EmptyState icon={CreditCard} title="Nenhum pagamento encontrado." />
+          <EmptyState icon={CreditCard} title="Nenhum pedido pago encontrado." />
         ) : (
           <Table>
             <TableHeader>

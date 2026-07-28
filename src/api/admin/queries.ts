@@ -15,10 +15,32 @@ export async function listAdminRefunds(limit = 100): Promise<Refund[]> {
   return (data ?? []) as unknown as Refund[]
 }
 
-export async function listAdminPayments(limit = 150): Promise<Payment[]> {
-  const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(limit)
+export async function listAdminPayments(limit = 150): Promise<{
+  payments: Payment[]
+  paidOrderCount: number
+  totalReceived: number
+}> {
+  const [
+    { data, error, count },
+    { data: dashboardStats, error: dashboardStatsError },
+  ] = await Promise.all([
+    supabase
+      .from('payments')
+      .select('*', { count: 'exact' })
+      .eq('status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabase.rpc('admin_dashboard_stats'),
+  ])
   if (error) throw normalizeApiError(error)
-  return (data ?? []) as unknown as Payment[]
+  if (dashboardStatsError) throw normalizeApiError(dashboardStatsError)
+
+  const stats = dashboardStats as unknown as AdminDashboardStats
+  return {
+    payments: (data ?? []) as unknown as Payment[],
+    paidOrderCount: count ?? 0,
+    totalReceived: stats.total_revenue,
+  }
 }
 
 export async function listAdminDropRequests(limit = 100): Promise<OrderDropRequest[]> {

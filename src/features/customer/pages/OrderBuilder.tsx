@@ -84,10 +84,11 @@ function isStepComplete(
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
     // Riot ID obrigatório nos dois modos de Clash (Solo: referência do
     // booster antes de logar via credenciais; Duo: identificador pra
-    // convidar o cliente pro time) -- mesma checagem de formato usada em
-    // elo_boost/win_boost/md5, sem exigir riotVerified (o tier continua
-    // selecionável manualmente quando a conta não tem rank na fila).
-    if (state.serviceType === 'clash') return !!state.clashTier && !!state.clashDay && isValidRiotId(state.riotId)
+    // convidar o cliente pro time). O tier é sempre derivado da verificação
+    // Riot e não pode ser escolhido manualmente.
+    if (state.serviceType === 'clash') {
+      return state.riotVerified && !!state.clashTier && !!state.clashDay && isValidRiotId(state.riotId)
+    }
   }
   return true
 }
