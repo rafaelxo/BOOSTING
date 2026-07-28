@@ -72,6 +72,7 @@ function clashIntent(overrides: Record<string, unknown> = {}) {
     clash_day: 'saturday',
     addon_codes: [],
     customer_notes: null,
+    riot_id: 'Fulano#BR1',
     coupon_code: null,
     ...overrides,
   }
@@ -86,6 +87,22 @@ Deno.test('Clash Solo tier_4 -- preço final bate com a tabela fixa (R$20,00), s
   assertEquals(outcome.priced.couponApplied, false)
   assertEquals(outcome.normalized.clashTier, 'tier_4')
   assertEquals(outcome.normalized.clashDay, 'saturday')
+  assertEquals(outcome.normalized.riotId, 'Fulano#BR1')
+})
+
+Deno.test('Clash sem riot_id é rejeitado (obrigatório nos dois modos -- Solo referencia o booster, Duo identifica o cliente pro time)', async () => {
+  const { riot_id: _riotId, ...withoutRiotId } = clashIntent()
+  const outcome = await validateAndPriceIntent(req, withoutRiotId, USER_ID, fakeServiceClient(), '', null)
+  assert(!outcome.ok)
+  assertEquals(outcome.response.status, 400)
+})
+
+Deno.test('Clash Duo mantém riot_id no normalized igual ao Solo', async () => {
+  const outcome = await validateAndPriceIntent(
+    req, clashIntent({ boost_mode: 'duo', riot_id: 'Cliente#BR2' }), USER_ID, fakeServiceClient(), '', null,
+  )
+  assert(outcome.ok, `esperava sucesso, veio erro: ${!outcome.ok ? await outcome.response.clone().text() : ''}`)
+  assertEquals(outcome.normalized.riotId, 'Cliente#BR2')
 })
 
 Deno.test('Clash Duo tier_4 -- preço final bate com a tabela fixa (R$59,90)', async () => {

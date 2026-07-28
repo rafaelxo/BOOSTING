@@ -106,25 +106,42 @@ serve(async (req) => {
       }
     }
 
-    // payments.order_id is not ON DELETE CASCADE, so remove it explicitly.
-    const { error: deletePaymentsError } = await admin
+    // Soft-cancel, nunca delete -- mesmo padrão de expire_stale_pix_orders()
+    // (migration 048) e do webhook do Mercado Pago (migration 122): o
+    // cliente deixa de ver o pedido (listCustomerOrders filtra status =
+    // 'canceled'), mas a linha continua existindo pra auditoria de
+    // pagamento e pra get_customer_order_state responder com um
+    // status/can_pay coerentes em vez de "order_not_found" -- um hard delete
+    // aqui era a única rota de cancelamento que produzia um formato de
+    // "pedido morto" diferente dos outros dois (linha ausente vs.
+    // status='canceled'), forçando o frontend a tratar `.catch(() => null)`
+    // como se fosse um erro de rede transiente em vez de um estado terminal.
+    const { error: updatePaymentsError } = await admin
       .from('payments')
-      .delete()
+      .update({ status: 'failed', updated_at: new Date().toISOString() })
       .eq('order_id', order.id)
       .eq('customer_id', auth.user.id)
 
-    if (deletePaymentsError) return errorResponse(req, 'Failed to delete payment record', 500, 'PAYMENT_DELETE_FAILED')
+    if (updatePaymentsError) return errorResponse(req, 'Failed to update payment record', 500, 'PAYMENT_UPDATE_FAILED')
 
-    const { error: deleteOrderError } = await admin
+    const { error: cancelOrderError } = await admin
       .from('orders')
-      .delete()
+      .update({ status: 'canceled', updated_at: new Date().toISOString() })
       .eq('id', order.id)
       .eq('customer_id', auth.user.id)
       .eq('status', 'awaiting_payment')
 
-    if (deleteOrderError) return errorResponse(req, 'Failed to delete order', 500, 'ORDER_DELETE_FAILED')
+    if (cancelOrderError) return errorResponse(req, 'Failed to cancel order', 500, 'ORDER_CANCEL_FAILED')
 
-    return jsonResponse(req, { success: true, order_id: order.id, deleted: true })
+    await admin.from('order_status_history').insert({
+      order_id: order.id,
+      from_status: 'awaiting_payment',
+      to_status: 'canceled',
+      changed_by: auth.user.id,
+      reason: 'Cancelado pelo cliente antes da confirmação do pagamento',
+    })
+
+    return jsonResponse(req, { success: true, order_id: order.id, canceled: true })
   } catch (err) {
     if (err instanceof HttpError) return errorResponse(req, err.message, err.status)
     console.error('cancel-pending-order error', err instanceof Error ? err.name : 'unknown')

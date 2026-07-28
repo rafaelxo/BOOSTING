@@ -25,7 +25,6 @@ truncate table
   public.order_status_history,
   public.orders,
   public.booster_services,
-  public.booster_applications,
   public.booster_profiles,
   public.customer_profiles,
   public.duo_accounts,

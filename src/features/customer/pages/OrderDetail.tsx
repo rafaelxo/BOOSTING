@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
-  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight,
+  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight, Tag,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge, GuaranteeNotice } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
@@ -198,6 +198,12 @@ function PendingPaymentSection({ order }: { order: Order }) {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
         queryClient.removeQueries({ queryKey: ['orders', 'detail', order.id] })
+        // Sem isso, o cache de "tenho um pedido pendente pra retomar" (lido
+        // por OrderBuilder.tsx ao abrir /orders/new) podia continuar
+        // apontando pra este pedido recém-cancelado até expirar sozinho --
+        // reabrir o configurador nessa janela mandava o cliente de volta
+        // pra cá, achando que ainda havia algo pra pagar.
+        queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
         navigate('/orders/new?new=1', { replace: true })
       },
       onError: async () => {
@@ -209,6 +215,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
           return
         }
         queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
+        queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
         navigate('/orders/new?new=1', { replace: true })
       },
     })
@@ -499,7 +506,7 @@ export function OrderDetailPage() {
   const detailStats = [
     ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo', value: modeLabel }] : []),
     ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
-    ...(isBoostFlow && order.riot_id ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id }] : []),
+    ...((isBoostFlow || order.service_type === 'clash') && order.riot_id ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id }] : []),
     ...(order.estimated_hours ? [{ icon: Clock, label: 'Entrega Estimada', value: formatEstimatedDelivery(order.estimated_hours) }] : []),
     ...(order.service_type === 'coaching' && order.sessions_purchased
       ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
@@ -632,6 +639,26 @@ export function OrderDetailPage() {
               </div>
             )}
 
+            {/* Cupom fixo aplicado automaticamente no configurador — mesmo
+                cupom/desconto já mostrados no resumo do order-builder
+                (OrderBuilder.tsx), agora também no pedido já pago. */}
+            {order.discount_price > 0 && (
+              <div className="mt-4 pt-4 border-t border-border-subtle space-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-success font-medium">
+                  <Tag className="h-3.5 w-3.5 shrink-0" />
+                  {order.coupon_code ? `Cupom ${order.coupon_code} aplicado` : 'Desconto aplicado'}
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-secondary">Subtotal</span>
+                  <span className="text-ink-muted line-through" data-tabular>{currency(order.base_price + order.extras_price)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink-secondary">Desconto</span>
+                  <span className="font-semibold text-success" data-tabular>-{currency(order.discount_price)}</span>
+                </div>
+              </div>
+            )}
+
             {order.customer_notes && (
               <div className="mt-4 pt-4 border-t border-border-subtle">
                 <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
@@ -644,7 +671,7 @@ export function OrderDetailPage() {
             ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderCoachingTopics orderId={order.id} />
             )
-            : order.riot_id && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderMatchHistory
                 orderId={order.id}
                 sync={order.status === 'in_progress' || order.status === 'paused' ? {

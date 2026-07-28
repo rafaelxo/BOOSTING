@@ -53,3 +53,16 @@ export const CLASH_DAY_LABEL: Record<ClashDay, string> = {
   saturday: 'Sábado',
   sunday: 'Domingo',
 }
+
+// Inverso de CLASH_TIER_RANK_TIERS — dado o rank verificado via Riot
+// (mesma consulta riot-account-rank usada pelo Elo Boost/Vitórias/MD5),
+// resolve automaticamente o tier de Clash correspondente, sem o cliente
+// precisar escolher manualmente. Cobre os 10 RankTier existentes (Ferro a
+// Challenger), então sempre encontra um tier — o fallback nunca é
+// alcançado na prática.
+export function rankTierToClashTier(tier: RankTier): ClashTier {
+  for (const clashTier of Object.keys(CLASH_TIER_RANK_TIERS) as ClashTier[]) {
+    if (CLASH_TIER_RANK_TIERS[clashTier].includes(tier)) return clashTier
+  }
+  return 'tier_1'
+}

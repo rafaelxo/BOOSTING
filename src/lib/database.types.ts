@@ -1769,6 +1769,7 @@ export type Database = {
           price_modifier: number
           price_modifier_pct: number
           service_id: string | null
+          service_type_overrides: Json
           sort_order: number
         }
         Insert: {
@@ -1782,6 +1783,7 @@ export type Database = {
           price_modifier?: number
           price_modifier_pct?: number
           service_id?: string | null
+          service_type_overrides?: Json
           sort_order?: number
         }
         Update: {
@@ -1795,6 +1797,7 @@ export type Database = {
           price_modifier?: number
           price_modifier_pct?: number
           service_id?: string | null
+          service_type_overrides?: Json
           sort_order?: number
         }
         Relationships: [

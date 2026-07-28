@@ -69,7 +69,16 @@ export async function listBoosterOrdersPage(params: {
 
 export async function listAdminOrders(status?: OrderStatus | 'all', serviceType?: ServiceType | 'all', limit = 100): Promise<Order[]> {
   let query = supabase.from('orders').select(ORDER_SAFE_COLUMNS).order('created_at', { ascending: false }).limit(limit)
-  if (status && status !== 'all') query = query.eq('status', status)
+  if (status && status !== 'all') {
+    query = query.eq('status', status)
+  } else {
+    // "Todos" nunca deve incluir cancelados por padrão -- mesmo padrão de
+    // listCustomerOrders (linha acima). Pedidos que expiraram/foram
+    // cancelados (pelo cliente ou pelo tempo) somem da visão geral do
+    // admin; ainda dá pra ver todos filtrando explicitamente por
+    // status='canceled'.
+    query = query.neq('status', 'canceled')
+  }
   if (serviceType && serviceType !== 'all') query = query.eq('service_type', serviceType)
   const { data, error } = await query
   if (error) throw normalizeApiError(error, 'Não foi possível carregar os pedidos.')

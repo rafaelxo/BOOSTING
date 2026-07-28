@@ -149,6 +149,12 @@ export interface ServiceExtra {
   icon: string | null
   flow: BoostFlow | null
   code: string | null          // identificador estável — nunca o label
+  // Sobrescrita de name/description por service_type (ver resolveAddonLabel
+  // em shared/boostDomain.ts) — o mesmo addon é compartilhado por vários
+  // service_types dentro de um flow (ex.: solo_standard serve Elo Boost
+  // Solo/Vitórias/MD5/Solo Clash), então o texto base sozinho nem sempre
+  // faz sentido pra todos eles.
+  service_type_overrides: Partial<Record<ServiceType, { name?: string; description?: string }>> | null
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -191,6 +197,12 @@ export interface Order {
   base_price: number
   extras_price: number
   total_price: number
+  // Cupom fixo aplicado automaticamente no configurador (shared/pricing.ts,
+  // DEFAULT_COUPON_CODE) — coupon_code é só o código informativo/auditoria,
+  // discount_price é o valor em R$ já abatido do subtotal (total_price já
+  // reflete o desconto, nunca precisa ser recalculado no cliente).
+  coupon_code: string | null
+  discount_price: number
   estimated_hours: number | null
   customer_notes: string | null
   booster_notes: string | null

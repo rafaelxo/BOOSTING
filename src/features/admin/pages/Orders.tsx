@@ -30,6 +30,9 @@ export function AdminOrdersPage() {
     { label: t('admin.orders.filters.awaiting'), value: 'awaiting_assignment' },
     { label: t('admin.orders.filters.disputed'), value: 'disputed' },
     { label: t('admin.orders.filters.completed'), value: 'completed' },
+    // "Todos" nunca inclui cancelados (listAdminOrders já filtra) -- pra
+    // auditoria, o admin ainda consegue vê-los explicitamente aqui.
+    { label: t('admin.orders.filters.canceled'), value: 'canceled' },
   ]
 
   const { data: orders, isLoading, isError, refetch } = useAdminOrders(status, serviceType)

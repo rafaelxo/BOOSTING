@@ -7,6 +7,7 @@ import {
   isStandardTier,
   hasDuplicateAddonCodes,
   getPdlBracket,
+  resolveAddonLabel,
   NO_DIVISION_TIERS,
 } from '../../../shared/boostDomain.ts'
 import { errorResponse, jsonResponse } from './responses.ts'
@@ -191,8 +192,11 @@ const md5IntentSchema = z.object({
 }).strict()
 
 // Solo Clash / Duo Clash — sem rank+divisão específico (só o tier), sem
-// LP/PDL, sem vitórias, sem Riot ID. Dia é obrigatório e restrito a sábado
-// ou domingo -- qualquer outro valor é rejeitado pelo próprio z.enum.
+// LP/PDL, sem vitórias. Dia é obrigatório e restrito a sábado ou domingo --
+// qualquer outro valor é rejeitado pelo próprio z.enum. Riot ID é obrigatório
+// nos dois modos: no Solo, é referência do booster antes de logar via
+// credenciais; no Duo, é o identificador que o booster usa pra convidar o
+// cliente pro time dentro do jogo (não há handoff de credenciais no Duo).
 const clashIntentSchema = z.object({
   service_type: z.literal('clash'),
   service_id: z.string().uuid(),
@@ -203,6 +207,7 @@ const clashIntentSchema = z.object({
   clash_day: z.enum(['saturday', 'sunday']),
   addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
+  riot_id: riotIdSchema,
   coupon_code: couponCodeSchema,
 }).strict()
 
@@ -536,7 +541,7 @@ export async function validateAndPriceIntent(
       currentPdl: null,
       avgPdlGain: null,
       avgPdlLoss: null,
-      riotId: null,
+      riotId: clash.riot_id,
       boosterServiceId: null,
       couponCode: clash.coupon_code,
       clashTier: clash.clash_tier,
@@ -795,13 +800,23 @@ export async function validateAndPriceIntent(
     if (addonCodes.length > 0) {
       const { data: rows, error: extraErr } = await serviceClient
         .from('service_extras')
-        .select('id, code, name, price_modifier, price_modifier_pct, sort_order')
+        .select('id, code, name, description, price_modifier, price_modifier_pct, sort_order, service_type_overrides')
         .eq('flow', addonFlow)
         .eq('is_active', true)
         .in('code', addonCodes)
       if (extraErr) return { ok: false, response: errorResponse(req, 'Failed to load extras', 500) }
       if (!rows || rows.length !== addonCodes.length) return { ok: false, response: badRequest(req, 'Addon inexistente ou inativo') }
-      extras = rows
+      // Mesmo texto que o cliente viu no configurador (resolveAddonLabel) fica
+      // congelado no snapshot do pedido -- nunca o name genérico de Elo Boost
+      // pra um addon comprado via Vitórias/MD5/Clash.
+      extras = rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: resolveAddonLabel(row, normalized.serviceType).name,
+        price_modifier: row.price_modifier,
+        price_modifier_pct: row.price_modifier_pct,
+        sort_order: row.sort_order,
+      }))
     }
   } else if (addonCodes.length > 0) {
     return { ok: false, response: badRequest(req, 'Addons não são aceitos para este tipo de serviço') }

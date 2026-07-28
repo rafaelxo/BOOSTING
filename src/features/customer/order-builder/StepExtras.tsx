@@ -6,7 +6,7 @@ import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { CheckCircle2, Zap, Tv, Crosshair, User, Trophy, Shield, Lightbulb, Mic } from 'lucide-react'
 import { Skeleton } from '@/components/ui'
 import { getWinBoostPrice } from '@/lib/pricing'
-import { getBoostFlow, isMasterPlusCurrentTier } from '@/lib/boostDomain'
+import { getBoostFlow, isMasterPlusCurrentTier, resolveAddonLabel } from '@/lib/boostDomain'
 import type { ServiceExtra } from '@/types'
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -122,6 +122,7 @@ export function StepExtras() {
                 const selected = selectedExtraIds.has(extra.id)
                 const Icon = ICON_MAP[extra.icon ?? 'zap'] ?? Zap
                 const price = getExtraPrice(extra)
+                const label = resolveAddonLabel(extra, serviceType!)
 
                 return (
                   <button
@@ -145,12 +146,12 @@ export function StepExtras() {
                     </div>
                     <div className="flex-1 min-w-0 pr-6">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={cn('text-sm font-semibold', selected ? 'text-brand' : 'text-ink')}>{extra.name}</p>
+                        <p className={cn('text-sm font-semibold', selected ? 'text-brand' : 'text-ink')}>{label.name}</p>
                         <span className={cn('text-xs font-bold shrink-0', price === 0 ? 'text-success' : 'text-brand')}>
                           {formatExtraPrice(extra)}
                         </span>
                       </div>
-                      <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{extra.description}</p>
+                      <p className="text-xs text-ink-secondary mt-1 leading-relaxed">{label.description}</p>
                     </div>
                   </button>
                 )

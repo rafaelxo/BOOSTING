@@ -369,7 +369,8 @@
         "active": "Ativos",
         "awaiting": "Aguardando",
         "disputed": "Disputados",
-        "completed": "Concluídos"
+        "completed": "Concluídos",
+        "canceled": "Cancelados"
       },
       "table": {
         "id": "ID Pedido",

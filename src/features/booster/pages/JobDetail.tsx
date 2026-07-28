@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
-  Gamepad2, Users, Shuffle, TrendingUp, Trophy, Wallet,
+  Gamepad2, Users, Shuffle, TrendingUp, Trophy, Wallet, Hash,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
@@ -311,9 +311,16 @@ export function JobDetailPage() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
                   <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
                   {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+                  {order.riot_id && (
+                    <span className="inline-flex items-center gap-1">
+                      <Hash className="h-3 w-3 shrink-0" />
+                      Riot ID: <span className="font-semibold text-ink">{order.riot_id}</span>
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs font-semibold text-brand pt-1">
                   A montagem do time é sua responsabilidade — organize dentro do League of Legends.
+                  {order.boost_mode === 'duo' && ' Use o Riot ID acima para convidar o cliente para o time.'}
                 </p>
               </div>
             )}

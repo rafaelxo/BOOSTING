@@ -34,7 +34,7 @@ export function StepReview() {
   const detailStats = [
     ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo', value: modoLabel }] : []),
     ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
-    ...(isBoostFlow && riotId.trim() ? [{ icon: Hash, label: 'Riot ID', value: riotId.trim() }] : []),
+    ...((isBoostFlow || serviceType === 'clash') && riotId.trim() ? [{ icon: Hash, label: 'Riot ID', value: riotId.trim() }] : []),
     ...(estimatedHours ? [{ icon: Clock, label: 'Entrega Estimada', value: formatEstimatedDelivery(estimatedHours) }] : []),
   ]
 

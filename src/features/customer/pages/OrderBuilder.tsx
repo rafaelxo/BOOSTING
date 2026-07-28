@@ -6,7 +6,7 @@ import { Stepper, Button, Card } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { applyCoupon, getWinBoostPrice } from '@/lib/pricing'
-import { getBoostFlow } from '@/lib/boostDomain'
+import { getBoostFlow, resolveAddonLabel } from '@/lib/boostDomain'
 import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag } from 'lucide-react'
 import type { ServiceType, Rank } from '@/types'
 import { supabase } from '@/lib/supabase'
@@ -82,7 +82,12 @@ function isStepComplete(
       return state.riotVerified && !!state.currentRank && winsOk && isValidRiotId(state.riotId)
     }
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
-    if (state.serviceType === 'clash') return !!state.clashTier && !!state.clashDay
+    // Riot ID obrigatório nos dois modos de Clash (Solo: referência do
+    // booster antes de logar via credenciais; Duo: identificador pra
+    // convidar o cliente pro time) -- mesma checagem de formato usada em
+    // elo_boost/win_boost/md5, sem exigir riotVerified (o tier continua
+    // selecionável manualmente quando a conta não tem rank na fila).
+    if (state.serviceType === 'clash') return !!state.clashTier && !!state.clashDay && isValidRiotId(state.riotId)
   }
   return true
 }
@@ -372,7 +377,7 @@ export function OrderBuilderPage() {
               )}
               {selectedAddons.map((extra) => (
                 <div key={extra.id} className="flex justify-between text-xs">
-                  <span className="text-ink-secondary">{extra.name}</span>
+                  <span className="text-ink-secondary">{serviceType ? resolveAddonLabel(extra, serviceType).name : extra.name}</span>
                   <span className="text-ink">
                     {extra.price_modifier > 0 ? `+${currency(extra.price_modifier)}` :
                      extra.price_modifier_pct > 0 ? `+${extra.price_modifier_pct}%` : 'Grátis'}

@@ -13,7 +13,7 @@
 // funções para validar e rejeitar qualquer combinação inválida — não confie
 // em nenhuma decisão de fluxo/addon recalculada apenas no cliente.
 
-import { rankStep, type Division, type RankTier } from './pricing.ts'
+import { rankStep, type Division, type RankTier, type ServiceType } from './pricing.ts'
 
 export type BoostMode = 'solo' | 'duo'
 export type BoostFlow = 'solo_standard' | 'duo_standard' | 'master_plus'
@@ -99,6 +99,39 @@ export const BOOST_ADDON_CODES: Record<BoostFlow, readonly string[]> = {
 
 export function isAddonCodeValidForFlow(flow: BoostFlow, code: string): boolean {
   return BOOST_ADDON_CODES[flow].includes(code)
+}
+
+// Um addon (code) é UMA linha em service_extras compartilhada por todo
+// service_type que reaproveita seu flow (ex.: solo_standard serve Elo Boost
+// Solo, Vitórias, MD5 e Solo Clash) — o name/description base foi escrito
+// pensando só em Elo Boost. service_type_overrides (migration 121) guarda
+// como o MESMO addon deve ser chamado/descrito para os demais service_types
+// daquele flow, sem duplicar a linha (preço/flow/code continuam únicos).
+// Chave ausente (ou campo ausente dentro dela) sempre cai pro texto base —
+// nunca um texto vazio. Usado tanto pelo frontend (StepExtras/OrderBuilder,
+// exibição ao vivo) quanto pela Edge Function (snapshot congelado em
+// orders.extras) — o mesmo texto que o cliente viu ao escolher o addon é o
+// que fica gravado no pedido.
+export interface AddonLabelOverride {
+  name?: string
+  description?: string
+}
+
+export interface AddonLabelSource {
+  name: string
+  description: string
+  service_type_overrides?: Partial<Record<ServiceType, AddonLabelOverride>> | null
+}
+
+export function resolveAddonLabel(
+  extra: AddonLabelSource,
+  serviceType: ServiceType,
+): { name: string; description: string } {
+  const override = extra.service_type_overrides?.[serviceType]
+  return {
+    name: override?.name ?? extra.name,
+    description: override?.description ?? extra.description,
+  }
 }
 
 export function hasDuplicateAddonCodes(codes: string[]): boolean {

@@ -281,6 +281,7 @@ export function StepPayment() {
         clash_tier: store.clashTier,
         clash_day: store.clashDay,
         addon_codes: addonCodes,
+        riot_id: store.riotId,
       }
     }
 
@@ -342,10 +343,48 @@ export function StepPayment() {
     try {
       pixData = await generatePixRequest(orderId)
     } catch (err) {
-      const orderId = err instanceof EdgeFunctionError && err.body && typeof err.body !== 'string'
+      // Pedido morto -- não existe mais (404, ex.: cancel-pending-order já
+      // apagou a linha) ou não pode mais receber pagamento (400 "Order is
+      // not awaiting payment", ex.: PIX recusado/cancelado no Mercado Pago,
+      // migration 122). Nunca trava o cliente re-tentando o mesmo pedido
+      // morto pra sempre -- limpa a vinculação (mantém a configuração já
+      // feita no store) pra que o próximo "Gerar PIX" crie um pedido novo.
+      // MP já mostra o pagamento como aprovado, mas o webhook ainda não
+      // chegou (create-pix-payment:252) -- vale pra qualquer tipo de
+      // serviço, é só uma corrida de tempo com o MP, não um erro de
+      // verdade. Redireciona igual ao caminho de payment_confirmed em vez
+      // de assustar o cliente com um alerta de erro pedindo pra "atualizar
+      // a página" manualmente.
+      if (err instanceof EdgeFunctionError && err.code === 'ALREADY_PAID') {
+        const state = await getCustomerOrderState(orderId).catch(() => null)
+        const requiresCredentials = state?.requires_credentials === true
+        setPix({ phase: 'confirmed' })
+        store.reset()
+        navigate(`/orders/${orderId}${requiresCredentials ? '#credentials' : ''}`, { replace: true })
+        return
+      }
+
+      const isDeadOrder = err instanceof EdgeFunctionError
+        && (err.status === 404 || (err.status === 400 && /not awaiting payment/i.test(err.message)))
+      if (isDeadOrder) {
+        setSavedOrderId(null)
+        setSavedTotalPrice(null)
+        setSearchParams({}, { replace: true })
+        // Sem isso, o retry criaria "outro" pedido só na aparência: o
+        // idempotency_key antigo ainda aponta (server-side) pro MESMO
+        // order_id morto, então persistPendingOrder() reencontraria e
+        // reusaria esse pedido de novo, batendo no mesmo 400 pra sempre.
+        idempotencyKeyRef.current = crypto.randomUUID()
+        setPix({
+          phase: 'error',
+          message: 'Este pedido não está mais disponível para pagamento (cancelado ou pagamento não confirmado). Clique em "Gerar PIX" para tentar novamente.',
+        })
+        return
+      }
+      const fallbackOrderId = err instanceof EdgeFunctionError && err.body && typeof err.body !== 'string'
         ? typeof err.body.order_id === 'string' ? err.body.order_id : undefined
         : undefined
-      setPix({ phase: 'error', message: pixErrorMessage(err), order_id: orderId })
+      setPix({ phase: 'error', message: pixErrorMessage(err), order_id: fallbackOrderId })
       return
     }
 
@@ -405,6 +444,26 @@ export function StepPayment() {
       if (state?.payment_confirmed) {
         const requiresCredentials = state.requires_credentials === true
         navigate(`/orders/${pendingOrderId}${requiresCredentials ? '#credentials' : ''}`, { replace: true })
+        return
+      }
+      // Pedido morto -- state null (não encontrado/não autorizado) ou
+      // status/can_pay indicam que ele já não pode mais receber pagamento
+      // (cancelado, pagamento recusado -- migration 122 -- ou expirado pelo
+      // cron de 048). Nunca insiste em gerar PIX pra um pedido morto -- essa
+      // era a causa de "volto ao site e ele me manda pra um pedido
+      // cancelado": o efeito chamava invokePix incondicionalmente. Mantém a
+      // configuração já feita (rank, extras etc. seguem no store) e só solta
+      // a vinculação com o pedido morto -- inclusive a idempotency key
+      // antiga, que senão faria o próximo persistPendingOrder() reencontrar
+      // e reusar o MESMO pedido morto pelo lookup de idempotency_key em
+      // create-pix-payment -- pra "Gerar PIX" criar um pedido genuinamente
+      // novo em vez de re-tentar o mesmo pra sempre.
+      if (!state?.can_pay) {
+        setSavedOrderId(null)
+        setSavedTotalPrice(null)
+        setSearchParams({}, { replace: true })
+        idempotencyKeyRef.current = crypto.randomUUID()
+        setSaveError('Este pedido não está mais disponível para pagamento (cancelado ou pagamento não confirmado). Clique em "Gerar PIX" para configurar o pagamento novamente.')
         return
       }
       setPix({ phase: 'generating' })

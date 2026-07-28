@@ -1,15 +1,24 @@
 // src/features/customer/order-builder/ClashConfigPicker.tsx
-import { useEffect } from 'react'
-import { Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Search } from 'lucide-react'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import { RankBadge } from '@/components/ui'
+import { RankBadge, ErrorAlert } from '@/components/ui'
+import { FormField } from '@/components/ui/FormField'
 import { getClashBasePrice, CLASH_ESTIMATED_HOURS } from '@/lib/pricing'
 import {
-  CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_TIER_BOUNDARY_RANKS, CLASH_DAY_LABEL,
+  CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_TIER_BOUNDARY_RANKS, CLASH_DAY_LABEL, rankTierToClashTier,
 } from '@/lib/clashDomain'
+// Mesma consulta riot-account-rank (fila fixa solo_duo) já usada pelo admin
+// pra reconsultar rank de conta Duo — não é específico de duo_accounts, só
+// nasceu ali primeiro. Reaproveitado aqui em vez de duplicar o fetch.
+import { lookupDuoAccountRiotRank } from '@/api/duoAccounts'
 import type { ClashTier, ClashDay, BoostMode } from '@/types'
+
+// Mesmo formato aceito pelo backend (riot-account-rank bodySchema) e usado
+// em StepConfigure.tsx para elo_boost/win_boost/md5.
+const RIOT_ID_FORMAT = /^[^#]{1,16}#[A-Za-z0-9]{2,5}$/
 
 const CLASH_TIERS: ClashTier[] = ['tier_4', 'tier_3', 'tier_2', 'tier_1']
 const CLASH_DAYS: ClashDay[] = ['saturday', 'sunday']
@@ -22,8 +31,18 @@ export function ClashConfigPicker() {
   const {
     boostMode, setBoostMode, clashTier, setClashTier, clashDay, setClashDay,
     setBasePrice, setEstimatedHours, setPdlModifierPct, stepAttempted,
+    riotId, setRiotId, riotVerified, setRiotVerified, riotAutoFilled, setRiotAutoFilled,
+    riotLookupLoading, setRiotLookupLoading, clearRiotLookup,
   } = useOrderBuilderStore()
   const currency = useCurrency()
+  const [riotLookupMessage, setRiotLookupMessage] = useState<string | null>(null)
+  const [riotLookupError, setRiotLookupError] = useState<string | null>(null)
+
+  // Mesmo travamento do rank em elo_boost/vitórias (RankLockGrid `disabled`):
+  // uma vez que o tier veio de uma verificação Riot bem-sucedida, deixa de
+  // ser editável manualmente -- editar o Riot ID invalida a verificação
+  // (setRiotId já zera riotVerified/riotAutoFilled) e destrava de novo.
+  const tierLocked = riotVerified && riotAutoFilled
 
   useEffect(() => {
     setPdlModifierPct(null)
@@ -35,6 +54,45 @@ export function ClashConfigPicker() {
     setBasePrice(getClashBasePrice(boostMode, clashTier))
     setEstimatedHours(CLASH_ESTIMATED_HOURS)
   }, [boostMode, clashTier, setBasePrice, setEstimatedHours, setPdlModifierPct])
+
+  // Riot ID obrigatório nos dois modos: no Solo é referência do booster
+  // antes de logar via credenciais; no Duo é o identificador que o booster
+  // usa pra convidar o cliente pro time dentro do jogo. A busca resolve o
+  // rank atual na fila solo/duo e preenche o tier de Clash sozinho
+  // (rankTierToClashTier) -- sem rank nesta fila (posicionamento/conta não
+  // encontrada), o tier continua selecionável manualmente como reserva.
+  async function lookupRiotRank() {
+    if (riotLookupLoading) return
+    const trimmed = riotId.trim()
+    setRiotLookupMessage(null)
+    setRiotLookupError(null)
+    if (!RIOT_ID_FORMAT.test(trimmed)) {
+      setRiotLookupError('Riot ID inválido. Use o formato Nome#TAG (ex.: Fulano#BR1).')
+      return
+    }
+    clearRiotLookup()
+
+    setRiotLookupLoading(true)
+    try {
+      const result = await lookupDuoAccountRiotRank(trimmed)
+      if (!result?.found) {
+        setRiotLookupError('Conta Riot não encontrada.')
+        return
+      }
+      if (!result.ranked || !result.tier) {
+        setRiotLookupMessage('Conta sem rank na fila solo/duo — selecione o tier manualmente abaixo.')
+        return
+      }
+      setClashTier(rankTierToClashTier(result.tier))
+      setRiotAutoFilled(true)
+      setRiotVerified(true)
+      setRiotLookupMessage('Tier preenchido automaticamente a partir do seu rank atual.')
+    } catch (error) {
+      setRiotLookupError(error instanceof Error ? error.message : 'Não foi possível consultar a Riot agora.')
+    } finally {
+      setRiotLookupLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -61,22 +119,75 @@ export function ClashConfigPicker() {
         </div>
       </div>
 
+      {/* Riot ID: obrigatório nos dois modos — no Solo é referência do
+          booster (que loga via credenciais), no Duo é o identificador que
+          o booster usa pra te convidar pro time dentro do jogo. A busca
+          preenche o tier sozinho a partir do rank atual na fila solo/duo. */}
+      <FormField
+        label="Riot ID"
+        required
+        hint="Informe seu Nome#TAG. O booster usa isso para identificar sua conta."
+        error={stepAttempted && !riotId.trim() ? 'Campo obrigatório' : undefined}
+      >
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={riotId}
+            onChange={e => {
+              setRiotId(e.target.value)
+              setRiotLookupMessage(null)
+              setRiotLookupError(null)
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void lookupRiotRank()
+              }
+            }}
+            placeholder="NomeDoInvocador#TAG"
+            className="input-base flex-1"
+            maxLength={32}
+          />
+          <button
+            type="button"
+            onClick={() => void lookupRiotRank()}
+            disabled={riotLookupLoading}
+            className={cn(
+              'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all',
+              'bg-brand text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed',
+            )}
+          >
+            <Search className="h-4 w-4" />
+            {riotLookupLoading ? 'Consultando...' : 'Verificar elo'}
+          </button>
+        </div>
+        {riotLookupMessage && <p className="mt-2 text-xs text-success">{riotLookupMessage}</p>}
+        {riotLookupError && <ErrorAlert message={riotLookupError} className="mt-2" />}
+      </FormField>
+
       <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-ink-muted mb-3">Tier</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-ink-muted mb-3">
+          Tier {tierLocked && <span className="font-normal normal-case text-ink-muted">(detectado automaticamente via Riot ID)</span>}
+        </p>
         <div className="grid sm:grid-cols-2 gap-3">
           {CLASH_TIERS.map((tier) => {
             const { low, high } = CLASH_TIER_BOUNDARY_RANKS[tier]
             const selected = clashTier === tier
+            const locked = tierLocked && !selected
             return (
               <button
                 key={tier}
                 type="button"
+                disabled={tierLocked}
                 onClick={() => setClashTier(tier)}
+                title={locked ? 'Tier detectado automaticamente via Riot ID' : undefined}
                 className={cn(
                   'relative flex items-center gap-3 p-4 rounded-2xl border-2 text-left transition-all duration-150',
                   selected
                     ? 'border-brand bg-brand/10 shadow-brand'
-                    : 'border-bg-elevated bg-bg-card hover:border-brand/40 hover:bg-bg-elevated',
+                    : locked
+                      ? 'border-transparent bg-transparent opacity-30 cursor-not-allowed'
+                      : 'border-bg-elevated bg-bg-card hover:border-brand/40 hover:bg-bg-elevated',
                 )}
               >
                 <div className="flex items-center shrink-0">
