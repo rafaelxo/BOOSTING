@@ -265,6 +265,13 @@ const VALID_COUPONS: Record<string, CouponDefinition> = Object.freeze({
   ELOPEAK30: { discountPct: 30 },
 })
 
+// Cupom fixo aplicado automaticamente pelo order-builder (StepReview/
+// OrderBuilder) -- o cliente não digita mais nada, só vê o desconto já
+// ativo. Continua passando pelo mesmo applyCoupon() de sempre (mesma
+// validação server-side em create-pix-payment), só a UI de "digitar cupom"
+// que sai de cena.
+export const DEFAULT_COUPON_CODE = 'ELOPEAK30'
+
 // Todo serviço com preço de tabela aceita cupom. Só Coaching fica de fora --
 // preço já vem do pacote que o próprio booster cadastra, não da tabela de
 // preços do produto (nada pra descontar contra o catálogo). placement_matches

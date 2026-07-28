@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search, Clock, DollarSign, CheckCircle2, Star, SlidersHorizontal, Check, X } from 'lucide-react'
+import { Search, Clock, DollarSign, CheckCircle2, Star, SlidersHorizontal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
@@ -7,6 +7,7 @@ import { LANES, LANE_LABEL, COACH_SPECIALTIES, SPECIALTY_LABEL } from '@/lib/lol
 import { matchesCoachPackageFilters, activeFilterCount } from '@/lib/coachFilters'
 import type { BoosterService } from '@/types'
 import { useAllCoachingPackages, useCoachBoosterInfo } from '@/api/coaching'
+import { MultiSelectPopover } from '@/components/ui'
 
 export function CoachPackagePicker() {
   const currency = useCurrency()
@@ -93,7 +94,7 @@ export function CoachPackagePicker() {
           )}
         </div>
 
-        {/* Busca por nome */}
+        {/* Busca por nome — filtro principal, texto livre */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
           <input
@@ -105,58 +106,12 @@ export function CoachPackagePicker() {
           />
         </div>
 
-        {/* Rotas — multi-seleção (OU): mostra coaches de qualquer rota marcada */}
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-ink-secondary uppercase tracking-wide">Rotas</p>
-          <div className="flex flex-wrap gap-1.5">
-            {LANES.map(({ key, label }) => {
-              const on = laneFilters.has(key)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(setLaneFilters, key)}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold border transition-all',
-                    on
-                      ? 'bg-brand/15 border-brand text-brand'
-                      : 'border-bg-elevated text-ink-secondary hover:border-brand/40',
-                  )}
-                >
-                  {on && <Check className="h-3 w-3" />}
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Especialidades — multi-seleção (OU) */}
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-ink-secondary uppercase tracking-wide">Especialidades</p>
-          <div className="flex flex-wrap gap-1.5">
-            {COACH_SPECIALTIES.map(({ key, label }) => {
-              const on = specialtyFilters.has(key)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleIn(setSpecialtyFilters, key)}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all',
-                    on
-                      ? 'bg-brand/15 border-brand text-brand'
-                      : 'border-bg-elevated text-ink-muted hover:border-brand/40',
-                  )}
-                >
-                  {on && <Check className="h-3 w-3" />}
-                  {label}
-                </button>
-              )
-            })}
-          </div>
+        {/* Rotas e Especialidades — popovers de multi-seleção (OU dentro de
+            cada um), filtram automaticamente a cada marcação, sem botão de
+            aplicar. */}
+        <div className="flex flex-wrap gap-2">
+          <MultiSelectPopover label="Rotas" options={LANES} selected={laneFilters} onToggle={(key) => toggleIn(setLaneFilters, key)} />
+          <MultiSelectPopover label="Especialidades" options={COACH_SPECIALTIES} selected={specialtyFilters} onToggle={(key) => toggleIn(setSpecialtyFilters, key)} />
         </div>
       </div>
 
@@ -166,7 +121,7 @@ export function CoachPackagePicker() {
       ) : !filtered.length ? (
         <p className="text-sm text-ink-muted py-6 text-center">Nenhum pacote encontrado com esses filtros.</p>
       ) : (
-        <div className="grid sm:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-1">
           {filtered.map(p => {
             const booster = boosterMap[p.booster_id]
             const selected = selectedCoachPackage?.id === p.id

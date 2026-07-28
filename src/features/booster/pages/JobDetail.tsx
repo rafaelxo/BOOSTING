@@ -544,22 +544,17 @@ export function JobDetailPage() {
         open={showDropModal}
         onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
         title="Solicitar Drop de Pedido"
-        description={
-          <>
-            Sua solicitação será enviada ao admin para aprovação. Com {order.wins_played} vitória(s), a penalidade é de{' '}
-            <span className="font-bold text-warning">
-              {order.wins_played === 0 ? '0%' : order.wins_played <= 2 ? '10%' : '20%'}
-            </span>{' '}
-            do valor do pedido.
-          </>
-        }
+        description="Sua solicitação será enviada ao admin para aprovação. Se você já concluiu 50% ou mais do pedido, recebe metade do que receberia normalmente por ele. Abaixo de 50% concluído, não recebe nada por este pedido."
       >
         <div>
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
             Motivo <span className="text-danger">*</span>
           </label>
-          <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo para abandonar o pedido..." className="input-base w-full min-h-[100px] resize-none text-sm" />
+          <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo para abandonar o pedido..." className="input-base w-full min-h-[100px] resize-none text-sm" maxLength={500} />
         </div>
+        {requestDrop.isError && (
+          <ErrorAlert message={requestDrop.error instanceof Error ? requestDrop.error.message : 'Erro'} className="mt-2" />
+        )}
         <div className="flex gap-3 justify-end pt-2">
           <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>Cancelar</Button>
           <Button

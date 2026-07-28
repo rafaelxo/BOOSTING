@@ -23,7 +23,7 @@ export function StepService() {
       <h2 className="text-lg font-bold text-ink mb-1">Selecionar Serviço</h2>
       <p className="text-sm text-ink-secondary mb-6">Com o que você precisa de ajuda?</p>
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4">
         {SERVICES.map(({ type, name, desc, icon: Icon, badge }) => (
           <button
             key={type}

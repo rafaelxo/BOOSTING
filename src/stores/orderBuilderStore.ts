@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { getBoostFlow, isMasterPlusCurrentTier, type BoostFlow, type BoostMode as BoostFlowMode } from '@/lib/boostDomain'
+import { DEFAULT_COUPON_CODE } from '@/lib/pricing'
 import type { GameSlug, ServiceType, QueueType, BoostMode, Rank, ClashTier, ClashDay } from '@/types'
 
 export type OrderBuilderStep = 'service' | 'configure' | 'extras' | 'review' | 'payment'
@@ -200,7 +201,7 @@ const initialState = {
   currentPdl: 0,
   avgPdlGain: 30,
   avgPdlLoss: 30,
-  couponCode: null as string | null,
+  couponCode: DEFAULT_COUPON_CODE as string | null,
   basePrice: 0,
   extrasPrice: 0,
   estimatedHours: null,

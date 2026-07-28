@@ -1,10 +1,9 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatEstimatedDelivery, formatRank } from '@/lib/utils'
+import { formatEstimatedDelivery, formatRank, orderRequiresAccountAccess } from '@/lib/utils'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
-import { RankBadge } from '@/components/ui'
+import { RankBadge, GuaranteeNotice } from '@/components/ui'
 import { Shuffle, Users, Hash, Clock, ChevronRight } from 'lucide-react'
-import { GuaranteeNotice } from './GuaranteeNotice'
 
 export function StepReview() {
   const {
@@ -17,6 +16,7 @@ export function StepReview() {
   } = useOrderBuilderStore()
 
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
+  const showAccountAccessNotice = serviceType != null && orderRequiresAccountAccess({ service_type: serviceType, boost_mode: boostMode })
 
   const isBoostFlow = serviceType === 'elo_boost' || serviceType === 'win_boost' || serviceType === 'md5'
   const modoLabel = serviceType === 'elo_boost'
@@ -131,6 +131,15 @@ export function StepReview() {
             {isMd5
               ? 'Asseguramos uma taxa de vitória de 80% ou mais nas suas partidas classificatórias. Caso o desempenho final fique abaixo desse percentual, adicionamos vitórias extras como compensação até atingir o resultado acordado.'
               : 'Trabalhamos com o sistema de vitórias líquidas, considerando o saldo entre vitórias e derrotas. Se houver alguma derrota durante o serviço, ela será compensada com uma vitória adicional, garantindo que você receba exatamente a quantidade de vitórias contratada. Exemplo: você compra 2 vitórias. Se o resultado for 3 vitórias e 1 derrota, o saldo final será de +2 vitórias líquidas, exatamente como contratado.'}
+          </GuaranteeNotice>
+        )}
+
+        {showAccountAccessNotice && (
+          <GuaranteeNotice title="Evite entrar na conta durante o pedido" variant="warning">
+            Nesse tipo de serviço, o booster faz login e joga direto na sua conta. Para não
+            atrapalhar o progresso nem gerar divergência de resultado, evite entrar na conta
+            até o pedido ser finalizado — você pode acompanhar tudo por aqui e pelo chat com o
+            booster.
           </GuaranteeNotice>
         )}
 

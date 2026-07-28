@@ -52,6 +52,7 @@ export type NotificationType =
   | 'commission_clawed_back'
   | 'commission_clawed_back_admin'
   | 'drop_penalty_applied'
+  | 'drop_payout_credited'
   | 'payment_amount_mismatch'
   | 'order_reassigned'
   | 'order_dropped_by_admin'

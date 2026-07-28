@@ -23,6 +23,7 @@ const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   commission_clawed_back: AlertTriangle,
   commission_clawed_back_admin: AlertTriangle,
   drop_penalty_applied: AlertTriangle,
+  drop_payout_credited: Wallet,
   payment_amount_mismatch: AlertTriangle,
   order_reassigned: RefreshCw,
   order_dropped_by_admin: AlertTriangle,

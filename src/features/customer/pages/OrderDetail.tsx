@@ -6,7 +6,7 @@ import {
   ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
   MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight,
 } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge, GuaranteeNotice } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
@@ -341,6 +341,13 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
       <p className="text-xs text-ink-muted mb-4">
         Envie as credenciais uma única vez para gerar um token criptografado de acesso. O booster verá apenas o token; login e senha não são exibidos.
       </p>
+      <div className="mb-4">
+        <GuaranteeNotice title="Evite entrar na conta durante o pedido" variant="warning">
+          O booster faz login e joga direto na sua conta nesse tipo de serviço. Para não
+          atrapalhar o progresso nem gerar divergência de resultado, evite entrar na conta até
+          o pedido ser finalizado — acompanhe o andamento por aqui e pelo chat com o booster.
+        </GuaranteeNotice>
+      </div>
       {canSet && (
         <div className="space-y-3">
           <div>

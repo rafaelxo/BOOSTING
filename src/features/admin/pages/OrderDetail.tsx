@@ -260,7 +260,7 @@ export function AdminOrderDetailPage() {
                 <XOctagon className="h-4 w-4 text-danger" />
                 Dropar Pedido
               </h3>
-              <p className="text-xs text-ink-muted mb-3">Cancela o pedido imediatamente. Não aplica penalidade ao booster.</p>
+              <p className="text-xs text-ink-muted mb-3">Retira o booster e reabre o pedido pra outro assumir. Se ele já concluiu 50%+ do pedido, recebe metade do valor normal e o pedido reabre pela metade do preço; abaixo de 50%, ele não recebe nada e o preço continua integral.</p>
               <Button variant="danger" size="sm" className="w-full" onClick={() => setShowDropModal(true)}>
                 Dropar Pedido
               </Button>
@@ -316,7 +316,7 @@ export function AdminOrderDetailPage() {
         open={showDropModal}
         onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
         title="Dropar Pedido"
-        description="O pedido será cancelado imediatamente. Nenhuma penalidade é aplicada ao booster."
+        description="O booster é retirado e o pedido volta pro painel de jobs disponíveis. Pagamento parcial (metade do valor normal) só se ele já tiver concluído 50% ou mais."
       >
         <div>
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">Motivo (mín. 10 caracteres)</label>

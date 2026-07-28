@@ -56,7 +56,7 @@ export function AdminDropsPage() {
                   <TableHead>Booster</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Vitórias / Derrotas</TableHead>
-                  <TableHead>Penalidade</TableHead>
+                  <TableHead>Conclusão / Pagamento</TableHead>
                   <TableHead>Há quanto tempo</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -83,7 +83,7 @@ export function AdminDropsPage() {
                       <span className="text-danger font-semibold">{r.losses_at_request}L</span>
                     </TableCell>
                     <TableCell>
-                      <span className={`font-bold ${r.penalty_pct > 0 ? 'text-warning' : 'text-ink-muted'}`}>
+                      <span className={`font-bold ${r.penalty_amount > 0 ? 'text-success' : 'text-ink-muted'}`}>
                         {r.penalty_pct}% ({currency(r.penalty_amount)})
                       </span>
                     </TableCell>
@@ -126,7 +126,7 @@ export function AdminDropsPage() {
                 <TableRow>
                   <TableHead>Pedido</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Penalidade</TableHead>
+                  <TableHead>Conclusão / Pagamento</TableHead>
                   <TableHead>Resolvido</TableHead>
                   <TableHead>Nota admin</TableHead>
                 </TableRow>
@@ -157,7 +157,7 @@ export function AdminDropsPage() {
         onOpenChange={(open) => { if (!open) { setResolving(null); setAdminNote('') } }}
         title={resolving?.approve ? 'Aprovar solicitação de drop' : 'Rejeitar solicitação de drop'}
         description={resolving?.approve
-          ? 'O pedido será cancelado e a penalidade deduzida dos ganhos do booster.'
+          ? 'O pedido volta pro painel de jobs disponíveis. Se o booster já concluiu 50% ou mais, ele recebe metade do valor normal do pedido.'
           : 'O pedido voltará ao status em andamento.'}
       >
         <div>

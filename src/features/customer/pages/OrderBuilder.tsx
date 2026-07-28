@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
@@ -7,7 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { applyCoupon, getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow } from '@/lib/boostDomain'
-import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag, X } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag } from 'lucide-react'
 import type { ServiceType, Rank } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -93,14 +93,12 @@ export function OrderBuilderPage() {
     step, steps, nextStep, prevStep, basePrice, extrasPrice,
     selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType, serviceId,
     setGame, setService, setServiceId, setStep, reset, preferredBoosterName, setPreferredBooster,
-    setSelectedCoachPackage, setBasePrice, couponCode, setCouponCode,
+    setSelectedCoachPackage, setBasePrice, couponCode,
     winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading, riotVerified,
     selectedCoachPackage, setStepAttempted, winPackage, queueType,
     clashTier, clashDay,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [couponInput, setCouponInput] = useState('')
-  const [couponError, setCouponError] = useState<string | null>(null)
   const currency = useCurrency()
   const pendingOrderId = searchParams.get('order')
   const explicitlyStartingNewOrder = searchParams.get('new') === '1'
@@ -299,26 +297,6 @@ export function OrderBuilderPage() {
     clashTier, clashDay,
   })
 
-  function handleApplyCoupon() {
-    const trimmed = couponInput.trim()
-    if (!trimmed || !serviceType) return
-    const result = applyCoupon(subtotal, trimmed, serviceType)
-    if (!result.couponApplied) {
-      setCouponError('Cupom inválido ou não aplicável a este serviço.')
-      setCouponCode(null)
-      return
-    }
-    setCouponError(null)
-    setCouponInput('')
-    setCouponCode(trimmed)
-  }
-
-  function handleRemoveCoupon() {
-    setCouponCode(null)
-    setCouponInput('')
-    setCouponError(null)
-  }
-
   return (
     <div>
       {/* Stepper */}
@@ -373,11 +351,12 @@ export function OrderBuilderPage() {
           </Card>
         </div>
 
-        {/* Summary panel — só aparece na revisão final, junto do cupom;
-            nos passos anteriores o pedido ainda não tem preço/cupom pra
-            mostrar, então a coluna some e o conteúdo principal ocupa tudo. */}
-        {step === 'review' && (
-        <aside className="lg:w-72 shrink-0 space-y-5">
+        {/* Summary panel — acompanha o pedido em todas as etapas (sticky),
+            não só na revisão final, pra o cliente ver quanto está pagando
+            desde o início. Largura maior que antes (era lg:w-72): nesse
+            tamanho os botões de Voltar/Ir para Pagamento da revisão ficavam
+            espremidos contra o padding do Card. */}
+        <aside className="lg:w-80 xl:w-96 shrink-0 space-y-5">
           <Card padding="lg" className="sticky top-6">
             <div className="space-y-2.5">
               <div className="flex justify-between text-xs">
@@ -401,48 +380,16 @@ export function OrderBuilderPage() {
                 </div>
               ))}
 
-              {/* Cupom — todo serviço com preço de tabela aceita (elo boost,
-                  vitórias, md5, clash). Só Coaching fica de fora, já que o
-                  preço é o pacote que o próprio booster cadastra (ver
-                  COUPON_ELIGIBLE_SERVICE_TYPES, que é a autoridade real —
-                  este `!== 'coaching'` aqui é só pra decidir se o campo
-                  aparece; applyCoupon() abaixo é quem decide se aplica). */}
-              {serviceType && serviceType !== 'coaching' && (
-                <div className="py-2">
-                  {!coupon?.couponApplied ? (
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted pointer-events-none" />
-                        <input
-                          type="text"
-                          value={couponInput}
-                          onChange={(e) => { setCouponInput(e.target.value); setCouponError(null) }}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon() } }}
-                          placeholder="Cupom"
-                          maxLength={32}
-                          className="input-base w-full pl-8 py-2 text-xs"
-                        />
-                      </div>
-                      <Button type="button" variant="secondary" size="sm" onClick={handleApplyCoupon} disabled={!couponInput.trim()}>
-                        Aplicar
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-success font-medium">
-                        Cupom {couponCode} · -{coupon.discountPct}%
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleRemoveCoupon}
-                        className="p-1 rounded-md text-ink-muted hover:text-ink hover:bg-bg-elevated transition-colors shrink-0"
-                        aria-label="Remover cupom"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  {couponError && <p className="text-[11px] text-danger mt-2">{couponError}</p>}
+              {/* Cupom fixo — aplicado automaticamente pelo store
+                  (couponCode inicia em DEFAULT_COUPON_CODE), sem o cliente
+                  precisar digitar nada. Só aparece quando de fato se aplica
+                  (elo boost/vitórias/md5/clash — Coaching fica fora porque
+                  o preço é o pacote do próprio booster, ver
+                  COUPON_ELIGIBLE_SERVICE_TYPES em shared/pricing.ts). */}
+              {coupon?.couponApplied && (
+                <div className="flex items-center gap-1.5 py-2 text-xs text-success font-medium">
+                  <Tag className="h-3.5 w-3.5 shrink-0" />
+                  Cupom {couponCode} aplicado · -{coupon.discountPct}%
                 </div>
               )}
 
@@ -493,7 +440,6 @@ export function OrderBuilderPage() {
             </div>
           </Card>
         </aside>
-        )}
       </div>
     </div>
   )

@@ -1,37 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useBoosterSoundStore } from '@/stores/boosterSoundStore'
+import { playOrderSound } from './orderSoundLibrary'
 
 const FALLBACK_POLL_INTERVAL_MS = 15_000
-
-function playCoinSound(context: AudioContext) {
-  if (context.state !== 'running') return
-
-  const now = context.currentTime
-  const gain = context.createGain()
-  const firstTone = context.createOscillator()
-  const secondTone = context.createOscillator()
-
-  gain.gain.setValueAtTime(0.0001, now)
-  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01)
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32)
-  gain.connect(context.destination)
-
-  firstTone.type = 'sine'
-  firstTone.frequency.setValueAtTime(880, now)
-  firstTone.frequency.exponentialRampToValueAtTime(1_320, now + 0.09)
-  firstTone.connect(gain)
-
-  secondTone.type = 'triangle'
-  secondTone.frequency.setValueAtTime(1_760, now + 0.07)
-  secondTone.frequency.exponentialRampToValueAtTime(2_200, now + 0.18)
-  secondTone.connect(gain)
-
-  firstTone.start(now)
-  firstTone.stop(now + 0.24)
-  secondTone.start(now + 0.07)
-  secondTone.stop(now + 0.32)
-}
 
 /**
  * Avisa boosters aprovados quando um pedido passa a estar disponível para eles.
@@ -45,9 +18,23 @@ export function useNewOrderSound() {
   const initializedRef = useRef(false)
   const syncingRef = useRef(false)
 
+  // Preferência de som lida via ref (não como dep do useCallback) pra trocar
+  // volume/som/mute sem recriar playNotification -- o que recriaria
+  // syncVisibleOrders e resubscreveria o canal Realtime/interval abaixo.
+  const soundId = useBoosterSoundStore((s) => s.soundId)
+  const volume = useBoosterSoundStore((s) => s.volume)
+  const muted = useBoosterSoundStore((s) => s.muted)
+  const settingsRef = useRef({ soundId, volume, muted })
+  useEffect(() => {
+    settingsRef.current = { soundId, volume, muted }
+  }, [soundId, volume, muted])
+
   const playNotification = useCallback(() => {
     const context = audioContextRef.current
-    if (context) playCoinSound(context)
+    if (!context) return
+    const { soundId: id, volume: vol, muted: isMuted } = settingsRef.current
+    if (isMuted) return
+    playOrderSound(context, id, vol)
   }, [])
 
   const syncVisibleOrders = useCallback(async () => {
