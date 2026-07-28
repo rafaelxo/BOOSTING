@@ -17,6 +17,11 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    // Especificar `types` troca o TS de "inclui tudo em node_modules/@types"
+    // pra "só isso" -- sem "node" aqui, os testes de shared/*.test.ts que já
+    // usavam fs/path/__dirname (node_modules/@types/node, já instalado)
+    // parariam de compilar.
+    "types": ["node", "@testing-library/jest-dom"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

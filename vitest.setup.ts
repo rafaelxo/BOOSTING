@@ -1,3 +1,27 @@
+// Nota: `npm run deadcode` (knip) aponta esse arquivo como dependente de um
+// pacote adaptador de ambiente jsdom não listado -- falso positivo
+// conhecido: esse pacote separado era convenção do Vitest 1-3; o Vitest 4
+// (instalado aqui) já embute suporte a jsdom nativamente (ver
+// node_modules/vitest/jsdom.d.ts) e o pacote em questão nem existe mais no
+// registro npm (confirmado: 404 ao tentar instalar). Sem efeito real -- os
+// testes de componente (*.test.tsx, via pragma de ambiente no topo do
+// arquivo) rodam e passam normalmente.
+
+// Matchers extras (toBeInTheDocument, toBeDisabled, etc.) e limpeza
+// automática do DOM entre testes de componente (*.test.tsx, ambiente jsdom
+// -- cada arquivo declara isso via `// @vitest-environment jsdom` no topo).
+// Sem o afterEach(cleanup) explícito aqui, o React Testing Library não
+// desmonta a árvore renderizada de um `it()` antes do próximo -- cada teste
+// que faz `render()` empilha DOM em cima do anterior no mesmo arquivo,
+// fazendo queries como getByText baterem em múltiplos elementos. Import
+// incondicional é inofensivo pros testes de lógica pura em 'node': cleanup()
+// só itera um Set de containers montados, que fica vazio se nada renderizou.
+import { afterEach } from 'vitest'
+import { cleanup } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
+
+afterEach(cleanup)
+
 // Testes rodam com `environment: 'node'` (ver vitest.config.ts) -- Node não
 // tem localStorage/sessionStorage reais como um browser. A versão
 // experimental do Node exige um --localstorage-file pra localStorage

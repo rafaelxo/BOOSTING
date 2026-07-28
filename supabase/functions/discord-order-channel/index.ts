@@ -141,10 +141,15 @@ serve(async (req) => {
     return jsonResponse(req, { error: 'invalid webhook payload' }, 400)
   }
 
-  // Supabase Database Webhooks wrap the row in { type, table, record, old_record }
+  // Supabase Database Webhooks wrap the row in { type, table, record, old_record }.
+  // dbWebhookSchema é um union de dois formatos com .passthrough() em ambos
+  // -- o index signature do passthrough impede o TS de estreitar o union só
+  // com `'record' in payload` (as duas variantes "aceitam" a chave `record`
+  // estruturalmente), então record/oldRecord saem `unknown`/`{}` mesmo já
+  // validados pelo Zod acima. Cast explícito pro formato que o Zod garantiu.
   const payload = parsedPayload.data
-  const record = 'record' in payload ? payload.record : payload
-  const oldRecord = 'record' in payload ? payload.old_record ?? {} : {}
+  const record = ('record' in payload ? payload.record : payload) as z.infer<typeof orderRecordSchema>
+  const oldRecord = ('record' in payload ? payload.old_record ?? {} : {}) as { status?: string }
 
   const orderId:           string        = record.id
   const newStatus:         string        = record.status

@@ -672,12 +672,19 @@ export async function validateAndPriceIntent(
     serviceClient.from('games').select('id, is_active').eq('id', normalized.gameId).maybeSingle(),
   ])
   if (serviceError || gameError) return { ok: false, response: errorResponse(req, 'Failed to validate catalog', 500) }
+  // `service`/`game` só são referenciados depois de confirmados não-nulos --
+  // um service_id/game_id inexistente no catálogo (typo, id de outro jogo,
+  // string arbitrária) sempre vem como maybeSingle() = null, nunca um erro,
+  // então checar `.type` antes deste guard derrubava a função com uma
+  // exceção não tratada (500 cru) em vez do 400 de validação de negócio.
+  if (!service || !game || !service.is_active || !game.is_active || service.game_id !== game.id) {
+    return { ok: false, response: badRequest(req, 'Serviço ou jogo inválido/inativo') }
+  }
   const serviceTypeMatchesCatalog =
     service.type === normalized.serviceType
     || (normalized.serviceType === 'md5' && service.type === 'win_boost')
 
-  if (!service || !game || !service.is_active || !game.is_active
-      || service.game_id !== game.id || !serviceTypeMatchesCatalog) {
+  if (!serviceTypeMatchesCatalog) {
     return { ok: false, response: badRequest(req, 'Serviço ou jogo inválido/inativo') }
   }
 

@@ -81,7 +81,6 @@ function isStepComplete(
         && (!state.isMd5 || state.md5MatchesRemaining == null || state.winsPurchased <= state.md5MatchesRemaining)
       return state.riotVerified && !!state.currentRank && winsOk && isValidRiotId(state.riotId)
     }
-    if (state.serviceType === 'placement_matches') return !!state.currentRank
     if (state.serviceType === 'coaching') return !!state.selectedCoachPackage
     if (state.serviceType === 'clash') return !!state.clashTier && !!state.clashDay
   }

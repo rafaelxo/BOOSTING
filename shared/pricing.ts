@@ -419,7 +419,7 @@ export function applyLpModifier(
 // base_price/extras_price/total_price em `orders` — o cliente nunca envia
 // preço, só a intenção (rank, extras selecionados, pacote de vitórias etc).
 
-interface RankValue {
+export interface RankValue {
   tier: RankTier
   division: Division | null
 }

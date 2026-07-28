@@ -8,8 +8,12 @@ export default defineConfig({
     },
   },
   test: {
+    // Testes de lógica pura (shared/*.test.ts, *.test.ts) rodam em 'node' --
+    // mais rápido, sem DOM. Testes de componente (*.test.tsx) precisam de
+    // DOM (React Testing Library) -- cada um declara isso individualmente
+    // via `// @vitest-environment jsdom` no topo do arquivo.
     environment: 'node',
-    include: ['shared/**/*.test.ts', 'src/**/*.test.ts'],
+    include: ['shared/**/*.test.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./vitest.setup.ts'],
   },
 })

@@ -14,10 +14,12 @@
     "functions:serve": "supabase functions serve --env-file ./supabase/functions/.env.local --no-verify-jwt",
     "functions:debug": "supabase functions serve --env-file ./supabase/functions/.env.local --no-verify-jwt --debug",
     "test": "vitest run --configLoader runner",
+    "test:edge": "deno test --allow-env supabase/functions/_shared/",
     "typecheck": "tsc -b --pretty false",
+    "typecheck:edge": "deno check supabase/functions/_shared/*.ts supabase/functions/*/index.ts",
     "audit": "npm audit --audit-level=high",
     "deadcode": "knip --no-progress",
-    "check": "npm run lint && npm run typecheck && npm run deadcode && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm run typecheck:edge && npm test && npm run test:edge && npm run build && npm run deadcode"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -46,6 +48,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -55,6 +60,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.11.0",
+    "jsdom": "^25.0.1",
     "knip": "^5.88.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",

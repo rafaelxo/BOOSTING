@@ -13,4 +13,5 @@ export const ORDER_SAFE_COLUMNS = [
   'preferred_booster_id', 'exclusive_until', 'md5_matches_remaining',
   'chat_locked', 'chat_locked_at', 'chat_locked_by',
   'match_sync_started_at', 'last_match_synced_at',
+  'coupon_code', 'discount_price', 'clash_tier', 'clash_day',
 ].join(',')

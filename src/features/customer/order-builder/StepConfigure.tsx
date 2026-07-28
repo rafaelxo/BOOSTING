@@ -6,7 +6,7 @@ import { RankLockGrid, WinCountButtons, PdlFieldRow, ErrorAlert } from '@/compon
 import { supabase } from '@/lib/supabase'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn, RANK_TIER_ORDER } from '@/lib/utils'
-import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, PLACEMENT_PRICE, DUO_BOOST_PCT, MD5_DISCOUNT_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER, expectedMatchesForWins } from '@/lib/pricing'
+import { calcEloPrice, estimateEloBoostHours, getWinBoostPrice, getMd5WinPrice, DUO_BOOST_PCT, MD5_DISCOUNT_PCT, applyLpModifier, lpModifierPct, MATCH_DURATION_HOURS, DELIVERY_ESTIMATE_MULTIPLIER, expectedMatchesForWins } from '@/lib/pricing'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import type { Division, QueueType, RankTier } from '@/types'
 import { Search, Info, Lock } from 'lucide-react'
@@ -326,11 +326,6 @@ export function StepConfigure() {
       setEstimatedHours(eloHours == null ? null : eloHours * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(lpModifierPct(avgLpGain))
 
-    } else if (serviceType === 'placement_matches') {
-      if (!currentRank) return
-      setBasePrice(PLACEMENT_PRICE[currentRank.tier] ?? 15)
-      setEstimatedHours(5 * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
-      setPdlModifierPct(null)
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
@@ -737,19 +732,6 @@ export function StepConfigure() {
               selectedDivision={currentRank?.division ?? null}
               onChange={(tier, division) => setCurrentRank({ tier, division })}
               disabled={serviceType === 'win_boost' || riotAutoFilled}
-            />
-          </FormField>
-        )}
-
-        {/* Rank — placement matches */}
-        {serviceType === 'placement_matches' && (
-          <FormField label="Rank Final da Última Temporada" required>
-            <RankLockGrid
-              tiers={RANK_TIER_ORDER}
-              current={null}
-              selectedTier={currentRank?.tier ?? null}
-              selectedDivision={currentRank?.division ?? null}
-              onChange={(tier, division) => setCurrentRank({ tier, division })}
             />
           </FormField>
         )}
