@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
 import { LEGAL_VERSION, hasAcceptedLegal } from '@/lib/legal'
 import { useAuthStore } from '@/stores/authStore'
+import { useBoosterStatus } from '@/api/boosters'
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -25,6 +26,7 @@ export function LoginPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { isAuthenticated, profile, isLoading, isInitialized } = useAuthStore()
+  const { data: boosterAccessState } = useBoosterStatus(profile?.id)
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [accepting, setAccepting] = useState(false)
@@ -55,6 +57,10 @@ export function LoginPage() {
     }
     if (profile?.role === 'admin') return '/admin'
     if (profile?.role === 'booster') return '/booster'
+    // Candidatura de booster ainda em análise (ou recusada) -- role continua
+    // 'customer' até approve_booster() aprovar, então sem isso o candidato
+    // caía direto no dashboard de cliente, sem nenhuma indicação de status.
+    if (boosterAccessState === 'pending' || boosterAccessState === 'rejected') return '/apply?booster=1'
     return '/dashboard'
   }
 

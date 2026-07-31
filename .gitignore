@@ -61,6 +61,7 @@ docs/
 .claude/
 .agents/
 graphify-out/
+.playwright-mcp
 
 # Keys and certs — never commit
 *.pem

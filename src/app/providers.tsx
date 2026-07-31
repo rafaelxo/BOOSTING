@@ -64,16 +64,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
           setInitialized(true)
           initialized = true
-          // Drop every cached query (orders, notifications, admin lists,
-          // etc.) on sign-out. Most keys already include the user id, so
-          // this isn't an active cross-account leak today, but it removes
-          // the category of risk entirely for shared/library devices and
-          // for any future query key that forgets to scope by user.
           queryClient.clear()
-          // Descarta também qualquer pedido em construção (Riot ID, notas,
-          // seleções) — o store do order builder é em memória e não some
-          // sozinho num SPA sem reload, então sem isso os dados de um pedido
-          // do usuário anterior vazariam pra quem logar em seguida na aba.
           useOrderBuilderStore.getState().reset()
         }
       }
@@ -102,9 +93,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     let data = initialData
 
     if (error) {
-      // Real failure (RLS, rede, etc.) — não mascarar como "perfil ausente".
-      // Detalhe do erro (código/policy do Postgrest) só em dev — em produção
-      // isso não deve vazar pra um monitor de erros externo.
       if (import.meta.env.DEV) console.error('fetchProfile: failed to load profile', error)
       setProfile(null)
       setLoading(false)
@@ -158,9 +146,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       case 'NETWORK_ERROR':
         return 'Não foi possível conectar à função do Discord. Em desenvolvimento, verifique se as Edge Functions locais estão rodando.'
       default:
-        return error.status >= 500
-          ? 'Falha interna ao entrar no servidor do Discord.'
-          : error.message
+        return error.message
     }
   }
 
@@ -169,13 +155,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     if (sessionStorage.getItem(storageKey) === 'true' || discordJoinInFlight.current) return
 
     if (!providerToken) {
-      // provider_token só existe no instante exato do redirect de volta do
-      // OAuth -- qualquer outro disparo de SIGNED_IN (nova aba, sincronização
-      // de sessão entre abas, reinicialização do client) legitimamente não
-      // tem esse token, sem que a sessão do usuário esteja quebrada. Tratar
-      // isso como erro ("entre novamente pelo Discord") é alarme falso: não
-      // marca como concluído (pra tentar de novo na próxima janela real de
-      // SIGNED_IN com token), só não incomoda o usuário à toa.
       if (import.meta.env.DEV) console.warn('joinDiscordServer: sem provider_token, pulando silenciosamente')
       return
     }
@@ -202,7 +181,14 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           setDiscordJoinNotice(null)
         } catch (retryErr) {
           sessionStorage.setItem(storageKey, 'true')
-          setDiscordJoinNotice(retryErr instanceof EdgeFunctionError ? discordJoinMessage(retryErr) : 'Falha interna ao entrar no servidor do Discord.')
+          if (retryErr instanceof EdgeFunctionError) {
+            setDiscordJoinNotice(discordJoinMessage(retryErr))
+          } else {
+            // Erro genérico/inesperado na retentativa -- não é acionável pelo
+            // usuário, então só loga em dev em vez de mostrar um toast vago.
+            if (import.meta.env.DEV) console.error('joinDiscordServer: retry failed with unexpected error', retryErr)
+            setDiscordJoinNotice(null)
+          }
         }
         return
       }
@@ -210,8 +196,6 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       if (err instanceof EdgeFunctionError) {
         sessionStorage.setItem(storageKey, 'true')
         setDiscordJoinNotice(discordJoinMessage(err))
-      } else {
-        setDiscordJoinNotice('Falha interna ao entrar no servidor do Discord.')
       }
     } finally {
       discordJoinInFlight.current = false

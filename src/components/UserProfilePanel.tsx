@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { X, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui'
@@ -167,7 +168,12 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   const role = profile?.role ?? 'customer'
   const roleBadge = ROLE_BADGE[role]
 
-  return (
+  // Portal pra document.body: os headers que montam esse painel (Booster/
+  // Customer/AdminLayout) usam backdrop-blur, que -- assim como transform/
+  // filter/will-change -- cria containing block pra descendentes
+  // `position: fixed`. Sem o portal, o backdrop e o aside abaixo ficavam
+  // confinados à caixa do header (~68px), não ao viewport inteiro.
+  return createPortal(
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
@@ -333,6 +339,7 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
           </button>
         </div>
       </aside>
-    </>
+    </>,
+    document.body
   )
 }

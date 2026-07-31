@@ -20,7 +20,12 @@ export function BoosterApplyPage() {
   if (!isBoosterIntent) return <Navigate to="/" replace />
   if (!profile) return null
   if (profile.role !== 'customer' && !isAlreadyBooster) return <Navigate to="/" replace />
-  if (isAlreadyBooster && state === 'approved') return <Navigate to="/booster" replace />
+  // Fonte de verdade é o status real da candidatura, não a role -- role só
+  // vira 'booster' em approve_booster() (após aprovação do admin), então um
+  // candidato recém-aplicado continua com role='customer' durante toda a
+  // análise. Checar só `isAlreadyBooster` aqui deixava pending/rejected sem
+  // tela nenhuma pra quem ainda não foi aprovado.
+  if (state === 'approved') return <Navigate to="/booster" replace />
 
   async function startBoosterApplication() {
     if (!profile) return false
@@ -50,12 +55,11 @@ export function BoosterApplyPage() {
     </div>
   )
 
-  // Role já é 'booster' — a fonte de verdade sobre o que mostrar em /apply passa
-  // a ser o status real da candidatura (evita depender só do role, que já foi
-  // trocado antes de onboard_booster criar a linha em booster_profiles). Se não
-  // houver candidatura (falha parcial após a troca de role), o formulário abaixo
-  // funciona como rota de recuperação.
-  if (isAlreadyBooster && state !== 'no_application') {
+  // Mostra as telas de status sempre que já existe uma candidatura (pending/
+  // rejected/error), independente da role -- ver comentário acima. Sem
+  // candidatura (`no_application`) cai pro formulário abaixo, que serve tanto
+  // pra quem nunca aplicou quanto como rota de recuperação.
+  if (state !== 'no_application') {
     return (
       <div className="min-h-screen px-4 py-10 flex flex-col">
         <div className="mx-auto w-full max-w-lg space-y-8">{header}</div>
