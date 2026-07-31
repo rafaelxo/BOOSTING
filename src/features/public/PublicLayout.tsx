@@ -1,15 +1,15 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Menu, X } from 'lucide-react'
 import { Button, LogoMark, ThemeToggle } from '@/components/ui'
+import { AmbientBackground } from '@/components/AmbientBackground'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 
 export function PublicLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   const { isAuthenticated, profile } = useAuthStore()
   const { t } = useTranslation()
 
@@ -18,19 +18,8 @@ export function PublicLayout() {
     : profile?.role === 'booster' ? '/booster'
     : '/dashboard'
 
-  function handleServicesClick() {
-    if (pathname === '/') {
-      document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })
-    } else {
-      navigate('/')
-      setTimeout(() => {
-        document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })
-      }, 150)
-    }
-    setMobileOpen(false)
-  }
-
   return (
+    <AmbientBackground>
     <div className="min-h-screen flex flex-col">
       {/* Discount bar */}
       <div className="bg-gradient-brand py-2 text-center text-xs font-semibold text-white/95 tracking-wide">
@@ -50,15 +39,8 @@ export function PublicLayout() {
 
           {/* Desktop nav */}
           <nav className="hidden lg:flex items-center gap-1 flex-1">
-            {/* Serviços — click only, scrolls to services section */}
-            <button
-              onClick={handleServicesClick}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors"
-            >
-              {t('nav.services')}
-            </button>
-
             {[
+              { href: '/services',  label: t('nav.services')  },
               { href: '/pricing',   label: t('nav.pricing')   },
               { href: '/security',  label: t('nav.security')  },
               { href: '/faq',       label: t('nav.faq')       },
@@ -100,13 +82,8 @@ export function PublicLayout() {
         {/* Mobile menu */}
         {mobileOpen && (
           <div className="lg:hidden border-t border-bg-elevated bg-bg-surface/90 backdrop-blur-xl px-5 py-5 space-y-1 animate-slide-down">
-            <button
-              onClick={handleServicesClick}
-              className="w-full text-left block px-3 py-2.5 rounded-xl text-sm text-ink-secondary hover:text-ink hover:bg-bg-elevated"
-            >
-              {t('nav.services')}
-            </button>
             {[
+              { href: '/services',  label: t('nav.services')      },
               { href: '/pricing',   label: t('nav.pricing')       },
               { href: '/security',  label: t('nav.security')      },
               { href: '/faq',       label: t('nav.faq')           },
@@ -156,6 +133,7 @@ export function PublicLayout() {
                 { href: '/services#elo-boost', label: t('footer.eloBoost') },
                 { href: '/services#win-boost', label: t('footer.winBoost') },
                 { href: '/services#coaching',  label: t('footer.coaching') },
+                { href: '/services#clash',     label: t('footer.clash')    },
               ]},
               { title: t('footer.company'), links: [
                 { href: '/pricing',   label: t('footer.pricing')  },
@@ -187,5 +165,6 @@ export function PublicLayout() {
         </div>
       </footer>
     </div>
+    </AmbientBackground>
   )
 }

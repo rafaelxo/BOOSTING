@@ -14,17 +14,22 @@ export default defineConfig(({ mode }) => {
       },
       dedupe: ['react', 'react-dom'],
     },
-    server: supabaseUrl
-      ? {
-          proxy: {
-            '/functions/v1': {
-              target: supabaseUrl,
-              changeOrigin: true,
-              secure: true,
+    server: {
+      // Permite acessar o dev server via túnel ngrok (Vite bloqueia hosts
+      // desconhecidos por padrão desde a 4.x, ver "Blocked request").
+      allowedHosts: ['unlimited-disband-backlight.ngrok-free.dev'],
+      ...(supabaseUrl
+        ? {
+            proxy: {
+              '/functions/v1': {
+                target: supabaseUrl,
+                changeOrigin: true,
+                secure: true,
+              },
             },
-          },
-        }
-      : undefined,
+          }
+        : {}),
+    },
     optimizeDeps: {
       include: [
         'react', 'react-dom', 'react-router-dom',

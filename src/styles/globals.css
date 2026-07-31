@@ -33,6 +33,7 @@
 
     --logo-url: url('/images/logo.png');
     --ambient-url: url('/images/site-ambient-light.png');
+    --ambient-size: cover;
     /* Scrim claro: clareia a imagem (em vez de escurecer) pra texto escuro
        (--color-ink) permanecer legível sobre a arte, mesmo que na versão
        dark o mesmo texto sempre lê melhor sobre fundo escurecido. */
@@ -75,6 +76,11 @@
 
     --logo-url: url('/images/logo.png');
     --ambient-url: url('/images/site-ambient-dark.png');
+    /* Um pouco menor que "cover" (que sempre preenche 100%) -- a arte dark lia
+       como mais "zoomada"/cropada que a light. Qualquer margem que sobre é
+       coberta pela cor sólida de fundo (ver AmbientBackground.tsx) e pelo
+       próprio overlay, que já esmaece pra cor sólida nas bordas. */
+    --ambient-size: 92%;
     /* Scrim escuro original: escurece a imagem pra texto claro (--color-ink)
        permanecer legível sobre a arte. */
     --ambient-overlay:
@@ -98,9 +104,10 @@
   }
 
   body {
-    /* Sem bg-bg-base sólido: o fundo ambiente (AmbientBackground, fixed atrás
-       de tudo) precisa aparecer por baixo de toda a aplicação. */
-    @apply text-ink font-sans antialiased;
+    /* AmbientBackground só é montado na home page (ver HomePage.tsx); em
+       todo o resto da aplicação (login, painel, etc.) é esse bg-bg-base
+       sólido que aparece. */
+    @apply bg-bg-base text-ink font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
   }
 

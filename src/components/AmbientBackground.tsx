@@ -18,8 +18,12 @@ export function AmbientBackground({ children }: AmbientBackgroundProps) {
     <div className="relative min-h-dvh">
       <div
         aria-hidden="true"
-        className="fixed inset-0 -z-20 pointer-events-none bg-cover bg-no-repeat bg-[65%_center] md:bg-center"
-        style={{ backgroundImage: 'var(--ambient-url)' }}
+        className="fixed inset-0 -z-20 pointer-events-none bg-no-repeat bg-[65%_center] md:bg-center"
+        style={{
+          backgroundImage: 'var(--ambient-url)',
+          backgroundSize: 'var(--ambient-size, cover)',
+          backgroundColor: 'rgb(var(--color-bg-base))',
+        }}
       />
       <div
         aria-hidden="true"

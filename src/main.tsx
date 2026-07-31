@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
-import { AmbientBackground } from './components/AmbientBackground'
 import { Providers } from './app/providers'
 import { router } from './app/router'
 import './styles/globals.css'
@@ -44,11 +43,9 @@ class ErrorBoundary extends React.Component<
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <AmbientBackground>
-        <Providers>
-          <RouterProvider router={router} />
-        </Providers>
-      </AmbientBackground>
+      <Providers>
+        <RouterProvider router={router} />
+      </Providers>
     </ErrorBoundary>
   </React.StrictMode>
 )
