@@ -112,14 +112,14 @@ export function PublicLayout() {
 
       {/* Footer */}
       <footer className="border-t border-bg-elevated bg-bg-surface/80 backdrop-blur-md">
-        <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-14">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+        <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             <div className="col-span-2 md:col-span-2">
-              <Link to="/" className="flex items-center gap-2 mb-4">
+              <Link to="/" className="flex items-center gap-2 mb-2.5">
                 <LogoMark className="h-8 w-8" />
                 <span className="font-extrabold text-ink">Elo<span className="text-brand">Peak</span></span>
               </Link>
-              <p className="text-sm text-ink-secondary max-w-xs leading-relaxed mb-4">
+              <p className="text-sm text-ink-secondary max-w-xs leading-relaxed mb-2.5">
                 {t('footer.tagline')}
               </p>
               <div className="flex items-center gap-2 text-xs font-semibold text-success bg-success/10 border border-success/20 px-3 py-1.5 rounded-full w-fit">
@@ -143,8 +143,8 @@ export function PublicLayout() {
               ]},
             ].map(({ title, links }) => (
               <div key={title}>
-                <p className="section-label mb-4">{title}</p>
-                <ul className="space-y-2.5">
+                <p className="section-label mb-2.5">{title}</p>
+                <ul className="space-y-2">
                   {links.map(({ href, label }) => (
                     <li key={href}>
                       <Link to={href} className="text-sm text-ink-secondary hover:text-ink transition-colors">{label}</Link>
@@ -155,7 +155,7 @@ export function PublicLayout() {
             ))}
           </div>
 
-          <div className="mt-12 pt-6 border-t border-bg-elevated flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="mt-6 pt-4 border-t border-bg-elevated flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-xs text-ink-muted">{t('footer.copyright', { year: new Date().getFullYear() })}</p>
             <div className="flex items-center gap-5">
               <Link to="/privacy" className="text-xs text-ink-muted hover:text-ink-secondary">{t('footer.privacy')}</Link>

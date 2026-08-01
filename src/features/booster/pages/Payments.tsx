@@ -20,8 +20,9 @@ function RequestPayoutCard({ available }: { available: number }) {
 
   const numericAmount = cents / 100
   const availableCents = Math.round(available * 100)
+  const hasBalance = availableCents >= MIN_PAYOUT_AMOUNT * 100
   const belowMinimum = cents > 0 && cents < MIN_PAYOUT_AMOUNT * 100
-  const valid = cents > 0 && cents <= availableCents && !belowMinimum
+  const valid = hasBalance && cents > 0 && cents <= availableCents && !belowMinimum
 
   return (
     <Card padding="md" className="ring-1 ring-brand/20">
@@ -38,9 +39,17 @@ function RequestPayoutCard({ available }: { available: number }) {
           valueCents={cents}
           onChangeCents={setCents}
           maxCents={availableCents}
+          disabled={!hasBalance}
           className="flex-1 text-sm"
           aria-label="Valor do saque"
         />
+        <Button
+          variant="secondary"
+          disabled={!hasBalance}
+          onClick={() => setCents(availableCents)}
+        >
+          Max
+        </Button>
         <Button
           loading={requestPayout.isPending}
           disabled={!valid}
@@ -49,7 +58,11 @@ function RequestPayoutCard({ available }: { available: number }) {
           Solicitar
         </Button>
       </div>
-      {cents > 0 && !valid && (
+      {!hasBalance ? (
+        <p className="text-xs text-ink-muted mt-2">
+          Você precisa de pelo menos {currency(MIN_PAYOUT_AMOUNT)} disponível pra solicitar um saque.
+        </p>
+      ) : cents > 0 && !valid && (
         <p className="text-xs text-danger mt-2">
           Informe um valor entre {currency(MIN_PAYOUT_AMOUNT)} e {currency(available)}.
         </p>

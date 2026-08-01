@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { TrendingUp, Zap, Users, Swords, CheckCircle2, ChevronRight } from 'lucide-react'
-import { Button, RankBadge, Skeleton } from '@/components/ui'
+import { useLocation } from 'react-router-dom'
+import { TrendingUp, Zap, Users, Swords, CheckCircle2 } from 'lucide-react'
+import { RankBadge, Skeleton } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import type { BoostFlow } from '@/types'
@@ -131,18 +131,18 @@ export function ServicesPage() {
     <div className="py-16">
       <div className="container-app space-y-20">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto">
+        <div className="text-center max-w-2xl xl:max-w-none mx-auto">
           <p className="section-label mb-3">League of Legends</p>
           <h1 className="text-4xl font-extrabold text-ink mb-4">Todos os Serviços</h1>
-          <p className="text-lg text-ink-secondary">
+          <p className="text-lg text-ink-secondary xl:whitespace-nowrap">
             Cada serviço usa boosters verificados, segurança total da conta e garantia de conclusão.
           </p>
         </div>
 
         {/* Services */}
         <div className="space-y-8">
-          {SERVICES.map(({ icon: Icon, slug, title, tagline, description, rankRange, highlights, color, bgColor, cta }) => (
-            <div key={title} id={slug.replace(/_/g, '-')} className="card p-8 flex flex-col md:flex-row gap-8 scroll-mt-24">
+          {SERVICES.map(({ icon: Icon, slug, title, tagline, description, rankRange, highlights, color, bgColor }) => (
+            <div key={title} id={slug.replace(/_/g, '-')} className="card p-8 flex flex-col md:flex-row md:items-center gap-12 scroll-mt-24">
               <div className="md:w-2/5 space-y-4">
                 <div className={`h-12 w-12 rounded-2xl ${bgColor} flex items-center justify-center`}>
                   <Icon className={`h-6 w-6 ${color}`} />
@@ -152,7 +152,8 @@ export function ServicesPage() {
                   <p className={`text-sm font-semibold mt-1 ${color}`}>{tagline}</p>
                 </div>
                 <p className="text-ink-secondary leading-relaxed">{description}</p>
-
+              </div>
+              <div className="md:w-3/5 md:ml-auto space-y-6">
                 {/* Rank range badges */}
                 <div>
                   <p className="text-[10px] font-bold text-ink-muted uppercase tracking-widest mb-2">Disponível para</p>
@@ -163,22 +164,17 @@ export function ServicesPage() {
                   </div>
                 </div>
 
-                <Button asChild>
-                  <Link to={cta}>
-                    Pedir {title} <ChevronRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="md:w-3/5">
-                <p className="section-label mb-3">O que está incluso</p>
-                <ul className="space-y-2.5">
-                  {highlights.map((h) => (
-                    <li key={h} className="flex items-start gap-2.5">
-                      <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-                      <span className="text-sm text-ink-secondary">{h}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div>
+                  <p className="section-label mb-3">O que está incluso</p>
+                  <ul className="space-y-2.5">
+                    {highlights.map((h) => (
+                      <li key={h} className="flex items-start gap-2.5">
+                        <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                        <span className="text-sm text-ink-secondary">{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           ))}
