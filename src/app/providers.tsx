@@ -1,7 +1,7 @@
 import '@/lib/i18n'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError, invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { useAuthStore } from '@/stores/authStore'
@@ -27,7 +27,6 @@ const queryClient = new QueryClient({
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setSession, setProfile, setLoading, setInitialized } = useAuthStore()
   const discordJoinInFlight = useRef(false)
-  const [discordJoinNotice, setDiscordJoinNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let initialized = false
@@ -125,31 +124,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     setInitialized(true)
   }
 
-  function discordJoinMessage(error: EdgeFunctionError) {
-    switch (error.code) {
-      case 'DISCORD_TOKEN_MISSING':
-        return 'Não recebemos o token OAuth do Discord. Entre novamente pelo Discord para entrar no servidor.'
-      case 'DISCORD_TOKEN_EXPIRED':
-      case 'DISCORD_TOKEN_INVALID':
-        return 'Seu token do Discord expirou. Entre novamente pelo Discord para entrar no servidor.'
-      case 'DISCORD_SCOPE_MISSING':
-        return 'O login do Discord não concedeu a permissão guilds.join. Entre novamente aceitando as permissões.'
-      case 'DISCORD_BOT_NOT_IN_GUILD':
-        return 'O bot do Discord não está no servidor configurado.'
-      case 'DISCORD_GUILD_INVALID':
-        return 'O servidor do Discord configurado é inválido.'
-      case 'DISCORD_ALREADY_MEMBER':
-        return 'Você já está no servidor do Discord.'
-      case 'RATE_LIMITED':
-      case 'DISCORD_RATE_LIMITED':
-        return 'O Discord limitou temporariamente a entrada no servidor. Vamos tentar novamente uma vez.'
-      case 'NETWORK_ERROR':
-        return 'Não foi possível conectar à função do Discord. Em desenvolvimento, verifique se as Edge Functions locais estão rodando.'
-      default:
-        return error.message
-    }
-  }
-
+  // Entrada no servidor do Discord é 100% automática e silenciosa em segundo
+  // plano -- nenhuma mensagem é mostrada ao usuário, nem de sucesso nem de
+  // falha. Falhas só são logadas em dev; o usuário nunca precisa agir (o
+  // storageKey evita reprocessar a cada sessão, sucesso ou não).
   async function joinDiscordServer(userId: string, providerToken?: string | null) {
     const storageKey = `discord-join-server:${userId}:completed`
     if (sessionStorage.getItem(storageKey) === 'true' || discordJoinInFlight.current) return
@@ -166,10 +144,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         timeoutMs: 15_000,
       })
       sessionStorage.setItem(storageKey, 'true')
-      setDiscordJoinNotice(null)
     } catch (err) {
       if (err instanceof EdgeFunctionError && err.status === 429) {
-        setDiscordJoinNotice(discordJoinMessage(err))
         const retryAfterMs = Math.max(1, err.retryAfter ?? 5) * 1000
         await new Promise((resolve) => setTimeout(resolve, retryAfterMs))
         try {
@@ -177,41 +153,22 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
             body: { discord_access_token: providerToken },
             timeoutMs: 15_000,
           })
-          sessionStorage.setItem(storageKey, 'true')
-          setDiscordJoinNotice(null)
         } catch (retryErr) {
+          if (import.meta.env.DEV) console.error('joinDiscordServer: retry failed', retryErr)
+        } finally {
           sessionStorage.setItem(storageKey, 'true')
-          if (retryErr instanceof EdgeFunctionError) {
-            setDiscordJoinNotice(discordJoinMessage(retryErr))
-          } else {
-            // Erro genérico/inesperado na retentativa -- não é acionável pelo
-            // usuário, então só loga em dev em vez de mostrar um toast vago.
-            if (import.meta.env.DEV) console.error('joinDiscordServer: retry failed with unexpected error', retryErr)
-            setDiscordJoinNotice(null)
-          }
         }
         return
       }
 
-      if (err instanceof EdgeFunctionError) {
-        sessionStorage.setItem(storageKey, 'true')
-        setDiscordJoinNotice(discordJoinMessage(err))
-      }
+      sessionStorage.setItem(storageKey, 'true')
+      if (import.meta.env.DEV) console.error('joinDiscordServer: failed', err)
     } finally {
       discordJoinInFlight.current = false
     }
   }
 
-  return (
-    <>
-      {children}
-      {discordJoinNotice && (
-        <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-lg border border-bg-elevated bg-bg-card px-4 py-3 text-sm text-ink shadow-lg">
-          {discordJoinNotice}
-        </div>
-      )}
-    </>
-  )
+  return <>{children}</>
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

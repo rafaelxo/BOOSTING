@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { normalizeApiError } from '@/api/core/errors'
-import type { BoosterProfile } from '@/types'
+import type { BoosterAdminNote, BoosterProfile } from '@/types'
 import type { BoosterAccessState, BoosterPerformanceSegment, ProfessionalProfileData, TopBoosterEntry } from './types'
 
 export async function getBoosterAccessState(userId: string): Promise<BoosterAccessState> {
@@ -13,7 +13,8 @@ export async function getBoosterAccessState(userId: string): Promise<BoosterAcce
   if (!data) return 'no_application'
   if (data.status === 'approved') return 'approved'
   if (data.status === 'rejected') return 'rejected'
-  return 'pending' // pending | under_review | suspended tratados como "aguardando" na UI
+  if (data.status === 'suspended') return 'suspended'
+  return 'pending' // pending | under_review tratados como "aguardando" na UI
 }
 
 export async function getOwnProfessionalProfile(userId: string): Promise<ProfessionalProfileData | null> {
@@ -98,6 +99,12 @@ export async function getAdminBoosterDetail(boosterId: string): Promise<BoosterP
   const { data, error } = await supabase.from('booster_profiles').select('*').eq('id', boosterId).single()
   if (error) throw normalizeApiError(error)
   return data as unknown as BoosterProfile
+}
+
+export async function listBoosterAdminNotes(): Promise<Map<string, BoosterAdminNote>> {
+  const { data, error } = await supabase.from('booster_admin_notes').select('*')
+  if (error) throw normalizeApiError(error)
+  return new Map((data ?? []).map((n) => [n.booster_id, n as unknown as BoosterAdminNote]))
 }
 
 export async function listBoosterNames(boosterUserIds: string[]): Promise<Map<string, { id: string; user_id: string; display_name: string }>> {

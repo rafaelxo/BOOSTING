@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { LogoMark, PageLoader, ThemeToggle } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterApplicationForm } from '@/features/booster/components/BoosterApplicationForm'
-import { PendingScreen, RejectedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
+import { PendingScreen, RejectedScreen, SuspendedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { requestBoosterRole, useBoosterStatus } from '@/api/boosters'
 import { queryKeys } from '@/api/core/queryKeys'
 
@@ -67,6 +67,7 @@ export function BoosterApplyPage() {
           {state === 'loading' && <PageLoader />}
           {state === 'pending' && <PendingScreen />}
           {state === 'rejected' && <RejectedScreen />}
+          {state === 'suspended' && <SuspendedScreen />}
           {state === 'error' && <BoosterStatusErrorScreen />}
         </div>
       </div>

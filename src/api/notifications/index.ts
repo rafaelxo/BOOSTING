@@ -7,7 +7,7 @@ import type { Notification } from '@/types'
 
 export type { Notification }
 
-export async function listNotifications(userId: string, limit = 20): Promise<Notification[]> {
+export async function listNotifications(userId: string, limit = 5): Promise<Notification[]> {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')

@@ -9,9 +9,9 @@ import {
 } from './queries'
 import {
   acceptBoostOrder, addOrderCoachingTopic, adminDropOrder, adminOverrideOrderStatus, cancelPendingOrder,
-  confirmOrderCompletion, disputeOrderCompletion, generatePix, requestOrderDrop, requestOrderSupport,
-  revealOrderCredentials, setOrderCoachingTopicDone, setOrderCredentials, syncOrderMatches, updateOrderStatus,
-  verifyOrderRank,
+  confirmOrderCompletion, disputeOrderCompletion, generatePix, requestCustomerOrderDrop, requestOrderDrop,
+  requestOrderSupport, revealOrderCredentials, setOrderCoachingTopicDone, setOrderCredentials, syncOrderMatches,
+  updateOrderStatus, verifyOrderRank,
 } from './mutations'
 import type { BoosterOrdersTab } from './types'
 
@@ -251,6 +251,17 @@ export function useRequestOrderDrop(orderId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (reason: string) => requestOrderDrop({ orderId, reason }),
+    onSuccess: () => {
+      invalidateOrder(queryClient, orderId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId).concat(['drop-request']) })
+    },
+  })
+}
+
+export function useRequestCustomerOrderDrop(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (reason: string) => requestCustomerOrderDrop({ orderId, reason }),
     onSuccess: () => {
       invalidateOrder(queryClient, orderId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId).concat(['drop-request']) })

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Clock, KeyRound, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
+  ArrowLeft, Clock, History, KeyRound, Lock, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
   MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight, Tag,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge, GuaranteeNotice } from '@/components/ui'
@@ -22,11 +22,11 @@ import { useCurrency } from '@/hooks/useCurrency'
 import {
   useOrder, useOrderStatusHistory, useCustomerOrderState, useSetOrderCredentials,
   useConfirmOrderCompletion, useDisputeOrderCompletion, useGeneratePix, useCancelPendingOrder,
-  useRequestOrderSupport, useSyncOrderMatches, getCustomerOrderState,
+  useRequestOrderSupport, useRequestCustomerOrderDrop, useSyncOrderMatches, getCustomerOrderState,
 } from '@/api/orders'
 import { useOrderSupportEscalation } from '@/api/admin'
 import { useBoosterServiceDetails } from '@/api/coaching'
-import type { Order, BoosterProfile } from '@/types'
+import type { Order, BoosterProfile, OrderStatus } from '@/types'
 import type { CustomerOrderState } from '@/api/orders'
 import { useQuery } from '@tanstack/react-query'
 
@@ -437,6 +437,72 @@ function CompletionConfirmationSection({ order, state }: { order: Order; state?:
   )
 }
 
+const CUSTOMER_DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 'awaiting_customer']
+
+function CustomerDropRequestSection({ order }: { order: Order }) {
+  const [showDropModal, setShowDropModal] = useState(false)
+  const [dropReason, setDropReason] = useState('')
+  const requestDrop = useRequestCustomerOrderDrop(order.id)
+
+  if (order.status === 'drop_requested') {
+    return (
+      <Card padding="md" className="border border-warning/30 bg-warning/5">
+        <div className="flex items-center gap-2 text-warning text-sm font-semibold">
+          <Lock className="h-4 w-4" />
+          Pedido travado · solicitação em análise
+        </div>
+        <p className="text-xs text-ink-secondary mt-1">
+          O admin está analisando o motivo da troca de booster. Nenhuma nova ação de boost acontece
+          enquanto isso — chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
+        </p>
+      </Card>
+    )
+  }
+
+  if (!CUSTOMER_DROPPABLE_STATUSES.includes(order.status)) return null
+
+  return (
+    <>
+      <Button
+        variant="danger-ghost"
+        className="w-full"
+        leftIcon={<AlertTriangle className="h-4 w-4" />}
+        onClick={() => setShowDropModal(true)}
+      >
+        Solicitar troca de booster
+      </Button>
+
+      <Modal
+        open={showDropModal}
+        onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
+        title="Solicitar troca de booster"
+        description="Sua solicitação será enviada ao admin para aprovação. O pedido continua ativo -- o booster atual é substituído e o pedido volta pro painel pra outro assumir, com valor e prazo já ajustados ao progresso entregue até aqui. Você não é cobrado nem reembolsado por isso."
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo <span className="text-danger">*</span>
+          </label>
+          <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo..." className="input-base w-full min-h-[100px] resize-none text-sm" maxLength={500} />
+        </div>
+        {requestDrop.isError && (
+          <ErrorAlert message={requestDrop.error instanceof Error ? requestDrop.error.message : 'Erro'} className="mt-2" />
+        )}
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>Cancelar</Button>
+          <Button
+            variant="danger"
+            loading={requestDrop.isPending}
+            disabled={dropReason.trim().length < 10}
+            onClick={() => requestDrop.mutate(dropReason.trim(), { onSuccess: () => { setShowDropModal(false); setDropReason('') } })}
+          >
+            Enviar Solicitação
+          </Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -527,6 +593,12 @@ export function OrderDetailPage() {
               {t('customer.order.id', { id: order.id.slice(0, 8).toUpperCase() })}
             </h1>
             <OrderStatusBadge status={order.status} />
+            {order.drop_count > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
+                <History className="h-3 w-3" />
+                Pedido reatribuído · valor e prazo atualizados
+              </span>
+            )}
           </div>
           <p className="text-sm text-ink-secondary mt-0.5">
             {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
@@ -671,7 +743,7 @@ export function OrderDetailPage() {
             ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderCoachingTopics orderId={order.id} />
             )
-            : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
               <OrderMatchHistory
                 orderId={order.id}
                 sync={order.status === 'in_progress' || order.status === 'paused' ? {
@@ -694,6 +766,7 @@ export function OrderDetailPage() {
         <div className="space-y-4">
           <PendingPaymentSection order={order} />
           <CompletionConfirmationSection order={order} state={customerState} />
+          <CustomerDropRequestSection order={order} />
 
           {order.status === 'completed' && (
             <Card padding="md" className="ring-1 ring-success/20">

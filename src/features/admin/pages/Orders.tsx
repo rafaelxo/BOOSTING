@@ -28,7 +28,6 @@ export function AdminOrdersPage() {
     { label: t('admin.orders.filters.all'), value: 'all' },
     { label: t('admin.orders.filters.active'), value: 'in_progress' },
     { label: t('admin.orders.filters.awaiting'), value: 'awaiting_assignment' },
-    { label: t('admin.orders.filters.disputed'), value: 'disputed' },
     { label: t('admin.orders.filters.completed'), value: 'completed' },
     // "Todos" nunca inclui cancelados (listAdminOrders já filtra) -- pra
     // auditoria, o admin ainda consegue vê-los explicitamente aqui.

@@ -101,6 +101,25 @@ export async function requestOrderDrop(params: { orderId: string; reason: string
   )
 }
 
+const REQUEST_CUSTOMER_ORDER_DROP_MESSAGES: Record<string, string> = {
+  invalid_reason: 'O motivo precisa ter entre 10 e 500 caracteres.',
+  order_not_found: 'Pedido não encontrado.',
+  order_not_assigned: 'Este pedido ainda não tem um booster atribuído.',
+  order_not_active: 'Este pedido não está mais em um status que aceita drop.',
+  drop_request_already_pending: 'Já existe uma solicitação de drop pendente para este pedido.',
+}
+
+export async function requestCustomerOrderDrop(params: { orderId: string; reason: string }) {
+  const { data, error } = await supabase.rpc('request_customer_order_drop', {
+    p_order_id: params.orderId, p_reason: params.reason,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(
+    data as { success: boolean; error?: string; penalty_pct?: number; penalty_amount?: number },
+    REQUEST_CUSTOMER_ORDER_DROP_MESSAGES,
+  )
+}
+
 export interface RequestOrderSupportResult {
   success: boolean
   error?: string

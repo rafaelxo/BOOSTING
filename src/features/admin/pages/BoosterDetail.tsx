@@ -1,12 +1,9 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Trophy, Swords, Users, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
-import { Button, Card, BoosterStatusBadge, Avatar, ErrorAlert, Skeleton } from '@/components/ui'
+import { ArrowLeft, Trophy, Swords, Users, ExternalLink } from 'lucide-react'
+import { Button, Card, BoosterStatusBadge, Avatar, Skeleton } from '@/components/ui'
 import { formatDate, formatRank, formatLastSeen } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
-import {
-  useAdminBoosterDetail, useBoosterPerformanceByRank, useAdminApproveBooster,
-  useAdminToggleBoosterTop3,
-} from '@/api/boosters'
+import { useAdminBoosterDetail, useBoosterPerformanceByRank } from '@/api/boosters'
 import { useBoosterSlotInfo } from '@/api/orders'
 
 type RankBucket = 'gold_minus' | 'plat_diamond' | 'master_plus'
@@ -41,22 +38,9 @@ export function AdminBoosterDetailPage() {
   // à mão (ver refresh_booster_performance_segments, migration 054).
   const { data: performanceSegments } = useBoosterPerformanceByRank(booster?.user_id)
 
-  const updateStatusMutation = useAdminApproveBooster()
-  const updateStatus = {
-    isPending: updateStatusMutation.isPending,
-    isError: updateStatusMutation.isError,
-    isSuccess: updateStatusMutation.isSuccess,
-    error: updateStatusMutation.error,
-    mutate: (status: 'approved' | 'rejected' | 'suspended') =>
-      updateStatusMutation.mutate({ boosterId: id!, newStatus: status }),
-  }
-
-  const toggleTop3Mutation = useAdminToggleBoosterTop3()
-
   if (isLoading) return <Skeleton className="h-48 w-full" />
   if (!booster) return <p className="text-ink-muted">Booster não encontrado.</p>
 
-  const isPending = booster.status === 'pending' || booster.status === 'under_review'
   const hasStats = !!performanceSegments?.some(s => s.total_matches > 0)
 
   return (
@@ -73,82 +57,11 @@ export function AdminBoosterDetailPage() {
             <Trophy className="h-3 w-3" /> TOP 3
           </span>
         )}
-        {booster.status === 'approved' && (
-          <Button
-            variant={booster.is_top3 ? 'secondary' : 'ghost'}
-            size="sm"
-            leftIcon={<Trophy className="h-3.5 w-3.5" />}
-            loading={toggleTop3Mutation.isPending}
-            onClick={() => toggleTop3Mutation.mutate({ boosterId: booster.id, isTop3: !booster.is_top3 })}
-            className="ml-auto"
-          >
-            {booster.is_top3 ? 'Remover do Top 3' : 'Marcar como Top 3'}
-          </Button>
-        )}
       </div>
 
-      {/* Action buttons for pending boosters */}
-      {isPending && (
-        <Card padding="md">
-          <p className="text-sm font-semibold text-ink mb-3">Decisão sobre a candidatura</p>
-          <div className="flex gap-3">
-            <Button
-              variant="success"
-              leftIcon={<CheckCircle2 className="h-4 w-4" />}
-              loading={updateStatus.isPending}
-              onClick={() => updateStatus.mutate('approved')}
-              className="flex-1"
-            >
-              Aprovar Booster
-            </Button>
-            <Button
-              variant="danger"
-              leftIcon={<XCircle className="h-4 w-4" />}
-              loading={updateStatus.isPending}
-              onClick={() => updateStatus.mutate('rejected')}
-              className="flex-1"
-            >
-              Rejeitar
-            </Button>
-          </div>
-          {updateStatus.isError && (
-            <ErrorAlert message={(updateStatus.error as Error).message} className="mt-2" />
-          )}
-          {updateStatus.isSuccess && (
-            <p className="text-success text-xs mt-2">Status atualizado com sucesso.</p>
-          )}
-        </Card>
-      )}
-
-      {booster.status === 'approved' && (
-        <Card padding="md">
-          <div className="flex gap-3">
-            <Button
-              variant="danger-ghost"
-              size="sm"
-              loading={updateStatus.isPending}
-              onClick={() => updateStatus.mutate('suspended')}
-            >
-              Suspender Booster
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {booster.status === 'suspended' && (
-        <Card padding="md">
-          <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              loading={updateStatus.isPending}
-              onClick={() => updateStatus.mutate('approved')}
-            >
-              Reativar Booster
-            </Button>
-          </div>
-        </Card>
-      )}
+      {/* Aprovar/rejeitar/suspender/reativar -- só no menu "Ações" da lista
+          de boosters (/admin/boosters), pra não ter o mesmo botão em dois
+          lugares. Top3 é automático (refresh_top3_boosters), sem toggle manual. */}
 
       {/* Dados da candidatura -- replica o que foi submetido no formulário
           (BoosterApplicationForm), pra fins de verificação/controle. Não é

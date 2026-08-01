@@ -4,9 +4,12 @@ import { queryKeys } from '@/api/core/queryKeys'
 import {
   getAdminBoosterDetail, getBoosterAccessState, getBoosterPerformanceByRank, getOwnBoosterProfileId,
   getOwnBoosterTop3Status, getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters,
-  listBoostersPerformance, listBoosterNames, listPublicBoosters,
+  listBoosterAdminNotes, listBoostersPerformance, listBoosterNames, listPublicBoosters,
 } from './queries'
-import { adminApproveBooster, adminToggleBoosterTop3, boosterHeartbeat, onboardBooster, updateProfessionalProfile } from './mutations'
+import {
+  adminApproveBooster, boosterHeartbeat, onboardBooster, setBoosterAdminNote,
+  updateProfessionalProfile,
+} from './mutations'
 
 export function useBoosterStatus(userId: string | undefined) {
   return useQuery({
@@ -149,10 +152,17 @@ export function useAdminApproveBooster() {
   })
 }
 
-export function useAdminToggleBoosterTop3() {
+export function useBoosterAdminNotes() {
+  return useQuery({
+    queryKey: ['boosters', 'admin-notes'] as const,
+    queryFn: listBoosterAdminNotes,
+  })
+}
+
+export function useSetBoosterAdminNote() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: adminToggleBoosterTop3,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['boosters'] }),
+    mutationFn: setBoosterAdminNote,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['boosters', 'admin-notes'] }),
   })
 }

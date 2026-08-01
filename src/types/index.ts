@@ -127,6 +127,15 @@ export interface BoosterProfile {
   updated_at: string
 }
 
+// Nota interna do admin sobre um booster -- nunca visível pro próprio
+// booster, tabela própria (booster_admin_notes) com RLS admin-only.
+export interface BoosterAdminNote {
+  booster_id: string
+  note: string
+  updated_at: string
+  updated_by: string | null
+}
+
 // ─── Catalog ──────────────────────────────────────────────────────────────────
 
 // Fluxo do configurador de boost ao qual um addon pertence. null = extra
@@ -242,6 +251,14 @@ export interface Order {
   // como início do prazo estimado (CountdownTimer).
   match_sync_started_at: string | null
   last_match_synced_at: string | null
+  // Disclaimer de drop: drop_count > 0 sinaliza que este pedido já foi
+  // reaberto por um drop antes. rank_before_last_drop é o current_rank
+  // (só elo_boost) tirado logo antes do último drop sobrescrevê-lo com o
+  // rank verificado mais recente -- mostra o progresso que o booster
+  // anterior entregou, além do current_rank -> target_rank já existente.
+  drop_count: number
+  rank_before_last_drop: Rank | null
+  last_dropped_at: string | null
 }
 
 export interface OrderStatusHistory {
@@ -283,6 +300,8 @@ export interface OrderDropRequest {
   admin_note: string | null
   created_at: string
   resolved_at: string | null
+  requested_by_role: 'booster' | 'admin' | 'customer'
+  status_at_request: OrderStatus | null
 }
 
 export interface OrderMatch {

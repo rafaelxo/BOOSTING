@@ -69,8 +69,8 @@ export async function adminApproveBooster(params: { boosterId: string; newStatus
   return assertRpcSuccess(data as { success: boolean; error?: string })
 }
 
-export async function adminToggleBoosterTop3(params: { boosterId: string; isTop3: boolean }) {
-  const { data, error } = await supabase.rpc('toggle_booster_top3', { p_booster_id: params.boosterId, p_is_top3: params.isTop3 })
+export async function setBoosterAdminNote(params: { boosterId: string; note: string }) {
+  const { data, error } = await supabase.rpc('set_booster_admin_note', { p_booster_id: params.boosterId, p_note: params.note })
   if (error) throw normalizeApiError(error)
   return assertRpcSuccess(data as { success: boolean; error?: string })
 }

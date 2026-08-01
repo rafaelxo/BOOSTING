@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Briefcase, Lock, Sparkles, Swords, Users, TrendingUp, Zap } from 'lucide-react'
+import { Briefcase, History, Lock, Sparkles, Swords, Users, TrendingUp, Zap } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -349,9 +349,29 @@ export function AvailableJobsPage() {
                         Exclusivo para você · {exclusiveLabel}
                       </span>
                     )}
+                    {job.drop_count > 0 && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
+                        <History className="h-3 w-3" />
+                        Pedido dropado · valor e prazo atualizados
+                      </span>
+                    )}
                   </div>
                   {job.current_rank && job.target_rank && (
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {job.drop_count > 0 && job.rank_before_last_drop && (
+                        <>
+                          <RankBadge
+                            tier={(job.rank_before_last_drop as { tier: RankTier }).tier}
+                            division={(job.rank_before_last_drop as { division: Division }).division}
+                            size="xs"
+                            showLabel={false}
+                          />
+                          <span className="text-xs font-medium text-ink-muted line-through">
+                            {formatRank((job.rank_before_last_drop as { tier: RankTier }).tier, (job.rank_before_last_drop as { division: Division }).division)}
+                          </span>
+                          <span className="text-ink-muted text-xs">→</span>
+                        </>
+                      )}
                       <RankBadge
                         tier={(job.current_rank as { tier: RankTier }).tier}
                         division={(job.current_rank as { division: Division }).division}

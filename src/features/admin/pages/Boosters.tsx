@@ -1,12 +1,133 @@
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, CheckCircle2, XCircle, Trophy, Star } from 'lucide-react'
-import { Button, BoosterStatusBadge, EmptyState, Skeleton, ErrorAlert } from '@/components/ui'
+import { Ban, CheckCircle2, ChevronDown, RotateCcw, Shield, StickyNote, Trophy, Star, XCircle } from 'lucide-react'
+import { Button, BoosterStatusBadge, EmptyState, Skeleton, ErrorAlert, Popover } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { formatDate } from '@/lib/utils'
-import type { BoosterProfile } from '@/types'
-import { useState } from 'react'
+import { cn, formatDate, timeAgo } from '@/lib/utils'
+import type { BoosterAdminNote, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
-import { useAdminBoosters, useAdminApproveBooster } from '@/api/boosters'
+import { useAdminBoosters, useAdminApproveBooster, useBoosterAdminNotes, useSetBoosterAdminNote } from '@/api/boosters'
+
+function BoosterActionsMenu({
+  booster, note, statusPending, onApprove, onReject, onSuspend, onReinstate,
+}: {
+  booster: BoosterProfile
+  note?: BoosterAdminNote
+  statusPending: boolean
+  onApprove: () => void
+  onReject: () => void
+  onSuspend: () => void
+  onReinstate: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [draft, setDraft] = useState(note?.note ?? '')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const setNote = useSetBoosterAdminNote()
+  const hasNote = !!note?.note?.trim()
+
+  const isNew = booster.status === 'pending' || booster.status === 'under_review'
+  const isActive = booster.status === 'approved'
+  const isSuspended = booster.status === 'suspended'
+
+  const itemClass = 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-sm font-medium transition-colors disabled:opacity-50'
+
+  return (
+    <>
+      <Button
+        ref={triggerRef}
+        size="xs"
+        variant="secondary"
+        onClick={() => setMenuOpen((v) => !v)}
+        rightIcon={<ChevronDown className={cn('h-3 w-3 transition-transform', menuOpen && 'rotate-180')} />}
+      >
+        Ações
+      </Button>
+
+      <Popover open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={triggerRef} className="w-60 p-2 space-y-1">
+        <button
+          type="button"
+          onClick={() => { setDraft(note?.note ?? ''); setNotesOpen(true); setMenuOpen(false) }}
+          className={cn(itemClass, 'text-ink-secondary hover:bg-bg-elevated')}
+        >
+          <StickyNote className="h-4 w-4 shrink-0" />
+          Notas
+          {hasNote && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-brand shrink-0" />}
+        </button>
+
+        {isNew && (
+          <>
+            <button
+              type="button"
+              disabled={statusPending}
+              onClick={() => { onApprove(); setMenuOpen(false) }}
+              className={cn(itemClass, 'text-success hover:bg-success/10')}
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" /> Aprovar
+            </button>
+            <button
+              type="button"
+              disabled={statusPending}
+              onClick={() => { onReject(); setMenuOpen(false) }}
+              className={cn(itemClass, 'text-danger hover:bg-danger/10')}
+            >
+              <XCircle className="h-4 w-4 shrink-0" /> Recusar
+            </button>
+          </>
+        )}
+
+        {isActive && (
+          <button
+            type="button"
+            disabled={statusPending}
+            onClick={() => { onSuspend(); setMenuOpen(false) }}
+            className={cn(itemClass, 'text-danger hover:bg-danger/10')}
+          >
+            <Ban className="h-4 w-4 shrink-0" /> Suspender
+          </button>
+        )}
+
+        {isSuspended && (
+          <button
+            type="button"
+            disabled={statusPending}
+            onClick={() => { onReinstate(); setMenuOpen(false) }}
+            className={cn(itemClass, 'text-ink-secondary hover:bg-bg-elevated')}
+          >
+            <RotateCcw className="h-4 w-4 shrink-0" /> Reativar
+          </button>
+        )}
+      </Popover>
+
+      <Popover open={notesOpen} onClose={() => setNotesOpen(false)} anchorRef={triggerRef} className="w-[26rem] p-4 space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-ink-muted">Notas -- visível só para admins</p>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Escreva o que quiser sobre este booster..."
+          className="input-base w-full min-h-[260px] resize-none text-sm"
+          maxLength={2000}
+          autoFocus
+        />
+        {note?.updated_at && (
+          <p className="text-xs text-ink-muted">Atualizado {timeAgo(note.updated_at)}</p>
+        )}
+        {setNote.isError && (
+          <ErrorAlert message={setNote.error instanceof Error ? setNote.error.message : 'Erro ao salvar'} />
+        )}
+        <div className="flex gap-3 justify-end pt-1">
+          <Button variant="ghost" onClick={() => setNotesOpen(false)}>Fechar</Button>
+          <Button
+            loading={setNote.isPending}
+            onClick={() => setNote.mutate({ boosterId: booster.id, note: draft }, { onSuccess: () => setNotesOpen(false) })}
+          >
+            Salvar
+          </Button>
+        </div>
+      </Popover>
+    </>
+  )
+}
 
 export function AdminBoostersPage() {
   const [filter, setFilter] = useState<BoosterProfile['status'] | 'all'>('all')
@@ -15,12 +136,12 @@ export function AdminBoostersPage() {
   const filterLabels: Record<string, string> = {
     all: t('admin.boosters.filters.all'),
     pending: t('admin.boosters.filters.pending'),
-    under_review: t('admin.boosters.filters.under_review'),
     approved: t('admin.boosters.filters.approved'),
     suspended: t('admin.boosters.filters.suspended'),
   }
 
   const { data: boosters, isLoading } = useAdminBoosters(filter)
+  const { data: boosterNotes } = useBoosterAdminNotes()
   const updateBoosterStatusMutation = useAdminApproveBooster()
   const updateBoosterStatus = {
     mutate: (params: { id: string; status: 'approved' | 'rejected' | 'suspended' }) =>
@@ -35,7 +156,7 @@ export function AdminBoostersPage() {
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 w-fit">
-          {(['all', 'pending', 'under_review', 'approved', 'suspended'] as const).map((s) => (
+          {(['all', 'pending', 'approved', 'suspended'] as const).map((s) => (
             <button key={s} onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${filter === s ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'}`}>
               {filterLabels[s] ?? s}
@@ -59,7 +180,6 @@ export function AdminBoostersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t('admin.boosters.table.name')}</TableHead>
-                <TableHead>{t('admin.boosters.table.games')}</TableHead>
                 <TableHead>{t('admin.boosters.table.rating')}</TableHead>
                 <TableHead>{t('admin.boosters.table.completed')}</TableHead>
                 <TableHead>{t('admin.boosters.table.status')}</TableHead>
@@ -82,7 +202,6 @@ export function AdminBoostersPage() {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{b.games?.join(', ') || '—'}</TableCell>
                   <TableCell>
                     <span className="flex items-center gap-1">
                       {b.rating.toFixed(1)}
@@ -93,34 +212,15 @@ export function AdminBoostersPage() {
                   <TableCell><BoosterStatusBadge status={b.status} /></TableCell>
                   <TableCell>{formatDate(b.created_at)}</TableCell>
                   <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      {b.status === 'pending' || b.status === 'under_review' ? (
-                        <>
-                          <Button size="xs" variant="success" leftIcon={<CheckCircle2 className="h-3 w-3" />}
-                            loading={updateBoosterStatusMutation.isPending}
-                            onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
-                            {t('admin.boosters.approve')}
-                          </Button>
-                          <Button size="xs" variant="danger" leftIcon={<XCircle className="h-3 w-3" />}
-                            loading={updateBoosterStatusMutation.isPending}
-                            onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'rejected' })}>
-                            {t('admin.boosters.reject')}
-                          </Button>
-                        </>
-                      ) : b.status === 'approved' ? (
-                        <Button size="xs" variant="danger-ghost"
-                          loading={updateBoosterStatusMutation.isPending}
-                          onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'suspended' })}>
-                          {t('admin.boosters.suspend')}
-                        </Button>
-                      ) : b.status === 'suspended' ? (
-                        <Button size="xs" variant="secondary"
-                          loading={updateBoosterStatusMutation.isPending}
-                          onClick={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}>
-                          {t('admin.boosters.reinstate')}
-                        </Button>
-                      ) : null}
-                    </div>
+                    <BoosterActionsMenu
+                      booster={b}
+                      note={boosterNotes?.get(b.id)}
+                      statusPending={updateBoosterStatusMutation.isPending}
+                      onApprove={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}
+                      onReject={() => updateBoosterStatus.mutate({ id: b.id, status: 'rejected' })}
+                      onSuspend={() => updateBoosterStatus.mutate({ id: b.id, status: 'suspended' })}
+                      onReinstate={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

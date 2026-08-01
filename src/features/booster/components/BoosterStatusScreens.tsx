@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Clock, X, AlertTriangle } from 'lucide-react'
+import { Ban, Clock, X, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui'
 
 export function PendingScreen() {
@@ -46,6 +46,29 @@ export function RejectedScreen() {
       >
         Contatar suporte
       </a>
+    </div>
+  )
+}
+
+export function SuspendedScreen() {
+  return (
+    <div className="max-w-sm text-center space-y-5">
+      <div className="h-16 w-16 rounded-full bg-danger/10 border border-danger/25 flex items-center justify-center mx-auto">
+        <Ban className="h-8 w-8 text-danger" />
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-ink mb-2">Conta suspensa</h2>
+        <p className="text-sm text-ink-secondary leading-relaxed">
+          Sua conta de booster foi suspensa por um administrador e o acesso ao
+          painel está bloqueado enquanto isso.
+        </p>
+      </div>
+      <p className="text-xs text-ink-muted">
+        Abra um ticket no nosso Discord pra entender o motivo ou contestar a suspensão:{' '}
+        <a href="https://discord.gg/aRPXe9pnwP" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+          discord.gg/aRPXe9pnwP
+        </a>
+      </p>
     </div>
   )
 }

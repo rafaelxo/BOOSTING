@@ -33,6 +33,8 @@ export function AdminDropsPage() {
   const pendingRequests = requests?.filter(r => r.status === 'pending') ?? []
   const pastRequests = requests?.filter(r => r.status !== 'pending') ?? []
 
+  const ROLE_LABEL: Record<string, string> = { booster: 'Booster', admin: 'Admin', customer: 'Cliente' }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">Solicitações de Drop</h1>
@@ -53,6 +55,7 @@ export function AdminDropsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Pedido</TableHead>
+                  <TableHead>Origem</TableHead>
                   <TableHead>Booster</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Vitórias / Derrotas</TableHead>
@@ -65,6 +68,11 @@ export function AdminDropsPage() {
                 {pendingRequests.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">#{r.order_id.slice(0, 8).toUpperCase()}</TableCell>
+                    <TableCell>
+                      <span className="badge text-[10px] font-bold bg-bg-elevated text-ink-secondary">
+                        {ROLE_LABEL[r.requested_by_role] ?? r.requested_by_role}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-xs">
                       {boosterNames?.get(r.booster_id) ? (
                         <Link to={`/admin/boosters/${boosterNames.get(r.booster_id)!.id}`} className="text-brand hover:underline font-medium">
@@ -125,6 +133,7 @@ export function AdminDropsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Pedido</TableHead>
+                  <TableHead>Origem</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Conclusão / Pagamento</TableHead>
                   <TableHead>Resolvido</TableHead>
@@ -135,6 +144,11 @@ export function AdminDropsPage() {
                 {pastRequests.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">#{r.order_id.slice(0, 8).toUpperCase()}</TableCell>
+                    <TableCell>
+                      <span className="badge text-[10px] font-bold bg-bg-elevated text-ink-secondary">
+                        {ROLE_LABEL[r.requested_by_role] ?? r.requested_by_role}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <span className={`badge text-xs font-bold ${r.status === 'approved' ? 'text-success bg-success/10' : 'text-danger bg-danger/10'}`}>
                         {r.status === 'approved' ? 'Aprovado' : 'Rejeitado'}
@@ -157,8 +171,8 @@ export function AdminDropsPage() {
         onOpenChange={(open) => { if (!open) { setResolving(null); setAdminNote('') } }}
         title={resolving?.approve ? 'Aprovar solicitação de drop' : 'Rejeitar solicitação de drop'}
         description={resolving?.approve
-          ? 'O pedido volta pro painel de jobs disponíveis. Se o booster já concluiu 50% ou mais, ele recebe metade do valor normal do pedido.'
-          : 'O pedido voltará ao status em andamento.'}
+          ? 'O pedido volta pro painel de jobs disponíveis. O booster recebe proporcional ao quanto já concluiu do pedido.'
+          : 'O pedido volta ao status em que estava antes da solicitação.'}
       >
         <div>
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">

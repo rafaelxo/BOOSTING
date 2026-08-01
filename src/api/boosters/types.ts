@@ -2,7 +2,7 @@ import type { BoosterProfile, Rank } from '@/types'
 
 export type { BoosterProfile }
 
-export type BoosterAccessState = 'no_application' | 'pending' | 'approved' | 'rejected' | 'error'
+export type BoosterAccessState = 'no_application' | 'pending' | 'approved' | 'rejected' | 'suspended' | 'error'
 
 export interface ProfessionalProfileData {
   display_name: string

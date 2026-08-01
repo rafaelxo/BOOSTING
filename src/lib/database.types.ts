@@ -83,6 +83,42 @@ export type Database = {
           },
         ]
       }
+      booster_admin_notes: {
+        Row: {
+          booster_id: string
+          note: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          booster_id: string
+          note?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          booster_id?: string
+          note?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_admin_notes_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: true
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_admin_notes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booster_ledger_entries: {
         Row: {
           actor_id: string | null
@@ -699,8 +735,10 @@ export type Database = {
           penalty_amount: number
           penalty_pct: number
           reason: string
+          requested_by_role: string
           resolved_at: string | null
           status: string
+          status_at_request: string | null
           wins_at_request: number
         }
         Insert: {
@@ -714,8 +752,10 @@ export type Database = {
           penalty_amount?: number
           penalty_pct?: number
           reason: string
+          requested_by_role?: string
           resolved_at?: string | null
           status?: string
+          status_at_request?: string | null
           wins_at_request?: number
         }
         Update: {
@@ -729,8 +769,10 @@ export type Database = {
           penalty_amount?: number
           penalty_pct?: number
           reason?: string
+          requested_by_role?: string
           resolved_at?: string | null
           status?: string
+          status_at_request?: string | null
           wins_at_request?: number
         }
         Relationships: [
@@ -2197,6 +2239,10 @@ export type Database = {
         Returns: Json
       }
       request_booster_role: { Args: never; Returns: Json }
+      request_customer_order_drop: {
+        Args: { p_order_id: string; p_reason: string }
+        Returns: Json
+      }
       request_order_drop: {
         Args: { p_order_id: string; p_reason: string }
         Returns: Json
@@ -2245,6 +2291,10 @@ export type Database = {
         Args: { p_done: boolean; p_order_id: string; p_topic_id: string }
         Returns: Json
       }
+      set_booster_admin_note: {
+        Args: { p_booster_id: string; p_note: string }
+        Returns: Json
+      }
       set_duo_account_active: {
         Args: { p_account_id: string; p_is_active: boolean }
         Returns: Json
@@ -2259,10 +2309,6 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
-      toggle_booster_top3: {
-        Args: { p_booster_id: string; p_is_top3: boolean }
-        Returns: Json
-      }
       update_booster_professional_profile: {
         Args: {
           p_available_days: string[]

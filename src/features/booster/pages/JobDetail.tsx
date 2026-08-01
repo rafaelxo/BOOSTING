@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Play, CheckCircle2, AlertTriangle, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
+  ArrowLeft, Play, CheckCircle2, AlertTriangle, Lock, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
   Gamepad2, Users, Shuffle, TrendingUp, Trophy, Wallet, Hash,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
@@ -391,7 +391,7 @@ export function JobDetailPage() {
             ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderCoachingTopics orderId={order.id} />
             )
-            : ['in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            : ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
               <OrderMatchHistory
                 orderId={order.id}
                 sync={order.status === 'in_progress' || order.status === 'paused' ? {
@@ -494,10 +494,14 @@ export function JobDetailPage() {
           {(order.status === 'drop_requested' || pendingDrop) && (
             <div className="card p-3 border border-warning/30 bg-warning/5">
               <div className="flex items-center gap-2 text-warning text-sm font-semibold">
-                <AlertTriangle className="h-4 w-4" />
-                Solicitação de drop pendente
+                <Lock className="h-4 w-4" />
+                Pedido travado · solicitação de drop em análise
               </div>
-              <p className="text-xs text-ink-secondary mt-1">Aguardando aprovação do admin.</p>
+              <p className="text-xs text-ink-secondary mt-1">
+                Aguardando o admin analisar o motivo. Nenhuma nova ação pode ser feita enquanto isso
+                (credenciais, tokens de acesso e sincronização de partidas ficam bloqueados) —
+                chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
+              </p>
             </div>
           )}
 
@@ -551,7 +555,7 @@ export function JobDetailPage() {
         open={showDropModal}
         onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
         title="Solicitar Drop de Pedido"
-        description="Sua solicitação será enviada ao admin para aprovação. Se você já concluiu 50% ou mais do pedido, recebe metade do que receberia normalmente por ele. Abaixo de 50% concluído, não recebe nada por este pedido."
+        description="Sua solicitação será enviada ao admin para aprovação. Você recebe proporcional ao quanto já concluiu do pedido -- quanto mais avançado, maior o pagamento."
       >
         <div>
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">

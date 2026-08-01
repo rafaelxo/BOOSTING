@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowLeft, RefreshCw, XOctagon, MessageCircleWarning,
+  ArrowLeft, History, Lock, RefreshCw, XOctagon, MessageCircleWarning,
   Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, User,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
@@ -144,6 +144,13 @@ export function AdminOrderDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-ink">Pedido #{order.id.slice(0, 8).toUpperCase()}</h1>
             <OrderStatusBadge status={order.status} />
+            {order.drop_count > 0 && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
+                <History className="h-3 w-3" />
+                Dropado {order.drop_count > 1 ? `${order.drop_count}x` : ''} · valor e prazo já atualizados
+                {order.last_dropped_at ? ` · último drop ${timeAgo(order.last_dropped_at)}` : ''}
+              </span>
+            )}
           </div>
           <p className="text-xs text-ink-muted mt-0.5">Criado em {formatDateTime(order.created_at)}</p>
         </div>
@@ -168,7 +175,11 @@ export function AdminOrderDetailPage() {
                   ...(order.service_type === 'elo_boost' && !order.pdl_bracket
                     ? [[Shuffle, 'Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]
                     : []),
-                  ...(!hasRankRail && order.current_rank ? [[TrendingUp, 'Rank Atual', formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)]] : []),
+                  ...(!hasRankRail && order.current_rank ? [[TrendingUp, 'Rank Atual', (
+                    order.drop_count > 0 && order.rank_before_last_drop
+                      ? `${formatRank((order.rank_before_last_drop as { tier: string }).tier as never, (order.rank_before_last_drop as { division: string }).division)} → ${formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)}`
+                      : formatRank((order.current_rank as { tier: string }).tier as never, (order.current_rank as { division: string }).division)
+                  )]] : []),
                   ...(!hasRankRail && order.service_type === 'elo_boost' && order.target_rank
                     ? [[TrendingUp, 'Rank Alvo', formatRank((order.target_rank as { tier: string }).tier as never, (order.target_rank as { division: string }).division)]]
                     : []),
@@ -234,7 +245,7 @@ export function AdminOrderDetailPage() {
             )}
           </Card>
 
-          {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+          {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
             <OrderMatchHistory
               orderId={order.id}
               sync={order.status === 'in_progress' || order.status === 'paused' ? {
@@ -252,6 +263,23 @@ export function AdminOrderDetailPage() {
         </div>
 
         <div className="space-y-4">
+          {order.status === 'drop_requested' && (
+            <Card padding="md" className="border border-warning/30 bg-warning/5">
+              <h3 className="text-sm font-semibold text-warning mb-1 flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Pedido travado · aguardando análise
+              </h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Existe uma solicitação de drop pendente pra este pedido. Nenhuma nova ação de boost
+                acontece (credenciais, tokens e sincronização de partidas ficam bloqueados) até você
+                aprovar ou rejeitar — chat e histórico continuam disponíveis normalmente.
+              </p>
+              <Button asChild size="sm" className="w-full">
+                <Link to="/admin/drops">Analisar solicitação</Link>
+              </Button>
+            </Card>
+          )}
+
           <SupportEscalationCard orderId={order.id} />
 
           {DROPPABLE_STATUSES.includes(order.status) && (
@@ -260,7 +288,7 @@ export function AdminOrderDetailPage() {
                 <XOctagon className="h-4 w-4 text-danger" />
                 Dropar Pedido
               </h3>
-              <p className="text-xs text-ink-muted mb-3">Retira o booster e reabre o pedido pra outro assumir. Se ele já concluiu 50%+ do pedido, recebe metade do valor normal e o pedido reabre pela metade do preço; abaixo de 50%, ele não recebe nada e o preço continua integral.</p>
+              <p className="text-xs text-ink-muted mb-3">Retira o booster e reabre o pedido pra outro assumir. Ele recebe proporcional ao quanto já concluiu do pedido (0% concluído = nada recebido, preço integral pro próximo booster; conforme a % de conclusão sobe, o pagamento sobe e o preço restante desce na mesma proporção).</p>
               <Button variant="danger" size="sm" className="w-full" onClick={() => setShowDropModal(true)}>
                 Dropar Pedido
               </Button>
@@ -316,7 +344,7 @@ export function AdminOrderDetailPage() {
         open={showDropModal}
         onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
         title="Dropar Pedido"
-        description="O booster é retirado e o pedido volta pro painel de jobs disponíveis. Pagamento parcial (metade do valor normal) só se ele já tiver concluído 50% ou mais."
+        description="O booster é retirado e o pedido volta pro painel de jobs disponíveis. O pagamento parcial é proporcional ao quanto ele já concluiu do pedido."
       >
         <div>
           <label className="text-xs font-semibold text-ink-secondary block mb-1.5">Motivo (mín. 10 caracteres)</label>

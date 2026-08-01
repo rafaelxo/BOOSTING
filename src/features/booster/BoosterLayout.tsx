@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
 import { useAuthStore } from '@/stores/authStore'
 import { useBoosterStatus, useBoosterHeartbeat } from '@/api/boosters'
-import { PendingScreen, RejectedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
+import { PendingScreen, RejectedScreen, SuspendedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { useNewOrderSound } from '@/features/booster/hooks/useNewOrderSound'
 
 function ApprovedBoosterPanel() {
@@ -123,6 +123,7 @@ export function BoosterLayout() {
   if (state === 'no_application') return shell(<NoApplicationScreen />)
   if (state === 'pending') return shell(<PendingScreen />)
   if (state === 'rejected') return shell(<RejectedScreen />)
+  if (state === 'suspended') return shell(<SuspendedScreen />)
   if (state === 'error') return shell(<BoosterStatusErrorScreen />)
 
   return <ApprovedBoosterPanel />
