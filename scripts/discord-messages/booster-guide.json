@@ -1,0 +1,62 @@
+[
+  {
+    "embeds": [
+      {
+        "title": "📘 Guia do Booster",
+        "description": "Bem-vindo à equipe EloPeak! Este guia explica o básico para um bom começo.",
+        "color": "#22C55E",
+        "fields": [
+          {
+            "name": "📥 Como recebo pedidos?",
+            "value": "Quando um cliente paga e envia as credenciais, você é notificado em dois lugares:\n• Discord → #jobs\n• Plataforma → aba JOBS\n\nAmbos atualizam ao vivo. Fique atento."
+          },
+          {
+            "name": "💼 Na aba JOBS",
+            "value": "O mercado mostra todos os pedidos disponíveis. Cada pedido exibe:\n• Tipo de serviço (Elojob, Duo Boost, MD5, Vitórias).\n• Rank atual → Rank objetivo.\n• Valor que você vai receber.\n• Tempo estimado."
+          },
+          {
+            "name": "✅ Aceitando um pedido",
+            "value": "Clique no pedido para ver os detalhes completos. Ao aceitar:\n• As credenciais da conta são liberadas para você.\n• O pedido sai da aba de boosts e vai para as suas orders.\n• Você assume a responsabilidade de completar.\n\nSó aceite pedidos que você tem certeza que consegue completar. Caso não consiga finalizar o boost, avaliaremos o motivo do drop. Se ocorrer com frequência, advertências serão tomadas."
+          },
+          {
+            "name": "💰 Pagamentos",
+            "value": "• Ao concluir um pedido, o valor vai para Saldo Pendente.\n• Quando o cliente aprova (ou auto-aprova em 7 dias), o saldo é liberado imediatamente.\n• O admin processa os pagamentos aos dias 15/30.\n• Mínimo para saque: R$ 50."
+          },
+          {
+            "name": "⚠️ Política de DROP e Penalidades",
+            "value": "A desistência ou cancelamento de um pedido aceito (DROP) está sujeito a regras de acordo com o histórico e desempenho na conta:\n• DROP com 3 ou mais derrotas: taxa de 10% do valor da order coletada (independente dos ganhos estimados) e uma advertência de drop."
+          },
+          {
+            "name": "🔻 DROP com winrate negativo (2 ou menos derrotas)",
+            "value": "• 1ª vez: Não haverá advertências ou taxas.\n• 2ª vez: Taxa de 5% sobre o valor da order coletada (independente dos ganhos estimados).\n• 3ª vez: Taxa de 5% sobre o valor da order coletada (independente dos ganhos estimados) e uma advertência de drop."
+          },
+          {
+            "name": "⚖️ DROP no 0 a 0 (50% de Winrate)",
+            "value": "• Até 6 jogos disputados: DROP permitido sem penalidades.\n• A partir do 7º game: uma advertência de drop."
+          },
+          {
+            "name": "🚫 Sistema de Advertências e Bloqueios",
+            "value": "• 2 advertências: 6 horas impedido de pegar novos boosts.\n• 3 penalidades: 16 horas impedido de pegar novos boosts.\n• 5 penalidades: Desligamento imediato da equipe (kick)."
+          },
+          {
+            "name": "📌 Observações",
+            "value": "• A cada dia 30, uma advertência de drop é removida do perfil do booster.\n• As porcentagens (5% e 10%) são descontadas diretamente no momento do saque.\n\nCadastre sua chave PIX vinculada ao seu CPF na plataforma para receber. Pagamentos são realizados apenas para chaves PIX de titularidade do próprio booster. Sem PIX cadastrado, o pagamento não é gerado."
+          },
+          {
+            "name": "📊 Sua performance importa",
+            "value": "Acompanhamos a qualidade de todos os boosters. Problemas como winrate baixo, abandono de serviços, não conclusão dentro do prazo e reclamações de clientes podem resultar em kick."
+          },
+          {
+            "name": "⚔️ Clash Orders",
+            "value": "• Solo Clash: você joga diretamente na conta do cliente e é responsável por montar a equipe, recrutando os outros 4 jogadores.\n• Duo Clash: você joga em sua própria conta junto com o cliente e é responsável por convocar mais 3 jogadores para completar o time."
+          },
+          {
+            "name": "🤝 Duo com outros boosters",
+            "value": "Para serviços solo, recomendamos jogar de duo com outro booster da equipe — isso aumenta seu winrate e agiliza a conclusão.\n\nUse o canal #procurando-duo para encontrar parceiros."
+          }
+        ],
+        "footer": { "text": "EloPeak — dúvidas? procure um dono." }
+      }
+    ]
+  }
+]
