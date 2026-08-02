@@ -111,6 +111,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "booster_admin_notes_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: true
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "booster_admin_notes_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -308,6 +315,7 @@ export type Database = {
         Row: {
           available_days: string[] | null
           bio: string | null
+          blocked_until: string | null
           cpf: string | null
           created_at: string
           current_rank: Json | null
@@ -339,6 +347,7 @@ export type Database = {
         Insert: {
           available_days?: string[] | null
           bio?: string | null
+          blocked_until?: string | null
           cpf?: string | null
           created_at?: string
           current_rank?: Json | null
@@ -370,6 +379,7 @@ export type Database = {
         Update: {
           available_days?: string[] | null
           bio?: string | null
+          blocked_until?: string | null
           cpf?: string | null
           created_at?: string
           current_rank?: Json | null
@@ -516,6 +526,9 @@ export type Database = {
       }
       duo_accounts: {
         Row: {
+          access_token_consumed_at: string | null
+          access_token_expires_at: string | null
+          access_token_id: string | null
           created_at: string
           created_by: string | null
           current_rank: Json | null
@@ -524,6 +537,8 @@ export type Database = {
           id: string
           is_active: boolean
           label: string
+          last_released_at: string | null
+          last_released_by: string | null
           notes: string | null
           reserved_at: string | null
           reserved_by: string | null
@@ -532,6 +547,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_token_consumed_at?: string | null
+          access_token_expires_at?: string | null
+          access_token_id?: string | null
           created_at?: string
           created_by?: string | null
           current_rank?: Json | null
@@ -540,6 +558,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           label: string
+          last_released_at?: string | null
+          last_released_by?: string | null
           notes?: string | null
           reserved_at?: string | null
           reserved_by?: string | null
@@ -548,6 +568,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_token_consumed_at?: string | null
+          access_token_expires_at?: string | null
+          access_token_id?: string | null
           created_at?: string
           created_by?: string | null
           current_rank?: Json | null
@@ -556,6 +579,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           label?: string
+          last_released_at?: string | null
+          last_released_by?: string | null
           notes?: string | null
           reserved_at?: string | null
           reserved_by?: string | null
@@ -570,6 +595,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_last_released_by_fkey"
+            columns: ["last_released_by"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_accounts_last_released_by_fkey"
+            columns: ["last_released_by"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "duo_accounts_reserved_by_fkey"
@@ -723,6 +762,71 @@ export type Database = {
           },
         ]
       }
+      order_coaching_topics: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          content: string
+          created_at: string
+          created_by: string
+          created_by_role: Database["public"]["Enums"]["user_role"]
+          id: string
+          is_done: boolean
+          order_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          content: string
+          created_at?: string
+          created_by: string
+          created_by_role: Database["public"]["Enums"]["user_role"]
+          id?: string
+          is_done?: boolean
+          order_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string
+          created_by_role?: Database["public"]["Enums"]["user_role"]
+          id?: string
+          is_done?: boolean
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_coaching_topics_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_coaching_topics_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_coaching_topics_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_coaching_topics_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_drop_requests: {
         Row: {
           admin_id: string | null
@@ -733,12 +837,18 @@ export type Database = {
           losses_at_request: number
           order_id: string
           penalty_amount: number
+          penalty_bucket: string | null
+          penalty_fee_amount: number | null
+          penalty_fee_pct: number | null
           penalty_pct: number
           reason: string
-          requested_by_role: string
+          requested_by_role: Database["public"]["Enums"]["drop_requester_role"]
           resolved_at: string | null
           status: string
-          status_at_request: string | null
+          status_at_request: Database["public"]["Enums"]["order_status"] | null
+          waived_at: string | null
+          waived_by: string | null
+          warning_issued: boolean
           wins_at_request: number
         }
         Insert: {
@@ -750,12 +860,18 @@ export type Database = {
           losses_at_request?: number
           order_id: string
           penalty_amount?: number
+          penalty_bucket?: string | null
+          penalty_fee_amount?: number | null
+          penalty_fee_pct?: number | null
           penalty_pct?: number
           reason: string
-          requested_by_role?: string
+          requested_by_role?: Database["public"]["Enums"]["drop_requester_role"]
           resolved_at?: string | null
           status?: string
-          status_at_request?: string | null
+          status_at_request?: Database["public"]["Enums"]["order_status"] | null
+          waived_at?: string | null
+          waived_by?: string | null
+          warning_issued?: boolean
           wins_at_request?: number
         }
         Update: {
@@ -767,12 +883,18 @@ export type Database = {
           losses_at_request?: number
           order_id?: string
           penalty_amount?: number
+          penalty_bucket?: string | null
+          penalty_fee_amount?: number | null
+          penalty_fee_pct?: number | null
           penalty_pct?: number
           reason?: string
-          requested_by_role?: string
+          requested_by_role?: Database["public"]["Enums"]["drop_requester_role"]
           resolved_at?: string | null
           status?: string
-          status_at_request?: string | null
+          status_at_request?: Database["public"]["Enums"]["order_status"] | null
+          waived_at?: string | null
+          waived_by?: string | null
+          warning_issued?: boolean
           wins_at_request?: number
         }
         Relationships: [
@@ -802,6 +924,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_drop_requests_waived_by_fkey"
+            columns: ["waived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -859,57 +988,6 @@ export type Database = {
           },
           {
             foreignKeyName: "order_matches_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_coaching_topics: {
-        Row: {
-          completed_at: string | null
-          completed_by: string | null
-          content: string
-          created_at: string
-          created_by: string
-          created_by_role: Database["public"]["Enums"]["user_role"]
-          id: string
-          is_done: boolean
-          order_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          completed_by?: string | null
-          content: string
-          created_at?: string
-          created_by: string
-          created_by_role: Database["public"]["Enums"]["user_role"]
-          id?: string
-          is_done?: boolean
-          order_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          completed_by?: string | null
-          content?: string
-          created_at?: string
-          created_by?: string
-          created_by_role?: Database["public"]["Enums"]["user_role"]
-          id?: string
-          is_done?: boolean
-          order_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_coaching_topics_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "available_boost_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_coaching_topics_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
@@ -1194,6 +1272,9 @@ export type Database = {
       }
       orders: {
         Row: {
+          access_token_consumed_at: string | null
+          access_token_expires_at: string | null
+          access_token_id: string | null
           assigned_booster_id: string | null
           avg_pdl_gain: number | null
           avg_pdl_loss: number | null
@@ -1207,6 +1288,7 @@ export type Database = {
           clash_day: Database["public"]["Enums"]["clash_day"] | null
           clash_tier: Database["public"]["Enums"]["clash_tier"] | null
           completed_at: string | null
+          coupon_code: string | null
           created_at: string
           credential_expires_at: string | null
           credentials_set: boolean
@@ -1215,6 +1297,8 @@ export type Database = {
           customer_id: string
           customer_notes: string | null
           discord_voice_channel_id: string | null
+          discount_price: number
+          drop_count: number
           estimated_hours: number | null
           exclusive_until: string | null
           extras: Json
@@ -1223,6 +1307,7 @@ export type Database = {
           game_id: string
           id: string
           idempotency_key: string
+          last_dropped_at: string | null
           last_match_synced_at: string | null
           losses_played: number
           match_sync_started_at: string | null
@@ -1233,6 +1318,7 @@ export type Database = {
           preferred_booster_id: string | null
           pricing_version: string
           queue_type: Database["public"]["Enums"]["queue_type"]
+          rank_before_last_drop: Json | null
           riot_id: string | null
           server: string
           service_id: string
@@ -1248,6 +1334,9 @@ export type Database = {
           wins_purchased: number | null
         }
         Insert: {
+          access_token_consumed_at?: string | null
+          access_token_expires_at?: string | null
+          access_token_id?: string | null
           assigned_booster_id?: string | null
           avg_pdl_gain?: number | null
           avg_pdl_loss?: number | null
@@ -1261,6 +1350,7 @@ export type Database = {
           clash_day?: Database["public"]["Enums"]["clash_day"] | null
           clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           completed_at?: string | null
+          coupon_code?: string | null
           created_at?: string
           credential_expires_at?: string | null
           credentials_set?: boolean
@@ -1269,6 +1359,8 @@ export type Database = {
           customer_id: string
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
+          discount_price?: number
+          drop_count?: number
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json
@@ -1277,6 +1369,7 @@ export type Database = {
           game_id: string
           id?: string
           idempotency_key?: string
+          last_dropped_at?: string | null
           last_match_synced_at?: string | null
           losses_played?: number
           match_sync_started_at?: string | null
@@ -1287,6 +1380,7 @@ export type Database = {
           preferred_booster_id?: string | null
           pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
+          rank_before_last_drop?: Json | null
           riot_id?: string | null
           server: string
           service_id: string
@@ -1302,6 +1396,9 @@ export type Database = {
           wins_purchased?: number | null
         }
         Update: {
+          access_token_consumed_at?: string | null
+          access_token_expires_at?: string | null
+          access_token_id?: string | null
           assigned_booster_id?: string | null
           avg_pdl_gain?: number | null
           avg_pdl_loss?: number | null
@@ -1315,6 +1412,7 @@ export type Database = {
           clash_day?: Database["public"]["Enums"]["clash_day"] | null
           clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           completed_at?: string | null
+          coupon_code?: string | null
           created_at?: string
           credential_expires_at?: string | null
           credentials_set?: boolean
@@ -1323,6 +1421,8 @@ export type Database = {
           customer_id?: string
           customer_notes?: string | null
           discord_voice_channel_id?: string | null
+          discount_price?: number
+          drop_count?: number
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json
@@ -1331,6 +1431,7 @@ export type Database = {
           game_id?: string
           id?: string
           idempotency_key?: string
+          last_dropped_at?: string | null
           last_match_synced_at?: string | null
           losses_played?: number
           match_sync_started_at?: string | null
@@ -1341,6 +1442,7 @@ export type Database = {
           preferred_booster_id?: string | null
           pricing_version?: string
           queue_type?: Database["public"]["Enums"]["queue_type"]
+          rank_before_last_drop?: Json | null
           riot_id?: string | null
           server?: string
           service_id?: string
@@ -1903,16 +2005,19 @@ export type Database = {
           created_at: string | null
           current_pdl: number | null
           current_rank: Json | null
+          drop_count: number | null
           estimated_hours: number | null
           exclusive_until: string | null
           extras: Json | null
           game_id: string | null
           id: string | null
+          last_dropped_at: string | null
           losses_played: number | null
           pdl_bracket: string | null
           preferred_booster_id: string | null
           pricing_version: string | null
           queue_type: Database["public"]["Enums"]["queue_type"] | null
+          rank_before_last_drop: Json | null
           server: string | null
           service_id: string | null
           sessions_purchased: number | null
@@ -1931,16 +2036,19 @@ export type Database = {
           created_at?: string | null
           current_pdl?: number | null
           current_rank?: Json | null
+          drop_count?: number | null
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json | null
           game_id?: string | null
           id?: string | null
+          last_dropped_at?: string | null
           losses_played?: number | null
           pdl_bracket?: string | null
           preferred_booster_id?: string | null
           pricing_version?: string | null
           queue_type?: Database["public"]["Enums"]["queue_type"] | null
+          rank_before_last_drop?: Json | null
           server?: string | null
           service_id?: string | null
           sessions_purchased?: number | null
@@ -1959,16 +2067,19 @@ export type Database = {
           created_at?: string | null
           current_pdl?: number | null
           current_rank?: Json | null
+          drop_count?: number | null
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json | null
           game_id?: string | null
           id?: string | null
+          last_dropped_at?: string | null
           losses_played?: number | null
           pdl_bracket?: string | null
           preferred_booster_id?: string | null
           pricing_version?: string | null
           queue_type?: Database["public"]["Enums"]["queue_type"] | null
+          rank_before_last_drop?: Json | null
           server?: string | null
           service_id?: string | null
           sessions_purchased?: number | null
@@ -2056,6 +2167,15 @@ export type Database = {
       }
       admin_set_order_chat_lock: {
         Args: { p_locked: boolean; p_order_id: string }
+        Returns: Json
+      }
+      apply_order_drop: {
+        Args: {
+          p_actor_id: string
+          p_from_status: string
+          p_order_id: string
+          p_reason: string
+        }
         Returns: Json
       }
       approve_booster: {
@@ -2166,6 +2286,10 @@ export type Database = {
         }
         Returns: Json
       }
+      order_drop_completion_pct: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       order_requires_access_token: {
         Args: {
           p_boost_mode: string
@@ -2271,12 +2395,12 @@ export type Database = {
       }
       save_duo_account: {
         Args: {
-          p_account_id: string
+          p_account_id?: string
           p_division: string
           p_is_active: boolean
           p_label: string
           p_login?: string
-          p_notes: string
+          p_notes?: string
           p_password?: string
           p_riot_id?: string
           p_tier: string
@@ -2285,10 +2409,6 @@ export type Database = {
       }
       send_order_message: {
         Args: { p_content: string; p_order_id: string }
-        Returns: Json
-      }
-      set_order_coaching_topic_done: {
-        Args: { p_done: boolean; p_order_id: string; p_topic_id: string }
         Returns: Json
       }
       set_booster_admin_note: {
@@ -2301,6 +2421,10 @@ export type Database = {
       }
       set_duo_account_credentials: {
         Args: { p_account_id: string; p_login: string; p_password: string }
+        Returns: Json
+      }
+      set_order_coaching_topic_done: {
+        Args: { p_done: boolean; p_order_id: string; p_topic_id: string }
         Returns: Json
       }
       set_order_credentials: {
@@ -2332,6 +2456,10 @@ export type Database = {
         Args: { p_new_status: string; p_order_id: string; p_reason?: string }
         Returns: Json
       }
+      waive_drop_penalty: {
+        Args: { p_admin_note?: string; p_request_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       booster_status:
@@ -2342,6 +2470,7 @@ export type Database = {
         | "rejected"
       clash_day: "saturday" | "sunday"
       clash_tier: "tier_4" | "tier_3" | "tier_2" | "tier_1"
+      drop_requester_role: "booster" | "admin" | "customer"
       ledger_entry_type:
         | "commission_credit"
         | "commission_adjustment"
@@ -2978,6 +3107,7 @@ export const Constants = {
       ],
       clash_day: ["saturday", "sunday"],
       clash_tier: ["tier_4", "tier_3", "tier_2", "tier_1"],
+      drop_requester_role: ["booster", "admin", "customer"],
       ledger_entry_type: [
         "commission_credit",
         "commission_adjustment",

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import { useRealtimeInvalidate } from '@/api/core/realtime'
 import { getAdminDashboardStats, getOrderSupportEscalation, listAdminDropRequests, listAdminPayments, listAdminRefunds } from './queries'
-import { adminResolveOrderSupport, resolveDropRequest } from './mutations'
+import { adminResolveOrderSupport, resolveDropRequest, waiveDropPenalty } from './mutations'
 
 export function useAdminDashboardStats() {
   return useQuery({
@@ -66,6 +66,14 @@ export function useResolveDropRequest() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: resolveDropRequest,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.admin.drops() }),
+  })
+}
+
+export function useWaiveDropPenalty() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: waiveDropPenalty,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.admin.drops() }),
   })
 }

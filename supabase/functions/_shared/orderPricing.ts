@@ -668,7 +668,30 @@ export async function validateAndPriceIntent(
           || rankStep(normalized.targetRank.tier, normalized.targetRank.division) <= rankStep(verifiedTier, verifiedDivision)) {
         return { ok: false, response: badRequest(req, 'Rank de destino precisa ser maior que o rank atual verificado na Riot') }
       }
-      if (verifiedMasterPlus) pdlBracket = getPdlBracket(leaguePoints)
+      if (verifiedMasterPlus) {
+        pdlBracket = getPdlBracket(leaguePoints)
+
+        // masterPlusPrice foi calculado antes da verificação Riot, com o
+        // current_pdl que o CLIENTE enviou (não autoritativo -- só usado
+        // pra pré-visualização no navegador). Sem recalcular aqui, um
+        // current_pdl inflado escolhia uma faixa de preço mais barata (a
+        // tabela é decrescente conforme o PDL sobe) e isso ia direto pro
+        // total_price cobrado, sem nenhuma outra validação pegar.
+        if (flow === 'master_plus' && normalized.targetRank) {
+          let verifiedMasterPlusPrice: number | null
+          try {
+            verifiedMasterPlusPrice = await fetchMasterPlusPrice(
+              serviceClient, verifiedTier, normalized.targetRank.tier as 'grandmaster' | 'challenger', normalized.queueType, leaguePoints,
+            )
+          } catch {
+            return { ok: false, response: errorResponse(req, 'Falha ao carregar preço', 500) }
+          }
+          if (verifiedMasterPlusPrice == null) {
+            return { ok: false, response: badRequest(req, 'Preço ainda não configurado para essa combinação de tiers. Fale com o suporte.') }
+          }
+          masterPlusPrice = verifiedMasterPlusPrice
+        }
+      }
     }
   }
 

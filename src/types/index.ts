@@ -56,6 +56,12 @@ export type NotificationType =
   | 'payment_amount_mismatch'
   | 'order_reassigned'
   | 'order_dropped_by_admin'
+  | 'customer_requested_drop'
+  | 'drop_fee_applied'
+  | 'drop_warning_issued'
+  | 'booster_temporarily_blocked'
+  | 'booster_auto_suspended'
+  | 'drop_penalty_waived'
 
 // ─── Rank / Tier system ───────────────────────────────────────────────────────
 
@@ -123,6 +129,7 @@ export interface BoosterProfile {
   available_days: string[] | null
   verified_at: string | null
   last_active_at: string | null
+  blocked_until: string | null
   created_at: string
   updated_at: string
 }
@@ -302,6 +309,12 @@ export interface OrderDropRequest {
   resolved_at: string | null
   requested_by_role: 'booster' | 'admin' | 'customer'
   status_at_request: OrderStatus | null
+  penalty_bucket: 'heavy_loss' | 'light_loss' | 'tied_or_winning' | null
+  penalty_fee_pct: number | null
+  penalty_fee_amount: number | null
+  warning_issued: boolean
+  waived_by: string | null
+  waived_at: string | null
 }
 
 export interface OrderMatch {

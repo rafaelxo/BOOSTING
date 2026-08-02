@@ -71,7 +71,7 @@ serve(async (req) => {
       return errorResponse(req, 'Order not found', 404)
     }
 
-    if (!['in_progress', 'paused'].includes(order.status as string)) {
+    if (!['in_progress', 'paused', 'drop_requested'].includes(order.status as string)) {
       return badRequest(req, 'Pedido não está em um status sincronizável')
     }
 

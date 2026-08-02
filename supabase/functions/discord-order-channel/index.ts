@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts'
 import { fetchWithTimeout, HttpError, readJsonBody } from '../_shared/http.ts'
 import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 import { rateLimitResponse } from '../_shared/responses.ts'
+import { CLASH_TIER_LABEL, CLASH_DAY_LABEL } from '../../../shared/clashDomain.ts'
 
 const DISCORD_API     = 'https://discord.com/api/v10'
 const BOT_TOKEN       = Deno.env.get('DISCORD_BOT_TOKEN')       ?? ''
@@ -13,6 +14,18 @@ const GUILD_ID        = Deno.env.get('DISCORD_GUILD_ID')        ?? ''
 const ADMIN_ROLE_ID   = Deno.env.get('DISCORD_ADMIN_ROLE_ID')   ?? ''
 const CATEGORY_ID     = Deno.env.get('DISCORD_CATEGORY_BOOSTS') ?? ''
 const WEBHOOK_SECRET  = Deno.env.get('DISCORD_WEBHOOK_SECRET')  ?? ''
+const CHANNEL_JOBS    = Deno.env.get('DISCORD_CHANNEL_JOBS')    ?? ''
+
+// Mesmo split de boosterEarningsShare() (ver src/lib/utils.ts) -- a
+// mensagem vale pra todos os boosters de uma vez, então mostra a faixa
+// (normal a top3) em vez de um valor fixo que só valeria pra alguns.
+const BOOSTER_SHARE_NORMAL = 0.55
+const BOOSTER_SHARE_TOP3   = 0.60
+
+const RANK_TIER_LABEL: Record<string, string> = {
+  iron: 'Ferro', bronze: 'Bronze', silver: 'Prata', gold: 'Ouro', platinum: 'Platina',
+  emerald: 'Esmeralda', diamond: 'Diamante', master: 'Mestre', grandmaster: 'Grão-mestre', challenger: 'Desafiante',
+}
 
 // Bit flags: VIEW_CHANNEL (1024) + CONNECT (1048576) + SPEAK (2097152)
 const VOICE_ALLOW    = String(1024 + 1048576 + 2097152)
@@ -39,7 +52,11 @@ async function fetchOrderProfiles(orderId: string) {
 
   const { data: order, error } = await db
     .from('orders')
-    .select('id, status, customer_id, assigned_booster_id, service_id, discord_voice_channel_id')
+    .select(`
+      id, status, customer_id, assigned_booster_id, service_id, discord_voice_channel_id,
+      service_type, boost_mode, queue_type, server, current_rank, target_rank,
+      clash_tier, clash_day, wins_purchased, sessions_purchased, total_price, estimated_hours
+    `)
     .eq('id', orderId)
     .single()
 
@@ -99,6 +116,80 @@ async function deleteVoiceChannel(channelId: string) {
   if (!res.ok && res.status !== 404) {
     console.error(`Discord delete channel failed ${res.status}:`, await res.text())
     throw new Error(`Discord delete channel ${res.status}`)
+  }
+}
+
+function formatRankValue(rank: { tier?: string; division?: string | null } | null | undefined) {
+  if (!rank?.tier) return null
+  const label = RANK_TIER_LABEL[rank.tier] ?? rank.tier
+  if (!rank.division || ['master', 'grandmaster', 'challenger'].includes(rank.tier)) return label
+  return `${label} ${rank.division}`
+}
+
+// Mirrors getOrderModeType() em src/lib/utils.ts -- rótulo específico da
+// variação do pedido (não só a categoria do serviço).
+function getOrderModeLabel(order: { service_type?: string | null; boost_mode?: string | null }) {
+  switch (order.service_type) {
+    case 'elo_boost': return order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost'
+    case 'win_boost': return 'Vitórias'
+    case 'md5': return 'MD5'
+    case 'coaching': return 'Coaching'
+    case 'placement_matches': return 'MD5 Completo'
+    case 'clash': return order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'
+    default: return order.service_type ?? '—'
+  }
+}
+
+const currency = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n)
+
+// deno-lint-ignore no-explicit-any
+function buildJobAvailableEmbed(order: any) {
+  const fields: { name: string; value: string; inline?: boolean }[] = []
+
+  if (order.service_type === 'clash') {
+    if (order.clash_tier) fields.push({ name: 'Tier', value: CLASH_TIER_LABEL[order.clash_tier as never] ?? order.clash_tier, inline: true })
+    if (order.clash_day)  fields.push({ name: 'Dia',  value: CLASH_DAY_LABEL[order.clash_day as never] ?? order.clash_day, inline: true })
+  } else {
+    const current = formatRankValue(order.current_rank)
+    const target = formatRankValue(order.target_rank)
+    if (current) fields.push({ name: 'Rank', value: target ? `${current} → ${target}` : current, inline: true })
+  }
+
+  if (order.queue_type) fields.push({ name: 'Fila', value: order.queue_type === 'flex' ? 'Flex' : 'Solo/Duo', inline: true })
+  if (order.server)     fields.push({ name: 'Servidor', value: order.server, inline: true })
+  if (order.estimated_hours) fields.push({ name: 'Tempo estimado', value: `${order.estimated_hours}h`, inline: true })
+  if (order.wins_purchased)    fields.push({ name: 'Vitórias', value: String(order.wins_purchased), inline: true })
+  if (order.sessions_purchased) fields.push({ name: 'Sessões', value: String(order.sessions_purchased), inline: true })
+
+  if (typeof order.total_price === 'number') {
+    const min = order.total_price * BOOSTER_SHARE_NORMAL
+    const max = order.total_price * BOOSTER_SHARE_TOP3
+    fields.push({
+      name: 'Você recebe',
+      value: `${currency(min)} – ${currency(max)} (conforme seu ranking)`,
+    })
+  }
+
+  return {
+    embeds: [{
+      title: '🆕 Novo pedido disponível',
+      description: getOrderModeLabel(order),
+      color: 0x22C55E,
+      fields,
+      footer: { text: 'Corre lá na aba JOBS pra pegar!' },
+    }],
+  }
+}
+
+async function sendChannelMessage(channelId: string, payload: object) {
+  const res = await fetchWithTimeout(`${DISCORD_API}/channels/${channelId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    console.error(`Discord send message failed ${res.status}:`, await res.text())
+    throw new Error(`Discord send message ${res.status}`)
   }
 }
 
@@ -181,6 +272,25 @@ serve(async (req) => {
       await saveChannelId(orderId, channelId)
 
       return jsonResponse(req, { ok: true, action: 'created', channelId })
+    }
+
+    // ── Anuncia no canal de jobs quando o pedido fica disponível ──────────────
+    // Cobre todos os caminhos que levam a awaiting_assignment: pagamento
+    // confirmado (com ou sem credenciais pendentes) e reabertura por drop
+    // (booster ou cliente) -- todos passam por UPDATE status em orders, então
+    // caem nesse mesmo webhook.
+    if (newStatus === 'awaiting_assignment' && oldStatus !== 'awaiting_assignment') {
+      if (!CHANNEL_JOBS) {
+        return jsonResponse(req, { ok: false, reason: 'DISCORD_CHANNEL_JOBS not configured' })
+      }
+
+      const { order } = await fetchOrderProfiles(orderId)
+      if (order.status !== 'awaiting_assignment') {
+        return jsonResponse(req, { ok: false, reason: 'order status mismatch, ignoring stale/forged payload' })
+      }
+
+      await sendChannelMessage(CHANNEL_JOBS, buildJobAvailableEmbed(order))
+      return jsonResponse(req, { ok: true, action: 'job_announced' })
     }
 
     // ── Delete channel when order is terminated ──────────────────────────────

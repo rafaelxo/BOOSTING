@@ -29,6 +29,8 @@ export const queryKeys = {
     services: (boosterId: string) => ['boosters', 'services', boosterId] as const,
     adminList: (filters?: Record<string, unknown>) => ['boosters', 'admin-list', filters ?? {}] as const,
     adminDetail: (boosterId: string) => ['boosters', 'admin-detail', boosterId] as const,
+    dropWarnings: (boosterUserId: string) => ['boosters', 'drop-warnings', boosterUserId] as const,
+    blockedUntil: (boosterUserId: string) => ['boosters', 'blocked-until', boosterUserId] as const,
   },
   payouts: {
     totals: (boosterId: string) => ['payouts', 'totals', boosterId] as const,

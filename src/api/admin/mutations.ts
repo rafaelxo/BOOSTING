@@ -9,6 +9,14 @@ export async function resolveDropRequest(params: { requestId: string; approve: b
   return assertRpcSuccess(data as { success: boolean; error?: string })
 }
 
+export async function waiveDropPenalty(params: { requestId: string; adminNote?: string }) {
+  const { data, error } = await supabase.rpc('waive_drop_penalty', {
+    p_request_id: params.requestId, p_admin_note: params.adminNote,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string })
+}
+
 export async function adminResolveOrderSupport(escalationId: string) {
   const { data, error } = await supabase.rpc('admin_resolve_order_support', { p_escalation_id: escalationId })
   if (error) throw normalizeApiError(error)

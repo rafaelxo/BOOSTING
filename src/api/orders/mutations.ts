@@ -90,6 +90,7 @@ const REQUEST_ORDER_DROP_MESSAGES: Record<string, string> = {
   order_not_found: 'Pedido não encontrado.',
   order_not_in_progress: 'Este pedido não está mais em andamento.',
   drop_request_already_pending: 'Já existe uma solicitação de drop pendente para este pedido.',
+  sync_required_before_drop: 'Sincronize as partidas do pedido pelo menos uma vez antes de solicitar o drop.',
 }
 
 export async function requestOrderDrop(params: { orderId: string; reason: string }) {

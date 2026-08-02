@@ -4,6 +4,7 @@ import type { SaveDuoAccountParams } from './types'
 
 const RESERVE_MESSAGES: Record<string, string> = {
   account_unavailable: 'Esta conta acabou de ser reservada por outro booster.',
+  cannot_switch_after_matches_played: 'Não é possível trocar de conta depois que partidas já foram contabilizadas neste pedido.',
 }
 
 export async function reserveDuoAccount(params: { orderId: string; accountId: string }) {
