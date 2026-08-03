@@ -1,12 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Briefcase, Clock, Swords, Users, CalendarClock,
-  Trophy, Target, Star, CheckCircle2, TrendingUp,
+  Trophy, Target, Star, CheckCircle2, TrendingUp, Gamepad2,
 } from 'lucide-react'
 import { Button, Card, Skeleton, StatCard, EmptyState, ErrorAlert } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { ORDER_SAFE_COLUMNS } from '@/lib/orderColumns'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import type { Order, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
@@ -150,9 +152,25 @@ export function BoosterDashboard() {
   const { t } = useTranslation()
   const { data: boosterProfile, isLoading: profileLoading, isError: profileError } = useBoosterProfile(profile?.id ?? '')
   const { data: activeOrders, isError: activeOrdersError } = useAssignedOrders(profile?.id)
+
+  const [accountTab, setAccountTab] = useState<AccountType>('__all__')
+  const [rankFilter, setRankFilter] = useState('__all__')
+  const [queueFilter, setQueueFilter] = useState('__all__')
+
+  const filters: PerformanceFilters = { accountType: accountTab, rankBucket: rankFilter, queueType: queueFilter }
   const { data: performance, isLoading: loadingPerformance, isError: performanceError } = usePerformanceSummary(
     boosterProfile?.status === 'approved' ? profile?.id : undefined,
+    filters,
   )
+  const { data: topChampions } = useTopChampions(
+    boosterProfile?.status === 'approved' ? profile?.id : undefined,
+    accountTab,
+  )
+  const { data: segmentCompletedCount } = useCompletedOrdersCount(
+    boosterProfile?.status === 'approved' && accountTab !== '__all__' ? profile?.id : undefined,
+    accountTab === '__all__' ? 'solo' : accountTab,
+  )
+  const completedCount = accountTab === '__all__' ? (boosterProfile?.total_completed ?? 0) : (segmentCompletedCount ?? 0)
 
   const { data: slotInfo } = useBoosterSlotInfo(profile?.id, boosterProfile?.status === 'approved')
 
@@ -219,13 +237,50 @@ export function BoosterDashboard() {
 
       {/* Performance */}
       <div>
-        <h2 className="text-base font-semibold text-ink mb-3 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-ink-muted" />
-          Performance
-        </h2>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-ink-muted" />
+            Performance
+          </h2>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-xl border border-border p-0.5">
+              {(['__all__', 'solo', 'duo'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => { setAccountTab(tab); setRankFilter('__all__'); setQueueFilter('__all__') }}
+                  className={cn(
+                    'px-3 py-1 text-xs font-semibold rounded-lg transition',
+                    accountTab === tab ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink',
+                  )}
+                >
+                  {tab === '__all__' ? 'Geral' : tab === 'solo' ? 'Solo' : 'Duo'}
+                </button>
+              ))}
+            </div>
+            <select
+              value={rankFilter}
+              onChange={(e) => { setRankFilter(e.target.value); setQueueFilter('__all__') }}
+              className="text-xs rounded-lg border border-border bg-bg px-2 py-1"
+            >
+              <option value="__all__">Todos os ranks</option>
+              <option value="gold_minus">Ouro e abaixo</option>
+              <option value="plat_diamond">Platina/Diamante</option>
+              <option value="master_plus">Mestre+</option>
+            </select>
+            <select
+              value={queueFilter}
+              onChange={(e) => { setQueueFilter(e.target.value); setRankFilter('__all__') }}
+              className="text-xs rounded-lg border border-border bg-bg px-2 py-1"
+            >
+              <option value="__all__">Todas as filas</option>
+              <option value="solo_duo">SoloQ</option>
+              <option value="flex">Flex</option>
+            </select>
+          </div>
+        </div>
         {loadingPerformance ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
+            {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
           </div>
         ) : performanceError ? (
           <ErrorAlert message="Não foi possível carregar suas estatísticas de performance." />
@@ -238,32 +293,61 @@ export function BoosterDashboard() {
             />
           </Card>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label="Win rate"
-              icon={Target}
-              color="text-success bg-success/10"
-              value={`${((performance.wins / performance.total_matches) * 100).toFixed(1)}%`}
-            />
-            <StatCard
-              label="KDA médio"
-              icon={Swords}
-              color="text-brand bg-brand/10"
-              value={performance.average_kda != null ? performance.average_kda.toFixed(1) : '—'}
-            />
-            <StatCard
-              label="Avaliação"
-              icon={Star}
-              color="text-warning bg-warning/10"
-              value={performance.average_rating != null ? `${performance.average_rating.toFixed(1)} (${performance.review_count})` : 'Sem avaliações'}
-            />
-            <StatCard
-              label="Serviços concluídos"
-              icon={CheckCircle2}
-              color="text-accent bg-accent/10"
-              value={boosterProfile?.total_completed ?? 0}
-            />
-          </div>
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <StatCard
+                label="Win rate"
+                icon={Target}
+                color="text-success bg-success/10"
+                value={`${((performance.wins / performance.total_matches) * 100).toFixed(1)}%`}
+              />
+              <StatCard
+                label="KDA médio"
+                icon={Swords}
+                color="text-brand bg-brand/10"
+                value={performance.average_kda != null ? performance.average_kda.toFixed(1) : '—'}
+              />
+              <StatCard
+                label="Avaliação"
+                icon={Star}
+                color="text-warning bg-warning/10"
+                value={performance.average_rating != null ? `${performance.average_rating.toFixed(1)} (${performance.review_count})` : 'Sem avaliações'}
+              />
+              <StatCard
+                label="Serviços concluídos"
+                icon={CheckCircle2}
+                color="text-accent bg-accent/10"
+                value={completedCount}
+              />
+              <StatCard
+                label="Farm/min"
+                icon={Gamepad2}
+                color="text-brand bg-brand/10"
+                value={performance.avg_cs_per_min != null ? performance.avg_cs_per_min.toFixed(1) : '—'}
+              />
+              <StatCard
+                label="MVPs"
+                icon={Trophy}
+                color="text-warning bg-warning/10"
+                value={performance.mvp_count}
+              />
+            </div>
+            {topChampions && topChampions.length > 0 && (
+              <Card padding="md" className="mt-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">Melhores campeões</h3>
+                <div className="space-y-2">
+                  {topChampions.map((c, i) => (
+                    <div key={c.champion} className="flex items-center justify-between text-sm">
+                      <span className="text-ink-secondary">{i + 1}. {c.champion}</span>
+                      <span className="text-ink-muted text-xs" data-tabular>
+                        {c.games_played} partida{c.games_played === 1 ? '' : 's'} · {Math.round((c.wins / c.games_played) * 100)}% WR
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </>
         )}
       </div>
 
