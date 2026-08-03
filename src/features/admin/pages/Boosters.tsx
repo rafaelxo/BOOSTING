@@ -1,15 +1,15 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Ban, CheckCircle2, ChevronDown, RotateCcw, Shield, StickyNote, Trophy, Star, XCircle } from 'lucide-react'
-import { Button, BoosterStatusBadge, EmptyState, Skeleton, ErrorAlert, Popover } from '@/components/ui'
+import { Ban, CheckCircle2, ChevronDown, RotateCcw, Shield, StickyNote, Trophy, Star, UserX, XCircle } from 'lucide-react'
+import { Button, BoosterStatusBadge, EmptyState, Skeleton, ErrorAlert, Popover, Modal } from '@/components/ui'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { cn, formatDate, timeAgo } from '@/lib/utils'
+import { cn, formatDate, formatDateTime, timeAgo } from '@/lib/utils'
 import type { BoosterAdminNote, BoosterProfile } from '@/types'
 import { useTranslation } from 'react-i18next'
-import { useAdminBoosters, useAdminApproveBooster, useBoosterAdminNotes, useSetBoosterAdminNote } from '@/api/boosters'
+import { useAdminBoosters, useAdminApproveBooster, useBoosterAdminNotes, useSetBoosterAdminNote, useExpelBooster } from '@/api/boosters'
 
 function BoosterActionsMenu({
-  booster, note, statusPending, onApprove, onReject, onSuspend, onReinstate,
+  booster, note, statusPending, onApprove, onReject, onSuspend, onReinstate, onExpel, expelPending,
 }: {
   booster: BoosterProfile
   note?: BoosterAdminNote
@@ -18,10 +18,14 @@ function BoosterActionsMenu({
   onReject: () => void
   onSuspend: () => void
   onReinstate: () => void
+  onExpel: (reason: string) => void
+  expelPending: boolean
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
   const [draft, setDraft] = useState(note?.note ?? '')
+  const [expelOpen, setExpelOpen] = useState(false)
+  const [expelReason, setExpelReason] = useState('')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const setNote = useSetBoosterAdminNote()
   const hasNote = !!note?.note?.trim()
@@ -88,14 +92,24 @@ function BoosterActionsMenu({
         )}
 
         {isSuspended && (
-          <button
-            type="button"
-            disabled={statusPending}
-            onClick={() => { onReinstate(); setMenuOpen(false) }}
-            className={cn(itemClass, 'text-ink-secondary hover:bg-bg-elevated')}
-          >
-            <RotateCcw className="h-4 w-4 shrink-0" /> Reativar
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={statusPending}
+              onClick={() => { onReinstate(); setMenuOpen(false) }}
+              className={cn(itemClass, 'text-ink-secondary hover:bg-bg-elevated')}
+            >
+              <RotateCcw className="h-4 w-4 shrink-0" /> Reativar
+            </button>
+            <button
+              type="button"
+              disabled={statusPending}
+              onClick={() => { setExpelOpen(true); setMenuOpen(false) }}
+              className={cn(itemClass, 'text-danger hover:bg-danger/10')}
+            >
+              <UserX className="h-4 w-4 shrink-0" /> Expulsar
+            </button>
+          </>
         )}
       </Popover>
 
@@ -125,6 +139,37 @@ function BoosterActionsMenu({
           </Button>
         </div>
       </Popover>
+
+      <Modal
+        open={expelOpen}
+        onOpenChange={(open) => { if (!open) { setExpelOpen(false); setExpelReason('') } }}
+        title={`Expulsar ${booster.display_name}`}
+        description="Ação permanente: o login é banido e a conta não pode mais ser reativada. Pedidos, avaliações e histórico financeiro são preservados."
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo <span className="text-danger">*</span>
+          </label>
+          <textarea
+            value={expelReason}
+            onChange={(e) => setExpelReason(e.target.value)}
+            placeholder="Descreva o motivo da expulsão..."
+            className="input-base w-full min-h-[100px] resize-none text-sm"
+            maxLength={500}
+          />
+        </div>
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setExpelOpen(false); setExpelReason('') }}>Cancelar</Button>
+          <Button
+            variant="danger"
+            loading={expelPending}
+            disabled={expelReason.trim().length < 10}
+            onClick={() => { onExpel(expelReason.trim()); setExpelOpen(false); setExpelReason('') }}
+          >
+            Expulsar Permanentemente
+          </Button>
+        </div>
+      </Modal>
     </>
   )
 }
@@ -147,6 +192,7 @@ export function AdminBoostersPage() {
     mutate: (params: { id: string; status: 'approved' | 'rejected' | 'suspended' }) =>
       updateBoosterStatusMutation.mutate({ boosterId: params.id, newStatus: params.status }),
   }
+  const expelBoosterMutation = useExpelBooster()
 
   const filtered = boosters ?? []
 
@@ -171,6 +217,10 @@ export function AdminBoostersPage() {
 
       {updateBoosterStatusMutation.isError && (
         <ErrorAlert message={(updateBoosterStatusMutation.error as Error).message} />
+      )}
+
+      {expelBoosterMutation.isError && (
+        <ErrorAlert message={(expelBoosterMutation.error as Error).message} />
       )}
 
       <div className="card p-0">
@@ -209,7 +259,14 @@ export function AdminBoostersPage() {
                     </span>
                   </TableCell>
                   <TableCell>{b.total_completed}</TableCell>
-                  <TableCell><BoosterStatusBadge status={b.status} /></TableCell>
+                  <TableCell>
+                    <BoosterStatusBadge status={b.status} />
+                    {b.status === 'suspended' && b.suspended_until && (
+                      <p className="text-[11px] text-ink-muted mt-1">
+                        Até {formatDateTime(b.suspended_until)}
+                      </p>
+                    )}
+                  </TableCell>
                   <TableCell>{formatDate(b.created_at)}</TableCell>
                   <TableCell>
                     <BoosterActionsMenu
@@ -220,6 +277,8 @@ export function AdminBoostersPage() {
                       onReject={() => updateBoosterStatus.mutate({ id: b.id, status: 'rejected' })}
                       onSuspend={() => updateBoosterStatus.mutate({ id: b.id, status: 'suspended' })}
                       onReinstate={() => updateBoosterStatus.mutate({ id: b.id, status: 'approved' })}
+                      onExpel={(reason) => expelBoosterMutation.mutate({ boosterId: b.id, reason })}
+                      expelPending={expelBoosterMutation.isPending}
                     />
                   </TableCell>
                 </TableRow>
