@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AUTO_SYNC_INTERVAL_MS, shouldAutoSync } from '@/lib/matchSync'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Play, CheckCircle2, AlertTriangle, Lock, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
@@ -30,7 +31,7 @@ import type { Division, Order, OrderStatus, RankTier } from '@/types'
 const DUO_FILTER_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
 const DUO_FILTER_DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
 
-function DuoAccountSection({ order }: { order: Order }) {
+function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () => void }) {
   const { profile } = useAuthStore()
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [switching, setSwitching] = useState(false)
@@ -55,7 +56,7 @@ function DuoAccountSection({ order }: { order: Order }) {
 
   function doReserve() {
     reserve.mutate({ orderId: order.id, accountId: selectedAccountId }, {
-      onSuccess: () => { setSwitching(false); setAccessToken(null) },
+      onSuccess: () => { setSwitching(false); setAccessToken(null); onLinked?.() },
     })
   }
 
@@ -211,6 +212,27 @@ export function JobDetailPage() {
 
   const updateStatus = useUpdateOrderStatus(id ?? '')
   const syncMatches = useSyncOrderMatches(id ?? '')
+
+  // Auto-sync: dispara sozinho quando a tela abre com um pedido
+  // sincronizável e o último sync (automático ou manual, via
+  // order.last_match_synced_at) já passou de 30 min -- reavalia a cada 30
+  // min enquanto a tela ficar aberta. orderRef evita fechar sobre um
+  // `order` desatualizado dentro do setInterval sem precisar recriá-lo a
+  // cada refetch (o que reiniciaria a contagem).
+  const orderRef = useRef(order)
+  orderRef.current = order
+
+  useEffect(() => {
+    if (!order) return
+    function maybeSync() {
+      const current = orderRef.current
+      if (current && shouldAutoSync(current, Date.now())) syncMatches.mutate()
+    }
+    maybeSync()
+    const intervalId = setInterval(maybeSync, AUTO_SYNC_INTERVAL_MS)
+    return () => clearInterval(intervalId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.id, order?.status])
   const verifyRank = useVerifyOrderRank(id ?? '')
   const revealAccessToken = useRevealOrderCredentials()
   const requestDrop = useRequestOrderDrop(id ?? '')
@@ -430,7 +452,7 @@ export function JobDetailPage() {
 
           {order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
             && ['assigned', 'in_progress', 'paused'].includes(order.status) && (
-            <DuoAccountSection order={order} />
+            <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
           )}
 
           {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (
