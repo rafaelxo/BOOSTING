@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import type { OnboardBoosterParams, UpdateProfessionalProfileParams } from './types'
 
 // Compartilhado entre onboard_booster e update_booster_professional_profile
@@ -67,6 +68,13 @@ export async function adminApproveBooster(params: { boosterId: string; newStatus
   const { data, error } = await supabase.rpc('approve_booster', { p_booster_id: params.boosterId, p_new_status: params.newStatus })
   if (error) throw normalizeApiError(error)
   return assertRpcSuccess(data as { success: boolean; error?: string })
+}
+
+export async function expelBooster(params: { boosterId: string; reason: string }) {
+  return invokeEdgeFunction<{ success: true }>('expel-booster', {
+    body: { booster_id: params.boosterId, reason: params.reason },
+    requireAuth: true,
+  })
 }
 
 export async function setBoosterAdminNote(params: { boosterId: string; note: string }) {

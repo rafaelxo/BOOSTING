@@ -31,7 +31,7 @@ export type OrderStatus =
   | 'refunded'
   | 'canceled'
 
-export type BoosterStatus = 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected'
+export type BoosterStatus = 'pending' | 'under_review' | 'approved' | 'suspended' | 'rejected' | 'removed'
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded' | 'disputed'
 
@@ -130,6 +130,7 @@ export interface BoosterProfile {
   verified_at: string | null
   last_active_at: string | null
   blocked_until: string | null
+  suspended_until: string | null
   created_at: string
   updated_at: string
 }

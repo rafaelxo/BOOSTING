@@ -7,7 +7,7 @@ import {
   listBoosterAdminNotes, listBoostersPerformance, listBoosterNames, listPublicBoosters,
 } from './queries'
 import {
-  adminApproveBooster, boosterHeartbeat, onboardBooster, setBoosterAdminNote,
+  adminApproveBooster, boosterHeartbeat, expelBooster, onboardBooster, setBoosterAdminNote,
   updateProfessionalProfile,
 } from './mutations'
 
@@ -164,6 +164,14 @@ export function useAdminApproveBooster() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: adminApproveBooster,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['boosters'] }),
+  })
+}
+
+export function useExpelBooster() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: expelBooster,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['boosters'] }),
   })
 }

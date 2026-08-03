@@ -146,6 +146,7 @@ export const BOOSTER_STATUS_LABEL: Record<BoosterStatus, string> = {
   approved: 'Aprovado',
   suspended: 'Suspenso',
   rejected: 'Rejeitado',
+  removed: 'Expulso',
 }
 
 export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
@@ -154,6 +155,7 @@ export const BOOSTER_STATUS_COLOR: Record<BoosterStatus, string> = {
   approved: 'text-success bg-success/10',
   suspended: 'text-danger bg-danger/10',
   rejected: 'text-ink-muted bg-bg-overlay',
+  removed: 'text-ink-muted bg-bg-overlay',
 }
 
 // ─── Payout request status ──────────────────────────────────────────────────
