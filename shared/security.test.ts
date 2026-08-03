@@ -40,7 +40,7 @@ describe('Edge HTTP hardening', () => {
 describe('Database authorization migration', () => {
   it('não expira pedido salvo antes de existir uma cobrança PIX', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/045_persist_unpaid_orders_before_pix.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/045_persist_unpaid_orders_before_pix.sql', import.meta.url),
       'utf8',
     )
 
@@ -52,7 +52,7 @@ describe('Database authorization migration', () => {
 
   it('locks trust fields and projects available orders without sensitive columns', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/007_security_integrity_and_payment_atomicity.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/007_security_integrity_and_payment_atomicity.sql', import.meta.url),
       'utf8',
     )
     expect(sql).toContain('drop policy if exists "booster_profiles_insert_own"')
@@ -72,7 +72,7 @@ describe('Database authorization migration', () => {
 
   it('centraliza o chat do pedido em RPCs e exige booster atribuido', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/034_order_chat_controls.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/034_order_chat_controls.sql', import.meta.url),
       'utf8',
     )
 
@@ -103,7 +103,7 @@ describe('Database authorization migration', () => {
 
   it('reconcilia o schema remoto sem referencias ao modulo de tickets removido', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/035_remote_schema_reconciliation.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/035_remote_schema_reconciliation.sql', import.meta.url),
       'utf8',
     )
 
@@ -116,7 +116,7 @@ describe('Database authorization migration', () => {
 
   it('so libera credenciais de pedidos pagos e revoga o token em estados terminais', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/036_order_credentials_backend_hardening.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/036_order_credentials_backend_hardening.sql', import.meta.url),
       'utf8',
     )
 
@@ -131,7 +131,7 @@ describe('Database authorization migration', () => {
 
   it('exige o booster autenticado e atribuido para resolver o token de acesso', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/036_order_credentials_backend_hardening.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/036_order_credentials_backend_hardening.sql', import.meta.url),
       'utf8',
     )
 
@@ -144,7 +144,7 @@ describe('Database authorization migration', () => {
 
   it('esconde o payload cifrado de credenciais de select(*) via grants de coluna', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/036_order_credentials_backend_hardening.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/036_order_credentials_backend_hardening.sql', import.meta.url),
       'utf8',
     )
 
@@ -170,7 +170,7 @@ describe('Database authorization migration', () => {
 
   it('segura pedidos pagos que exigem credenciais e so os libera depois do envio', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/047_paid_credentials_handoff.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/047_paid_credentials_handoff.sql', import.meta.url),
       'utf8',
     )
 
@@ -186,7 +186,7 @@ describe('Database authorization migration', () => {
 
   it('cancela PIX vencido no backend e executa a limpeza a cada minuto', async () => {
     const sql = await readFile(
-      new URL('../supabase/migrations/048_expired_pix_cleanup_schedule.sql', import.meta.url),
+      new URL('../supabase/migrations_archive/048_expired_pix_cleanup_schedule.sql', import.meta.url),
       'utf8',
     )
 

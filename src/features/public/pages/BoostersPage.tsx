@@ -18,7 +18,7 @@ const MEDAL: Record<number, { border: string; badge: string; text: string }> = {
 
 // ── TopBoosterCard ───────────────────────────────────────────────────────────
 // Seleção sistemática (get_top_boosters) — nunca uma lista fixa/manual.
-// Ver supabase/migrations/054_booster_performance_segments.sql e
+// Ver supabase/migrations_archive/054_booster_performance_segments.sql e
 // 055_top_boosters_selection.sql para a fórmula, o fallback e o desempate.
 
 function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position: number }) {

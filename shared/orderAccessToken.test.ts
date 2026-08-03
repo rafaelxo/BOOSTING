@@ -3,8 +3,8 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 
 const root = join(__dirname, '..')
-const sql = readFileSync(join(root, 'supabase', 'migrations', '014_order_access_token_credentials.sql'), 'utf-8')
-const fixSql = readFileSync(join(root, 'supabase', 'migrations', '016_order_requires_access_token_service_type.sql'), 'utf-8')
+const sql = readFileSync(join(root, 'supabase', 'migrations_archive', '014_order_access_token_credentials.sql'), 'utf-8')
+const fixSql = readFileSync(join(root, 'supabase', 'migrations_archive', '016_order_requires_access_token_service_type.sql'), 'utf-8')
 
 function functionBlock(name: string, source = sql): string {
   const escaped = name.replace('.', '\\.')

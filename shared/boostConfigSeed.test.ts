@@ -11,7 +11,7 @@ import { MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney } from './pricing'
 // sort_order em cada fluxo. Não substitui testar contra um banco real —
 // isso não foi possível neste ambiente (Docker/Supabase local indisponível,
 // ver relatório final).
-const migrationPath = join(__dirname, '..', 'supabase', 'migrations', '005_boost_configurator.sql')
+const migrationPath = join(__dirname, '..', 'supabase', 'migrations_archive', '005_boost_configurator.sql')
 const sql = readFileSync(migrationPath, 'utf-8')
 
 interface SeedRow {
@@ -121,7 +121,7 @@ describe('Tabela master_plus_pricing — 12 combinações válidas, sem preço f
 // seed da migration 099 (estado FINAL do banco) ao constante do código.
 describe('master_plus_pricing (099) — seed do banco bate com o preço exibido na página pública', () => {
   const migration099 = readFileSync(
-    join(__dirname, '..', 'supabase', 'migrations', '099_simplify_master_plus_pricing_brackets.sql'),
+    join(__dirname, '..', 'supabase', 'migrations_archive', '099_simplify_master_plus_pricing_brackets.sql'),
     'utf-8',
   )
 

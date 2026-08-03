@@ -4,7 +4,7 @@ import { join } from 'path'
 
 const root = join(__dirname, '..')
 const migration = readFileSync(
-  join(root, 'supabase', 'migrations', '013_role_application_rls_hardening.sql'),
+  join(root, 'supabase', 'migrations_archive', '013_role_application_rls_hardening.sql'),
   'utf-8',
 )
 
