@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import { useRealtimeInvalidate } from '@/api/core/realtime'
 import type { OrderStatus, ServiceType } from '@/types'
+import { secondsRemaining } from './cooldown'
 import {
   getBoosterOrder, getBoosterSlotInfo, getCustomerOrderState, getOrder, getPendingDropRequest,
   listAdminOrders, listAvailableJobs, listBoosterOrdersPage, listCustomerOrders, listOrderCoachingTopics,
@@ -299,8 +301,29 @@ export function useCancelPendingOrder() {
 
 export function useSyncOrderMatches(orderId: string) {
   const queryClient = useQueryClient()
-  return useMutation({
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
+
+  useEffect(() => {
+    if (cooldownUntil == null) return
+    const tick = () => {
+      const remaining = secondsRemaining(cooldownUntil, Date.now())
+      setCooldownSeconds(remaining)
+      if (remaining <= 0) setCooldownUntil(null)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [cooldownUntil])
+
+  const mutation = useMutation({
     mutationFn: () => syncOrderMatches(orderId),
+    // Cooldown se aplica independente de sucesso/erro (inclusive num 503 de
+    // rate limit do próprio servidor) -- o objetivo é impedir clique
+    // repetido, não só comemorar sucesso.
+    onSettled: () => {
+      setCooldownUntil(Date.now() + 30_000)
+    },
     onSuccess: () => {
       invalidateOrder(queryClient, orderId)
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.matches(orderId) })
@@ -311,6 +334,8 @@ export function useSyncOrderMatches(orderId: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.orders.latestRankVerification(orderId) })
     },
   })
+
+  return { ...mutation, cooldownSeconds }
 }
 
 export function useRequestOrderSupport(orderId: string) {
