@@ -3,18 +3,24 @@ import { normalizeApiError } from '@/api/core/errors'
 import type { BoosterAdminNote, BoosterProfile } from '@/types'
 import type { BoosterAccessState, BoosterPerformanceSegment, ProfessionalProfileData, TopBoosterEntry } from './types'
 
-export async function getBoosterAccessState(userId: string): Promise<BoosterAccessState> {
+export interface BoosterAccessResult {
+  state: BoosterAccessState
+  suspendedUntil: string | null
+}
+
+export async function getBoosterAccessState(userId: string): Promise<BoosterAccessResult> {
   const { data, error } = await supabase
     .from('booster_profiles')
-    .select('status, display_name')
+    .select('status, display_name, suspended_until')
     .eq('user_id', userId)
     .maybeSingle()
-  if (error) return 'error'
-  if (!data) return 'no_application'
-  if (data.status === 'approved') return 'approved'
-  if (data.status === 'rejected') return 'rejected'
-  if (data.status === 'suspended') return 'suspended'
-  return 'pending' // pending | under_review tratados como "aguardando" na UI
+  if (error) return { state: 'error', suspendedUntil: null }
+  if (!data) return { state: 'no_application', suspendedUntil: null }
+  if (data.status === 'approved') return { state: 'approved', suspendedUntil: null }
+  if (data.status === 'rejected') return { state: 'rejected', suspendedUntil: null }
+  if (data.status === 'suspended') return { state: 'suspended', suspendedUntil: data.suspended_until }
+  if (data.status === 'removed') return { state: 'removed', suspendedUntil: null }
+  return { state: 'pending', suspendedUntil: null } // pending | under_review tratados como "aguardando" na UI
 }
 
 export async function getOwnProfessionalProfile(userId: string): Promise<ProfessionalProfileData | null> {

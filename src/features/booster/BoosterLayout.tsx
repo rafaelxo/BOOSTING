@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
 import { useAuthStore } from '@/stores/authStore'
 import { useBoosterStatus, useBoosterHeartbeat } from '@/api/boosters'
-import { PendingScreen, RejectedScreen, SuspendedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
+import { PendingScreen, RejectedScreen, SuspendedScreen, RemovedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { useNewOrderSound } from '@/features/booster/hooks/useNewOrderSound'
 
 function ApprovedBoosterPanel() {
@@ -100,11 +100,11 @@ function ApprovedBoosterPanel() {
 // UserAccountBadge, dados profissionais ficam em Serviços.
 export function BoosterLayout() {
   const { profile } = useAuthStore()
-  const { data: accessState, isLoading } = useBoosterStatus(profile?.id)
+  const { data: access, isLoading } = useBoosterStatus(profile?.id)
 
   // Still loading — wait
-  if (isLoading || !accessState) return <PageLoader />
-  const state = accessState
+  if (isLoading || !access) return <PageLoader />
+  const state = access.state
 
   // Common app shell (header only for restricted states)
   const shell = (content: React.ReactNode) => (
@@ -123,7 +123,8 @@ export function BoosterLayout() {
   if (state === 'no_application') return shell(<NoApplicationScreen />)
   if (state === 'pending') return shell(<PendingScreen />)
   if (state === 'rejected') return shell(<RejectedScreen />)
-  if (state === 'suspended') return shell(<SuspendedScreen />)
+  if (state === 'suspended') return shell(<SuspendedScreen suspendedUntil={access.suspendedUntil} />)
+  if (state === 'removed') return shell(<RemovedScreen />)
   if (state === 'error') return shell(<BoosterStatusErrorScreen />)
 
   return <ApprovedBoosterPanel />

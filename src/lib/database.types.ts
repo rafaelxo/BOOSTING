@@ -338,6 +338,7 @@ export type Database = {
           region_preferences: string[]
           specialties: string[] | null
           status: Database["public"]["Enums"]["booster_status"]
+          suspended_until: string | null
           total_completed: number
           total_earnings: number
           updated_at: string
@@ -370,6 +371,7 @@ export type Database = {
           region_preferences?: string[]
           specialties?: string[] | null
           status?: Database["public"]["Enums"]["booster_status"]
+          suspended_until?: string | null
           total_completed?: number
           total_earnings?: number
           updated_at?: string
@@ -402,6 +404,7 @@ export type Database = {
           region_preferences?: string[]
           specialties?: string[] | null
           status?: Database["public"]["Enums"]["booster_status"]
+          suspended_until?: string | null
           total_completed?: number
           total_earnings?: number
           updated_at?: string
@@ -2472,6 +2475,7 @@ export type Database = {
         | "approved"
         | "suspended"
         | "rejected"
+        | "removed"
       clash_day: "saturday" | "sunday"
       clash_tier: "tier_4" | "tier_3" | "tier_2" | "tier_1"
       drop_requester_role: "booster" | "admin" | "customer"
@@ -3108,6 +3112,7 @@ export const Constants = {
         "approved",
         "suspended",
         "rejected",
+        "removed",
       ],
       clash_day: ["saturday", "sunday"],
       clash_tier: ["tier_4", "tier_3", "tier_2", "tier_1"],

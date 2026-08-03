@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { LogoMark, PageLoader, ThemeToggle } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
 import { BoosterApplicationForm } from '@/features/booster/components/BoosterApplicationForm'
-import { PendingScreen, RejectedScreen, SuspendedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
+import { PendingScreen, RejectedScreen, SuspendedScreen, RemovedScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { requestBoosterRole, useBoosterStatus } from '@/api/boosters'
 import { queryKeys } from '@/api/core/queryKeys'
 
@@ -14,8 +14,8 @@ export function BoosterApplyPage() {
   const { profile } = useAuthStore()
   const isBoosterIntent = searchParams.get('booster') === '1'
   const isAlreadyBooster = profile?.role === 'booster'
-  const { data: accessState, isLoading: statusLoading } = useBoosterStatus(profile?.id)
-  const state = statusLoading || !accessState ? 'loading' : accessState
+  const { data: access, isLoading: statusLoading } = useBoosterStatus(profile?.id)
+  const state = statusLoading || !access ? 'loading' : access.state
 
   if (!isBoosterIntent) return <Navigate to="/" replace />
   if (!profile) return null
@@ -67,7 +67,8 @@ export function BoosterApplyPage() {
           {state === 'loading' && <PageLoader />}
           {state === 'pending' && <PendingScreen />}
           {state === 'rejected' && <RejectedScreen />}
-          {state === 'suspended' && <SuspendedScreen />}
+          {state === 'suspended' && <SuspendedScreen suspendedUntil={access?.suspendedUntil ?? null} />}
+          {state === 'removed' && <RemovedScreen />}
           {state === 'error' && <BoosterStatusErrorScreen />}
         </div>
       </div>

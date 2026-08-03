@@ -50,7 +50,12 @@ export function RejectedScreen() {
   )
 }
 
-export function SuspendedScreen() {
+function hoursRemaining(suspendedUntil: string): number {
+  const ms = new Date(suspendedUntil).getTime() - Date.now()
+  return Math.max(1, Math.ceil(ms / (60 * 60 * 1000)))
+}
+
+export function SuspendedScreen({ suspendedUntil }: { suspendedUntil: string | null }) {
   return (
     <div className="max-w-sm text-center space-y-5">
       <div className="h-16 w-16 rounded-full bg-danger/10 border border-danger/25 flex items-center justify-center mx-auto">
@@ -59,12 +64,35 @@ export function SuspendedScreen() {
       <div>
         <h2 className="text-xl font-bold text-ink mb-2">Conta suspensa</h2>
         <p className="text-sm text-ink-secondary leading-relaxed">
-          Sua conta de booster foi suspensa por um administrador e o acesso ao
-          painel está bloqueado enquanto isso.
+          {suspendedUntil
+            ? `Você está suspenso por mais ${hoursRemaining(suspendedUntil)} hora(s). O acesso volta a funcionar automaticamente depois desse período.`
+            : 'Sua conta de booster foi suspensa por um administrador e o acesso ao painel está bloqueado enquanto isso.'}
         </p>
       </div>
       <p className="text-xs text-ink-muted">
         Abra um ticket no nosso Discord pra entender o motivo ou contestar a suspensão:{' '}
+        <a href="https://discord.gg/aRPXe9pnwP" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
+          discord.gg/aRPXe9pnwP
+        </a>
+      </p>
+    </div>
+  )
+}
+
+export function RemovedScreen() {
+  return (
+    <div className="max-w-sm text-center space-y-5">
+      <div className="h-16 w-16 rounded-full bg-danger/10 border border-danger/25 flex items-center justify-center mx-auto">
+        <Ban className="h-8 w-8 text-danger" />
+      </div>
+      <div>
+        <h2 className="text-xl font-bold text-ink mb-2">Conta removida</h2>
+        <p className="text-sm text-ink-secondary leading-relaxed">
+          Sua conta de booster foi removida permanentemente da plataforma e o acesso não pode ser restaurado por aqui.
+        </p>
+      </div>
+      <p className="text-xs text-ink-muted">
+        Dúvidas? Fale com o suporte no Discord:{' '}
         <a href="https://discord.gg/aRPXe9pnwP" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
           discord.gg/aRPXe9pnwP
         </a>
