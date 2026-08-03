@@ -13,28 +13,96 @@ import { useTranslation } from 'react-i18next'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
 import { useBoosterSlotInfo } from '@/api/orders'
 
+export type AccountType = '__all__' | 'solo' | 'duo'
+
 interface PerformanceSummary {
   total_matches: number
   wins: number
   losses: number
   average_kda: number | null
+  avg_cs_per_min: number | null
+  mvp_count: number
   review_count: number
   average_rating: number | null
 }
 
-function usePerformanceSummary(boosterId: string | undefined) {
+interface PerformanceFilters {
+  accountType: AccountType
+  rankBucket: string // '__all__' or a specific rank_bucket value
+  queueType: string // '__all__' or a specific queue_type value
+}
+
+// Reflete as combinações materializadas por refresh_booster_performance_segments
+// (migration 140): account_type sozinho, ou cruzado com NO MÁXIMO um outro
+// filtro (rank OU fila, nunca os dois junto) -- selecionar rank e fila ao
+// mesmo tempo cai no rollup por account_type (sem filtro extra), já que essa
+// combinação não é pré-calculada.
+function segmentFilterFor(filters: PerformanceFilters): { rank_bucket: string; queue_type: string } {
+  if (filters.rankBucket !== '__all__') return { rank_bucket: filters.rankBucket, queue_type: '__all__' }
+  if (filters.queueType !== '__all__') return { rank_bucket: '__all__', queue_type: filters.queueType }
+  return { rank_bucket: '__all__', queue_type: '__all__' }
+}
+
+function usePerformanceSummary(boosterId: string | undefined, filters: PerformanceFilters) {
+  const segment = segmentFilterFor(filters)
   return useQuery({
-    queryKey: ['booster-performance-summary', boosterId],
+    queryKey: ['booster-performance-summary', boosterId, filters.accountType, segment.rank_bucket, segment.queue_type],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('booster_performance_segments')
-        .select('total_matches, wins, losses, average_kda, review_count, average_rating')
+        .select('total_matches, wins, losses, average_kda, avg_cs_per_min, mvp_count, review_count, average_rating')
         .eq('booster_id', boosterId!)
         .eq('service_type', '__all__')
-        .eq('rank_bucket', '__all__')
+        .eq('account_type', filters.accountType)
+        .eq('rank_bucket', segment.rank_bucket)
+        .eq('queue_type', segment.queue_type)
         .maybeSingle()
       if (error) throw error
       return data as PerformanceSummary | null
+    },
+    enabled: !!boosterId,
+  })
+}
+
+interface ChampionStat {
+  champion: string
+  games_played: number
+  wins: number
+}
+
+function useTopChampions(boosterId: string | undefined, accountType: AccountType) {
+  return useQuery({
+    queryKey: ['booster-top-champions', boosterId, accountType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booster_champion_stats')
+        .select('champion, games_played, wins')
+        .eq('booster_id', boosterId!)
+        .eq('account_type', accountType)
+        .order('games_played', { ascending: false })
+        .limit(3)
+      if (error) throw error
+      return (data ?? []) as ChampionStat[]
+    },
+    enabled: !!boosterId,
+  })
+}
+
+// booster_profiles.total_completed já cobre o rollup geral (Geral) sem
+// query extra -- só Solo/Duo precisam de uma contagem ao vivo, porque esse
+// contador não é segmentado por boost_mode.
+function useCompletedOrdersCount(boosterId: string | undefined, accountType: 'solo' | 'duo') {
+  return useQuery({
+    queryKey: ['booster-completed-orders-count', boosterId, accountType],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('assigned_booster_id', boosterId!)
+        .eq('status', 'completed')
+        .eq('boost_mode', accountType)
+      if (error) throw error
+      return count ?? 0
     },
     enabled: !!boosterId,
   })
