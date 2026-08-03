@@ -51,6 +51,10 @@ supabase/functions/.env
 supabase/functions/.env.local
 !supabase/functions/.env.example
 
+# Old migrations kept locally for reference only — not pushed, to stop
+# bloating commits. New migrations in supabase/migrations/ still get committed.
+supabase/migrations_archive/
+
 # Deploy tooling
 .vercel/
 
