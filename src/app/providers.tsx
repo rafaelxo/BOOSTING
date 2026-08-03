@@ -39,8 +39,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         const displayName = (session.user.user_metadata?.name ?? session.user.user_metadata?.full_name) as string | undefined
         fetchProfile(session.user.id, displayName)
       } else {
-        setProfile(null)
-        setLoading(false)
+        // Reuse the store's own reset() instead of re-deriving the "logged
+        // out" shape by hand here — keeps the empty-state definition in one
+        // place (authStore.ts).
+        useAuthStore.getState().reset()
         setInitialized(true)
         initialized = true
       }
@@ -59,8 +61,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           const displayName = (session.user.user_metadata?.name ?? session.user.user_metadata?.full_name) as string | undefined
           await fetchProfile(session.user.id, displayName)
         } else {
-          setProfile(null)
-          setLoading(false)
+          // Signed out (or session otherwise cleared) — wipe auth state and
+          // every other piece of per-user client state so nothing from this
+          // account can leak into the next session in the same browser.
+          useAuthStore.getState().reset()
           setInitialized(true)
           initialized = true
           queryClient.clear()

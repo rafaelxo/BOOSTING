@@ -178,7 +178,8 @@ serve(async (req) => {
       }
     }
 
-    await serviceClient.rpc('mark_order_match_sync', { p_order_id: orderId })
+    const { error: markSyncError } = await serviceClient.rpc('mark_order_match_sync', { p_order_id: orderId })
+    if (markSyncError) console.error('mark_order_match_sync failed', orderId, markSyncError.message)
 
     // Um recálculo ao final do lote, não por partida — sync-order-matches
     // pode registrar várias partidas numa única chamada. Usa o booster REAL
@@ -186,7 +187,8 @@ serve(async (req) => {
     // ser o cliente ou um admin disparando o sync manualmente, não só o
     // próprio booster.
     if (recorded.length > 0) {
-      await serviceClient.rpc('refresh_booster_performance_segments', { p_booster_id: order.assigned_booster_id })
+      const { error: refreshError } = await serviceClient.rpc('refresh_booster_performance_segments', { p_booster_id: order.assigned_booster_id })
+      if (refreshError) console.error('refresh_booster_performance_segments failed', order.assigned_booster_id, refreshError.message)
     }
 
     return jsonResponse(req, {

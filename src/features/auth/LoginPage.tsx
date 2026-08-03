@@ -36,6 +36,18 @@ export function LoginPage() {
   const authenticated = isAuthenticated()
   const alreadyAccepted = !!profile && hasAcceptedLegal(profile)
 
+  // Supabase redirects back here with ?error=...&error_description=... when
+  // o provedor (Discord) recusa o login (usuário negou permissão, app
+  // removido, etc.) — sem isso a tela ficava muda, parecendo que nada
+  // aconteceu, e o usuário tentava de novo sem saber o motivo real.
+  // URLSearchParams#get() já devolve o valor decodificado — decodificar de
+  // novo aqui quebraria (URIError) se a mensagem do provedor contiver um
+  // '%' literal, travando a tela que este efeito existe pra proteger.
+  useEffect(() => {
+    const providerError = searchParams.get('error_description') || searchParams.get('error')
+    if (providerError) setError(providerError)
+  }, [searchParams])
+
   // Perfil que já aceitou os termos antes (usuário recorrente) — marca as
   // caixinhas sozinho, refletindo o que já está gravado no banco. Um perfil
   // novo (terms_accepted_at/privacy_accepted_at nulos) começa desmarcado e

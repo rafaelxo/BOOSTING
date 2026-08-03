@@ -2209,6 +2209,10 @@ export type Database = {
         Returns: Json
       }
       cancel_payout_request: { Args: { p_request_id: string }; Returns: Json }
+      cancel_pending_order_payment: {
+        Args: { p_customer_id: string; p_order_id: string }
+        Returns: Json
+      }
       check_own_write_rate_limit: {
         Args: { p_limit: number; p_scope: string; p_window_seconds: number }
         Returns: boolean

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
-import type { Profile, UserRole } from '@/types'
+import type { Profile } from '@/types'
 
 interface AuthState {
   session: Session | null
@@ -17,10 +17,6 @@ interface AuthState {
 
   // Derived
   isAuthenticated: () => boolean
-  role: () => UserRole | null
-  isAdmin: () => boolean
-  isBooster: () => boolean
-  isCustomer: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
@@ -43,8 +39,4 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ session: null, user: null, profile: null, isLoading: false }),
 
   isAuthenticated: () => !!get().session,
-  role: () => get().profile?.role ?? null,
-  isAdmin: () => get().profile?.role === 'admin',
-  isBooster: () => get().profile?.role === 'booster',
-  isCustomer: () => get().profile?.role === 'customer',
 }))

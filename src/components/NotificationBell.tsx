@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import { Popover } from '@/components/ui'
 import type { Notification, NotificationType } from '@/types'
-import { useNotifications, useMarkNotificationsRead } from '@/api/notifications'
+import { useNotifications, useMarkNotificationsRead, useMarkAllNotificationsRead, useUnreadNotificationsCount } from '@/api/notifications'
 
 const TYPE_ICON: Record<NotificationType, React.ElementType> = {
   order_status_changed: RefreshCw,
@@ -61,9 +61,9 @@ export function NotificationBell() {
   const containerRef = useRef<HTMLButtonElement>(null)
 
   const { data: notifications = [] } = useNotifications(profile?.id)
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount(profile?.id)
   const markRead = useMarkNotificationsRead(profile?.id)
-
-  const unreadCount = notifications.filter((n) => !n.is_read).length
+  const markAllRead = useMarkAllNotificationsRead(profile?.id)
 
   function markAsRead(ids: string[]) {
     if (!ids.length) return
@@ -109,7 +109,7 @@ export function NotificationBell() {
           <p className="text-sm font-bold text-ink">Notificações</p>
           {unreadCount > 0 && (
             <button
-              onClick={() => markAsRead(notifications.filter((n) => !n.is_read).map((n) => n.id))}
+              onClick={() => markAllRead.mutate()}
               className="flex items-center gap-1 text-[11px] font-semibold text-brand hover:underline"
             >
               <CheckCheck className="h-3 w-3" /> Marcar todas

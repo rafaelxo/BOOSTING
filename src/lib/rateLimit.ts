@@ -23,5 +23,4 @@ export const limits = {
   auth:        { windowMs: 60_000, max: 10 },  // 10 auth attempts / min
   formSubmit:  { windowMs: 30_000, max: 8  },  // 8 form submits / 30s
   rpcMutation: { windowMs: 10_000, max: 20 },  // 20 RPC calls / 10s
-  search:      { windowMs:  5_000, max: 30 },  // 30 queries / 5s
 }

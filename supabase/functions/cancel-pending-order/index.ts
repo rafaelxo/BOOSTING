@@ -116,30 +116,26 @@ serve(async (req) => {
     // "pedido morto" diferente dos outros dois (linha ausente vs.
     // status='canceled'), forçando o frontend a tratar `.catch(() => null)`
     // como se fosse um erro de rede transiente em vez de um estado terminal.
-    const { error: updatePaymentsError } = await admin
-      .from('payments')
-      .update({ status: 'failed', updated_at: new Date().toISOString() })
-      .eq('order_id', order.id)
-      .eq('customer_id', auth.user.id)
-
-    if (updatePaymentsError) return errorResponse(req, 'Failed to update payment record', 500, 'PAYMENT_UPDATE_FAILED')
-
-    const { error: cancelOrderError } = await admin
-      .from('orders')
-      .update({ status: 'canceled', updated_at: new Date().toISOString() })
-      .eq('id', order.id)
-      .eq('customer_id', auth.user.id)
-      .eq('status', 'awaiting_payment')
-
-    if (cancelOrderError) return errorResponse(req, 'Failed to cancel order', 500, 'ORDER_CANCEL_FAILED')
-
-    await admin.from('order_status_history').insert({
-      order_id: order.id,
-      from_status: 'awaiting_payment',
-      to_status: 'canceled',
-      changed_by: auth.user.id,
-      reason: 'Cancelado pelo cliente antes da confirmação do pagamento',
+    //
+    // A transição em si é feita via RPC atômica (migration 134): as duas
+    // updates (payments + orders) e o insert de histórico rodam numa única
+    // transação com `for update`, evitando que um webhook do Mercado Pago
+    // aprovando o pagamento nesta mesma janela sobrescreva payments.status
+    // para 'failed' num pedido que na verdade já foi pago.
+    const { data: cancelResult, error: cancelRpcError } = await admin.rpc('cancel_pending_order_payment', {
+      p_order_id: order.id,
+      p_customer_id: auth.user.id,
     })
+
+    if (cancelRpcError) return errorResponse(req, 'Failed to cancel order', 500, 'ORDER_CANCEL_FAILED')
+
+    const result = cancelResult as { success: boolean; error?: string } | null
+    if (!result?.success) {
+      if (result?.error === 'order_not_awaiting_payment') {
+        return errorResponse(req, 'Only awaiting payment orders can be cancelled here', 409, 'ORDER_NOT_AWAITING_PAYMENT')
+      }
+      return errorResponse(req, 'Failed to cancel order', 500, 'ORDER_CANCEL_FAILED')
+    }
 
     return jsonResponse(req, { success: true, order_id: order.id, canceled: true })
   } catch (err) {

@@ -227,7 +227,7 @@ export function PricingPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-ink-muted mt-2">Abaixo de Mestre: média menor que 20 LP/partida aplica +20%; entre 20 e 25 mantém o preço; acima de 25 aplica -5%.</p>
+          <p className="text-xs text-ink-muted mt-2">Abaixo de Mestre: média menor que 20 LP/partida aplica +15%; entre 20 e 25 mantém o preço; acima de 25 aplica -5%.</p>
         </section>
 
         {/* ── Coaching ── */}

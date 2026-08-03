@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
+import { useForm, Controller } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Wallet, Banknote, PiggyBank, Hourglass, Send, FileText, XCircle, ShieldAlert } from 'lucide-react'
 import { Button, Card, Skeleton, EmptyState, StatCard, ErrorAlert, CurrencyMaskedInput } from '@/components/ui'
 import { formatDateTime, cn, PAYOUT_REQUEST_STATUS_LABEL, PAYOUT_REQUEST_STATUS_COLOR } from '@/lib/utils'
@@ -13,17 +16,50 @@ import {
 const STATUS_LABEL = PAYOUT_REQUEST_STATUS_LABEL
 const STATUS_COLOR = PAYOUT_REQUEST_STATUS_COLOR
 
+interface PayoutFormData {
+  cents: number
+}
+
 function RequestPayoutCard({ available }: { available: number }) {
   const { profile } = useAuthStore()
   const currency = useCurrency()
-  const [cents, setCents] = useState(0)
   const requestPayout = useRequestPayout(profile?.id)
 
-  const numericAmount = cents / 100
   const availableCents = Math.round(available * 100)
   const hasBalance = availableCents >= MIN_PAYOUT_AMOUNT * 100
-  const belowMinimum = cents > 0 && cents < MIN_PAYOUT_AMOUNT * 100
-  const valid = hasBalance && cents > 0 && cents <= availableCents && !belowMinimum
+  const rangeMessage = `Informe um valor entre ${currency(MIN_PAYOUT_AMOUNT)} e ${currency(available)}.`
+
+  // Backend (RPC request_payout) sempre reforça o limite de saldo -- esse
+  // schema é só pra dar feedback imediato e consistente com o resto do
+  // projeto (mesmo padrão de zodResolver de BoosterApplicationForm.tsx).
+  const schema = z.object({
+    cents: z.number({ invalid_type_error: 'Informe um valor de saque.' })
+      .int()
+      .min(MIN_PAYOUT_AMOUNT * 100, rangeMessage)
+      .max(availableCents, rangeMessage),
+  })
+
+  const {
+    control, handleSubmit, setValue, watch, trigger, reset,
+    formState: { errors, isValid },
+  } = useForm<PayoutFormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { cents: 0 },
+    mode: 'onChange',
+  })
+
+  const cents = watch('cents')
+
+  // formState.isValid parte como `true` (otimista) até a primeira validação
+  // rodar -- sem isso, o botão "Solicitar" ficaria habilitado por um
+  // instante antes de qualquer interação, mesmo com valor 0.
+  useEffect(() => {
+    trigger('cents')
+  }, [trigger, availableCents])
+
+  function onSubmit(data: PayoutFormData) {
+    requestPayout.mutate(data.cents / 100, { onSuccess: () => reset({ cents: 0 }) })
+  }
 
   return (
     <Card padding="md" className="ring-1 ring-brand/20">
@@ -35,38 +71,43 @@ function RequestPayoutCard({ available }: { available: number }) {
         Disponível: <span className="font-bold text-ink" data-tabular>{currency(available)}</span>
         {' · '}Mínimo: <span className="font-bold text-ink" data-tabular>{currency(MIN_PAYOUT_AMOUNT)}</span>
       </p>
-      <div className="flex gap-2">
-        <CurrencyMaskedInput
-          valueCents={cents}
-          onChangeCents={setCents}
-          maxCents={availableCents}
-          disabled={!hasBalance}
-          className="flex-1 text-sm"
-          aria-label="Valor do saque"
+      <form className="flex gap-2" onSubmit={handleSubmit(onSubmit)}>
+        <Controller
+          control={control}
+          name="cents"
+          render={({ field }) => (
+            <CurrencyMaskedInput
+              valueCents={field.value}
+              onChangeCents={field.onChange}
+              maxCents={availableCents}
+              disabled={!hasBalance}
+              className="flex-1 text-sm"
+              aria-label="Valor do saque"
+            />
+          )}
         />
         <Button
+          type="button"
           variant="secondary"
           disabled={!hasBalance}
-          onClick={() => setCents(availableCents)}
+          onClick={() => setValue('cents', availableCents, { shouldValidate: true })}
         >
           Max
         </Button>
         <Button
+          type="submit"
           loading={requestPayout.isPending}
-          disabled={!valid}
-          onClick={() => requestPayout.mutate(numericAmount, { onSuccess: () => setCents(0) })}
+          disabled={!hasBalance || !isValid}
         >
           Solicitar
         </Button>
-      </div>
+      </form>
       {!hasBalance ? (
         <p className="text-xs text-ink-muted mt-2">
           Você precisa de pelo menos {currency(MIN_PAYOUT_AMOUNT)} disponível pra solicitar um saque.
         </p>
-      ) : cents > 0 && !valid && (
-        <p className="text-xs text-danger mt-2">
-          Informe um valor entre {currency(MIN_PAYOUT_AMOUNT)} e {currency(available)}.
-        </p>
+      ) : cents > 0 && errors.cents && (
+        <p className="text-xs text-danger mt-2">{errors.cents.message}</p>
       )}
       {requestPayout.isError && (
         <ErrorAlert className="mt-2" message={requestPayout.error instanceof Error ? requestPayout.error.message : 'Erro ao solicitar saque.'} />

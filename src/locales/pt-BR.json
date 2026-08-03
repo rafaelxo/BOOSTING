@@ -3,11 +3,9 @@
     "services": "Serviços",
     "pricing": "Preços",
     "security": "Segurança",
-    "reviews": "Avaliações",
     "faq": "FAQ",
     "dashboard": "Painel",
     "signIn": "Entrar",
-    "boostNow": "Boostar Agora",
     "applyBooster": "Seja um Booster",
     "announcement": "Boosting profissional · Garantia de conclusão · Suporte 24/7",
     "boosters": "Boosters"
@@ -16,17 +14,13 @@
     "tagline": "Serviços de gaming profissionais. Seguro, rápido e garantido.",
     "services": "Serviços",
     "company": "Empresa",
-    "account": "Conta",
     "eloBoost": "Solo Boost / Duo Boost",
     "winBoost": "Vitórias / MD5",
     "coaching": "Coaching",
     "clash": "Clash",
     "pricing": "Preços",
-    "reviews": "Avaliações",
     "security": "Segurança",
     "faq": "FAQ",
-    "signIn": "Entrar",
-    "dashboard": "Painel",
     "copyright": "© {{year}} EloPeak. Todos os direitos reservados.",
     "privacy": "Privacidade",
     "terms": "Termos",
@@ -38,11 +32,6 @@
     "heroDesc": "Solo boost, duo boost, coaching e MD5 profissionais — com transparência total, chat ao vivo e",
     "heroDescBold": "garantia de 100% de conclusão",
     "heroDescPost": ".",
-    "startBoost": "Começar Boost",
-    "viewPricing": "Ver Preços",
-    "trustBadge1": "VPN em cada sessão",
-    "trustBadge2": "Aparecer offline",
-    "trustBadge3": "Credenciais criptografadas",
     "stats": {
       "ordersCompleted": "Pedidos concluídos",
       "avgRating": "Avaliação média",
@@ -81,48 +70,19 @@
       "sectionLabel": "Por que mais de 1.800 jogadores confiam em nós",
       "title": "Sua conta está em boas mãos.",
       "desc": "As credenciais enviadas pela plataforma são criptografadas antes de serem armazenadas e ficam disponíveis apenas para o booster atribuído e para a equipe autorizada quando necessário. Cada sessão roda através de VPN. Você tem um histórico completo no histórico de pedidos ao vivo.",
-      "point1": "Acesso restrito às credenciais",
-      "point2": "VPN em cada sessão de jogo",
-      "point3": "Aparecer offline por padrão",
-      "point4": "Reembolso total se não concluir",
       "policy": "Leia nossa política de segurança →"
     },
     "extras": {
-      "offlineLabel": "Aparecer Offline",
-      "offlineDesc": "Oculto da lista de amigos durante todas as sessões.",
       "vpnLabel": "Proteção VPN",
       "vpnDesc": "Cada sessão roda através de um VPN local.",
       "chatLabel": "Chat ao Vivo",
       "chatDesc": "Chat direto com seu booster dentro do seu pedido.",
-      "streamLabel": "Transmissão ao Vivo",
-      "streamDesc": "Stream privado para você assistir cada partida em tempo real.",
-      "soloLabel": "Apenas Solo Queue",
-      "soloDesc": "Sem filas em duo — 100% partidas ranked solo.",
       "guaranteeLabel": "Garantia 100%",
       "guaranteeDesc": "Reembolso total se não conseguirmos concluir seu pedido."
     },
     "reviewsSection": {
       "sectionLabel": "Clientes reais",
       "title": "O que os jogadores dizem"
-    },
-    "boosterRecruit": {
-      "sectionLabel": "Ganhe com suas habilidades",
-      "title": "Transforme seu rank em renda.",
-      "desc": "Jogadores Grão-mestre ou Desafiante recebem valores flexíveis de acordo com cada pedido, definem seus próprios horários e escolhem os jobs que querem atender.",
-      "apply": "Candidatar-se como Booster",
-      "requirements": "Requisitos",
-      "perOrder": "Por pedido",
-      "avgPayment": "Pagamento médio",
-      "activeBoosters": "Boosters ativos",
-      "avgRating": "Avaliação média do booster",
-      "req1Title": "Grão-mestre ou Desafiante",
-      "req1Sub": "Consideramos rank atual ou recente, com foco em Grão-mestre e Desafiante.",
-      "req2Title": "Pelo menos uma função dominada",
-      "req2Sub": "Analisamos pool de campeões, taxa de vitória e KDA.",
-      "req3Title": "10+ horas/semana de disponibilidade",
-      "req3Sub": "Flexível — você escolhe os dias e sessões.",
-      "req4Title": "Comunicação e empatia",
-      "req4Sub": "Chat em português com o cliente dentro dos pedidos. Empatia e clareza são essenciais."
     },
     "cta": {
       "title": "Pronto para alcançar seu rank objetivo?",
@@ -134,9 +94,7 @@
     "nav": {
       "dashboard": "Painel",
       "newOrder": "Novo Pedido",
-      "myOrders": "Meus Pedidos",
-      "signOut": "Sair",
-      "role": "Cliente"
+      "myOrders": "Meus Pedidos"
     },
     "dashboard": {
       "welcome": "Bem-vindo",
@@ -162,23 +120,8 @@
       "id": "Pedido #{{id}}",
       "created": "Criado {{date}}",
       "details": "Detalhes do Pedido",
-      "service": "Serviço",
-      "queue": "Fila",
-      "currentRank": "Rank Atual",
-      "targetRank": "Rank Alvo",
       "totalPaid": "Total Pago",
-      "notes": "Suas Notas",
-      "chat": "Chat com Booster",
-      "noMessages": "Sem mensagens ainda. Seu booster aparecerá aqui quando for atribuído.",
-      "messagePlaceholder": "Mensagem para seu booster...",
-      "timeline": "Histórico de Status",
-      "noHistory": "Sem histórico ainda.",
-      "soloQueue": "Solo/Duo",
-      "flexQueue": "Flex",
-      "paymentSuccess": "Pagamento confirmado!",
-      "paymentSuccessDesc": "Seu pedido foi pago e está na fila. Um booster será atribuído em breve.",
-      "paymentProcessing": "Aguardando confirmação do pagamento PIX...",
-      "paymentProcessingDesc": "Isso pode levar alguns segundos."
+      "notes": "Suas Notas"
     },
     "history": {
       "title": "Histórico de Pedidos",
@@ -186,55 +129,12 @@
       "filters": {
         "all": "Todos",
         "active": "Ativos",
-        "completed": "Concluídos",
-        "canceled": "Cancelados"
+        "completed": "Concluídos"
       },
       "empty": "Nenhum pedido encontrado",
       "emptyFilter": "Tente mudar o filtro.",
       "emptyAll": "Faça seu primeiro pedido para começar.",
       "startBoost": "Configurar Boost"
-    }
-  },
-  "auth": {
-    "login": {
-      "title": "Entrar",
-      "subtitle": "Bem-vindo de volta.",
-      "email": "E-mail",
-      "password": "Senha",
-      "forgotPassword": "Esqueceu a senha?",
-      "submit": "Entrar",
-      "noAccount": "Não tem uma conta?",
-      "register": "Registrar",
-      "invalidCredentials": "E-mail ou senha incorretos.",
-      "discordLogin": "Continuar com Discord",
-      "discordLoading": "Conectando...",
-      "orEmail": "ou continue com e-mail"
-    },
-    "register": {
-      "titleCustomer": "Criar conta",
-      "titleBooster": "Candidatar-se como Booster",
-      "subtitleCustomer": "Comece seu primeiro pedido em minutos.",
-      "subtitleBooster": "Junte-se à nossa equipe de boosters verificados.",
-      "username": "Nome de usuário",
-      "email": "E-mail",
-      "password": "Senha",
-      "confirmPassword": "Confirmar Senha",
-      "submitCustomer": "Criar Conta",
-      "submitBooster": "Enviar Candidatura",
-      "hasAccount": "Já tem uma conta?",
-      "signIn": "Entrar",
-      "wantToBoost": "Quer fazer boost?",
-      "applyHere": "Candidate-se aqui",
-      "termsPrefix": "Ao se registrar você concorda com nossos",
-      "termsLink": "Termos de Serviço",
-      "and": "e",
-      "privacyLink": "Política de Privacidade",
-      "successTitle": "Verifique seu e-mail",
-      "successDesc": "Enviamos um link de confirmação para o seu e-mail. Clique nele para ativar sua conta.",
-      "backToLogin": "Voltar para o login",
-      "discordSignUp": "Cadastrar com Discord",
-      "discordLoading": "Conectando...",
-      "orEmail": "ou cadastre-se com e-mail"
     }
   },
   "booster": {
@@ -245,27 +145,12 @@
       "services": "Serviços",
       "payments": "Pagamentos",
       "accounts": "Contas",
-      "signOut": "Sair",
-      "role": "Booster",
-      "pendingBanner": "Candidatura pendente",
-      "pendingBannerDesc": "Nossa equipe está analisando seu perfil."
+      "role": "Booster"
     },
     "dashboard": {
-      "title": "Painel do Booster",
       "activeCount": "{{count}} pedido ativo",
-      "activeCountPlural": "{{count}} pedidos ativos",
       "noActive": "Sem pedidos ativos no momento.",
       "browseJobs": "Ver Jobs",
-      "stats": {
-        "active": "Pedidos Ativos",
-        "completed": "Concluídos",
-        "earned": "Total Ganho",
-        "rating": "Avaliação"
-      },
-      "activeTitle": "Pedidos Ativos",
-      "viewAll": "Ver todos →",
-      "empty": "Sem pedidos ativos",
-      "emptyDesc": "Explore pedidos disponíveis para pegar um novo job.",
       "pending": {
         "title": "Candidatura em Análise",
         "desc": "Sua candidatura está sendo analisada pela nossa equipe. Você será notificado quando aprovado.",
@@ -275,7 +160,6 @@
     "jobs": {
       "title": "Jobs Disponíveis",
       "count": "{{count}} job disponível",
-      "countPlural": "{{count}} jobs disponíveis",
       "live": "Ao vivo",
       "accept": "Aceitar",
       "yourCut": "Seu corte ({{pct}}%)",
@@ -303,38 +187,10 @@
       "soloQueue": "Solo/Duo",
       "flexQueue": "Flex",
       "customerNotes": "Notas do Cliente",
-      "chat": "Chat do Pedido",
-      "messagePlaceholder": "Mensagem para o cliente...",
       "earnings": "Ganhos",
-      "yourCutOf": "Sua comissão ({{pct}}% do valor do pedido)",
       "actions": "Ações",
       "startOrder": "Iniciar Pedido",
-      "pause": "Pausar",
-      "resume": "Retomar",
       "markComplete": "Marcar Concluído"
-    },
-    "earnings": {
-      "title": "Ganhos",
-      "totalEarned": "Total Ganho",
-      "thisMonth": "Este Mês",
-      "pendingPayout": "Pagamento Pendente",
-      "monthlyChart": "Ganhos Mensais",
-      "payoutHistory": "Histórico de Pagamentos",
-      "noPayouts": "Sem pagamentos ainda. Conclua pedidos para começar a ganhar.",
-      "order": "Pedido #{{id}}",
-      "earned": "Ganho"
-    },
-    "onboarding": {
-      "title": "Complete Seu Perfil de Booster",
-      "subtitle": "Preencha seus dados e nossa equipe irá analisar sua candidatura.",
-      "displayName": "Nome de Exibição",
-      "bio": "Bio",
-      "bioHint": "Conte aos clientes sobre sua experiência e estilo.",
-      "bioPlaceholder": "ex: Diamante 1 ADC main, 5+ anos de exp...",
-      "peakRank": "Rank de Pico",
-      "games": "Jogos",
-      "servers": "Regiões",
-      "submit": "Enviar Candidatura"
     }
   },
   "admin": {
@@ -347,15 +203,12 @@
       "customers": "Clientes",
       "payments": "Pagamentos",
       "refunds": "Reembolsos",
-      "reviews": "Avaliações",
-      "signOut": "Sair",
       "role": "Admin",
       "panel": "Painel Admin"
     },
     "overview": {
       "title": "Visão Geral",
       "live": "Ao vivo",
-      "totalRevenue": "Receita Total",
       "activeOrders": "Pedidos Ativos",
       "pendingBoosters": "Boosters Pendentes",
       "ordersWeek": "Pedidos Esta Semana",
@@ -369,7 +222,6 @@
         "all": "Todos",
         "active": "Ativos",
         "awaiting": "Aguardando",
-        "disputed": "Disputados",
         "completed": "Concluídos",
         "canceled": "Cancelados"
       },
@@ -387,23 +239,17 @@
       "filters": {
         "all": "Todos",
         "pending": "Pendentes",
-        "under_review": "Em Revisão",
         "approved": "Aprovados",
         "suspended": "Suspensos"
       },
       "table": {
         "name": "Nome",
-        "games": "Jogos",
         "rating": "Avaliação",
         "completed": "Concluídos",
         "status": "Status",
         "joined": "Entrou",
         "actions": "Ações"
       },
-      "approve": "Aprovar",
-      "reject": "Rejeitar",
-      "suspend": "Suspender",
-      "reinstate": "Reativar",
       "empty": "Nenhum booster encontrado"
     },
     "customers": {
@@ -417,19 +263,6 @@
       },
       "empty": "Nenhum cliente ainda"
     },
-    "payments": {
-      "title": "Pagamentos",
-      "totalCollected": "Total Coletado",
-      "table": {
-        "id": "ID Pagamento",
-        "order": "Pedido",
-        "amount": "Valor",
-        "method": "Método",
-        "status": "Status",
-        "date": "Data"
-      },
-      "empty": "Nenhum pagamento ainda"
-    },
     "refunds": {
       "title": "Reembolsos",
       "table": {
@@ -441,42 +274,6 @@
         "date": "Data"
       },
       "empty": "Nenhum reembolso emitido"
-    }
-  },
-  "pricing": {
-    "sectionLabel": "Preços transparentes",
-    "title": "Preços",
-    "subtitle": "Preços base para solo queue. O preço final é calculado na calculadora com base no seu rank, tipo de serviço e extras.",
-    "eloBoost": "Solo Boost / Duo Boost — Por Divisão",
-    "winBoost": "Vitórias",
-    "coaching": "Coaching",
-    "extrasTitle": "Extras Disponíveis",
-    "from": "De",
-    "to": "Para",
-    "price": "Preço",
-    "wins": "{{count}} Vitórias",
-    "sessions": "{{count}} sessão de {{hours}}h",
-    "sessionsPlural": "{{count}} sessões de {{hours}}h",
-    "startingFrom": "A partir de",
-    "orderNow": "Pedir Agora",
-    "configureOrder": "Configurar Pedido",
-    "winsUnit": "vitórias",
-    "sessionLabel": "sessão · {{hours}}h cada",
-    "sessionsLabel": "{{count}} sessões · {{hours}}h cada",
-    "extras": {
-      "priority": "Processamento Prioritário",
-      "priorityDesc": "Atribuição imediata ao booster mais bem avaliado",
-      "solo": "Apenas Solo Queue",
-      "soloDesc": "Sem partidas em duo",
-      "mono": "Campeão Único",
-      "monoDesc": "Campeão específico em cada partida",
-      "stream": "Transmissão ao Vivo",
-      "streamDesc": "Stream privado das suas partidas",
-      "monitoring": "Monitoramento ao Vivo",
-      "monitoringDesc": "Pedido monitorado pela equipe com atualizações",
-      "offline": "Aparecer Offline",
-      "offlineDesc": "Invisível na lista de amigos",
-      "free": "Grátis"
     }
   },
   "security": {

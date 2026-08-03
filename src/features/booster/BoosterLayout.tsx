@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Briefcase, ClipboardList, Wrench, Landmark, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { LogoMark } from '@/components/ui'
+import { LogoMark, PageLoader } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
 import { useAuthStore } from '@/stores/authStore'
@@ -103,7 +103,7 @@ export function BoosterLayout() {
   const { data: accessState, isLoading } = useBoosterStatus(profile?.id)
 
   // Still loading — wait
-  if (isLoading || !accessState) return null
+  if (isLoading || !accessState) return <PageLoader />
   const state = accessState
 
   // Common app shell (header only for restricted states)

@@ -296,12 +296,17 @@ serve(async (req) => {
     // server-side before responding, instead of pushing that wait onto the
     // client — this is the actual root cause of the "QR code sometimes
     // fails" symptom, not something a client-side retry alone can fix.
+    let lastPollStatus: number | null = null
     for (let attempt = 0; attempt < 3 && !mp.point_of_interaction?.transaction_data?.qr_code_base64; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 1200))
       const poll = await fetchWithTimeout(`https://api.mercadopago.com/v1/payments/${mpPaymentId}`, {
         headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
       })
+      lastPollStatus = poll.status
       if (poll.ok) mp = await poll.json()
+    }
+    if (!mp.point_of_interaction?.transaction_data?.qr_code_base64) {
+      console.error('PIX QR code still missing after polling', mpPaymentId, 'last poll status:', lastPollStatus)
     }
 
     const { data: recorded, error: recordError } = await serviceClient.rpc('record_pix_payment', {
