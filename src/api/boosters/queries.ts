@@ -61,6 +61,7 @@ export async function listBoostersPerformance(boosterUserIds: string[]): Promise
     .in('booster_id', boosterUserIds)
     .eq('service_type', '__all__')
     .eq('rank_bucket', '__all__')
+    .eq('account_type', '__all__')
   if (error) throw normalizeApiError(error)
   return (data ?? []) as unknown as BoosterPerformanceSegment[]
 }
@@ -72,6 +73,7 @@ export async function getBoosterPerformanceByRank(boosterUserId: string): Promis
     .eq('booster_id', boosterUserId)
     .eq('service_type', '__all__')
     .neq('rank_bucket', '__all__')
+    .eq('account_type', '__all__')
   if (error) throw normalizeApiError(error)
   return (data ?? []) as unknown as BoosterPerformanceSegment[]
 }
