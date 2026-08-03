@@ -330,6 +330,9 @@ export interface OrderMatch {
   duration_seconds: number | null
   played_at: string
   created_at: string
+  minions_killed: number | null
+  neutral_minions_killed: number | null
+  is_mvp: boolean
 }
 
 export interface OrderCoachingTopic {
