@@ -261,11 +261,77 @@ export interface MatchDetail {
   queueId: number | null
   durationSeconds: number | null
   playedAt: string
+  minionsKilled: number
+  neutralMinionsKilled: number
+  isMvp: boolean
 }
 
 export type MatchDetailResult =
   | { ok: true; detail: MatchDetail }
   | { ok: false; reason: 'rate_limited' | 'upstream_error' | 'participant_not_found'; status: number }
+
+interface RiotParticipant {
+  puuid?: string
+  win?: boolean
+  championName?: string
+  kills?: number
+  deaths?: number
+  assists?: number
+  teamId?: number
+  totalMinionsKilled?: number
+  neutralMinionsKilled?: number
+}
+
+export interface RiotMatchV5Body {
+  info?: {
+    queueId?: number
+    gameDuration?: number
+    gameEndTimestamp?: number
+    participants?: RiotParticipant[]
+  }
+}
+
+function kdaOf(p: Pick<RiotParticipant, 'kills' | 'deaths' | 'assists'>): number {
+  return ((p.kills ?? 0) + (p.assists ?? 0)) / Math.max(1, p.deaths ?? 0)
+}
+
+// Pura -- só depende do JSON já buscado, sem I/O. Extraída de
+// fetchMatchDetail pra ser testável sem mockar fetch (ver riotLookup.test.ts).
+export function parseMatchDetail(body: RiotMatchV5Body, puuid: string, matchId: string): MatchDetailResult {
+  const participants = body.info?.participants ?? []
+  const participant = participants.find((candidate) => candidate.puuid === puuid)
+  if (!participant || typeof participant.win !== 'boolean') {
+    return { ok: false, reason: 'participant_not_found', status: 502 }
+  }
+
+  // MVP = maior KDA entre os 5 do mesmo teamId (empate conta pros dois --
+  // usa >= contra o máximo do time, não > estrito). Se teamId vier ausente
+  // (não deveria em match-v5 normal), trata o próprio jogador como "time" de
+  // 1 -- sempre MVP nesse caso degenerado, em vez de quebrar.
+  const teammates = participant.teamId != null
+    ? participants.filter((p) => p.teamId === participant.teamId)
+    : [participant]
+  const bestTeamKda = Math.max(...teammates.map(kdaOf))
+  const isMvp = kdaOf(participant) >= bestTeamKda
+
+  return {
+    ok: true,
+    detail: {
+      externalMatchId: matchId,
+      result: participant.win ? 'win' : 'loss',
+      champion: participant.championName ?? null,
+      kills: participant.kills ?? 0,
+      deaths: participant.deaths ?? 0,
+      assists: participant.assists ?? 0,
+      queueId: body.info?.queueId ?? null,
+      durationSeconds: body.info?.gameDuration ?? null,
+      playedAt: new Date((body.info?.gameEndTimestamp ?? Date.now())).toISOString(),
+      minionsKilled: participant.totalMinionsKilled ?? 0,
+      neutralMinionsKilled: participant.neutralMinionsKilled ?? 0,
+      isMvp,
+    },
+  }
+}
 
 // Uma partida por vez (Match-V5 não expõe um endpoint em lote) — o
 // participante é localizado pelo puuid, nunca por posição/index.
@@ -282,38 +348,6 @@ export async function fetchMatchDetail(
   if (resp.status === 429) return { ok: false, reason: 'rate_limited', status: 429 }
   if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
 
-  const body = await resp.json() as {
-    info?: {
-      queueId?: number
-      gameDuration?: number
-      gameEndTimestamp?: number
-      participants?: Array<{
-        puuid?: string
-        win?: boolean
-        championName?: string
-        kills?: number
-        deaths?: number
-        assists?: number
-      }>
-    }
-  }
-  const participant = body.info?.participants?.find((candidate) => candidate.puuid === puuid)
-  if (!participant || typeof participant.win !== 'boolean') {
-    return { ok: false, reason: 'participant_not_found', status: 502 }
-  }
-
-  return {
-    ok: true,
-    detail: {
-      externalMatchId: matchId,
-      result: participant.win ? 'win' : 'loss',
-      champion: participant.championName ?? null,
-      kills: participant.kills ?? 0,
-      deaths: participant.deaths ?? 0,
-      assists: participant.assists ?? 0,
-      queueId: body.info?.queueId ?? null,
-      durationSeconds: body.info?.gameDuration ?? null,
-      playedAt: new Date((body.info?.gameEndTimestamp ?? Date.now())).toISOString(),
-    },
-  }
+  const body = await resp.json() as RiotMatchV5Body
+  return parseMatchDetail(body, puuid, matchId)
 }
