@@ -18,6 +18,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
+import { canMarkOrderComplete } from '@/lib/orderCompletionGate'
 import {
   useBoosterOrder, usePendingDropRequest, useUpdateOrderStatus, useSyncOrderMatches, useVerifyOrderRank,
   useRevealOrderCredentials, useRequestOrderDrop, useOrderStatusHistory,
@@ -281,7 +282,8 @@ export function JobDetailPage() {
 
   if (!order) return null
 
-  const objectiveReached = order.wins_purchased == null || order.wins_played >= order.wins_purchased
+  const completionGate = canMarkOrderComplete(order, new Date())
+  const objectiveReached = completionGate.allowed
   const availableActions = STATUS_ACTIONS.filter(a =>
     a.from.includes(order.status) && (a.to !== 'awaiting_customer' || objectiveReached)
   )
@@ -498,13 +500,25 @@ export function JobDetailPage() {
               {updateStatus.isError && (
                 <ErrorAlert
                   className="mt-2"
-                  message={
-                    updateStatus.error instanceof Error && updateStatus.error.message === 'objective_not_reached'
-                      ? 'Ainda faltam vitórias contratadas para marcar como concluído.'
-                      : updateStatus.error instanceof Error ? updateStatus.error.message : 'Erro ao atualizar status'
-                  }
+                  message={(() => {
+                    const code = updateStatus.error instanceof Error ? updateStatus.error.message : null
+                    if (code === 'objective_not_reached') return 'Ainda faltam vitórias contratadas para marcar como concluído.'
+                    if (code === 'no_matches_played') return 'Sincronize ao menos 1 partida deste pedido antes de marcar como concluído.'
+                    if (code === 'clash_completion_window_closed') return 'Clash só pode ser marcado como concluído a partir das 23h.'
+                    return code ?? 'Erro ao atualizar status'
+                  })()}
                 />
               )}
+            </Card>
+          )}
+
+          {!completionGate.allowed && order.status === 'in_progress' && (
+            <Card padding="md" className="ring-1 ring-warning/20">
+              <p className="text-xs text-ink-secondary">
+                {completionGate.reason === 'clash_completion_window_closed'
+                  ? 'Disponível a partir das 23h.'
+                  : 'Sincronize ao menos 1 partida deste pedido para poder marcar como concluído.'}
+              </p>
             </Card>
           )}
 
