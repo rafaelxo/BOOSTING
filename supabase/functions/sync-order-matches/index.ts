@@ -36,7 +36,10 @@ serve(async (req) => {
     if (!auth) return errorResponse(req, 'Unauthorized', 401)
     const { user, client: userClient } = auth
 
-    const rateLimit = await consumeUserRateLimit('sync-order-matches', user.id, 20, 300)
+    // Reduzido de 20 -> 6 chamadas/5min: o sync automático (JobDetail, a
+    // cada 30 min por pedido) cobre o caso comum, então o limite aqui só
+    // precisa segurar cliques manuais repetidos, não sustentar polling.
+    const rateLimit = await consumeUserRateLimit('sync-order-matches', user.id, 6, 300)
     if (!rateLimit.allowed) return rateLimitResponse(req, rateLimit.retryAfter)
 
     const rawBody = await readJsonBody(req)
@@ -159,6 +162,9 @@ serve(async (req) => {
         p_queue_id: detail.detail.queueId,
         p_duration_seconds: detail.detail.durationSeconds,
         p_played_at: detail.detail.playedAt,
+        p_minions_killed: detail.detail.minionsKilled,
+        p_neutral_minions_killed: detail.detail.neutralMinionsKilled,
+        p_is_mvp: detail.detail.isMvp,
       })
       const result = recordResult as { success?: boolean; inserted?: boolean; error?: string } | null
       if (recordErr || !result?.success) {
