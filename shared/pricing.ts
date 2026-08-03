@@ -272,6 +272,8 @@ const VALID_COUPONS: Record<string, CouponDefinition> = Object.freeze({
 // que sai de cena.
 export const DEFAULT_COUPON_CODE = 'ELOPEAK30'
 
+export const DEFAULT_COUPON_DISCOUNT_PCT = VALID_COUPONS[DEFAULT_COUPON_CODE].discountPct
+
 // Todo serviço com preço de tabela aceita cupom. Só Coaching fica de fora --
 // preço já vem do pacote que o próprio booster cadastra, não da tabela de
 // preços do produto (nada pra descontar contra o catálogo). placement_matches

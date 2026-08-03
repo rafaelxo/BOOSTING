@@ -1,12 +1,50 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ChevronRight } from 'lucide-react'
-import { Button, Skeleton, RankBadge } from '@/components/ui'
+import { CheckCircle2, ChevronRight, PartyPopper, Tag } from 'lucide-react'
+import { Button, Modal, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney, getClashBasePrice } from '@/lib/pricing'
+import {
+  getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney, getClashBasePrice,
+  DEFAULT_COUPON_CODE, DEFAULT_COUPON_DISCOUNT_PCT,
+} from '@/lib/pricing'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_TIER_BOUNDARY_RANKS, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import type { ClashDay, ClashTier, RankTier, ServiceExtra } from '@/types'
+import type { ClashDay, ClashTier, RankTier } from '@/types'
+
+const COUPON_PROMO_SEEN_KEY = 'pricing_coupon_promo_seen'
+
+function CouponPromoModal() {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (sessionStorage.getItem(COUPON_PROMO_SEEN_KEY) === 'true') return
+    const timer = setTimeout(() => setOpen(true), 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  function dismiss() {
+    sessionStorage.setItem(COUPON_PROMO_SEEN_KEY, 'true')
+    setOpen(false)
+  }
+
+  return (
+    <Modal open={open} onOpenChange={(next) => { if (!next) dismiss() }} title="Cupom aplicado automaticamente" maxWidth="sm">
+      <div className="text-center space-y-4">
+        <div className="h-14 w-14 rounded-full bg-success/10 border border-success/25 flex items-center justify-center mx-auto">
+          <PartyPopper className="h-7 w-7 text-success" />
+        </div>
+        <p className="text-sm text-ink-secondary leading-relaxed">
+          O cupom <span className="font-bold text-ink">{DEFAULT_COUPON_CODE}</span> já está aplicado em todos os
+          preços de <span className="font-semibold text-ink">Elo Boost, Vitórias, MD5 e Clash</span> — sem precisar digitar nada.
+        </p>
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-success/10 border border-success/25 px-4 py-1.5 text-sm font-bold text-success">
+          <Tag className="h-4 w-4" /> -{DEFAULT_COUPON_DISCOUNT_PCT}% OFF
+        </div>
+        <Button className="w-full" onClick={dismiss}>Entendi</Button>
+      </div>
+    </Modal>
+  )
+}
 
 const COACHING_HIGHLIGHTS = [
   'Opções de sessão de horário predefinido',
@@ -47,62 +85,6 @@ const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emera
 
 const CLASH_TIERS: ClashTier[] = ['tier_4', 'tier_3', 'tier_2', 'tier_1']
 const CLASH_DAYS: ClashDay[] = ['saturday', 'sunday']
-
-function formatExtraPrice(extra: ServiceExtra, currency: (n: number) => string): string {
-  if (extra.price_modifier > 0) return `+${currency(extra.price_modifier)}`
-  if (extra.price_modifier_pct > 0) return `+${extra.price_modifier_pct}%`
-  return 'Grátis'
-}
-
-function AddonGroup({ title, flow, currency }: { title: string; flow: 'solo_standard' | 'duo_standard' | 'master_plus'; currency: (n: number) => string }) {
-  const { data, isLoading, isError } = useBoostAddons(flow)
-  const extras = data ?? EMPTY_ADDONS
-
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 gap-3">
-        {[1, 2].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div>
-        <h3 className="text-sm font-bold text-ink-secondary uppercase tracking-wide mb-3">{title}</h3>
-        <div className="rounded-2xl border border-danger/25 bg-danger/10 px-4 py-3 text-sm text-danger">
-          Não foi possível carregar estes extras. Tente novamente em instantes.
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <h3 className="text-sm font-bold text-ink-secondary uppercase tracking-wide mb-3">{title}</h3>
-      {extras.length === 0 ? (
-        <p className="rounded-2xl border border-bg-elevated px-4 py-3 text-sm text-ink-muted">
-          Nenhum extra ativo nesta modalidade.
-        </p>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
-          {extras.map((extra) => (
-          <div key={extra.id} className="card p-4 flex items-start gap-3">
-            <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold text-ink">{extra.name}</p>
-                <span className="text-xs font-bold text-brand">{formatExtraPrice(extra, currency)}</span>
-              </div>
-              <p className="text-xs text-ink-secondary">{extra.description}</p>
-            </div>
-          </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function ClashPricingSection({ currency }: { currency: (n: number) => string }) {
   return (
@@ -230,9 +212,6 @@ export function PricingPage() {
           <p className="text-xs text-ink-muted mt-2">Abaixo de Mestre: média menor que 20 LP/partida aplica +15%; entre 20 e 25 mantém o preço; acima de 25 aplica -5%.</p>
         </section>
 
-        {/* ── Coaching ── */}
-        <CoachingPricingSection />
-
         {/* ── Vitórias / MD5 ── */}
         <section>
           <h2 className="text-xl font-bold text-ink mb-1">Vitórias / MD5</h2>
@@ -271,16 +250,8 @@ export function PricingPage() {
         {/* ── Clash ── */}
         <ClashPricingSection currency={currency} />
 
-        {/* ── Extras ── */}
-        <section className="space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-ink mb-1">Extras Opcionais</h2>
-            <p className="text-sm text-ink-secondary">Os extras disponíveis dependem da modalidade escolhida no configurador.</p>
-          </div>
-          <AddonGroup title="Solo Boost / Wins / MD5 / Solo Clash" flow="solo_standard" currency={currency} />
-          <AddonGroup title="Duo Boost / Duo Clash" flow="duo_standard" currency={currency} />
-          <AddonGroup title="Boost Master+" flow="master_plus" currency={currency} />
-        </section>
+        {/* ── Coaching ── */}
+        <CoachingPricingSection />
 
         {/* CTA */}
         <div className="text-center">
@@ -292,6 +263,8 @@ export function PricingPage() {
         </div>
 
       </div>
+
+      <CouponPromoModal />
     </div>
   )
 }
