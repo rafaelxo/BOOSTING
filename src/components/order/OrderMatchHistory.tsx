@@ -13,6 +13,7 @@ function formatDuration(seconds: number | null): string {
 interface SyncControls {
   onSync: () => void
   syncing: boolean
+  cooldownSeconds?: number
   error?: string | null
   resultMessage?: string | null
 }
@@ -36,8 +37,15 @@ export function OrderMatchHistory({ orderId, sync }: { orderId: string; sync?: S
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-ink">Histórico de partidas</h3>
         {sync && (
-          <Button size="xs" variant="secondary" leftIcon={<RefreshCw className="h-3 w-3" />} loading={sync.syncing} onClick={sync.onSync}>
-            Sincronizar
+          <Button
+            size="xs"
+            variant="secondary"
+            leftIcon={<RefreshCw className="h-3 w-3" />}
+            loading={sync.syncing}
+            disabled={(sync.cooldownSeconds ?? 0) > 0}
+            onClick={sync.onSync}
+          >
+            {sync.cooldownSeconds ? `Aguarde ${sync.cooldownSeconds}s` : 'Sincronizar'}
           </Button>
         )}
       </div>

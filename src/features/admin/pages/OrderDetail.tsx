@@ -251,6 +251,7 @@ export function AdminOrderDetailPage() {
               sync={order.status === 'in_progress' || order.status === 'paused' ? {
                 onSync: () => syncMatches.mutate(),
                 syncing: syncMatches.isPending,
+                cooldownSeconds: syncMatches.cooldownSeconds,
                 error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
                 resultMessage: syncMatches.data
                   ? (syncMatches.data.synced
