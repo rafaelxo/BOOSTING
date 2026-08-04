@@ -107,21 +107,22 @@ describe('Tabela master_plus_pricing — 12 combinações válidas, sem preço f
 
 // A partir da migration 090 o preço do Master+ passou a depender do PAR
 // (tier atual, tier alvo) -- não mais só do tier alvo (028-078, superseded).
-// A migration 093 acrescentou fila e degrau de PDL; a 099 (atual) enxugou os
-// degraus de PDL da SoloQ e tirou os da Flex por completo. O preço EXIBIDO na
-// página pública vem do código (MASTER_PLUS_TIER_PRICE_CENTS, chaveado pelo
-// TIER ATUAL da linha exibida — "master" = custo de avançar de Mestre pra
-// Grão-Mestre, "grandmaster" = custo de avançar de Grão-Mestre pra
+// A migration 093 acrescentou fila e degrau de PDL; a 099 enxugou os degraus
+// de PDL da SoloQ e tirou os da Flex por completo; a 146 (atual) reajustou
+// todos os valores em +30%, mantendo a mesma estrutura de degraus. O preço
+// EXIBIDO na página pública vem do código (MASTER_PLUS_TIER_PRICE_CENTS,
+// chaveado pelo TIER ATUAL da linha exibida — "master" = custo de avançar de
+// Mestre pra Grão-Mestre, "grandmaster" = custo de avançar de Grão-Mestre pra
 // Challenger) enquanto o preço COBRADO vem da tabela master_plus_pricing no
 // banco (lida em StepConfigure e revalidada em orderPricing.ts), sempre no
 // PRIMEIRO degrau de PDL (menor pdl_from) da fila solo_duo -- mesma
 // referência que a página pública usa (PDL=0 de quem acabou de entrar no
 // tier atual). São duas fontes de verdade pro mesmo valor monetário: se
 // divergirem, o cliente vê um preço e é cobrado outro. Este teste amarra a
-// seed da migration 099 (estado FINAL do banco) ao constante do código.
-describe('master_plus_pricing (099) — seed do banco bate com o preço exibido na página pública', () => {
-  const migration099 = readFileSync(
-    join(__dirname, '..', 'supabase', 'migrations_archive', '099_simplify_master_plus_pricing_brackets.sql'),
+// seed da migration 146 (estado FINAL do banco) ao constante do código.
+describe('master_plus_pricing (146) — seed do banco bate com o preço exibido na página pública', () => {
+  const migration146 = readFileSync(
+    join(__dirname, '..', 'supabase', 'migrations', '146_master_plus_pricing_30pct_increase.sql'),
     'utf-8',
   )
 
@@ -145,7 +146,7 @@ describe('master_plus_pricing (099) — seed do banco bate com o preço exibido 
     return out
   }
 
-  const seeded = parseFirstBracketPrices(migration099)
+  const seeded = parseFirstBracketPrices(migration146)
 
   it('semeia o primeiro degrau (solo_duo) dos 3 pares válidos (master->grandmaster, grandmaster->challenger, master->challenger)', () => {
     expect(Object.keys(seeded).sort()).toEqual(['grandmaster->challenger', 'master->challenger', 'master->grandmaster'])

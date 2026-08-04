@@ -4,19 +4,20 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Clock, History, KeyRound, Lock, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
-  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, ChevronRight, Tag,
+  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, Tag,
 } from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, RankBadge, GuaranteeNotice } from '@/components/ui'
+import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, GuaranteeNotice } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
 import { OrderProgress } from '@/components/order/OrderProgress'
+import { OrderRankSummary } from '@/components/order/OrderRankSummary'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, formatRank, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
+import { formatDateTime, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { useCurrency } from '@/hooks/useCurrency'
 import {
@@ -558,12 +559,7 @@ export function OrderDetailPage() {
     )
   }
 
-  const currentRank = order.current_rank as { tier: Parameters<typeof RankBadge>[0]['tier']; division: Parameters<typeof RankBadge>[0]['division']; lp?: number } | null
-  const targetRank = order.target_rank as { tier: Parameters<typeof RankBadge>[0]['tier']; division: Parameters<typeof RankBadge>[0]['division'] } | null
   const isBoostFlow = order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
-  const progressLocked = !order.match_sync_started_at
-  const currentPoints = order.pdl_bracket ? order.current_pdl : currentRank?.lp
-  const pointsLabel = order.pdl_bracket ? 'PDL' : 'LP'
   const modeLabel = order.service_type === 'elo_boost'
     ? (order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost')
     : order.service_type === 'md5' ? 'MD5'
@@ -646,38 +642,7 @@ export function OrderDetailPage() {
               </div>
             )}
 
-            {currentRank && (
-              <div className="mb-4">
-                <div className="flex items-center justify-center gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <RankBadge tier={currentRank.tier} division={currentRank.division} size="lg" showLabel={false} />
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Atual</p>
-                      <p className="text-base font-bold text-ink truncate">{formatRank(currentRank.tier, currentRank.division)}</p>
-                    </div>
-                  </div>
-
-                  {order.service_type === 'elo_boost' && targetRank && (
-                    <>
-                      <div className="flex flex-col items-center gap-1 shrink-0">
-                        <ChevronRight className="h-5 w-5 text-ink-muted" />
-                        <span className={`text-sm font-bold text-brand whitespace-nowrap ${progressLocked ? 'blur-[3px] opacity-60 select-none' : ''}`} data-tabular>
-                          {currentPoints ?? '—'} {pointsLabel}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <RankBadge tier={targetRank.tier} division={targetRank.division} size="lg" showLabel={false} />
-                        <div className="min-w-0">
-                          <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Alvo</p>
-                          <p className="text-base font-bold text-ink truncate">{formatRank(targetRank.tier, targetRank.division)}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+            <OrderRankSummary order={order} />
 
             {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
               <OrderProgress order={order} hideRankBadges />
@@ -757,6 +722,9 @@ export function OrderDetailPage() {
                       : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
                     : null,
                 } : undefined}
+                pdlEstimate={order.service_type === 'elo_boost'
+                  ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+                  : null}
               />
             )}
         </div>

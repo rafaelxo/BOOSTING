@@ -259,6 +259,9 @@ export function AdminOrderDetailPage() {
                     : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
                   : null,
               } : undefined}
+              pdlEstimate={order.service_type === 'elo_boost'
+                ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+                : null}
             />
           )}
         </div>

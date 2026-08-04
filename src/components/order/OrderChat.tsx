@@ -12,6 +12,12 @@ const ROLE_LABEL: Record<UserRole, string> = {
   admin: 'Admin',
 }
 
+// Mesmo limite validado no banco (order_messages_content_length, migration
+// 007) -- char_length(btrim(content)) entre 1 e 4000. maxLength no textarea
+// já impede digitar/colar além disso; o valor só precisa existir aqui uma
+// vez pra também alimentar o contador visual abaixo da caixa.
+const MESSAGE_MAX_LENGTH = 4000
+
 // orderStatus é opcional só pra decidir a mensagem certa quando o chat está
 // travado (pedido concluído trava sozinho -- ver trigger
 // trg_lock_chat_on_order_completed, migration 085 -- e não deve soar como se
@@ -127,7 +133,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
             </div>
           )}
 
-          <div className="min-h-64 max-h-[430px] space-y-4 overflow-y-auto px-4 py-5" aria-live="polite">
+          <div className="min-h-64 max-h-[430px] space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5" aria-live="polite">
             {messages.length === 0 ? (
               <p className="py-12 text-center text-xs text-ink-muted">Nenhuma mensagem enviada.</p>
             ) : (
@@ -137,7 +143,16 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
                 return (
                   <div key={item.id} className={cn('flex items-start gap-2.5', isMe && 'flex-row-reverse')}>
                     <Avatar src={item.sender_avatar_url} name={item.sender_name} size="sm" />
-                    <div className={cn('flex max-w-[82%] flex-col', isMe ? 'items-end' : 'items-start')}>
+                    {/* min-w-0 é o que de fato permite a bolha encolher abaixo da
+                        largura "natural" do conteúdo -- sem isso, um item flex
+                        nunca fica menor que seu min-content, então uma palavra
+                        longa sem espaço (link, token) empurrava a área toda pra
+                        rolagem horizontal em vez de quebrar linha, mesmo com
+                        break-words no filho. max-w em `ch` (largura do caractere
+                        "0" na fonte atual) força a quebra de linha automática a
+                        cada ~35 caracteres, em vez de esticar até 82% do card
+                        inteiro -- bolha de chat, não parede de texto. */}
+                    <div className={cn('flex min-w-0 max-w-[35ch] flex-col', isMe ? 'items-end' : 'items-start')}>
                       <div className="mb-1 flex flex-wrap items-center gap-x-2 px-1 text-[10px] text-ink-muted">
                         <span className="font-semibold text-ink-secondary">{item.sender_name}</span>
                         <span>{ROLE_LABEL[item.sender_role]}</span>
@@ -164,30 +179,44 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
           </div>
 
           {canSend ? (
-            <div className="flex items-end gap-2 border-t border-border-subtle p-3">
-              <textarea
-                ref={textareaRef}
-                value={message}
-                onChange={handleMessageChange}
-                onKeyDown={handleKeyDown}
-                maxLength={4000}
-                rows={1}
-                placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
-                aria-label="Escrever mensagem"
-                style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
-                className="input-base min-h-11 flex-1 resize-none overflow-y-auto py-2.5 text-sm"
-                disabled={sendMessage.isPending}
-              />
-              <Button
-                size="icon-lg"
-                onClick={submitMessage}
-                loading={sendMessage.isPending}
-                disabled={!message.trim()}
-                title="Enviar mensagem"
-                aria-label="Enviar mensagem"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+            <div className="border-t border-border-subtle p-3">
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={textareaRef}
+                  value={message}
+                  onChange={handleMessageChange}
+                  onKeyDown={handleKeyDown}
+                  maxLength={MESSAGE_MAX_LENGTH}
+                  rows={1}
+                  placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
+                  aria-label="Escrever mensagem"
+                  style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
+                  className="input-base min-h-11 flex-1 max-w-[35ch] resize-none overflow-y-auto py-2.5 text-sm"
+                  disabled={sendMessage.isPending}
+                />
+                <Button
+                  size="icon-lg"
+                  onClick={submitMessage}
+                  loading={sendMessage.isPending}
+                  disabled={!message.trim()}
+                  title="Enviar mensagem"
+                  aria-label="Enviar mensagem"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+              {/* Só aparece perto do teto -- o limite (mesmo char_length(btrim(content))
+                  entre 1 e 4000 validado no banco, ver order_messages_content_length)
+                  já é aplicado silenciosamente pelo maxLength nativo; isso é só o
+                  aviso visual de que ele existe, sem poluir a caixa o tempo todo. */}
+              {message.length > MESSAGE_MAX_LENGTH * 0.9 && (
+                <p className={cn(
+                  'mt-1 text-right text-[10px]',
+                  message.length >= MESSAGE_MAX_LENGTH ? 'text-danger font-semibold' : 'text-ink-muted',
+                )}>
+                  {message.length}/{MESSAGE_MAX_LENGTH}
+                </p>
+              )}
             </div>
           ) : locked ? null : (
             <div className="border-t border-border-subtle px-4 py-3 text-center text-xs text-ink-muted">

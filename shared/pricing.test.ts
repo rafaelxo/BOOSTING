@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   computeOrderPrice, calcEloPrice, getEloDivPrice, getWinBoostPrice, getMd5WinPrice, applyLpModifier, lpModifierPct,
-  estimateEloBoostHours, moneyToCents, PLACEMENT_PRICE, applyCoupon, getClashBasePrice, CLASH_ESTIMATED_HOURS,
+  estimateEloBoostHours, moneyToCents, centsToMoney, PLACEMENT_PRICE, applyCoupon, getClashBasePrice, CLASH_ESTIMATED_HOURS,
   type OrderPriceInput, type RankTier,
 } from './pricing'
 
@@ -32,7 +32,7 @@ describe('Cálculo de addons — percentual sobre o preço base, não composto (
   it('exemplo do enunciado: base R$100, Gameplay Explicativa 30% + Acesso Prioritário 15% = R$145', () => {
     const input = baseInput({
       currentRank: { tier: 'iron', division: 'I' },
-      targetRank: { tier: 'bronze', division: 'IV' }, // 1 passo => 1x ELO_DIV_PRICE.iron = 8.50, não 100 — testamos a fórmula com um basePrice sintético abaixo
+      targetRank: { tier: 'bronze', division: 'IV' }, // 1 passo => 1x ELO_DIV_PRICE.iron = 11.05, não 100 — testamos a fórmula com um basePrice sintético abaixo
     })
     // Usamos o motor real de addons isoladamente: soma percentuais sobre um
     // basePrice conhecido, sem depender da tabela de rank por divisão.
@@ -188,7 +188,11 @@ describe('Fluxo padrão (Iron–Diamond) — Duo aplica +50% sobre o preço com 
       targetRank: { tier: 'iron', division: 'I' },
       boostMode: 'duo',
     }))
-    expect(duo.basePrice).toBeCloseTo(Math.round(solo.basePrice * 1.5 * 100) / 100, 2)
+    // Comparação em centavos inteiros (mesma técnica de arredondamento do
+    // código de produção) -- multiplicar o float solo.basePrice direto por
+    // 1.5 pode cair num "empate" de meio centavo cujo arredondamento diverge
+    // por erro de ponto flutuante, sem relação com nenhum bug de preço.
+    expect(duo.basePrice).toBeCloseTo(centsToMoney(Math.round(moneyToCents(solo.basePrice) * 1.5)), 2)
   })
 
   it('rank alvo igual ou abaixo do atual não gera preço (calcEloPrice retorna 0)', () => {
@@ -294,7 +298,7 @@ describe('Integridade monetária e entradas hostis', () => {
       currentRank: { tier: 'gold', division: 'II' },
       winsPurchased,
     }))
-    expect(priced.basePrice).toBe(winsPurchased * 3.9)
+    expect(priced.basePrice).toBe(winsPurchased * 5.07)
     expect(priced.totalPrice).toBe(priced.basePrice)
   })
 
@@ -314,7 +318,7 @@ describe('Integridade monetária e entradas hostis', () => {
       currentRank: { tier: 'gold', division: 'II' },
       winsPurchased: 5,
     }))
-    expect(validAtBoundary.basePrice).toBe(5 * 3.9)
+    expect(validAtBoundary.basePrice).toBe(5 * 5.07)
 
     const invalidAtBoundary = computeOrderPrice(baseInput({
       serviceType: 'win_boost',
@@ -331,7 +335,7 @@ describe('Integridade monetária e entradas hostis', () => {
       winsPurchased: 2,
     }))
 
-    expect(priced.basePrice).toBe(199.8)
+    expect(priced.basePrice).toBe(259.74)
   })
 
   it('calcula MD5 proporcional ao pacote de 5 partidas com Master+', () => {
@@ -341,8 +345,8 @@ describe('Integridade monetária e entradas hostis', () => {
       winsPurchased: 3,
     }))
 
-    // grandmaster: Vitória Avulsa R$59,90/vitória com 50% de desconto = R$29,95/vitória
-    expect(priced.basePrice).toBe(89.85)
+    // grandmaster: Vitória Avulsa R$77,87/vitória com 50% de desconto = R$38,94/vitória
+    expect(priced.basePrice).toBe(116.82)
   })
 
   it('recusa quantidade negativa (basePrice zerado, mesma faixa 1-5 do MD5)', () => {
@@ -362,15 +366,15 @@ describe('MD5 — preço por vitória líquida (garantia de win rate nas placeme
       currentRank: { tier: 'gold', division: null },
       winsPurchased: 3,
     }))
-    // Gold solo_duo: Vitória Avulsa R$3,90/vitória com 50% de desconto = R$1,95/vitória
-    expect(priced.basePrice).toBeCloseTo(1.95 * 3, 2)
+    // Gold solo_duo: Vitória Avulsa R$5,07/vitória com 50% de desconto = R$2,54/vitória
+    expect(priced.basePrice).toBeCloseTo(2.54 * 3, 2)
   })
 
   it('todos os 10 tiers derivam de getWinBoostPrice com 50% de desconto (solo_duo)', () => {
     const cases: [string, number][] = [
-      ['iron', 1.45], ['bronze', 1.45], ['silver', 1.95], ['gold', 1.95],
-      ['platinum', 3.45], ['emerald', 4.95], ['diamond', 7.95],
-      ['master', 22.45], ['grandmaster', 29.95], ['challenger', 49.95],
+      ['iron', 1.89], ['bronze', 1.89], ['silver', 2.54], ['gold', 2.54],
+      ['platinum', 4.49], ['emerald', 6.44], ['diamond', 10.34],
+      ['master', 29.19], ['grandmaster', 38.94], ['challenger', 64.94],
     ]
     for (const [tier, perWinPrice] of cases) {
       const priced = computeOrderPrice(baseInput({
@@ -423,12 +427,12 @@ describe('placement_matches (MD5 Completo, legado) — PLACEMENT_PRICE segue com
 
 describe('Preços por fila — Vitória Avulsa', () => {
   const soloDuo: [RankTier, number][] = [
-    ['iron', 290], ['bronze', 290], ['silver', 390], ['gold', 390], ['platinum', 690],
-    ['emerald', 990], ['diamond', 1590], ['master', 4490], ['grandmaster', 5990], ['challenger', 9990],
+    ['iron', 377], ['bronze', 377], ['silver', 507], ['gold', 507], ['platinum', 897],
+    ['emerald', 1287], ['diamond', 2067], ['master', 5837], ['grandmaster', 7787], ['challenger', 12987],
   ]
   const flex: [RankTier, number][] = [
-    ['iron', 265], ['bronze', 265], ['silver', 370], ['gold', 370], ['platinum', 650],
-    ['emerald', 940], ['diamond', 1510], ['master', 4490], ['grandmaster', 5990], ['challenger', 9990],
+    ['iron', 377], ['bronze', 377], ['silver', 507], ['gold', 507], ['platinum', 897],
+    ['emerald', 1287], ['diamond', 2067], ['master', 5253], ['grandmaster', 7008], ['challenger', 11688],
   ]
   it.each(soloDuo)('solo_duo %s = %i centavos', (tier, cents) => {
     expect(moneyToCents(getWinBoostPrice('solo_duo', tier))).toBe(cents)
@@ -440,12 +444,12 @@ describe('Preços por fila — Vitória Avulsa', () => {
 
 describe('Preços por fila — MD5 (garantia de win rate, por vitória — Vitória Avulsa com 50% de desconto)', () => {
   const soloDuo: [RankTier, number][] = [
-    ['iron', 145], ['bronze', 145], ['silver', 195], ['gold', 195], ['platinum', 345],
-    ['emerald', 495], ['diamond', 795], ['master', 2245], ['grandmaster', 2995], ['challenger', 4995],
+    ['iron', 189], ['bronze', 189], ['silver', 254], ['gold', 254], ['platinum', 449],
+    ['emerald', 644], ['diamond', 1034], ['master', 2919], ['grandmaster', 3894], ['challenger', 6494],
   ]
   const flex: [RankTier, number][] = [
-    ['iron', 133], ['bronze', 133], ['silver', 185], ['gold', 185], ['platinum', 325],
-    ['emerald', 470], ['diamond', 755], ['master', 2245], ['grandmaster', 2995], ['challenger', 4995],
+    ['iron', 189], ['bronze', 189], ['silver', 254], ['gold', 254], ['platinum', 449],
+    ['emerald', 644], ['diamond', 1034], ['master', 2627], ['grandmaster', 3504], ['challenger', 5844],
   ]
   it.each(soloDuo)('solo_duo %s = %i centavos', (tier, cents) => {
     expect(moneyToCents(getMd5WinPrice('solo_duo', tier))).toBe(cents)
@@ -458,13 +462,13 @@ describe('Preços por fila — MD5 (garantia de win rate, por vitória — Vitó
 describe('Preços por fila — Elo Boost (por divisão)', () => {
   // Iron..Diamond entry price per division, in cents.
   const soloDuo: [RankTier, number][] = [
-    ['iron', 850], ['bronze', 990], ['silver', 1350], ['gold', 1690],
-    ['platinum', 2390], ['emerald', 4690], ['diamond', 7490],
+    ['iron', 1105], ['bronze', 1287], ['silver', 1755], ['gold', 2197],
+    ['platinum', 3107], ['emerald', 6097], ['diamond', 9737],
   ]
   // Flex deixou de ter desconto sobre solo_duo -- mesmos valores das duas filas.
   const flex: [RankTier, number][] = [
-    ['iron', 850], ['bronze', 990], ['silver', 1350], ['gold', 1690],
-    ['platinum', 2390], ['emerald', 4690], ['diamond', 7490],
+    ['iron', 1105], ['bronze', 1287], ['silver', 1755], ['gold', 2197],
+    ['platinum', 3107], ['emerald', 6097], ['diamond', 9737],
   ]
   it.each(soloDuo)('solo_duo %s = %i centavos/divisão', (tier, cents) => {
     expect(moneyToCents(getEloDivPrice('solo_duo', tier))).toBe(cents)
@@ -693,14 +697,14 @@ describe('Cupom de desconto (applyCoupon) — só ELOPEAK30, 30%, todo serviço 
 
 describe('Clash — preço fixo por modalidade × tier (seção 3 da spec)', () => {
   it.each([
-    ['solo', 'tier_4', 20.00],
-    ['solo', 'tier_3', 33.90],
-    ['solo', 'tier_2', 39.90],
-    ['solo', 'tier_1', 65.00],
-    ['duo', 'tier_4', 59.90],
-    ['duo', 'tier_3', 66.90],
-    ['duo', 'tier_2', 100.00],
-    ['duo', 'tier_1', 165.90],
+    ['solo', 'tier_4', 26.00],
+    ['solo', 'tier_3', 44.07],
+    ['solo', 'tier_2', 51.87],
+    ['solo', 'tier_1', 84.50],
+    ['duo', 'tier_4', 77.87],
+    ['duo', 'tier_3', 86.97],
+    ['duo', 'tier_2', 130.00],
+    ['duo', 'tier_1', 215.67],
   ] as const)('%s + %s = R$ %d', (mode, tier, expected) => {
     const priced = computeOrderPrice(baseInput({ serviceType: 'clash', boostMode: mode, clashTier: tier }))
     expect(priced.basePrice).toBeCloseTo(expected, 2)
@@ -708,8 +712,8 @@ describe('Clash — preço fixo por modalidade × tier (seção 3 da spec)', () 
   })
 
   it('getClashBasePrice bate com a tabela de centavos', () => {
-    expect(moneyToCents(getClashBasePrice('solo', 'tier_1'))).toBe(6500)
-    expect(moneyToCents(getClashBasePrice('duo', 'tier_2'))).toBe(10000)
+    expect(moneyToCents(getClashBasePrice('solo', 'tier_1'))).toBe(8450)
+    expect(moneyToCents(getClashBasePrice('duo', 'tier_2'))).toBe(13000)
   })
 
   it('sem clashTier selecionado, preço fica 0 (pedido não avança)', () => {

@@ -2,16 +2,18 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingBag, Users, DollarSign,
   Shield,
-  RefreshCw, AlertTriangle, Landmark, Banknote,
+  RefreshCw, AlertTriangle, Landmark, Banknote, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LogoMark } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
+import { useSidebarCollapse } from '@/hooks/useSidebarCollapse'
 
 export function AdminLayout() {
   const { pathname } = useLocation()
   const { t } = useTranslation()
+  const { collapsed, toggle } = useSidebarCollapse('admin')
 
   const NAV_SECTIONS = [
     {
@@ -40,25 +42,32 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen flex">
       {/* ── Sidebar ────────────────────────────────────────────────── */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
+      <aside className={cn(
+        'hidden lg:flex flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0 transition-all duration-200',
+        collapsed ? 'w-[76px]' : 'w-64',
+      )}>
         {/* Logo */}
-        <div className="h-[68px] flex items-center px-6 border-b border-bg-elevated gap-3 shrink-0">
-          <Link to="/" className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className={cn('h-[68px] flex items-center border-b border-bg-elevated gap-3 shrink-0', collapsed ? 'justify-center px-0' : 'px-6')}>
+          <Link to="/" className="flex items-center gap-2.5 min-w-0">
             <LogoMark className="h-8 w-8 shrink-0" />
-            <span className="font-bold text-ink truncate">
-              Elo<span className="text-brand">Peak</span>
-            </span>
+            {!collapsed && (
+              <span className="font-bold text-ink truncate">
+                Elo<span className="text-brand">Peak</span>
+              </span>
+            )}
           </Link>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-danger/15 text-danger border border-danger/25 shrink-0 uppercase tracking-wide">
-            {t('admin.nav.role')}
-          </span>
+          {!collapsed && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-danger/15 text-danger border border-danger/25 shrink-0 uppercase tracking-wide">
+              {t('admin.nav.role')}
+            </span>
+          )}
         </div>
 
         {/* Nav sections */}
-        <nav className="flex-1 px-4 py-5 space-y-6 overflow-y-auto">
+        <nav className="flex-1 px-3 py-5 space-y-6 overflow-y-auto">
           {NAV_SECTIONS.map(({ label, items }) => (
             <div key={label}>
-              <p className="section-label px-3 mb-2">{label}</p>
+              {!collapsed && <p className="section-label px-3 mb-2">{label}</p>}
               <div className="space-y-0.5">
                 {items.map(({ href, icon: Icon, label: itemLabel }) => {
                   const active = isActive(href)
@@ -66,15 +75,17 @@ export function AdminLayout() {
                     <Link
                       key={href}
                       to={href}
+                      title={collapsed ? itemLabel : undefined}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                        'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                        collapsed ? 'justify-center px-2' : 'px-3',
                         active
                           ? 'bg-brand/15 text-brand border border-brand/20'
                           : 'text-ink-secondary hover:text-ink hover:bg-bg-elevated border border-transparent'
                       )}
                     >
                       <Icon className="h-[18px] w-[18px] shrink-0" />
-                      {itemLabel}
+                      {!collapsed && <span className="truncate">{itemLabel}</span>}
                     </Link>
                   )
                 })}
@@ -82,6 +93,22 @@ export function AdminLayout() {
             </div>
           ))}
         </nav>
+
+        <div className="p-3 border-t border-bg-elevated shrink-0">
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            className="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors"
+          >
+            {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" /> : (
+              <>
+                <PanelLeftClose className="h-[18px] w-[18px] shrink-0" />
+                <span className="text-xs font-medium">Recolher</span>
+              </>
+            )}
+          </button>
+        </div>
       </aside>
 
       {/* ── Main area ──────────────────────────────────────────────── */}
@@ -109,9 +136,11 @@ export function AdminLayout() {
           </div>
         </nav>
 
-        {/* Largura padronizada — mesma régua do painel de cliente e booster. */}
-        <main className="flex-1 overflow-auto p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto w-full">
+        {/* Largura padronizada — mesma régua do painel de cliente e booster.
+            Com a sidebar recolhida, o teto cresce junto pra aproveitar o
+            espaço liberado em vez de deixar como margem em branco. */}
+        <main className="flex-1 overflow-auto p-6 lg:p-9">
+          <div className={cn('mx-auto w-full transition-all duration-200', collapsed ? 'max-w-[1600px]' : 'max-w-7xl')}>
             <Outlet />
           </div>
         </main>

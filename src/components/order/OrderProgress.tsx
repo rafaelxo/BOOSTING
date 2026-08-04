@@ -5,6 +5,7 @@ import { listOrderRankVerifications } from '@/api/orders'
 import { queryKeys } from '@/api/core/queryKeys'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn } from '@/lib/utils'
+import { rankStep } from '@/lib/pricing'
 import type { Order, RankTier, Division } from '@/types'
 
 function ProgressBar({ percent, tone = 'brand', locked = false }: { percent: number; tone?: 'brand' | 'success'; locked?: boolean }) {
@@ -96,6 +97,18 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
     : initial
   const done = latest?.passed === true
 
+  // Progresso RELATIVO a este pedido (0% = rank em que ele começou, 100% =
+  // rank alvo) -- nunca a posição absoluta na escada inteira. Sem isso, um
+  // pedido que já começa em Platina nasceria com a barra ~60% cheia mesmo
+  // sem nenhuma partida jogada ainda (o antigo comportamento). "Só carrega
+  // se realmente tiver jogado": enquanto não há verificação registrada,
+  // current === initial, então o span percorrido é sempre 0.
+  const startStep = rankStep(initial.tier, initial.division)
+  const targetStep = rankStep(target.tier, target.division)
+  const currentStep = rankStep(current.tier, current.division)
+  const span = targetStep - startStep
+  const relativePct = locked ? 0 : span > 0 ? Math.max(0, Math.min(100, ((currentStep - startStep) / span) * 100)) : 0
+
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
       {done && (
@@ -114,6 +127,7 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
         liveCutoffLp={locked ? null : liveCutoffLp}
         locked={locked}
         showBadges={!hideRankBadges}
+        fillPercentOverride={relativePct}
       />
       <p className="text-xs text-ink-muted mt-3">
         {locked

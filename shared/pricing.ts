@@ -69,25 +69,25 @@ export type QueueType = 'solo_duo' | 'flex'
 // que cria essa tabela).
 const ELO_DIV_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
   solo_duo: {
-    iron: 850, bronze: 990, silver: 1350, gold: 1690,
-    platinum: 2390, emerald: 4690, diamond: 7490,
+    iron: 1105, bronze: 1287, silver: 1755, gold: 2197,
+    platinum: 3107, emerald: 6097, diamond: 9737,
   },
   flex: {
-    iron: 850, bronze: 990, silver: 1350, gold: 1690,
-    platinum: 2390, emerald: 4690, diamond: 7490,
+    iron: 1105, bronze: 1287, silver: 1755, gold: 2197,
+    platinum: 3107, emerald: 6097, diamond: 9737,
   },
 }
 
 // Tabela usada só pela página pública de preços (sem seleção de fila) —
 // reflete a fila solo_duo, a padrão exibida antes do configurador.
 export const ELO_TIERS: { tier: RankTier; perDiv: number }[] = [
-  { tier: 'iron',     perDiv: 8.50  },
-  { tier: 'bronze',   perDiv: 9.90  },
-  { tier: 'silver',   perDiv: 13.50 },
-  { tier: 'gold',     perDiv: 16.90 },
-  { tier: 'platinum', perDiv: 23.90 },
-  { tier: 'emerald',  perDiv: 46.90 },
-  { tier: 'diamond',  perDiv: 74.90 },
+  { tier: 'iron',     perDiv: 11.05 },
+  { tier: 'bronze',   perDiv: 12.87 },
+  { tier: 'silver',   perDiv: 17.55 },
+  { tier: 'gold',     perDiv: 21.97 },
+  { tier: 'platinum', perDiv: 31.07 },
+  { tier: 'emerald',  perDiv: 60.97 },
+  { tier: 'diamond',  perDiv: 97.37 },
 ]
 
 const TIER_NAMES = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
@@ -125,12 +125,12 @@ export function calcEloPrice(
 // ── Vitória Avulsa (Win Boost) — preço por vitória, em CENTAVOS ─────────────
 const WIN_PRICE_CENTS: Record<QueueType, Record<string, number>> = {
   solo_duo: {
-    iron: 290, bronze: 290, silver: 390, gold: 390, platinum: 690,
-    emerald: 990, diamond: 1590, master: 4490, grandmaster: 5990, challenger: 9990,
+    iron: 377, bronze: 377, silver: 507, gold: 507, platinum: 897,
+    emerald: 1287, diamond: 2067, master: 5837, grandmaster: 7787, challenger: 12987,
   },
   flex: {
-    iron: 265, bronze: 265, silver: 370, gold: 370, platinum: 650,
-    emerald: 940, diamond: 1510, master: 4490, grandmaster: 5990, challenger: 9990,
+    iron: 377, bronze: 377, silver: 507, gold: 507, platinum: 897,
+    emerald: 1287, diamond: 2067, master: 5253, grandmaster: 7008, challenger: 11688,
   },
 }
 
@@ -334,8 +334,8 @@ export type ClashDay = 'saturday' | 'sunday'
 // tier correspondente ao elo atual da conta (ver shared/clashDomain.ts para
 // o mapeamento tier -> faixa de RankTier).
 export const CLASH_PRICE_CENTS: Record<'solo' | 'duo', Record<ClashTier, number>> = {
-  solo: { tier_4: 2000, tier_3: 3390, tier_2: 3990, tier_1: 6500 },
-  duo: { tier_4: 5990, tier_3: 6690, tier_2: 10000, tier_1: 16590 },
+  solo: { tier_4: 2600, tier_3: 4407, tier_2: 5187, tier_1: 8450 },
+  duo: { tier_4: 7787, tier_3: 8697, tier_2: 13000, tier_1: 21567 },
 }
 
 export function getClashBasePrice(mode: 'solo' | 'duo', tier: ClashTier): number {
@@ -364,16 +364,16 @@ export const PLACEMENT_PRICE: Record<string, number> = {
 // PDL (0 do tier atual) daquela progressão — mesmo significado usado pelas
 // linhas de Iron–Diamond (preço "tier completo" partindo daquele tier), não
 // um custo acumulado desde Mestre:
-//   master      -> avançar de Mestre para Grão-Mestre     (R$   899,90)
-//   grandmaster -> avançar de Grão-Mestre para Challenger (R$ 1.249,90)
+//   master      -> avançar de Mestre para Grão-Mestre     (R$ 1.169,87)
+//   grandmaster -> avançar de Grão-Mestre para Challenger (R$ 1.624,87)
 //   challenger  -> Mestre->Challenger direto (pula Grão-Mestre), soma dos
 //                  dois primeiros degraus acima — único caso sem "tier
 //                  atual == linha", mantido só como referência (não é
-//                  exibido na página pública hoje)                (R$ 2.149,80)
+//                  exibido na página pública hoje)                (R$ 2.794,74)
 export const MASTER_PLUS_TIER_PRICE_CENTS: Record<'master' | 'grandmaster' | 'challenger', number> = {
-  master: 89990,
-  grandmaster: 124990,
-  challenger: 214980,
+  master: 116987,
+  grandmaster: 162487,
+  challenger: 279474,
 } as const
 
 // ── Duo Boost — percentual sobre o elo boost ──────────────────────────────────

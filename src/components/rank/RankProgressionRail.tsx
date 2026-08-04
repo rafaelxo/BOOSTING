@@ -25,6 +25,13 @@ export interface RankProgressionRailProps {
   /** Oculta os badges quando o consumidor renderiza o mesmo resumo de ranks
    * em um bloco próprio logo abaixo da barra. */
   showBadges?: boolean
+  /** Preenchimento em % relativo ao PROGRESSO DESTE PEDIDO (0 = rank em que
+   * o pedido começou, 100 = rank alvo), em vez da posição absoluta na
+   * escada inteira (rankStep/MAX_STEP). Sem isso, um pedido que começa em
+   * Platina já nasceria com a barra ~60% cheia mesmo sem nenhuma partida
+   * jogada. Quando informado, o marcador de meta some (a barra inteira já
+   * representa 0→alvo, um marcador no fim seria redundante). */
+  fillPercentOverride?: number | null
 }
 
 // Componente-assinatura do produto: a "trilha de ascensão" -- usada no hero
@@ -33,10 +40,14 @@ export interface RankProgressionRailProps {
 // preenchimento é sempre derivada do rank real (rankStep), nunca estética.
 export function RankProgressionRail({
   currentTier, currentDivision, currentLp, targetTier, targetDivision, liveCutoffLp,
-  size = 'full', className, locked = false, showBar = true, showBadges = true,
+  size = 'full', className, locked = false, showBar = true, showBadges = true, fillPercentOverride = null,
 }: RankProgressionRailProps) {
-  const currentPct = Math.min(100, (rankStep(currentTier, currentDivision) / MAX_STEP) * 100)
-  const targetPct = targetTier != null
+  const currentPct = fillPercentOverride != null
+    ? Math.max(0, Math.min(100, fillPercentOverride))
+    : Math.min(100, (rankStep(currentTier, currentDivision) / MAX_STEP) * 100)
+  const targetPct = fillPercentOverride != null
+    ? null
+    : targetTier != null
     ? Math.min(100, (rankStep(targetTier, targetDivision ?? null) / MAX_STEP) * 100)
     : null
 

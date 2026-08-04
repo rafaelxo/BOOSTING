@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AUTO_SYNC_INTERVAL_MS, shouldAutoSync } from '@/lib/matchSync'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Play, CheckCircle2, AlertTriangle, Lock, ShieldCheck, KeyRound, Copy, Landmark, RefreshCcw,
+  ArrowLeft, Play, CheckCircle2, AlertTriangle, Lock, ShieldCheck, KeyRound, Copy, Check, Landmark, RefreshCcw,
   Gamepad2, Users, Shuffle, TrendingUp, Trophy, Wallet, Hash,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
@@ -12,6 +12,7 @@ import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
 import { OrderProgress } from '@/components/order/OrderProgress'
+import { OrderRankSummary } from '@/components/order/OrderRankSummary'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { useAuthStore } from '@/stores/authStore'
@@ -190,12 +191,15 @@ export function JobDetailPage() {
   const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null)
   const [tokenSecondsLeft, setTokenSecondsLeft] = useState(0)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [nickCopied, setNickCopied] = useState(false)
   const { t } = useTranslation()
   const currency = useCurrency()
 
+  // "Concluir" (in_progress -> awaiting_customer) saiu daqui -- agora é um
+  // botão dedicado no rodapé do card de Detalhes, ao lado de "Verificar
+  // Rank e Concluir" (ver mais abaixo). Só resta a transição de início.
   const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
     { from: ['assigned'], to: 'in_progress', label: t('booster.job.startOrder'), icon: Play, variant: 'primary' },
-    { from: ['in_progress'], to: 'awaiting_customer', label: t('booster.job.markComplete'), icon: CheckCircle2, variant: 'success' as const },
   ]
 
   const { data: isTop3 } = useOwnBoosterTop3Status(profile?.id)
@@ -269,6 +273,13 @@ export function JobDetailPage() {
     setTimeout(() => setTokenCopied(false), 1500)
   }
 
+  async function copyNickname() {
+    if (!order?.riot_id) return
+    await navigator.clipboard.writeText(order.riot_id)
+    setNickCopied(true)
+    setTimeout(() => setNickCopied(false), 1500)
+  }
+
   if (loadingOrder) return <PageLoader />
 
   if (orderError) {
@@ -284,10 +295,15 @@ export function JobDetailPage() {
 
   const completionGate = canMarkOrderComplete(order, new Date())
   const objectiveReached = completionGate.allowed
-  const availableActions = STATUS_ACTIONS.filter(a =>
-    a.from.includes(order.status) && (a.to !== 'awaiting_customer' || objectiveReached)
-  )
-  const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
+  const availableActions = STATUS_ACTIONS.filter(a => a.from.includes(order.status))
+  // "Toda hora" (qualquer status ativo), não só 'in_progress' -- mesma janela
+  // de status droppable já usada no lado do cliente (CUSTOMER_DROPPABLE_STATUSES).
+  const dropVisible = ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && !pendingDrop
+  const verifyVisible = ['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && !!order.target_rank && !!order.riot_id
+  const completeVisible = order.status === 'in_progress' && objectiveReached
+  const completeBlockedInfo = order.status === 'in_progress' && !objectiveReached
+  const showDetailsFooter = dropVisible || verifyVisible || completeVisible || completeBlockedInfo
+  const nicknameVisible = !!order.riot_id && (order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5')
 
   return (
     <div className="space-y-6">
@@ -309,7 +325,6 @@ export function JobDetailPage() {
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Card padding="md">
-            <OrderProgress order={order} />
             <h3 className="text-sm font-semibold text-ink mb-4">{t('booster.job.details')}</h3>
 
             {order.service_type === 'coaching' && coachPackage && (
@@ -336,9 +351,17 @@ export function JobDetailPage() {
                   <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
                   {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
                   {order.riot_id && (
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1.5">
                       <Hash className="h-3 w-3 shrink-0" />
                       Riot ID: <span className="font-semibold text-ink">{order.riot_id}</span>
+                      <button
+                        type="button"
+                        onClick={() => void copyNickname()}
+                        aria-label="Copiar Riot ID"
+                        className="text-ink-muted hover:text-brand transition-colors"
+                      >
+                        {nickCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      </button>
                     </span>
                   )}
                 </div>
@@ -349,6 +372,15 @@ export function JobDetailPage() {
               </div>
             )}
 
+            <OrderRankSummary order={order} />
+            {order.pdl_bracket && (
+              <p className="text-xs text-ink-muted flex items-center justify-center gap-1 -mt-2 mb-4">
+                <TrendingUp className="h-3 w-3 shrink-0" />
+                Méd. Ganho/Perda: <span className="font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</span>
+              </p>
+            )}
+            <OrderProgress order={order} hideRankBadges />
+
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div><p className="text-xs text-ink-muted flex items-center gap-1"><Gamepad2 className="h-3 w-3 shrink-0" />Serviço</p><p className="text-sm font-semibold text-ink">{getServiceLabel(order.service_type)}</p></div>
               <div><p className="text-xs text-ink-muted flex items-center gap-1"><Shuffle className="h-3 w-3 shrink-0" />Tipo</p><p className="text-sm font-semibold text-ink">{getOrderModeType(order)}</p></div>
@@ -358,31 +390,23 @@ export function JobDetailPage() {
               {(order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null && (
                 <div><p className="text-xs text-ink-muted flex items-center gap-1"><Trophy className="h-3 w-3 shrink-0" />Vitórias Compradas</p><p className="text-sm font-semibold text-ink">{order.wins_purchased}</p></div>
               )}
-              {order.pdl_bracket && (
-                <>
-                  <div><p className="text-xs text-ink-muted flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" />PDL Atual</p><p className="text-sm font-semibold text-ink">{order.current_pdl ?? '—'} PDL</p></div>
-                  <div><p className="text-xs text-ink-muted flex items-center gap-1"><TrendingUp className="h-3 w-3 shrink-0" />Méd. Ganho/Perda</p><p className="text-sm font-semibold text-ink">+{order.avg_pdl_gain ?? '—'} / −{order.avg_pdl_loss ?? '—'} PDL</p></div>
-                </>
-              )}
-              {!hasRankRail && order.current_rank && (
-                <div>
-                  <p className="text-xs text-ink-muted mb-1">{t('booster.job.from')}</p>
-                  <div className="flex items-center gap-2">
-                    <RankBadge tier={(order.current_rank as { tier: RankTier }).tier} division={(order.current_rank as { division: Division }).division} size="sm" showLabel={false} />
-                    <span className="text-sm font-semibold text-ink">{formatRank((order.current_rank as { tier: RankTier }).tier, (order.current_rank as { division: Division }).division)}</span>
-                  </div>
-                </div>
-              )}
-              {!hasRankRail && order.target_rank && (
-                <div>
-                  <p className="text-xs text-ink-muted mb-1">{t('booster.job.to')}</p>
-                  <div className="flex items-center gap-2">
-                    <RankBadge tier={(order.target_rank as { tier: RankTier }).tier} division={(order.target_rank as { division: Division }).division} size="sm" showLabel={false} />
-                    <span className="text-sm font-semibold text-ink">{formatRank((order.target_rank as { tier: RankTier }).tier, (order.target_rank as { division: Division }).division)}</span>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {nicknameVisible && (
+              <div className="flex items-center justify-between gap-3 bg-bg-elevated rounded-xl px-3 py-2.5 mb-4">
+                <div className="min-w-0">
+                  <p className="text-xs text-ink-muted flex items-center gap-1"><Hash className="h-3 w-3 shrink-0" />Nickname do cliente</p>
+                  <p className="text-sm font-semibold text-ink truncate">{order.riot_id}</p>
+                </div>
+                <Button
+                  size="xs" variant={nickCopied ? 'success' : 'secondary'}
+                  leftIcon={nickCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  onClick={() => void copyNickname()}
+                >
+                  {nickCopied ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+            )}
             {order.extras?.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-ink-muted mb-1.5">Extras</p>
@@ -409,6 +433,70 @@ export function JobDetailPage() {
                 <p className="text-lg font-bold text-success" data-tabular>{currency(order.total_price * boosterEarningsShare(isTop3))}</p>
               </div>
             </div>
+
+            {/* Ações do booster -- Drop à esquerda, Verificar/Concluir à
+                direita, no rodapé do próprio card de Detalhes (sincronizar
+                partidas mora no card de Histórico de partidas, não aqui). */}
+            {showDetailsFooter && (
+              <div className="mt-4 pt-4 border-t border-border-subtle">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    {dropVisible && (
+                      <Button variant="danger-ghost" size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDropModal(true)}>
+                        Solicitar Drop
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {verifyVisible && (
+                      <Button variant="secondary" size="sm" leftIcon={<ShieldCheck className="h-4 w-4" />} loading={verifyRank.isPending} onClick={() => verifyRank.mutate()}>
+                        Verificar Resultado
+                      </Button>
+                    )}
+                    {completeVisible && (
+                      <Button variant="success" size="sm" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={updateStatus.isPending} onClick={() => updateStatus.mutate('awaiting_customer')}>
+                        Concluir
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {verifyRank.isError && (
+                  <ErrorAlert message={verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'} className="mt-3" />
+                )}
+                {verifyRank.data && !verifyRank.data.passed && (
+                  <div className="text-xs text-warning mt-3 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                    {verifyRank.data.reason === 'account_not_found' && 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.'}
+                    {verifyRank.data.reason === 'unranked' && 'A conta ainda não tem partidas ranqueadas solo/duo nesta temporada.'}
+                    {verifyRank.data.reason === 'target_not_reached' && verifyRank.data.fetched_tier && (
+                      <>
+                        Rank atual verificado: <strong>{formatRank(verifyRank.data.fetched_tier as RankTier, verifyRank.data.fetched_division ?? null)}</strong> —
+                        alvo: <strong>{formatRank(verifyRank.data.target_tier as RankTier, verifyRank.data.target_division ?? null)}</strong>. Ainda não bateu.
+                      </>
+                    )}
+                  </div>
+                )}
+                {updateStatus.isError && (
+                  <ErrorAlert
+                    className="mt-3"
+                    message={(() => {
+                      const code = updateStatus.error instanceof Error ? updateStatus.error.message : null
+                      if (code === 'objective_not_reached') return 'Ainda faltam vitórias contratadas para marcar como concluído.'
+                      if (code === 'no_matches_played') return 'Sincronize ao menos 1 partida deste pedido antes de marcar como concluído.'
+                      if (code === 'clash_completion_window_closed') return 'Clash só pode ser marcado como concluído a partir das 23h.'
+                      return code ?? 'Erro ao atualizar status'
+                    })()}
+                  />
+                )}
+                {completeBlockedInfo && (
+                  <p className="text-xs text-ink-muted mt-3">
+                    {completionGate.reason === 'clash_completion_window_closed'
+                      ? 'Disponível a partir das 23h.'
+                      : 'Sincronize ao menos 1 partida deste pedido para poder marcar como concluído.'}
+                  </p>
+                )}
+              </div>
+            )}
           </Card>
 
           {order.service_type === 'coaching'
@@ -429,6 +517,9 @@ export function JobDetailPage() {
                       : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
                     : null,
                 } : undefined}
+                pdlEstimate={order.service_type === 'elo_boost'
+                  ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+                  : null}
               />
             )}
         </div>
@@ -457,36 +548,6 @@ export function JobDetailPage() {
             <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
           )}
 
-          {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && order.target_rank && order.riot_id && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-brand" />
-                Verificação de Rank
-              </h3>
-              <p className="text-xs text-ink-secondary mb-3">
-                Confirma automaticamente, via Riot Games, se a conta já atingiu o rank alvo. Se sim, o pedido é concluído.
-              </p>
-              <Button className="w-full" variant="success" leftIcon={<ShieldCheck className="h-4 w-4" />} loading={verifyRank.isPending} onClick={() => verifyRank.mutate()}>
-                Verificar Rank e Concluir
-              </Button>
-              {verifyRank.isError && (
-                <ErrorAlert message={verifyRank.error instanceof Error ? verifyRank.error.message : 'Erro ao verificar rank'} className="mt-2" />
-              )}
-              {verifyRank.data && !verifyRank.data.passed && (
-                <div className="text-xs text-warning mt-2 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
-                  {verifyRank.data.reason === 'account_not_found' && 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.'}
-                  {verifyRank.data.reason === 'unranked' && 'A conta ainda não tem partidas ranqueadas solo/duo nesta temporada.'}
-                  {verifyRank.data.reason === 'target_not_reached' && verifyRank.data.fetched_tier && (
-                    <>
-                      Rank atual verificado: <strong>{formatRank(verifyRank.data.fetched_tier as RankTier, verifyRank.data.fetched_division ?? null)}</strong> —
-                      alvo: <strong>{formatRank(verifyRank.data.target_tier as RankTier, verifyRank.data.target_division ?? null)}</strong>. Ainda não bateu.
-                    </>
-                  )}
-                </div>
-              )}
-            </Card>
-          )}
-
           {availableActions.length > 0 && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
@@ -500,32 +561,10 @@ export function JobDetailPage() {
               {updateStatus.isError && (
                 <ErrorAlert
                   className="mt-2"
-                  message={(() => {
-                    const code = updateStatus.error instanceof Error ? updateStatus.error.message : null
-                    if (code === 'objective_not_reached') return 'Ainda faltam vitórias contratadas para marcar como concluído.'
-                    if (code === 'no_matches_played') return 'Sincronize ao menos 1 partida deste pedido antes de marcar como concluído.'
-                    if (code === 'clash_completion_window_closed') return 'Clash só pode ser marcado como concluído a partir das 23h.'
-                    return code ?? 'Erro ao atualizar status'
-                  })()}
+                  message={updateStatus.error instanceof Error ? updateStatus.error.message : 'Erro ao atualizar status'}
                 />
               )}
             </Card>
-          )}
-
-          {!completionGate.allowed && order.status === 'in_progress' && (
-            <Card padding="md" className="ring-1 ring-warning/20">
-              <p className="text-xs text-ink-secondary">
-                {completionGate.reason === 'clash_completion_window_closed'
-                  ? 'Disponível a partir das 23h.'
-                  : 'Sincronize ao menos 1 partida deste pedido para poder marcar como concluído.'}
-              </p>
-            </Card>
-          )}
-
-          {order.status === 'in_progress' && !pendingDrop && (
-            <Button variant="danger-ghost" className="w-full" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDropModal(true)}>
-              Solicitar Drop
-            </Button>
           )}
 
           {(order.status === 'drop_requested' || pendingDrop) && (

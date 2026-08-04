@@ -5,7 +5,7 @@ import { Button, Modal, RankBadge } from '@/components/ui'
 import { RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
 import {
   getWinBoostPrice, getMd5WinPrice, ELO_TIERS, MASTER_PLUS_TIER_PRICE_CENTS, centsToMoney, getClashBasePrice,
-  DEFAULT_COUPON_CODE, DEFAULT_COUPON_DISCOUNT_PCT,
+  DEFAULT_COUPON_CODE, DEFAULT_COUPON_DISCOUNT_PCT, applyCoupon, type ServiceType,
 } from '@/lib/pricing'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_TIER_BOUNDARY_RANKS, CLASH_DAY_LABEL } from '@/lib/clashDomain'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -13,7 +13,42 @@ import type { ClashDay, ClashTier, RankTier } from '@/types'
 
 const COUPON_PROMO_SEEN_KEY = 'pricing_coupon_promo_seen'
 
-function CouponPromoModal() {
+// Mesmo desconto fixo aplicado no checkout (applyCoupon/DEFAULT_COUPON_CODE)
+// -- aqui só recalculamos o preço final pra exibir na aba Preços, nunca
+// inventamos um percentual próprio da página.
+function discountedPrice(price: number, serviceType: ServiceType): number {
+  const { discountPrice } = applyCoupon(price, DEFAULT_COUPON_CODE, serviceType)
+  return price - discountPrice
+}
+
+// Preço "antes" riscado + preço "depois" (com o cupom automático) em
+// destaque -- mesmo padrão visual do resumo do pedido (ver OrderBuilder.tsx,
+// bloco de Total com line-through). Só troca de visual depois que o cliente
+// fecha o popup do cupom (discountRevealed) -- antes disso mostra o preço
+// de tabela puro, sem risco.
+function PriceWithDiscount({
+  price, serviceType, discountRevealed, currency, sizeClassName, align = 'right',
+}: {
+  price: number
+  serviceType: ServiceType
+  discountRevealed: boolean
+  currency: (n: number) => string
+  sizeClassName: string
+  align?: 'right' | 'center'
+}) {
+  if (!discountRevealed) {
+    return <span className={`${sizeClassName} text-ink`}>{currency(price)}</span>
+  }
+  const final = discountedPrice(price, serviceType)
+  return (
+    <span className={`inline-flex flex-col ${align === 'center' ? 'items-center' : 'items-end'} gap-0.5 animate-fade-in`}>
+      <span className="text-[10px] leading-none text-ink-muted line-through font-normal">{currency(price)}</span>
+      <span className={`${sizeClassName} text-ink`}>{currency(final)}</span>
+    </span>
+  )
+}
+
+function CouponPromoModal({ onDismiss }: { onDismiss: () => void }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -25,6 +60,7 @@ function CouponPromoModal() {
   function dismiss() {
     sessionStorage.setItem(COUPON_PROMO_SEEN_KEY, 'true')
     setOpen(false)
+    onDismiss()
   }
 
   return (
@@ -86,7 +122,7 @@ const MD5_TIERS: RankTier[] = ['iron','bronze','silver','gold','platinum','emera
 const CLASH_TIERS: ClashTier[] = ['tier_4', 'tier_3', 'tier_2', 'tier_1']
 const CLASH_DAYS: ClashDay[] = ['saturday', 'sunday']
 
-function ClashPricingSection({ currency }: { currency: (n: number) => string }) {
+function ClashPricingSection({ currency, discountRevealed }: { currency: (n: number) => string; discountRevealed: boolean }) {
   return (
     <section>
       <h2 className="text-xl font-bold text-ink mb-1">Clash</h2>
@@ -107,7 +143,6 @@ function ClashPricingSection({ currency }: { currency: (n: number) => string }) 
               const { low, high } = CLASH_TIER_BOUNDARY_RANKS[tier]
               const soloPrice = getClashBasePrice('solo', tier)
               const duoPrice = getClashBasePrice('duo', tier)
-              const duoIncreasePct = Math.round(((duoPrice - soloPrice) / soloPrice) * 100)
               return (
                 <tr key={tier} className="hover:bg-bg-elevated/40 transition-colors">
                   <td className="py-3 px-5">
@@ -122,10 +157,17 @@ function ClashPricingSection({ currency }: { currency: (n: number) => string }) 
                       </div>
                     </div>
                   </td>
-                  <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(soloPrice)}</td>
                   <td className="py-3.5 px-5 text-right">
-                    <span className="text-ink font-semibold">{currency(duoPrice)}</span>
-                    <span className="block text-[10px] text-brand font-normal">+{duoIncreasePct}%</span>
+                    <PriceWithDiscount
+                      price={soloPrice} serviceType="clash" discountRevealed={discountRevealed}
+                      currency={currency} sizeClassName="font-semibold"
+                    />
+                  </td>
+                  <td className="py-3.5 px-5 text-right">
+                    <PriceWithDiscount
+                      price={duoPrice} serviceType="clash" discountRevealed={discountRevealed}
+                      currency={currency} sizeClassName="font-semibold"
+                    />
                   </td>
                 </tr>
               )
@@ -140,6 +182,12 @@ function ClashPricingSection({ currency }: { currency: (n: number) => string }) 
 
 export function PricingPage() {
   const currency = useCurrency()
+  // Antes de fechar o popup do cupom, mostra o preço de tabela puro; depois
+  // (ou em visitas seguintes na mesma sessão, quando o popup nem reabre),
+  // troca pra preço riscado + preço com o cupom automático já aplicado.
+  const [discountRevealed, setDiscountRevealed] = useState(
+    () => sessionStorage.getItem(COUPON_PROMO_SEEN_KEY) === 'true',
+  )
 
   return (
     <div className="py-16">
@@ -166,7 +214,7 @@ export function PricingPage() {
                 <tr>
                   <th className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">Tier</th>
                   <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Solo / div</th>
-                  <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Duo / div <span className="text-brand normal-case font-normal">(+50%)</span></th>
+                  <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Duo / div</th>
                   <th className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">Tier completo (solo)</th>
                 </tr>
               </thead>
@@ -183,9 +231,24 @@ export function PricingPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(perDiv)}</td>
-                      <td className="py-3.5 px-5 text-right text-ink font-semibold">{currency(duoDiv)}</td>
-                      <td className="py-3.5 px-5 text-right text-ink font-medium">{currency(perDiv * 4)}</td>
+                      <td className="py-3.5 px-5 text-right">
+                        <PriceWithDiscount
+                          price={perDiv} serviceType="elo_boost" discountRevealed={discountRevealed}
+                          currency={currency} sizeClassName="font-semibold"
+                        />
+                      </td>
+                      <td className="py-3.5 px-5 text-right">
+                        <PriceWithDiscount
+                          price={duoDiv} serviceType="elo_boost" discountRevealed={discountRevealed}
+                          currency={currency} sizeClassName="font-semibold"
+                        />
+                      </td>
+                      <td className="py-3.5 px-5 text-right">
+                        <PriceWithDiscount
+                          price={perDiv * 4} serviceType="elo_boost" discountRevealed={discountRevealed}
+                          currency={currency} sizeClassName="font-medium"
+                        />
+                      </td>
                     </tr>
                   )
                 })}
@@ -201,8 +264,11 @@ export function PricingPage() {
                     </td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
                     <td className="py-3.5 px-5 text-right text-ink-muted font-semibold">—</td>
-                    <td className="py-3.5 px-5 text-right text-ink font-semibold">
-                      {currency(centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier]))}
+                    <td className="py-3.5 px-5 text-right">
+                      <PriceWithDiscount
+                        price={centsToMoney(MASTER_PLUS_TIER_PRICE_CENTS[tier])} serviceType="elo_boost"
+                        discountRevealed={discountRevealed} currency={currency} sizeClassName="font-semibold"
+                      />
                     </td>
                   </tr>
                 ))}
@@ -223,7 +289,10 @@ export function PricingPage() {
                 <div key={tier} className="card p-4 text-center flex flex-col items-center gap-1.5">
                   <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
                   <p className={`text-sm font-bold ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</p>
-                  <p className="text-xl font-extrabold text-ink">{currency(price)}</p>
+                  <PriceWithDiscount
+                    price={price} serviceType="win_boost" discountRevealed={discountRevealed}
+                    currency={currency} sizeClassName="text-xl font-extrabold" align="center"
+                  />
                   <p className="text-[10px] text-ink-muted mt-0.5">por vitória</p>
                 </div>
               )
@@ -239,16 +308,20 @@ export function PricingPage() {
                 <div key={tier} className="card p-4 text-center flex flex-col items-center gap-1.5">
                   <RankBadge tier={tier} size="xs" showDivision={false} showLabel={false} />
                   <p className={`text-sm font-bold ${RANK_TIER_COLOR[tier]}`}>{RANK_TIER_LABEL[tier]}</p>
-                  <p className="text-xl font-extrabold text-ink">{currency(getMd5WinPrice('solo_duo', tier) * 5)}</p>
+                  <PriceWithDiscount
+                    price={getMd5WinPrice('solo_duo', tier) * 5} serviceType="md5" discountRevealed={discountRevealed}
+                    currency={currency} sizeClassName="text-xl font-extrabold" align="center"
+                  />
                   <p className="text-[10px] text-ink-muted mt-0.5">pacote MD5</p>
                 </div>
               ))}
             </div>
           </div>
+          <p className="text-xs text-ink-muted mt-4">SoloQ e Flex têm o mesmo preço por vitória até Diamante — o valor só muda a partir de Mestre (Master+).</p>
         </section>
 
         {/* ── Clash ── */}
-        <ClashPricingSection currency={currency} />
+        <ClashPricingSection currency={currency} discountRevealed={discountRevealed} />
 
         {/* ── Coaching ── */}
         <CoachingPricingSection />
@@ -264,7 +337,7 @@ export function PricingPage() {
 
       </div>
 
-      <CouponPromoModal />
+      <CouponPromoModal onDismiss={() => setDiscountRevealed(true)} />
     </div>
   )
 }
