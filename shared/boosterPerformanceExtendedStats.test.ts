@@ -21,7 +21,10 @@ describe('migration 140 — extended performance stats', () => {
   })
 
   it('derruba a assinatura antiga de record_order_match antes de recriar', async () => {
-    const sql = await migrationPromise
+    // Normaliza CRLF -> LF antes do indexOf -- este arquivo tem quebras de
+    // linha CRLF neste checkout (Windows), e a assinatura procurada abaixo
+    // abrange uma quebra de linha real no SQL.
+    const sql = (await migrationPromise).replace(/\r\n/g, '\n')
     const dropIdx = sql.indexOf('drop function if exists public.record_order_match(uuid, text, text, text, integer, integer, integer, integer, integer, timestamptz)')
     const createIdx = sql.indexOf('create or replace function public.record_order_match(\n  p_order_id uuid,')
     expect(dropIdx).toBeGreaterThan(-1)

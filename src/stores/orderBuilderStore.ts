@@ -137,6 +137,7 @@ interface OrderBuilderState {
   setClashTier: (tier: ClashTier | null) => void
   setClashDay: (day: ClashDay | null) => void
   setPreferredBooster: (id: string, name: string) => void
+  clearPreferredBooster: () => void
   setRiotId: (riotId: string) => void
   setRiotAutoFilled: (v: boolean) => void
   setRiotVerified: (v: boolean) => void
@@ -383,6 +384,12 @@ export const useOrderBuilderStore = create<OrderBuilderState>()(
   setClashTier: (clashTier) => set({ clashTier }),
   setClashDay: (clashDay) => set({ clashDay }),
   setPreferredBooster: (preferredBoosterId, preferredBoosterName) => set({ preferredBoosterId, preferredBoosterName }),
+  // Único jeito de desvincular o booster escolhido -- trocar de serviço (ver
+  // StepService.tsx) preserva o vínculo, só o x no banner (OrderBuilder.tsx)
+  // chama isto. Limpa junto o pacote de coach (é dono do vínculo quando veio
+  // de lá) pra não deixar preço/pacote de um booster que não é mais o
+  // vinculado.
+  clearPreferredBooster: () => set({ preferredBoosterId: null, preferredBoosterName: null, selectedCoachPackage: null }),
   // Editar o Riot ID invalida a verificação (form volta a travar) — mas NÃO
   // limpa o rank já preenchido a cada tecla; a limpeza completa acontece no
   // início da próxima busca (clearRiotLookup), pra não apagar dados enquanto

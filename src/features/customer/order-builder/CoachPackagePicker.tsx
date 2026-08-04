@@ -11,7 +11,7 @@ import { MultiSelectPopover } from '@/components/ui'
 
 export function CoachPackagePicker() {
   const currency = useCurrency()
-  const { selectedCoachPackage, setSelectedCoachPackage, setPreferredBooster, setBasePrice } = useOrderBuilderStore()
+  const { selectedCoachPackage, setSelectedCoachPackage, setPreferredBooster, setBasePrice, preferredBoosterId } = useOrderBuilderStore()
   const [search, setSearch] = useState('')
   const [laneFilters, setLaneFilters] = useState<Set<string>>(new Set())
   const [specialtyFilters, setSpecialtyFilters] = useState<Set<string>>(new Set())
@@ -34,7 +34,16 @@ export function CoachPackagePicker() {
   const activeCount = activeFilterCount({ lanes: laneFilters, specialties: specialtyFilters })
   const hasAnyFilter = activeCount > 0 || search.trim().length > 0
 
-  const { data: packages = [], isLoading } = useAllCoachingPackages()
+  const { data: allPackages = [], isLoading } = useAllCoachingPackages()
+
+  // Pedido vinculado a um booster específico (link direto, perfil público ou
+  // pacote escolhido antes de trocar pra este serviço) -- só os pacotes de
+  // coaching desse booster aparecem. Desvincula pelo x do banner
+  // (OrderBuilder.tsx clearPreferredBooster), nunca daqui.
+  const packages = useMemo(
+    () => preferredBoosterId ? allPackages.filter(p => p.booster_id === preferredBoosterId) : allPackages,
+    [allPackages, preferredBoosterId],
+  )
 
   const boosterIds = useMemo(() => [...new Set(packages.map(p => p.booster_id))], [packages])
 
@@ -67,7 +76,11 @@ export function CoachPackagePicker() {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-bold text-ink mb-1">Escolha um Pacote de Coach</h2>
-        <p className="text-sm text-ink-secondary">Busque e filtre entre os pacotes de todos os coaches disponíveis.</p>
+        <p className="text-sm text-ink-secondary">
+          {preferredBoosterId
+            ? 'Mostrando apenas os pacotes do booster vinculado a este pedido.'
+            : 'Busque e filtre entre os pacotes de todos os coaches disponíveis.'}
+        </p>
       </div>
 
       {/* Caixa de filtros */}

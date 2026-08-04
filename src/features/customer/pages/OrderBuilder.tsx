@@ -7,7 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { applyCoupon, getWinBoostPrice } from '@/lib/pricing'
 import { getBoostFlow, resolveAddonLabel } from '@/lib/boostDomain'
-import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag } from 'lucide-react'
+import { ChevronRight, ChevronLeft, Shield, Clock, Star, UserCheck, Tag, X } from 'lucide-react'
 import type { ServiceType, Rank } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -98,7 +98,7 @@ export function OrderBuilderPage() {
   const {
     step, steps, nextStep, prevStep, basePrice, extrasPrice,
     selectedExtraIds, currentRank, targetRank, boostMode, gameSlug, gameId, serviceType, serviceId,
-    setGame, setService, setServiceId, setStep, reset, preferredBoosterName, setPreferredBooster,
+    setGame, setService, setServiceId, setStep, reset, preferredBoosterName, setPreferredBooster, clearPreferredBooster,
     setSelectedCoachPackage, setBasePrice, couponCode,
     winsPurchased, riotId, isMd5, md5MatchesRemaining, riotLookupLoading, riotVerified,
     selectedCoachPackage, setStepAttempted, winPackage, queueType,
@@ -313,7 +313,18 @@ export function OrderBuilderPage() {
         {preferredBoosterName && (
           <div className="flex items-center gap-2.5 mb-6 rounded-xl border border-brand/25 bg-brand/10 px-4 py-3 text-sm text-ink">
             <UserCheck className="h-4 w-4 text-brand shrink-0" />
-            Pedido vinculado a <span className="font-semibold">{preferredBoosterName}</span> — ele(a) poderá aceitar com exclusividade por 12 horas após o pagamento.
+            <span className="flex-1">
+              Pedido vinculado a <span className="font-semibold">{preferredBoosterName}</span> — ele(a) poderá aceitar com exclusividade por 12 horas após o pagamento.
+            </span>
+            <button
+              type="button"
+              onClick={() => clearPreferredBooster()}
+              aria-label="Desvincular booster"
+              title="Desvincular booster"
+              className="shrink-0 text-ink-muted hover:text-ink transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 

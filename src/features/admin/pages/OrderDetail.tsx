@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft, History, Lock, RefreshCw, XOctagon, MessageCircleWarning,
-  Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, User,
+  Gamepad2, Users, Shuffle, TrendingUp, Trophy, CalendarDays, Wallet, User, Hash, Copy, Check,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
 import { OrderChat } from '@/components/order/OrderChat'
@@ -86,6 +86,7 @@ export function AdminOrderDetailPage() {
   const currency = useCurrency()
   const [showDropModal, setShowDropModal] = useState(false)
   const [dropReason, setDropReason] = useState('')
+  const [nickCopied, setNickCopied] = useState(false)
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
@@ -134,6 +135,13 @@ export function AdminOrderDetailPage() {
 
   const hasRankRail = !!(order.target_rank && order.current_rank && !order.pdl_bracket)
 
+  async function copyNickname() {
+    if (!order?.riot_id) return
+    await navigator.clipboard.writeText(order.riot_id)
+    setNickCopied(true)
+    setTimeout(() => setNickCopied(false), 1500)
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
@@ -171,6 +179,21 @@ export function AdminOrderDetailPage() {
                   [Gamepad2, 'Serviço', getServiceLabel(order.service_type)],
                   ...(order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
                     ? [[Users, 'Fila', order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex']]
+                    : []),
+                  ...(order.riot_id && (order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5')
+                    ? [[Hash, 'Nickname', (
+                      <span key="nickname" className="inline-flex items-center gap-1.5">
+                        {order.riot_id}
+                        <button
+                          type="button"
+                          onClick={() => void copyNickname()}
+                          aria-label="Copiar Riot ID"
+                          className="text-ink-muted hover:text-brand transition-colors"
+                        >
+                          {nickCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        </button>
+                      </span>
+                    )]]
                     : []),
                   ...(order.service_type === 'elo_boost' && !order.pdl_bracket
                     ? [[Shuffle, 'Modo', order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost']]

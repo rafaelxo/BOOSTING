@@ -11,10 +11,17 @@ const SERVICES: { type: ServiceType; name: string; desc: string; icon: React.Ele
 ]
 
 export function StepService() {
-  const { serviceType, setService, reset } = useOrderBuilderStore()
+  const { serviceType, setService, reset, preferredBoosterId, preferredBoosterName, setPreferredBooster } = useOrderBuilderStore()
 
   const handleSelectService = (type: ServiceType) => {
-    if (serviceType && serviceType !== type) reset()
+    if (serviceType && serviceType !== type) {
+      reset()
+      // reset() zera preferredBoosterId/Name junto com o resto -- mas o
+      // vínculo com um booster específico só deve sair pelo x do banner
+      // (OrderBuilder.tsx clearPreferredBooster), nunca por trocar de
+      // serviço. Reaplica depois do reset.
+      if (preferredBoosterId && preferredBoosterName) setPreferredBooster(preferredBoosterId, preferredBoosterName)
+    }
     setService(type, type)
   }
 
