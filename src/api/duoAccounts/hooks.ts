@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
-import { listAdminDuoAccounts, listDuoAccounts, lookupDuoAccountRiotRank } from './queries'
+import { getDuoAccountReservationHistory, listAdminDuoAccounts, listDuoAccounts, lookupDuoAccountRiotRank } from './queries'
 import {
   adminDeleteDuoAccount, adminReleaseDuoAccount, adminSaveDuoAccount, adminSetDuoAccountActive,
   clearDuoOwnRiotId, getDuoAccountAccessToken, releaseDuoAccountReservation, reserveDuoAccount,
@@ -22,6 +22,14 @@ export function useAdminDuoAccounts() {
     queryKey: queryKeys.duoAccounts.adminList(),
     queryFn: listAdminDuoAccounts,
     refetchInterval: 15_000,
+  })
+}
+
+export function useDuoAccountReservationHistory(accountId: string | undefined) {
+  return useQuery({
+    queryKey: ['duo-accounts', 'reservation-history', accountId],
+    queryFn: () => getDuoAccountReservationHistory(accountId!),
+    enabled: !!accountId,
   })
 }
 

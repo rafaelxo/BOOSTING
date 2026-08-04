@@ -16,6 +16,28 @@ export interface AdminDuoAccount extends BoosterVisibleDuoAccount {
   created_at: string
   updated_at: string
   has_credentials?: boolean
+  reserved_at: string | null
+  reserved_by_name: string | null
+}
+
+export interface DuoAccountReservationHistoryEntry {
+  id: string
+  reserved_at: string
+  released_at: string | null
+  booster_id: string
+  booster_name: string | null
+  order_id: string | null
+  order_service_type: string | null
+  order_status: string | null
+}
+
+export interface DuoAccountReservationHistory {
+  stats: {
+    total_reservations: number
+    total_seconds: number
+    distinct_boosters: number
+  }
+  history: DuoAccountReservationHistoryEntry[]
 }
 
 export interface SaveDuoAccountParams {

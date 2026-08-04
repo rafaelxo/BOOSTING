@@ -335,12 +335,19 @@ export function parseMatchDetail(body: RiotMatchV5Body, puuid: string, matchId: 
 
 // Uma partida por vez (Match-V5 não expõe um endpoint em lote) — o
 // participante é localizado pelo puuid, nunca por posição/index.
-export async function fetchMatchDetail(
+export type MatchBodyResult =
+  | { ok: true; body: RiotMatchV5Body }
+  | { ok: false; reason: 'rate_limited' | 'upstream_error'; status: number }
+
+// Separado de fetchMatchDetail pra permitir ler o resultado de MAIS DE UM
+// participante (cliente + conta duo) na mesma partida sem duas chamadas HTTP
+// -- ver sync-order-matches, que chama parseMatchDetail duas vezes em cima
+// do mesmo body pra atribuir a partida a cada lado corretamente.
+export async function fetchMatchBody(
   matchId: string,
-  puuid: string,
   apiKey: string,
   regionalRoute: string,
-): Promise<MatchDetailResult> {
+): Promise<MatchBodyResult> {
   const resp = await fetchWithTimeout(
     `https://${regionalRoute}.api.riotgames.com/lol/match/v5/matches/${encodeURIComponent(matchId)}`,
     { headers: { 'X-Riot-Token': apiKey } },
@@ -349,5 +356,16 @@ export async function fetchMatchDetail(
   if (!resp.ok) return { ok: false, reason: 'upstream_error', status: resp.status }
 
   const body = await resp.json() as RiotMatchV5Body
-  return parseMatchDetail(body, puuid, matchId)
+  return { ok: true, body }
+}
+
+export async function fetchMatchDetail(
+  matchId: string,
+  puuid: string,
+  apiKey: string,
+  regionalRoute: string,
+): Promise<MatchDetailResult> {
+  const bodyResult = await fetchMatchBody(matchId, apiKey, regionalRoute)
+  if (!bodyResult.ok) return bodyResult
+  return parseMatchDetail(bodyResult.body, puuid, matchId)
 }

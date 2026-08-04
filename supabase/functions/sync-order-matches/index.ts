@@ -9,12 +9,21 @@ import { consumeUserRateLimit } from '../_shared/rateLimit.ts'
 import {
   fetchRiotAccount,
   fetchMatchIdsSince,
-  fetchMatchDetail,
+  fetchMatchBody,
+  parseMatchDetail,
   RIOT_QUEUE_TYPE,
+  type RiotMatchV5Body,
 } from '../_shared/riotLookup.ts'
 
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const REGIONAL_ROUTE = 'americas'
+// Backfill de atribuição duo: quantas das últimas partidas do CLIENTE
+// checamos em busca da conta duo, além das que já entraram no loop
+// principal por serem novas em order_matches. Cobre o caso "booster jogou
+// primeiro, só depois cadastrou a conta duo" -- sem isso, essas partidas
+// nunca seriam atribuídas ao booster (já estariam em order_matches, então
+// nunca cairiam em newMatchIds de novo).
+const DUO_BACKFILL_LOOKBACK = 5
 
 const bodySchema = z.object({
   order_id: z.string().uuid(),
@@ -60,6 +69,10 @@ serve(async (req) => {
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
     if (!order) return errorResponse(req, 'Order not found', 404)
+    // Capturado fora do closure de attributeDuoMatch abaixo -- o TS não
+    // preserva o narrowing de "order não é null" dentro de uma função
+    // aninhada definida bem depois do guard clause acima.
+    const assignedBoosterId = order.assigned_booster_id
 
     const serviceClient = supabaseAdmin()
 
@@ -78,13 +91,24 @@ serve(async (req) => {
       return badRequest(req, 'Pedido não está em um status sincronizável')
     }
 
-    // Duo Boost: o booster joga com uma conta Duo separada, não a conta do
-    // cliente (order.riot_id) -- as partidas de verdade acontecem nessa
-    // conta, então é dela que sincronizamos. Duas origens possíveis: uma
-    // conta reservada do pool da plataforma (duo_accounts) OU a conta
-    // própria do booster (order.duo_own_riot_id, sem reserva nenhuma) --
-    // a reservada tem prioridade se por algum motivo as duas existirem.
-    let riotIdSource = order.riot_id as string | null
+    // order_matches (histórico/progresso DO PEDIDO) é SEMPRE a conta do
+    // cliente, solo ou duo -- é a conta sendo entregue, quem determina se o
+    // objetivo foi atingido. Em Duo Boost, o booster joga PARTIDO com o
+    // cliente numa conta separada (pool da plataforma ou própria) -- essa
+    // conta nunca alimenta order_matches, só booster_duo_matches (stats do
+    // booster), resolvida abaixo.
+    if (!order.riot_id) {
+      return badRequest(req, 'Este pedido não tem conta Riot cadastrada para sincronizar')
+    }
+    const clientRiotId = String(order.riot_id)
+    const clientHashIdx = clientRiotId.lastIndexOf('#')
+    if (clientHashIdx < 1 || clientHashIdx === clientRiotId.length - 1) {
+      return badRequest(req, 'Riot ID inválido')
+    }
+
+    // Conta duo (opcional -- pode ainda não ter sido cadastrada). Reservada
+    // do pool tem prioridade se por algum motivo as duas existirem.
+    let duoRiotId: string | null = null
     if (order.boost_mode === 'duo') {
       const { data: duoAccount, error: duoErr } = await serviceClient
         .from('duo_accounts')
@@ -92,44 +116,52 @@ serve(async (req) => {
         .eq('reserved_order_id', orderId)
         .maybeSingle()
       if (duoErr) return errorResponse(req, 'Failed to load duo account', 500)
-      riotIdSource = duoAccount?.riot_id ?? (order.duo_own_riot_id as string | null) ?? null
-      if (!riotIdSource) {
-        return badRequest(req, 'Nenhuma conta Duo (da plataforma ou própria) cadastrada para este pedido')
-      }
-    } else if (!riotIdSource) {
-      return badRequest(req, 'Este pedido não tem conta Riot cadastrada para sincronizar')
-    }
-
-    const riotId = String(riotIdSource)
-    const hashIdx = riotId.lastIndexOf('#')
-    if (hashIdx < 1 || hashIdx === riotId.length - 1) {
-      return badRequest(req, 'Riot ID inválido')
+      duoRiotId = duoAccount?.riot_id ?? (order.duo_own_riot_id as string | null) ?? null
     }
 
     const startTimeEpochSeconds = order.match_sync_started_at
       ? Math.floor(new Date(order.match_sync_started_at as string).getTime() / 1000)
       : Math.floor(Date.now() / 1000) - 60 * 60 * 24
 
-    // ── Account-V1: Riot ID → puuid ──────────────────────────────────────────
-    const accountResult = await fetchRiotAccount(riotId, RIOT_API_KEY, REGIONAL_ROUTE)
-    if (!accountResult.ok) {
-      if (accountResult.reason === 'not_found') return jsonResponse(req, { synced: false, reason: 'account_not_found' })
-      if (accountResult.reason === 'rate_limited') return errorResponse(req, 'Sincronização indisponível no momento, tente novamente em instantes', 503)
-      console.error('Riot account-v1 error', accountResult.status)
+    // ── Account-V1: Riot ID → puuid (cliente, sempre) ────────────────────────
+    const clientAccountResult = await fetchRiotAccount(clientRiotId, RIOT_API_KEY, REGIONAL_ROUTE)
+    if (!clientAccountResult.ok) {
+      if (clientAccountResult.reason === 'not_found') return jsonResponse(req, { synced: false, reason: 'account_not_found' })
+      if (clientAccountResult.reason === 'rate_limited') return errorResponse(req, 'Sincronização indisponível no momento, tente novamente em instantes', 503)
+      console.error('Riot account-v1 error (client)', clientAccountResult.status)
       return errorResponse(req, 'Falha ao consultar conta Riot', 502)
     }
-    const { puuid } = accountResult.account
+    const clientPuuid = clientAccountResult.account.puuid
+
+    // Conta duo: best-effort. Se falhar (não encontrada, rate limit), não
+    // aborta a sincronização inteira -- o histórico do pedido (lado do
+    // cliente) continua funcionando normalmente, só a atribuição de stats
+    // pro booster fica pra próxima tentativa.
+    let duoPuuid: string | null = null
+    if (duoRiotId) {
+      const duoAccountResult = await fetchRiotAccount(duoRiotId, RIOT_API_KEY, REGIONAL_ROUTE)
+      if (duoAccountResult.ok) {
+        duoPuuid = duoAccountResult.account.puuid
+      } else if (duoAccountResult.reason !== 'not_found') {
+        console.error('Riot account-v1 error (duo)', duoAccountResult.status)
+      }
+    }
 
     // Vitórias Avulsas/MD5 usam a fila do pedido; elo_boost também é sempre
     // solo_duo ou flex — mesmo mapeamento em todos os fluxos.
     const matchQueueId = RIOT_QUEUE_TYPE[order.queue_type as 'solo_duo' | 'flex'].matchQueueId
 
-    const idsResult = await fetchMatchIdsSince(puuid, RIOT_API_KEY, REGIONAL_ROUTE, matchQueueId, startTimeEpochSeconds)
+    const idsResult = await fetchMatchIdsSince(clientPuuid, RIOT_API_KEY, REGIONAL_ROUTE, matchQueueId, startTimeEpochSeconds)
     if (!idsResult.ok) {
       if (idsResult.reason === 'rate_limited') return errorResponse(req, 'Sincronização indisponível no momento, tente novamente em instantes', 503)
       console.error('Riot match-v5 ids error', idsResult.status)
       return errorResponse(req, 'Falha ao consultar partidas na Riot', 502)
     }
+
+    // Riot devolve mais recente primeiro -- guarda essa ordem pro backfill
+    // duo abaixo (só olha as últimas N), antes de reverter pro loop
+    // principal (mais antiga primeiro, pro histórico evoluir em ordem real).
+    const idsMostRecentFirst = idsResult.matchIds
 
     // Não reprocessa partidas já registradas — evita gastar chamadas da Riot
     // com detalhe de partidas que já sabemos ter contabilizado.
@@ -138,52 +170,113 @@ serve(async (req) => {
       .select('external_match_id')
       .eq('order_id', orderId)
     const alreadyRecorded = new Set((existingMatches ?? []).map((m) => m.external_match_id as string))
-    const newMatchIds = idsResult.matchIds.filter((id) => !alreadyRecorded.has(id))
-
-    // Mais antiga primeiro, para o histórico e os contadores evoluírem em
-    // ordem cronológica real.
+    const newMatchIds = idsMostRecentFirst.filter((id) => !alreadyRecorded.has(id))
     newMatchIds.reverse()
 
     const recorded: Array<{ external_match_id: string; result: 'win' | 'loss'; champion: string | null }> = []
+    const duoCheckedIds = new Set<string>()
+    let duoRecordedCount = 0
+
+    async function attributeDuoMatch(body: RiotMatchV5Body, matchId: string): Promise<void> {
+      duoCheckedIds.add(matchId)
+      if (!duoPuuid) return
+      const duoDetail = parseMatchDetail(body, duoPuuid, matchId)
+      // ok: false aqui só significa que a conta duo não estava NESSA partida
+      // específica (ex.: o cliente jogou uma sozinho) -- não é um erro.
+      if (!duoDetail.ok) return
+      const d = duoDetail.detail
+      const { error } = await serviceClient
+        .from('booster_duo_matches')
+        .upsert({
+          order_id: orderId,
+          booster_id: assignedBoosterId,
+          external_match_id: d.externalMatchId,
+          result: d.result,
+          champion: d.champion,
+          kills: d.kills,
+          deaths: d.deaths,
+          assists: d.assists,
+          queue_id: d.queueId,
+          duration_seconds: d.durationSeconds,
+          played_at: d.playedAt,
+          minions_killed: d.minionsKilled,
+          neutral_minions_killed: d.neutralMinionsKilled,
+          is_mvp: d.isMvp,
+        }, { onConflict: 'order_id,external_match_id', ignoreDuplicates: true })
+      if (error) console.error('booster_duo_matches upsert failed', matchId, error.message)
+      else duoRecordedCount += 1
+    }
 
     for (const matchId of newMatchIds) {
-      const detail = await fetchMatchDetail(matchId, puuid, RIOT_API_KEY, REGIONAL_ROUTE)
-      if (!detail.ok) {
-        if (detail.reason === 'rate_limited') break
-        console.error('Riot match-v5 detail error', matchId, detail.status)
+      const bodyResult = await fetchMatchBody(matchId, RIOT_API_KEY, REGIONAL_ROUTE)
+      if (!bodyResult.ok) {
+        if (bodyResult.reason === 'rate_limited') break
+        console.error('Riot match-v5 detail error', matchId, bodyResult.status)
         continue
       }
 
-      const { data: recordResult, error: recordErr } = await serviceClient.rpc('record_order_match', {
-        p_order_id: orderId,
-        p_external_match_id: detail.detail.externalMatchId,
-        p_result: detail.detail.result,
-        p_champion: detail.detail.champion,
-        p_kills: detail.detail.kills,
-        p_deaths: detail.detail.deaths,
-        p_assists: detail.detail.assists,
-        p_queue_id: detail.detail.queueId,
-        p_duration_seconds: detail.detail.durationSeconds,
-        p_played_at: detail.detail.playedAt,
-        p_minions_killed: detail.detail.minionsKilled,
-        p_neutral_minions_killed: detail.detail.neutralMinionsKilled,
-        p_is_mvp: detail.detail.isMvp,
-      })
-      const result = recordResult as { success?: boolean; inserted?: boolean; error?: string } | null
-      if (recordErr || !result?.success) {
-        console.error('record_order_match failed', result?.error ?? recordErr?.message)
-        // Pedido pode ter saído de in_progress/paused durante a sincronização
-        // (ex: booster marcou concluído em outra aba) — para sem corromper o
-        // que já foi contabilizado até aqui.
-        if (result?.error === 'invalid_status') break
-        continue
-      }
-      if (result.inserted) {
-        recorded.push({
-          external_match_id: detail.detail.externalMatchId,
-          result: detail.detail.result,
-          champion: detail.detail.champion,
+      const clientDetail = parseMatchDetail(bodyResult.body, clientPuuid, matchId)
+      if (clientDetail.ok) {
+        const { data: recordResult, error: recordErr } = await serviceClient.rpc('record_order_match', {
+          p_order_id: orderId,
+          p_external_match_id: clientDetail.detail.externalMatchId,
+          p_result: clientDetail.detail.result,
+          p_champion: clientDetail.detail.champion,
+          p_kills: clientDetail.detail.kills,
+          p_deaths: clientDetail.detail.deaths,
+          p_assists: clientDetail.detail.assists,
+          p_queue_id: clientDetail.detail.queueId,
+          p_duration_seconds: clientDetail.detail.durationSeconds,
+          p_played_at: clientDetail.detail.playedAt,
+          p_minions_killed: clientDetail.detail.minionsKilled,
+          p_neutral_minions_killed: clientDetail.detail.neutralMinionsKilled,
+          p_is_mvp: clientDetail.detail.isMvp,
         })
+        const result = recordResult as { success?: boolean; inserted?: boolean; error?: string } | null
+        if (recordErr || !result?.success) {
+          console.error('record_order_match failed', result?.error ?? recordErr?.message)
+          // Pedido pode ter saído de in_progress/paused durante a
+          // sincronização (ex: booster marcou concluído em outra aba) —
+          // para sem corromper o que já foi contabilizado até aqui.
+          if (result?.error === 'invalid_status') break
+        } else if (result.inserted) {
+          recorded.push({
+            external_match_id: clientDetail.detail.externalMatchId,
+            result: clientDetail.detail.result,
+            champion: clientDetail.detail.champion,
+          })
+        }
+      }
+
+      if (duoPuuid) await attributeDuoMatch(bodyResult.body, matchId)
+    }
+
+    // Backfill: partidas jogadas ANTES do booster cadastrar a conta duo já
+    // estariam em order_matches (não passam por newMatchIds de novo), então
+    // nunca seriam checadas pra atribuição duo sem isso. Olha só as últimas
+    // DUO_BACKFILL_LOOKBACK do cliente, pulando as que o loop acima já
+    // checou ou que já têm linha em booster_duo_matches.
+    if (duoPuuid) {
+      const backfillCandidates = idsMostRecentFirst
+        .slice(0, DUO_BACKFILL_LOOKBACK)
+        .filter((id) => !duoCheckedIds.has(id))
+
+      for (const matchId of backfillCandidates) {
+        const { data: existingDuoMatch } = await serviceClient
+          .from('booster_duo_matches')
+          .select('id')
+          .eq('order_id', orderId)
+          .eq('external_match_id', matchId)
+          .maybeSingle()
+        if (existingDuoMatch) continue
+
+        const bodyResult = await fetchMatchBody(matchId, RIOT_API_KEY, REGIONAL_ROUTE)
+        if (!bodyResult.ok) {
+          if (bodyResult.reason === 'rate_limited') break
+          console.error('Riot match-v5 detail error (duo backfill)', matchId, bodyResult.status)
+          continue
+        }
+        await attributeDuoMatch(bodyResult.body, matchId)
       }
     }
 
@@ -195,7 +288,7 @@ serve(async (req) => {
     // do pedido (order.assigned_booster_id), não user.id — o chamador pode
     // ser o cliente ou um admin disparando o sync manualmente, não só o
     // próprio booster.
-    if (recorded.length > 0) {
+    if (recorded.length > 0 || duoRecordedCount > 0) {
       const { error: refreshError } = await serviceClient.rpc('refresh_booster_performance_segments', { p_booster_id: order.assigned_booster_id })
       if (refreshError) console.error('refresh_booster_performance_segments failed', order.assigned_booster_id, refreshError.message)
     }

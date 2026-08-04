@@ -1,16 +1,103 @@
 import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2, Trash2 } from 'lucide-react'
+import { Landmark, Plus, Eye, EyeOff, Search, CheckCircle2, Trash2, History } from 'lucide-react'
 import { Button, EmptyState, Skeleton, Modal, RankBadge, ErrorAlert } from '@/components/ui'
 import { FormField } from '@/components/ui/FormField'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
-import { RANK_TIER_LABEL, formatDate } from '@/lib/utils'
+import { RANK_TIER_LABEL, formatDate, formatDateTime } from '@/lib/utils'
 import {
   useAdminDuoAccounts, useDuoAccountAutoRefresh, useAdminSaveDuoAccount, useAdminSetDuoAccountActive,
-  useAdminReleaseDuoAccount, useAdminDeleteDuoAccount, lookupDuoAccountRiotRank, adminGetDuoAccountCredentials,
+  useAdminReleaseDuoAccount, useAdminDeleteDuoAccount, useDuoAccountReservationHistory,
+  lookupDuoAccountRiotRank, adminGetDuoAccountCredentials,
 } from '@/api/duoAccounts'
 import type { AdminDuoAccount } from '@/api/duoAccounts'
 import type { Division, RankTier } from '@/types'
+
+function formatDurationSeconds(seconds: number): string {
+  if (seconds < 60) return '<1min'
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  if (days > 0) return `${days}d ${hours % 24}h`
+  if (hours > 0) return `${hours}h ${minutes % 60}min`
+  return `${minutes}min`
+}
+
+function DuoAccountHistoryModal({ account, onClose }: { account: AdminDuoAccount | null; onClose: () => void }) {
+  const { data, isLoading, isError } = useDuoAccountReservationHistory(account?.id)
+
+  return (
+    <Modal
+      open={!!account}
+      onOpenChange={(open) => !open && onClose()}
+      title={`Histórico de reservas — ${account?.riot_id ?? account?.label}`}
+      maxWidth="2xl"
+    >
+      {isLoading ? (
+        <Skeleton className="h-48 w-full" />
+      ) : isError ? (
+        <ErrorAlert message="Não foi possível carregar o histórico desta conta." />
+      ) : data && account ? (
+        <div className="space-y-4">
+          {account.reserved_by && (
+            <div className="rounded-xl border border-warning/25 bg-warning/5 px-4 py-3">
+              <p className="text-[10px] font-semibold text-warning uppercase tracking-wide mb-1">Reserva ativa agora</p>
+              <p className="text-sm font-bold text-ink">{account.reserved_by_name ?? 'Booster'}</p>
+              {account.reserved_at && (
+                <p className="text-xs text-ink-muted mt-0.5">
+                  desde {formatDateTime(account.reserved_at)} · {formatDurationSeconds(
+                    Math.max(0, (Date.now() - new Date(account.reserved_at).getTime()) / 1000),
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-2 rounded-xl bg-bg-elevated p-3 text-center" data-tabular>
+            <div>
+              <p className="text-sm font-bold text-ink">{data.stats.total_reservations}</p>
+              <p className="text-[10px] text-ink-muted mt-0.5">Reservas totais</p>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-ink">{data.stats.distinct_boosters}</p>
+              <p className="text-[10px] text-ink-muted mt-0.5">Boosters distintos</p>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-ink">{formatDurationSeconds(data.stats.total_seconds)}</p>
+              <p className="text-[10px] text-ink-muted mt-0.5">Tempo total reservada</p>
+            </div>
+          </div>
+
+          {data.history.length === 0 ? (
+            <p className="text-xs text-ink-muted py-4 text-center">Nenhuma reserva registrada ainda.</p>
+          ) : (
+            <div className="max-h-80 space-y-1.5 overflow-y-auto pr-0.5">
+              {data.history.map((h) => (
+                <div key={h.id} className="flex items-center justify-between gap-3 rounded-xl border border-border-subtle px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink truncate">{h.booster_name ?? 'Booster removido'}</p>
+                    <p className="text-ink-muted mt-0.5 truncate">
+                      {h.order_id ? `Pedido #${h.order_id.slice(0, 8).toUpperCase()}` : 'Sem pedido associado'}
+                      {h.order_service_type && ` · ${h.order_service_type}`}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0" data-tabular>
+                    <p className="text-ink-secondary">{formatDateTime(h.reserved_at)}</p>
+                    <p className="text-ink-muted mt-0.5">
+                      {h.released_at
+                        ? formatDurationSeconds((new Date(h.released_at).getTime() - new Date(h.reserved_at).getTime()) / 1000)
+                        : 'Em andamento'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </Modal>
+  )
+}
 
 const RIOT_ID_FORMAT = /^[^#]{1,16}#[A-Za-z0-9]{2,5}$/
 
@@ -135,6 +222,7 @@ export function AdminDuoAccountsPage() {
     mutate: (accountId: string) => releaseReservationMutation.mutate(accountId),
   }
 
+  const [historyTarget, setHistoryTarget] = useState<AdminDuoAccount | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AdminDuoAccount | null>(null)
   const deleteAccountMutation = useAdminDeleteDuoAccount()
   const deleteAccount = {
@@ -226,13 +314,27 @@ export function AdminDuoAccountsPage() {
                     <TableCell>
                       {a.reserved_by ? (
                         <div className="flex items-center gap-2">
-                          <span className="badge text-xs text-warning bg-warning/10">Reservada</span>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryTarget(a)}
+                            className="badge text-xs text-warning bg-warning/10 hover:bg-warning/20 transition-colors cursor-pointer"
+                            title={a.reserved_by_name ? `Reservada por ${a.reserved_by_name} — ver histórico` : 'Ver histórico de reservas'}
+                          >
+                            Reservada
+                          </button>
                           <Button size="xs" variant="ghost" loading={releaseReservation.isPending} onClick={() => releaseReservation.mutate(a.id)}>
                             Liberar
                           </Button>
                         </div>
                       ) : (
-                        <span className="badge text-xs text-ink-muted bg-bg-overlay">Livre</span>
+                        <button
+                          type="button"
+                          onClick={() => setHistoryTarget(a)}
+                          className="badge text-xs text-ink-muted bg-bg-overlay hover:bg-bg-elevated transition-colors cursor-pointer inline-flex items-center gap-1"
+                          title="Ver histórico de reservas"
+                        >
+                          <History className="h-3 w-3" /> Livre
+                        </button>
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-ink-muted">{formatDate(a.created_at)}</TableCell>
@@ -386,6 +488,8 @@ export function AdminDuoAccountsPage() {
           </div>
         </div>
       </Modal>
+
+      <DuoAccountHistoryModal account={historyTarget} onClose={() => setHistoryTarget(null)} />
 
       <Modal
         open={!!deleteTarget}
