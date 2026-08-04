@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { normalizeApiError } from '@/api/core/errors'
 import { queryKeys } from '@/api/core/queryKeys'
@@ -74,5 +74,64 @@ export function useBoosterReviews(boosterUserId: string | undefined) {
     queryKey: queryKeys.reviews.forBooster(boosterUserId ?? ''),
     queryFn: () => listBoosterReviews(boosterUserId!),
     enabled: !!boosterUserId,
+  })
+}
+
+export interface OwnReview {
+  id: string
+  rating: number
+  content: string | null
+  created_at: string
+}
+
+// Uma review por pedido (orders.id é unique em reviews) -- usado pra decidir
+// entre mostrar o formulário ou a avaliação já enviada em OrderReviewSection.
+export async function getOwnReview(orderId: string): Promise<OwnReview | null> {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('id, rating, content, created_at')
+    .eq('order_id', orderId)
+    .maybeSingle()
+  if (error) throw normalizeApiError(error)
+  return data
+}
+
+export function useOwnReview(orderId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.reviews.own(orderId ?? ''),
+    queryFn: () => getOwnReview(orderId!),
+    enabled: !!orderId,
+  })
+}
+
+export interface CreateReviewInput {
+  orderId: string
+  boosterId: string | null
+  rating: number
+  content: string
+}
+
+// RLS (reviews_customer_insert, migration archive 137) exige customer_id =
+// auth.uid(), pedido do próprio cliente com status 'completed', e booster_id
+// batendo com orders.assigned_booster_id do mesmo pedido -- nunca confiar só
+// na validação client-side.
+export async function createReview({ orderId, boosterId, rating, content }: CreateReviewInput): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) throw new Error('Não autenticado.')
+  const { error } = await supabase.from('reviews').insert({
+    order_id: orderId,
+    customer_id: auth.user.id,
+    booster_id: boosterId,
+    rating,
+    content: content.trim() || null,
+  })
+  if (error) throw normalizeApiError(error, 'Não foi possível enviar sua avaliação.')
+}
+
+export function useCreateReview(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Omit<CreateReviewInput, 'orderId'>) => createReview({ orderId, ...input }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.reviews.own(orderId) }),
   })
 }

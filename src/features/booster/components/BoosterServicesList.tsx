@@ -85,7 +85,7 @@ export function BoosterServicesList({ userId }: { userId: string }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-bold text-ink">Meus Serviços</h2>
-          <p className="text-xs text-ink-secondary mt-0.5">Crie até {MAX_SERVICES} serviços para seus clientes (coaching, boost ou outro).</p>
+          <p className="text-xs text-ink-secondary mt-0.5">Crie até {MAX_SERVICES} serviços de coach para seus clientes.</p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className={cn(

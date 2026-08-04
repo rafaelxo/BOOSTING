@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
+import { ApiError, assertRpcSuccess, normalizeApiError } from '@/api/core/errors'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import type { OnboardBoosterParams, UpdateProfessionalProfileParams } from './types'
 
@@ -61,7 +61,12 @@ export async function updateProfessionalProfile(params: UpdateProfessionalProfil
     p_hours_per_day_max: params.hoursPerDayMax,
   })
   if (error) throw normalizeApiError(error)
-  return assertRpcSuccess(data as { success: boolean; error?: string }, PROFESSIONAL_PROFILE_MESSAGES)
+  const result = data as { success: boolean; error?: string; days_remaining?: number }
+  if (result.success === false && result.error === 'display_name_cooldown') {
+    const days = result.days_remaining ?? 30
+    throw new ApiError(`Troca de nome disponível somente em ${days} dia${days === 1 ? '' : 's'}.`, { code: result.error })
+  }
+  return assertRpcSuccess(result, PROFESSIONAL_PROFILE_MESSAGES)
 }
 
 export async function adminApproveBooster(params: { boosterId: string; newStatus: 'approved' | 'rejected' | 'suspended' }) {

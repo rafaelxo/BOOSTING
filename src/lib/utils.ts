@@ -37,8 +37,17 @@ export function formatEstimatedDelivery(hours: number): string {
 
 // ─── Booster presence ─────────────────────────────────────────────────────────
 
-// Não há mais conceito de "disponível/indisponível" — apenas quando o booster
-// foi visto pela última vez, derivado de booster_profiles.last_active_at.
+// Sem toggle manual de "disponível/indisponível" -- continua puramente
+// derivado de booster_profiles.last_active_at. "Online" aqui só significa
+// "teve atividade nos últimos 5min", igual à antiga BOOSTER_PRESENCE_WINDOW_MS
+// (removida no refactor a6de7db) -- não é um status setado pelo booster.
+export const BOOSTER_PRESENCE_WINDOW_MS = 5 * 60_000
+
+export function isBoosterOnline(lastActiveAt: string | null | undefined): boolean {
+  if (!lastActiveAt) return false
+  return Date.now() - new Date(lastActiveAt).getTime() < BOOSTER_PRESENCE_WINDOW_MS
+}
+
 export function formatLastSeen(lastActiveAt: string | null | undefined): string {
   if (!lastActiveAt) return 'Sem atividade registrada'
   return `Visto ${timeAgo(lastActiveAt)}`

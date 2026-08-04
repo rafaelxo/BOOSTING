@@ -25,10 +25,26 @@ export async function getCustomerDashboardStats(customerId: string): Promise<Cus
   }
 }
 
+// Só clientes com 1+ pedido nos últimos 30 dias -- customer_profiles não tem
+// last_order_at (total_orders/total_spent ali são acumulados vitalícios),
+// então a janela recente vem de uma segunda query em orders.created_at.
+const ACTIVE_CUSTOMER_WINDOW_MS = 30 * 24 * 60 * 60_000
+
 export async function listAdminCustomers(limit = 100): Promise<AdminCustomerListRow[]> {
+  const windowStart = new Date(Date.now() - ACTIVE_CUSTOMER_WINDOW_MS).toISOString()
+  const { data: recentOrders, error: ordersError } = await supabase
+    .from('orders')
+    .select('customer_id')
+    .gte('created_at', windowStart)
+  if (ordersError) throw normalizeApiError(ordersError)
+
+  const activeCustomerIds = [...new Set((recentOrders ?? []).map((o) => o.customer_id))]
+  if (!activeCustomerIds.length) return []
+
   const { data, error } = await supabase
     .from('customer_profiles')
     .select('*, profiles(email, username, created_at)')
+    .in('user_id', activeCustomerIds)
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw normalizeApiError(error)

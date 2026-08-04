@@ -64,5 +64,6 @@ export const queryKeys = {
   reviews: {
     public: (limit: number) => ['reviews', 'public', limit] as const,
     forBooster: (boosterId: string) => ['reviews', 'booster', boosterId] as const,
+    own: (orderId: string) => ['reviews', 'own', orderId] as const,
   },
 } as const

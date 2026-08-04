@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap, Star, Trophy, Swords, Sparkles } from 'lucide-react'
 import { Avatar, Skeleton, RankBadge } from '@/components/ui'
-import { cn, formatRank, formatLastSeen } from '@/lib/utils'
+import { cn, formatRank, formatLastSeen, isBoosterOnline } from '@/lib/utils'
 import type { BoosterProfile, RankTier } from '@/types'
 import { usePublicBoosters, useTopBoosters, useBoostersPerformance } from '@/api/boosters'
 import type { TopBoosterEntry } from '@/api/boosters'
@@ -80,7 +80,14 @@ function BoosterCard({ booster, winRate }: { booster: BoosterProfile; winRate: n
         <Avatar src={booster.avatar_url} name={booster.display_name} size="lg" />
 
         <p className="text-sm font-bold text-ink truncate w-full">{booster.display_name}</p>
-        <p className="text-[10px] text-ink-muted -mt-2">{formatLastSeen(booster.last_active_at)}</p>
+        {isBoosterOnline(booster.last_active_at) ? (
+          <p className="text-[10px] font-semibold text-success -mt-2 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+            Online
+          </p>
+        ) : (
+          <p className="text-[10px] text-ink-muted -mt-2">{formatLastSeen(booster.last_active_at)}</p>
+        )}
 
         {winRate > 0 && (
           <div className="text-center">

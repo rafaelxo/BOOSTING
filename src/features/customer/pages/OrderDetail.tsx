@@ -14,6 +14,7 @@ import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderRankSummary } from '@/components/order/OrderRankSummary'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
+import { OrderReviewSection } from '@/components/order/OrderReviewSection'
 import { CountdownTimer } from '@/components/order/CountdownTimer'
 import { supabase } from '@/lib/supabase'
 import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
@@ -745,6 +746,8 @@ export function OrderDetailPage() {
               </div>
             </Card>
           )}
+
+          <OrderReviewSection order={order} />
 
           <CredentialsSection order={order} state={customerState} />
 

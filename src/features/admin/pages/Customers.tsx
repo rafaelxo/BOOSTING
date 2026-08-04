@@ -16,6 +16,7 @@ export function AdminCustomersPage() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold text-ink">{t('admin.customers.title')}</h1>
+      <p className="text-xs text-ink-muted -mt-3">Mostrando apenas clientes com 1+ pedido nos últimos 30 dias.</p>
       {(customers?.length ?? 0) >= 100 && (
         <p className="text-xs text-warning">Mostrando os 100 clientes mais recentes — pode haver mais.</p>
       )}

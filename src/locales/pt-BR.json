@@ -260,7 +260,7 @@
         "totalSpent": "Total Gasto",
         "joined": "Entrou"
       },
-      "empty": "Nenhum cliente ainda"
+      "empty": "Nenhum cliente com pedidos nos últimos 30 dias"
     },
     "refunds": {
       "title": "Reembolsos",

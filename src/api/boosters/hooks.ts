@@ -48,6 +48,10 @@ export function usePublicBoosters() {
     queryKey: queryKeys.boosters.publicList(),
     queryFn: listPublicBoosters,
     staleTime: 60_000,
+    // Refetch periódico pro badge "Online" (derivado de last_active_at, ver
+    // isBoosterOnline em lib/utils.ts) refletir presença em near-real-time --
+    // mesmo intervalo já usado em useAdminOrders/booster-month-orders.
+    refetchInterval: 30_000,
   })
 }
 
