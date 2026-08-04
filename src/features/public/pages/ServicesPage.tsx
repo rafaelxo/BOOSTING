@@ -1,10 +1,8 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { TrendingUp, Zap, Users, Swords, CheckCircle2 } from 'lucide-react'
-import { RankBadge, Skeleton } from '@/components/ui'
+import { RankBadge } from '@/components/ui'
 import { RANK_TIER_ORDER, RANK_TIER_LABEL, RANK_TIER_COLOR } from '@/lib/utils'
-import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
-import type { BoostFlow } from '@/types'
 
 const SERVICES = [
   {
@@ -84,35 +82,6 @@ const SERVICES = [
   },
 ]
 
-const EXTRA_GROUPS: { flow: BoostFlow; label: string }[] = [
-  { flow: 'solo_standard', label: 'Solo Boost / Wins / MD5 / Solo Clash' },
-  { flow: 'duo_standard', label: 'Duo Boost / Duo Clash' },
-  { flow: 'master_plus', label: 'Boost Master+' },
-]
-
-function ExtraGroup({ flow, label }: { flow: BoostFlow; label: string }) {
-  const { data, isLoading } = useBoostAddons(flow)
-  const extras = data ?? EMPTY_ADDONS
-
-  if (isLoading) {
-    return <Skeleton className="h-24 rounded-2xl" />
-  }
-
-  return (
-    <div className="card p-4 space-y-3">
-      <p className="text-xs font-bold text-ink-muted uppercase tracking-wide">{label}</p>
-      <div className="space-y-2">
-        {extras.map((extra) => (
-          <div key={extra.id}>
-            <p className="text-sm font-semibold text-ink">{extra.name}</p>
-            <p className="text-xs text-ink-secondary leading-relaxed">{extra.description}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export function ServicesPage() {
   const { hash } = useLocation()
 
@@ -178,20 +147,6 @@ export function ServicesPage() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Premium extras */}
-        <div>
-          <div className="text-center mb-8">
-            <p className="section-label mb-2">Upgrades</p>
-            <h2 className="text-2xl font-bold text-ink">Extras Premium</h2>
-            <p className="text-ink-secondary mt-2">Adicione a qualquer pedido durante o checkout.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {EXTRA_GROUPS.map(({ flow, label }) => (
-              <ExtraGroup key={flow} flow={flow} label={label} />
-            ))}
-          </div>
         </div>
 
         {/* All ranks visual */}

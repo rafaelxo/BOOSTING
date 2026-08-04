@@ -1,7 +1,7 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
-import { Button, LogoMark, ThemeToggle } from '@/components/ui'
+import { Button, LogoMark } from '@/components/ui'
 import { PageLoader } from '@/components/ui/Spinner'
 import { supabase } from '@/lib/supabase'
 import { checkRateLimit, limits } from '@/lib/rateLimit'
@@ -154,14 +154,13 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center mb-8">
           <Link to="/" className="flex items-center gap-2">
             <LogoMark className="h-9 w-9" />
             <span className="text-xl font-bold text-ink">
               Elo<span className="text-brand">Peak</span>
             </span>
           </Link>
-          <ThemeToggle />
         </div>
 
         <div className="card p-6 space-y-5">

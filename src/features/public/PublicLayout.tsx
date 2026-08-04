@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Menu, X } from 'lucide-react'
-import { Button, LogoMark, ThemeToggle } from '@/components/ui'
+import { Button, LogoMark } from '@/components/ui'
 import { AmbientBackground } from '@/components/AmbientBackground'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -21,11 +21,6 @@ export function PublicLayout() {
   return (
     <AmbientBackground>
     <div className="min-h-screen flex flex-col">
-      {/* Discount bar */}
-      <div className="bg-gradient-brand py-2 text-center text-xs font-semibold text-white/95 tracking-wide">
-        {t('nav.announcement')}
-      </div>
-
       {/* Navbar */}
       <header className="sticky top-0 z-50 border-b border-bg-elevated/60 bg-bg-base/90 backdrop-blur-xl">
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 flex h-[68px] items-center gap-6">
@@ -58,7 +53,6 @@ export function PublicLayout() {
 
           {/* Right side */}
           <div className="hidden lg:flex items-center gap-3 ml-auto">
-            <ThemeToggle />
             {isAuthenticated() ? (
               <Button asChild size="sm">
                 <Link to={dashboardLink}>{t('nav.dashboard')}</Link>
@@ -97,7 +91,6 @@ export function PublicLayout() {
               </Link>
             ))}
             <div className="pt-3 flex gap-2">
-              <ThemeToggle />
               <Button asChild size="sm" className="flex-1">
                 <Link to="/login">{t('nav.signIn')}</Link>
               </Button>
