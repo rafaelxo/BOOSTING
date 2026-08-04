@@ -188,7 +188,7 @@ begin
 
   if public.is_admin() then
     select coalesce(jsonb_agg(jsonb_build_object(
-      'id', d.id, 'game_id', d.game_id, 'label', d.label,
+      'id', d.id, 'game_id', d.game_id, 'label', d.label, 'riot_id', d.riot_id,
       'current_rank', d.current_rank, 'notes', d.notes, 'is_active', d.is_active,
       'created_by', d.created_by, 'created_at', d.created_at, 'updated_at', d.updated_at,
       'has_credentials', d.encrypted_credentials is not null,
@@ -209,7 +209,7 @@ begin
     end if;
 
     select coalesce(jsonb_agg(jsonb_build_object(
-      'id', id, 'label', label, 'current_rank', current_rank, 'is_active', is_active,
+      'id', id, 'label', label, 'riot_id', riot_id, 'current_rank', current_rank, 'is_active', is_active,
       'reserved_by', reserved_by, 'reserved_order_id', reserved_order_id
     ) order by created_at desc), '[]'::jsonb)
     into v_accounts

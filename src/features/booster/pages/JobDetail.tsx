@@ -279,7 +279,10 @@ export function JobDetailPage() {
   // "Concluir" (in_progress -> awaiting_customer) saiu daqui -- agora é um
   // botão dedicado no rodapé do card de Detalhes, ao lado de "Verificar
   // Rank e Concluir" (ver mais abaixo). Só resta a transição de início.
-  const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' | 'secondary' | 'success' | 'danger' }[] = [
+  // Só resta a transição de início agora -- "Concluir" (variant 'success')
+  // saiu daqui pro rodapé do card de Detalhes, então o tipo não precisa mais
+  // cobrir todos os variants de Button, só o único que sobrou.
+  const STATUS_ACTIONS: { from: OrderStatus[]; to: OrderStatus; label: string; icon: React.ElementType; variant: 'primary' }[] = [
     { from: ['assigned'], to: 'in_progress', label: t('booster.job.startOrder'), icon: Play, variant: 'primary' },
   ]
 
@@ -677,7 +680,7 @@ export function JobDetailPage() {
               <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
               <div className="space-y-2">
                 {availableActions.map(({ to, label, icon: Icon, variant }) => (
-                  <Button key={to} variant={variant === 'success' ? 'success' : variant} className="w-full" leftIcon={<Icon className="h-4 w-4" />} loading={updateStatus.isPending} onClick={() => updateStatus.mutate(to)}>
+                  <Button key={to} variant={variant} className="w-full" leftIcon={<Icon className="h-4 w-4" />} loading={updateStatus.isPending} onClick={() => updateStatus.mutate(to)}>
                     {label}
                   </Button>
                 ))}

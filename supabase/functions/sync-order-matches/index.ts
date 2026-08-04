@@ -123,8 +123,14 @@ serve(async (req) => {
       ? Math.floor(new Date(order.match_sync_started_at as string).getTime() / 1000)
       : Math.floor(Date.now() / 1000) - 60 * 60 * 24
 
-    // ── Account-V1: Riot ID → puuid (cliente, sempre) ────────────────────────
-    const clientAccountResult = await fetchRiotAccount(clientRiotId, RIOT_API_KEY, REGIONAL_ROUTE)
+    // ── Account-V1: Riot ID → puuid (cliente + duo, em paralelo) ─────────────
+    // As duas chamadas são independentes -- disparar em paralelo evita pagar
+    // a latência de duas rodadas sequenciais à Riot a cada sync de pedido duo.
+    const [clientAccountResult, duoAccountResult] = await Promise.all([
+      fetchRiotAccount(clientRiotId, RIOT_API_KEY, REGIONAL_ROUTE),
+      duoRiotId ? fetchRiotAccount(duoRiotId, RIOT_API_KEY, REGIONAL_ROUTE) : Promise.resolve(null),
+    ])
+
     if (!clientAccountResult.ok) {
       if (clientAccountResult.reason === 'not_found') return jsonResponse(req, { synced: false, reason: 'account_not_found' })
       if (clientAccountResult.reason === 'rate_limited') return errorResponse(req, 'Sincronização indisponível no momento, tente novamente em instantes', 503)
@@ -138,8 +144,7 @@ serve(async (req) => {
     // cliente) continua funcionando normalmente, só a atribuição de stats
     // pro booster fica pra próxima tentativa.
     let duoPuuid: string | null = null
-    if (duoRiotId) {
-      const duoAccountResult = await fetchRiotAccount(duoRiotId, RIOT_API_KEY, REGIONAL_ROUTE)
+    if (duoAccountResult) {
       if (duoAccountResult.ok) {
         duoPuuid = duoAccountResult.account.puuid
       } else if (duoAccountResult.reason !== 'not_found') {
@@ -185,7 +190,13 @@ serve(async (req) => {
       // específica (ex.: o cliente jogou uma sozinho) -- não é um erro.
       if (!duoDetail.ok) return
       const d = duoDetail.detail
-      const { error } = await serviceClient
+      // .select() faz a diferença aqui: com ignoreDuplicates, um conflito
+      // vira um no-op que a Supabase reporta como sucesso (error: null) --
+      // sem checar se alguma linha voltou, duoRecordedCount subiria mesmo
+      // reprocessando uma partida já gravada (ex.: loop principal parou em
+      // 'invalid_status' e a mesma partida volta em newMatchIds na próxima
+      // chamada), disparando um refresh_booster_performance_segments à toa.
+      const { data: upserted, error } = await serviceClient
         .from('booster_duo_matches')
         .upsert({
           order_id: orderId,
@@ -203,8 +214,9 @@ serve(async (req) => {
           neutral_minions_killed: d.neutralMinionsKilled,
           is_mvp: d.isMvp,
         }, { onConflict: 'order_id,external_match_id', ignoreDuplicates: true })
+        .select('id')
       if (error) console.error('booster_duo_matches upsert failed', matchId, error.message)
-      else duoRecordedCount += 1
+      else if (upserted && upserted.length > 0) duoRecordedCount += 1
     }
 
     for (const matchId of newMatchIds) {
@@ -261,14 +273,23 @@ serve(async (req) => {
         .slice(0, DUO_BACKFILL_LOOKBACK)
         .filter((id) => !duoCheckedIds.has(id))
 
+      // Uma consulta batched pros até DUO_BACKFILL_LOOKBACK candidatos, em
+      // vez de um SELECT sequencial por candidato -- mesmo resultado, só sem
+      // pagar N round-trips ao banco antes de decidir se vale a pena buscar
+      // na Riot.
+      const alreadyInDuoMatches = backfillCandidates.length > 0
+        ? new Set(
+            (await serviceClient
+              .from('booster_duo_matches')
+              .select('external_match_id')
+              .eq('order_id', orderId)
+              .in('external_match_id', backfillCandidates)
+            ).data?.map((m) => m.external_match_id as string) ?? [],
+          )
+        : new Set<string>()
+
       for (const matchId of backfillCandidates) {
-        const { data: existingDuoMatch } = await serviceClient
-          .from('booster_duo_matches')
-          .select('id')
-          .eq('order_id', orderId)
-          .eq('external_match_id', matchId)
-          .maybeSingle()
-        if (existingDuoMatch) continue
+        if (alreadyInDuoMatches.has(matchId)) continue
 
         const bodyResult = await fetchMatchBody(matchId, RIOT_API_KEY, REGIONAL_ROUTE)
         if (!bodyResult.ok) {

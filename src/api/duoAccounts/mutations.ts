@@ -32,6 +32,7 @@ const OWN_ACCOUNT_MESSAGES: Record<string, string> = {
   not_duo_order: 'Este pedido não é Duo Boost.',
   invalid_status: 'Pedido não está em um status que aceite troca de conta.',
   invalid_riot_id: 'Riot ID inválido — use o formato Nome#TAG.',
+  order_not_found: 'Pedido não encontrado.',
 }
 
 export async function setDuoOwnRiotId(params: { orderId: string; riotId: string }) {
