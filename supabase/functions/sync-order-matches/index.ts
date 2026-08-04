@@ -55,7 +55,7 @@ serve(async (req) => {
     // aceitar qualquer um dos três, não só o booster.
     const { data: order, error: orderErr } = await userClient
       .from('orders')
-      .select('id, status, customer_id, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased')
+      .select('id, status, customer_id, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased, duo_own_riot_id')
       .eq('id', orderId)
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
@@ -80,7 +80,10 @@ serve(async (req) => {
 
     // Duo Boost: o booster joga com uma conta Duo separada, não a conta do
     // cliente (order.riot_id) -- as partidas de verdade acontecem nessa
-    // conta reservada, então é dela que sincronizamos.
+    // conta, então é dela que sincronizamos. Duas origens possíveis: uma
+    // conta reservada do pool da plataforma (duo_accounts) OU a conta
+    // própria do booster (order.duo_own_riot_id, sem reserva nenhuma) --
+    // a reservada tem prioridade se por algum motivo as duas existirem.
     let riotIdSource = order.riot_id as string | null
     if (order.boost_mode === 'duo') {
       const { data: duoAccount, error: duoErr } = await serviceClient
@@ -89,9 +92,9 @@ serve(async (req) => {
         .eq('reserved_order_id', orderId)
         .maybeSingle()
       if (duoErr) return errorResponse(req, 'Failed to load duo account', 500)
-      riotIdSource = duoAccount?.riot_id ?? null
+      riotIdSource = duoAccount?.riot_id ?? (order.duo_own_riot_id as string | null) ?? null
       if (!riotIdSource) {
-        return badRequest(req, 'Nenhuma conta Duo reservada com Riot ID cadastrado para este pedido')
+        return badRequest(req, 'Nenhuma conta Duo (da plataforma ou própria) cadastrada para este pedido')
       }
     } else if (!riotIdSource) {
       return badRequest(req, 'Este pedido não tem conta Riot cadastrada para sincronizar')

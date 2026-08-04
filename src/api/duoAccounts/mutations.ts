@@ -27,6 +27,27 @@ export async function getDuoAccountAccessToken(accountId: string) {
   return assertRpcSuccess(data as { success: boolean; error?: string; access_token?: string })
 }
 
+const OWN_ACCOUNT_MESSAGES: Record<string, string> = {
+  forbidden: 'Você não é o booster deste pedido.',
+  not_duo_order: 'Este pedido não é Duo Boost.',
+  invalid_status: 'Pedido não está em um status que aceite troca de conta.',
+  invalid_riot_id: 'Riot ID inválido — use o formato Nome#TAG.',
+}
+
+export async function setDuoOwnRiotId(params: { orderId: string; riotId: string }) {
+  const { data, error } = await supabase.rpc('set_duo_own_riot_id', {
+    p_order_id: params.orderId, p_riot_id: params.riotId,
+  })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string }, OWN_ACCOUNT_MESSAGES)
+}
+
+export async function clearDuoOwnRiotId(orderId: string) {
+  const { data, error } = await supabase.rpc('clear_duo_own_riot_id', { p_order_id: orderId })
+  if (error) throw normalizeApiError(error)
+  return assertRpcSuccess(data as { success: boolean; error?: string }, OWN_ACCOUNT_MESSAGES)
+}
+
 export async function updateDuoAccountRank(params: { accountId: string; tier: string; division: string | null }) {
   const { data, error } = await supabase.rpc('update_duo_account_rank', {
     p_account_id: params.accountId, p_tier: params.tier, p_division: (params.division ?? '') as never,

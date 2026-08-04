@@ -14,5 +14,5 @@ export const ORDER_SAFE_COLUMNS = [
   'chat_locked', 'chat_locked_at', 'chat_locked_by',
   'match_sync_started_at', 'last_match_synced_at',
   'coupon_code', 'discount_price', 'clash_tier', 'clash_day',
-  'drop_count', 'rank_before_last_drop', 'last_dropped_at',
+  'drop_count', 'rank_before_last_drop', 'last_dropped_at', 'duo_own_riot_id',
 ].join(',')

@@ -26,35 +26,67 @@ import {
 } from '@/api/orders'
 import { useOwnBoosterTop3Status } from '@/api/boosters'
 import { useBoosterServiceDetails } from '@/api/coaching'
-import { useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation } from '@/api/duoAccounts'
+import {
+  useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation,
+  useSetDuoOwnRiotId, useClearDuoOwnRiotId,
+} from '@/api/duoAccounts'
 import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
-import type { Division, Order, OrderStatus, RankTier } from '@/types'
+import { rankStep } from '@/lib/pricing'
+import type { Order, OrderStatus, RankTier } from '@/types'
 
-const DUO_FILTER_TIERS: RankTier[] = ['iron', 'bronze', 'silver', 'gold', 'platinum', 'emerald', 'diamond']
-const DUO_FILTER_DIVISIONS: Division[] = ['IV', 'III', 'II', 'I']
+// Janela de proximidade de elo pra filtrar contas Duo disponíveis
+// automaticamente: até Esmeralda I, aceita ±1 divisão inteira (4 degraus de
+// rankStep); a partir de Diamante, a janela fecha pra ±2 subdivisões só --
+// matchmaking fica mais sensível a diferença de elo nesse patamar.
+const DUO_RANK_WINDOW_EMERALD_I_STEP = rankStep('emerald', 'I')
+
+function withinDuoRankWindow(clientStep: number, accountStep: number): boolean {
+  const windowSize = clientStep <= DUO_RANK_WINDOW_EMERALD_I_STEP ? 4 : 2
+  return Math.abs(accountStep - clientStep) <= windowSize
+}
 
 function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () => void }) {
   const { profile } = useAuthStore()
+  const [accountSource, setAccountSource] = useState<'platform' | 'own'>(order.duo_own_riot_id ? 'own' : 'platform')
+  const [ownRiotId, setOwnRiotId] = useState('')
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [switching, setSwitching] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [tokenCopied, setTokenCopied] = useState(false)
   const [search, setSearch] = useState('')
-  const [tierFilter, setTierFilter] = useState<RankTier | 'all'>('all')
-  const [divisionFilter, setDivisionFilter] = useState<Division | 'all'>('all')
 
   const { data: accounts, isLoading } = useBoosterDuoAccounts()
   const reserve = useReserveDuoAccount()
   const getToken = useGetDuoAccountAccessToken()
   const release = useReleaseDuoAccountReservation()
+  const setOwnAccount = useSetDuoOwnRiotId()
+  const clearOwnAccount = useClearDuoOwnRiotId()
 
   const reserved = (accounts as BoosterVisibleDuoAccount[] | undefined)?.find(a => a.reserved_by === profile?.id && a.reserved_order_id === order.id)
+
+  // Elo atual do cliente neste pedido -- referência pra janela de proximidade
+  // abaixo. Sem ele (raro, mas possível), não dá pra filtrar por elo: mostra
+  // todas as contas em vez de esconder tudo por falta de dado.
+  const clientStep = order.current_rank ? rankStep(order.current_rank.tier, order.current_rank.division) : null
+
   const available = ((accounts as BoosterVisibleDuoAccount[] | undefined)?.filter(a => a.reserved_by === null) ?? []).filter((a) => {
     if (search.trim() && !(a.riot_id ?? a.label).toLowerCase().includes(search.trim().toLowerCase())) return false
-    if (tierFilter !== 'all' && a.current_rank?.tier !== tierFilter) return false
-    if (divisionFilter !== 'all' && a.current_rank?.division !== divisionFilter) return false
+    if (clientStep != null) {
+      if (!a.current_rank) return false
+      if (!withinDuoRankWindow(clientStep, rankStep(a.current_rank.tier, a.current_rank.division))) return false
+    }
     return true
   })
+
+  function doSaveOwnAccount() {
+    setOwnAccount.mutate({ orderId: order.id, riotId: ownRiotId.trim() }, {
+      onSuccess: () => { setOwnRiotId(''); onLinked?.() },
+    })
+  }
+
+  function doClearOwnAccount() {
+    clearOwnAccount.mutate(order.id)
+  }
 
   function doReserve() {
     reserve.mutate({ orderId: order.id, accountId: selectedAccountId }, {
@@ -90,7 +122,61 @@ function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () =>
         Conta Duo
       </h3>
 
-      {isLoading ? (
+      {/* Alternar de aba não mexe no que já está salvo em cada lado -- só
+          muda o que fica visível. */}
+      <div className="mb-3 grid grid-cols-2 gap-1.5 rounded-xl bg-bg-elevated p-1">
+        <button
+          type="button"
+          onClick={() => setAccountSource('platform')}
+          className={`rounded-lg py-1.5 text-xs font-semibold transition-colors ${accountSource === 'platform' ? 'bg-bg-surface text-ink shadow-sm' : 'text-ink-muted'}`}
+        >
+          Conta da plataforma
+        </button>
+        <button
+          type="button"
+          onClick={() => setAccountSource('own')}
+          className={`rounded-lg py-1.5 text-xs font-semibold transition-colors ${accountSource === 'own' ? 'bg-bg-surface text-ink shadow-sm' : 'text-ink-muted'}`}
+        >
+          Conta própria
+        </button>
+      </div>
+
+      {accountSource === 'own' ? (
+        <div className="space-y-2">
+          <p className="text-xs text-ink-secondary">
+            Use sua própria conta pra jogar com o cliente — só o Riot ID, sem token (você já tem acesso).
+          </p>
+          {order.duo_own_riot_id ? (
+            <div className="flex items-center justify-between bg-bg-elevated rounded-xl px-3 py-2.5">
+              <p className="text-sm font-semibold text-ink truncate">{order.duo_own_riot_id}</p>
+              <Button size="sm" variant="danger-ghost" loading={clearOwnAccount.isPending} onClick={doClearOwnAccount}>
+                Remover
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-1.5">
+              <input
+                value={ownRiotId}
+                onChange={(e) => setOwnRiotId(e.target.value)}
+                placeholder="Nome#TAG"
+                className="input-base flex-1 text-sm"
+              />
+              <Button size="sm" disabled={!ownRiotId.trim()} loading={setOwnAccount.isPending} onClick={doSaveOwnAccount}>
+                Salvar
+              </Button>
+            </div>
+          )}
+          {(setOwnAccount.isError || clearOwnAccount.isError) && (
+            <ErrorAlert
+              message={
+                (setOwnAccount.error instanceof Error && setOwnAccount.error.message) ||
+                (clearOwnAccount.error instanceof Error && clearOwnAccount.error.message) ||
+                'Erro ao salvar conta'
+              }
+            />
+          )}
+        </div>
+      ) : isLoading ? (
         <p className="text-xs text-ink-muted">Carregando contas...</p>
       ) : reserved && !switching ? (
         <div className="space-y-3">
@@ -132,20 +218,15 @@ function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () =>
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-1.5">
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nick..." className="input-base col-span-3 sm:col-span-1 text-xs" />
-            <select value={tierFilter} onChange={(e) => { setTierFilter(e.target.value as RankTier | 'all'); setSelectedAccountId('') }} className="input-base text-xs">
-              <option value="all">Elo</option>
-              {DUO_FILTER_TIERS.map((t) => <option key={t} value={t}>{RANK_TIER_LABEL[t]}</option>)}
-            </select>
-            <select value={divisionFilter} onChange={(e) => { setDivisionFilter(e.target.value as Division | 'all'); setSelectedAccountId('') }} className="input-base text-xs">
-              <option value="all">Divisão</option>
-              {DUO_FILTER_DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nick..." className="input-base w-full text-xs" />
+          <p className="text-[10px] text-ink-muted">
+            {clientStep != null
+              ? `Contas filtradas automaticamente pelo elo do cliente (${clientStep <= DUO_RANK_WINDOW_EMERALD_I_STEP ? '±1 divisão' : '±2 subdivisões'}).`
+              : 'Sem elo atual do cliente pra filtrar — mostrando todas as contas disponíveis.'}
+          </p>
 
           {available.length === 0 ? (
-            <p className="text-xs text-ink-muted py-2">Nenhuma conta Duo disponível com esse filtro.</p>
+            <p className="text-xs text-ink-muted py-2">Nenhuma conta Duo disponível nessa faixa de elo.</p>
           ) : (
             <div className="max-h-52 space-y-1.5 overflow-y-auto pr-0.5">
               {available.map((a) => (
@@ -499,6 +580,54 @@ export function JobDetailPage() {
             )}
           </Card>
 
+          {/* Entre Detalhes do Pedido e Histórico de partidas -- tudo que é
+              "mecânica de acesso à conta" (Duo, token) fica junto aqui, não
+              espalhado pela sidebar. */}
+          {order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
+            && ['assigned', 'in_progress', 'paused'].includes(order.status) && (
+            <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
+          )}
+
+          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
+            && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+            <Card padding="md">
+              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-brand" />
+                Token de acesso
+              </h3>
+              <p className="text-xs text-ink-secondary mb-3">
+                Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
+              </p>
+
+              {!order.credentials_set ? (
+                <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                  O cliente ainda não cadastrou as credenciais de acesso.
+                </div>
+              ) : accessToken ? (
+                <div className="space-y-2">
+                  <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
+                  <p className="text-[11px] text-ink-muted text-center">
+                    Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
+                  </p>
+                  <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
+                    {tokenCopied ? 'Copiado' : 'Copiar token'}
+                  </Button>
+                  <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                    Criar novo token
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                  Criar token
+                </Button>
+              )}
+
+              {revealAccessToken.isError && (
+                <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
+              )}
+            </Card>
+          )}
+
           {order.service_type === 'coaching'
             ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
               <OrderCoachingTopics orderId={order.id} />
@@ -543,11 +672,6 @@ export function JobDetailPage() {
             </Card>
           )}
 
-          {order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
-            && ['assigned', 'in_progress', 'paused'].includes(order.status) && (
-            <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
-          )}
-
           {availableActions.length > 0 && (
             <Card padding="md">
               <h3 className="text-sm font-semibold text-ink mb-3">{t('booster.job.actions')}</h3>
@@ -579,46 +703,6 @@ export function JobDetailPage() {
                 chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
               </p>
             </div>
-          )}
-
-          {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
-            && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-            <Card padding="md">
-              <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-                <KeyRound className="h-4 w-4 text-brand" />
-                Token de acesso
-              </h3>
-              <p className="text-xs text-ink-secondary mb-3">
-                Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
-              </p>
-
-              {!order.credentials_set ? (
-                <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
-                  O cliente ainda não cadastrou as credenciais de acesso.
-                </div>
-              ) : accessToken ? (
-                <div className="space-y-2">
-                  <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
-                  <p className="text-[11px] text-ink-muted text-center">
-                    Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
-                  </p>
-                  <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
-                    {tokenCopied ? 'Copiado' : 'Copiar token'}
-                  </Button>
-                  <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                    Criar novo token
-                  </Button>
-                </div>
-              ) : (
-                <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                  Criar token
-                </Button>
-              )}
-
-              {revealAccessToken.isError && (
-                <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
-              )}
-            </Card>
           )}
 
           <OrderChat orderId={order.id} viewerRole="booster" orderStatus={order.status} />

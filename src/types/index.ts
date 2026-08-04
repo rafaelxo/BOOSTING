@@ -251,6 +251,11 @@ export interface Order {
   // Riot ID (nome#tag) usado pra verificar automaticamente se o rank alvo
   // foi atingido — só coletado em fluxos que têm target_rank (elo_boost).
   riot_id: string | null
+  // Riot ID da "conta própria" do booster pra Duo Boost -- alternativa à
+  // conta reservada em duo_accounts (pool da plataforma). Só faz sentido
+  // quando boost_mode === 'duo'; sem token de acesso porque é a própria
+  // conta do booster, ele já tem login.
+  duo_own_riot_id: string | null
   // Pacote de coach comprado (booster_services.id) — só setado quando
   // service_type === 'coaching'.
   booster_service_id: string | null

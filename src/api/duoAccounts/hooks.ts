@@ -4,7 +4,8 @@ import { queryKeys } from '@/api/core/queryKeys'
 import { listAdminDuoAccounts, listDuoAccounts, lookupDuoAccountRiotRank } from './queries'
 import {
   adminDeleteDuoAccount, adminReleaseDuoAccount, adminSaveDuoAccount, adminSetDuoAccountActive,
-  getDuoAccountAccessToken, releaseDuoAccountReservation, reserveDuoAccount, updateDuoAccountRank,
+  clearDuoOwnRiotId, getDuoAccountAccessToken, releaseDuoAccountReservation, reserveDuoAccount,
+  setDuoOwnRiotId, updateDuoAccountRank,
 } from './mutations'
 import type { AdminDuoAccount, BoosterVisibleDuoAccount } from './types'
 
@@ -42,6 +43,24 @@ export function useReleaseDuoAccountReservation() {
 
 export function useGetDuoAccountAccessToken() {
   return useMutation({ mutationFn: getDuoAccountAccessToken })
+}
+
+// duo_own_riot_id mora em orders, não em duo_accounts -- invalida o detalhe
+// do pedido (é de lá que JobDetail lê o campo), não a lista de contas.
+export function useSetDuoOwnRiotId() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: setDuoOwnRiotId,
+    onSuccess: (_data, variables) => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(variables.orderId) }),
+  })
+}
+
+export function useClearDuoOwnRiotId() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: clearDuoOwnRiotId,
+    onSuccess: (_data, orderId) => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(orderId) }),
+  })
 }
 
 export function useAdminSaveDuoAccount() {
