@@ -126,6 +126,51 @@ export type Database = {
           },
         ]
       }
+      booster_champion_stats: {
+        Row: {
+          account_type: string
+          booster_id: string
+          calculated_at: string
+          champion: string
+          games_played: number
+          id: string
+          wins: number
+        }
+        Insert: {
+          account_type?: string
+          booster_id: string
+          calculated_at?: string
+          champion: string
+          games_played?: number
+          id?: string
+          wins?: number
+        }
+        Update: {
+          account_type?: string
+          booster_id?: string
+          calculated_at?: string
+          champion?: string
+          games_played?: number
+          id?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_champion_stats_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "booster_champion_stats_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       booster_ledger_entries: {
         Row: {
           actor_id: string | null
@@ -235,8 +280,10 @@ export type Database = {
       }
       booster_performance_segments: {
         Row: {
+          account_type: string
           adjusted_rating: number
           adjusted_win_rate: number
+          avg_cs_per_min: number | null
           average_kda: number | null
           average_rating: number | null
           booster_id: string
@@ -244,8 +291,10 @@ export type Database = {
           id: string
           last_match_at: string | null
           losses: number
+          mvp_count: number
           normalized_kda: number
           performance_score: number
+          queue_type: string
           rank_bucket: string
           review_count: number
           score_version: string
@@ -255,8 +304,10 @@ export type Database = {
           wins: number
         }
         Insert: {
+          account_type?: string
           adjusted_rating?: number
           adjusted_win_rate?: number
+          avg_cs_per_min?: number | null
           average_kda?: number | null
           average_rating?: number | null
           booster_id: string
@@ -264,8 +315,10 @@ export type Database = {
           id?: string
           last_match_at?: string | null
           losses?: number
+          mvp_count?: number
           normalized_kda?: number
           performance_score?: number
+          queue_type?: string
           rank_bucket?: string
           review_count?: number
           score_version?: string
@@ -275,8 +328,10 @@ export type Database = {
           wins?: number
         }
         Update: {
+          account_type?: string
           adjusted_rating?: number
           adjusted_win_rate?: number
+          avg_cs_per_min?: number | null
           average_kda?: number | null
           average_rating?: number | null
           booster_id?: string
@@ -284,8 +339,10 @@ export type Database = {
           id?: string
           last_match_at?: string | null
           losses?: number
+          mvp_count?: number
           normalized_kda?: number
           performance_score?: number
+          queue_type?: string
           rank_bucket?: string
           review_count?: number
           score_version?: string
@@ -639,6 +696,65 @@ export type Database = {
             columns: ["reserved_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duo_account_reservations: {
+        Row: {
+          account_id: string
+          booster_id: string
+          id: string
+          order_id: string | null
+          released_at: string | null
+          released_by: string | null
+          reserved_at: string
+        }
+        Insert: {
+          account_id: string
+          booster_id: string
+          id?: string
+          order_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          reserved_at?: string
+        }
+        Update: {
+          account_id?: string
+          booster_id?: string
+          id?: string
+          order_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          reserved_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_account_reservations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "duo_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2263,6 +2379,10 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: Json
       }
+      get_duo_account_reservation_history: {
+        Args: { p_account_id: string }
+        Returns: Json
+      }
       get_order_chat: { Args: { p_order_id: string }; Returns: Json }
       get_order_credentials: { Args: { p_order_id: string }; Returns: Json }
       get_top_boosters: {
@@ -2339,7 +2459,10 @@ export type Database = {
           p_deaths: number
           p_duration_seconds: number
           p_external_match_id: string
+          p_is_mvp: boolean
           p_kills: number
+          p_minions_killed: number
+          p_neutral_minions_killed: number
           p_order_id: string
           p_played_at: string
           p_queue_id: number
@@ -2428,6 +2551,14 @@ export type Database = {
       }
       set_duo_account_credentials: {
         Args: { p_account_id: string; p_login: string; p_password: string }
+        Returns: Json
+      }
+      set_duo_own_riot_id: {
+        Args: { p_order_id: string; p_riot_id: string }
+        Returns: Json
+      }
+      clear_duo_own_riot_id: {
+        Args: { p_order_id: string }
         Returns: Json
       }
       set_order_coaching_topic_done: {
