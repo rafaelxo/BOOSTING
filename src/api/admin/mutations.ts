@@ -6,7 +6,9 @@ export async function resolveDropRequest(params: { requestId: string; approve: b
     p_request_id: params.requestId, p_approve: params.approve, p_admin_note: params.adminNote,
   })
   if (error) throw normalizeApiError(error)
-  return assertRpcSuccess(data as { success: boolean; error?: string })
+  return assertRpcSuccess(data as { success: boolean; error?: string }, {
+    drop_limit_reached: 'Este pedido já atingiu o limite de 2 drops aprovados.',
+  })
 }
 
 export async function waiveDropPenalty(params: { requestId: string; adminNote?: string }) {

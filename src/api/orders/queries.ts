@@ -35,7 +35,12 @@ export async function listCustomerOrders(customerId: string, limit = 100): Promi
   return (data ?? []) as unknown as Order[]
 }
 
-export async function listAvailableJobs(limit = 50): Promise<Order[]> {
+// limit bem acima do volume real de pedidos simultâneos aguardando booster --
+// com ascending + um limite baixo (era 50), um pedido novo nunca aparecia
+// assim que o pool passasse de 50 (os 50 mais ANTIGOS ficam, o resto é
+// cortado): o job mais recente literalmente não vinha na resposta, parecendo
+// um bug de tempo real quando na verdade era truncamento da consulta.
+export async function listAvailableJobs(limit = 300): Promise<Order[]> {
   const { data, error } = await supabase
     .from('available_boost_orders')
     .select('*')

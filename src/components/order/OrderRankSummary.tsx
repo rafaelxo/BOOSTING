@@ -33,9 +33,13 @@ export function OrderRankSummary({ order }: { order: Order }) {
           <>
             <div className="flex flex-col items-center gap-1 shrink-0">
               <ChevronRight className="h-5 w-5 text-ink-muted" />
-              <span className={`text-sm font-bold text-brand whitespace-nowrap ${progressLocked ? 'blur-[3px] opacity-60 select-none' : ''}`} data-tabular>
-                {currentPoints ?? '—'} {pointsLabel}
-              </span>
+              {progressLocked ? (
+                <span className="text-[11px] font-medium text-ink-muted whitespace-nowrap">Aguardando início</span>
+              ) : (
+                <span className="text-sm font-bold text-brand whitespace-nowrap" data-tabular>
+                  {currentPoints != null ? `${currentPoints} ${pointsLabel}` : 'Sincronizando…'}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2.5 min-w-0">

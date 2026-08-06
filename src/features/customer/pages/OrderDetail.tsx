@@ -3,11 +3,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft, Clock, History, KeyRound, Lock, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
-  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, Tag,
+  Clock, History, KeyRound, Lock, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
+  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, GuaranteeNotice } from '@/components/ui'
-import { OrderChat } from '@/components/order/OrderChat'
+import { OrderActionBar } from '@/components/order/OrderActionBar'
+import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
+import { OrderChatModal } from '@/components/order/OrderChatModal'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
@@ -48,25 +50,14 @@ function useAssignedBooster(boosterId: string | null) {
   })
 }
 
-function AssignedBoosterStat({ order }: { order: Order }) {
+function AssignedBoosterValue({ order }: { order: Order }) {
   const { data: booster, isLoading } = useAssignedBooster(order.assigned_booster_id)
-
+  if (isLoading) return <Skeleton className="h-5 w-20 mx-auto" />
+  if (!booster) return <span>Não associado</span>
   return (
-    <div>
-      <p className="text-xs text-ink-muted flex items-center justify-center gap-1">
-        <UserCheck className="h-3 w-3 shrink-0" />
-        Booster associado
-      </p>
-      {isLoading ? (
-        <Skeleton className="h-5 w-20 mx-auto mt-0.5" />
-      ) : booster ? (
-        <Link to={`/boosters/${booster.id}`} className="block text-sm font-semibold text-ink mt-0.5 truncate hover:text-brand transition-colors">
-          {booster.display_name}
-        </Link>
-      ) : (
-        <p className="text-sm font-semibold text-ink mt-0.5">---</p>
-      )}
-    </div>
+    <Link to={`/boosters/${booster.id}`} className="text-brand hover:underline">
+      {booster.display_name}
+    </Link>
   )
 }
 
@@ -180,17 +171,8 @@ function PendingPaymentSection({ order }: { order: Order }) {
     })
   }
 
-  // Mostra o qr code assim que a página abre, sem exigir clique em "Efetuar
-  // pagamento" -- create-pix-payment reaproveita o pagamento PIX pendente
-  // existente (nunca gera um segundo), então isso sempre reexibe o MESMO qr
-  // code de quando o pedido foi criado, nunca duplica cobrança.
   useEffect(() => {
     if (order.status === 'awaiting_payment') loadPix()
-    // Refaz a chamada sempre que o pedido (re)entra em 'awaiting_payment' --
-    // não só na primeira renderização deste pedido. Sem `order.status` aqui,
-    // se o status saísse e voltasse a 'awaiting_payment' com o mesmo
-    // order.id (esta seção não desmonta nesse caso), o QR nunca recarregava
-    // sozinho. loadPix fica de fora de propósito (recriada a cada render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.id, order.status])
 
@@ -200,11 +182,6 @@ function PendingPaymentSection({ order }: { order: Order }) {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
         queryClient.removeQueries({ queryKey: ['orders', 'detail', order.id] })
-        // Sem isso, o cache de "tenho um pedido pendente pra retomar" (lido
-        // por OrderBuilder.tsx ao abrir /orders/new) podia continuar
-        // apontando pra este pedido recém-cancelado até expirar sozinho --
-        // reabrir o configurador nessa janela mandava o cliente de volta
-        // pra cá, achando que ainda havia algo pra pagar.
         queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
         navigate('/orders/new?new=1', { replace: true })
       },
@@ -246,7 +223,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const expired = remaining === 0
 
   return (
-    <Card id="payment" padding="md">
+    <div id="payment" className="border-t border-border-subtle pt-5">
       <div className="flex items-center gap-2 mb-3">
         <QrCode className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
@@ -257,7 +234,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
       </p>
 
       {!pix ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 max-w-md">
           <Button className="w-full" loading={generatePix.isPending} onClick={loadPix} leftIcon={<QrCode className="h-4 w-4" />}>
             Efetuar pagamento
           </Button>
@@ -266,14 +243,14 @@ function PendingPaymentSection({ order }: { order: Order }) {
           </Button>
         </div>
       ) : expired ? (
-        <div className="space-y-3">
+        <div className="space-y-3 max-w-md">
           <ErrorAlert message="Este PIX expirou. O pedido está sendo cancelado e o configurador será reiniciado." />
           <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
             Cancelar pedido
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-md">
           <div className="flex items-center justify-between rounded-xl bg-bg-elevated px-4 py-3">
             <div>
               <p className="text-xs text-ink-muted">Total</p>
@@ -311,7 +288,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
       )}
 
       {error && <div className="mt-3"><ErrorAlert message={error} /></div>}
-    </Card>
+    </div>
   )
 }
 
@@ -337,10 +314,10 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
   }
 
   return (
-    <Card id="credentials" padding="md" className="scroll-mt-24 ring-1 ring-brand/20">
+    <div id="credentials" className="scroll-mt-24 border-t border-border-subtle pt-5">
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold text-ink">Acesso da Conta</h3>
+        <h3 className="text-sm font-semibold text-ink">Conta do pedido</h3>
         {state.credentials_set && (
           <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-lg">
             <ShieldCheck className="h-3 w-3" /> Salvas
@@ -358,7 +335,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
         </GuaranteeNotice>
       </div>
       {canSet && (
-        <div className="space-y-3">
+        <div className="space-y-3 max-w-md">
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Login / E-mail da conta</label>
             <input type="text" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Ex: SeuUsuario#BR1" className="input-base w-full text-sm" autoComplete="username" maxLength={160} />
@@ -376,132 +353,64 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
           )}
         </div>
       )}
-    </Card>
-  )
-}
-
-function CompletionConfirmationSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
-  const [showDisputeModal, setShowDisputeModal] = useState(false)
-  const [disputeReason, setDisputeReason] = useState('')
-  const confirm = useConfirmOrderCompletion(order.id)
-  const dispute = useDisputeOrderCompletion(order.id)
-
-  if (!state?.can_confirm_completion) return null
-
-  return (
-    <Card padding="md" className="ring-1 ring-success/20">
-      <div className="flex items-center gap-2 mb-2">
-        <CheckCircle2 className="h-4 w-4 text-success" />
-        <h3 className="text-sm font-semibold text-ink">Confirmação necessária</h3>
-      </div>
-      <p className="text-xs text-ink-secondary mb-4">
-        Serviço concluído! O booster finalizou o pedido. Confirme a conclusão após revisar o resultado.
-      </p>
-      <div className="space-y-2">
-        <Button className="w-full" variant="success" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={confirm.isPending} onClick={() => confirm.mutate()}>
-          Confirmar conclusão
-        </Button>
-        <Button className="w-full" variant="danger-ghost" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
-          Não recebi o que contratei
-        </Button>
-      </div>
-      {(confirm.isError || dispute.isError) && (
-        <ErrorAlert
-          className="mt-2"
-          message={
-            (confirm.error instanceof Error && confirm.error.message) ||
-            (dispute.error instanceof Error && dispute.error.message) ||
-            'Erro ao processar sua solicitação'
-          }
-        />
-      )}
-
-      <Modal
-        open={showDisputeModal}
-        onOpenChange={(open) => { if (!open) { setShowDisputeModal(false); setDisputeReason('') } }}
-        title="Abrir disputa"
-        description="Conte o que não foi entregue conforme contratado. Um administrador vai revisar o pedido."
-      >
-        <div>
-          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
-            Motivo <span className="text-danger">*</span>
-          </label>
-          <textarea value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Descreva o que aconteceu..." className="input-base w-full min-h-[100px] resize-none text-sm" />
-        </div>
-        <div className="flex gap-3 justify-end pt-2">
-          <Button variant="ghost" onClick={() => { setShowDisputeModal(false); setDisputeReason('') }}>Cancelar</Button>
-          <Button variant="danger" loading={dispute.isPending} disabled={disputeReason.trim().length < 10} onClick={() => dispute.mutate(disputeReason.trim(), { onSuccess: () => setShowDisputeModal(false) })}>
-            Enviar disputa
-          </Button>
-        </div>
-      </Modal>
-    </Card>
+    </div>
   )
 }
 
 const CUSTOMER_DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 'awaiting_customer']
 
-function CustomerDropRequestSection({ order }: { order: Order }) {
-  const [showDropModal, setShowDropModal] = useState(false)
+function DropLockedBanner({ order }: { order: Order }) {
+  if (order.status !== 'drop_requested') return null
+  return (
+    <Card padding="md" className="border border-warning/30 bg-warning/5">
+      <div className="flex items-center gap-2 text-warning text-sm font-semibold">
+        <Lock className="h-4 w-4" />
+        Pedido travado · solicitação em análise
+      </div>
+      <p className="text-xs text-ink-secondary mt-1">
+        O admin está analisando o motivo da troca de booster. Nenhuma nova ação de boost acontece
+        enquanto isso — chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
+      </p>
+    </Card>
+  )
+}
+
+function CustomerDropModal({ order, open, onClose }: { order: Order; open: boolean; onClose: () => void }) {
   const [dropReason, setDropReason] = useState('')
   const requestDrop = useRequestCustomerOrderDrop(order.id)
-
-  if (order.status === 'drop_requested') {
-    return (
-      <Card padding="md" className="border border-warning/30 bg-warning/5">
-        <div className="flex items-center gap-2 text-warning text-sm font-semibold">
-          <Lock className="h-4 w-4" />
-          Pedido travado · solicitação em análise
-        </div>
-        <p className="text-xs text-ink-secondary mt-1">
-          O admin está analisando o motivo da troca de booster. Nenhuma nova ação de boost acontece
-          enquanto isso — chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
-        </p>
-      </Card>
-    )
-  }
-
-  if (!CUSTOMER_DROPPABLE_STATUSES.includes(order.status)) return null
+  const remainingDrops = Math.max(0, 2 - order.drop_count)
 
   return (
-    <>
-      <Button
-        variant="danger-ghost"
-        className="w-full"
-        leftIcon={<AlertTriangle className="h-4 w-4" />}
-        onClick={() => setShowDropModal(true)}
-      >
-        Solicitar troca de booster
-      </Button>
-
-      <Modal
-        open={showDropModal}
-        onOpenChange={(open) => { if (!open) { setShowDropModal(false); setDropReason('') } }}
-        title="Solicitar troca de booster"
-        description="Sua solicitação será enviada ao admin para aprovação. O pedido continua ativo -- o booster atual é substituído e o pedido volta pro painel pra outro assumir, com valor e prazo já ajustados ao progresso entregue até aqui. Você não é cobrado nem reembolsado por isso."
-      >
-        <div>
-          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
-            Motivo <span className="text-danger">*</span>
-          </label>
-          <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo..." className="input-base w-full min-h-[100px] resize-none text-sm" maxLength={500} />
-        </div>
-        {requestDrop.isError && (
-          <ErrorAlert message={requestDrop.error instanceof Error ? requestDrop.error.message : 'Erro'} className="mt-2" />
-        )}
-        <div className="flex gap-3 justify-end pt-2">
-          <Button variant="ghost" onClick={() => { setShowDropModal(false); setDropReason('') }}>Cancelar</Button>
-          <Button
-            variant="danger"
-            loading={requestDrop.isPending}
-            disabled={dropReason.trim().length < 10}
-            onClick={() => requestDrop.mutate(dropReason.trim(), { onSuccess: () => { setShowDropModal(false); setDropReason('') } })}
-          >
-            Enviar Solicitação
-          </Button>
-        </div>
-      </Modal>
-    </>
+    <Modal
+      open={open}
+      onOpenChange={(next) => { if (!next) { onClose(); setDropReason('') } }}
+      title="Solicitar troca de booster"
+      description="Sua solicitação será enviada ao admin para aprovação. O pedido continua ativo -- o booster atual é substituído e o pedido volta pro painel pra outro assumir, com valor e prazo já ajustados ao progresso entregue até aqui. Você não é cobrado nem reembolsado por isso."
+    >
+      <p className="text-xs font-medium text-ink-secondary bg-bg-elevated rounded-lg px-3 py-2">
+        Você ainda possui {remainingDrops} drop{remainingDrops === 1 ? '' : 's'} disponíve{remainingDrops === 1 ? 'l' : 'is'} para este pedido.
+      </p>
+      <div>
+        <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+          Motivo <span className="text-danger">*</span>
+        </label>
+        <textarea value={dropReason} onChange={(e) => setDropReason(e.target.value)} placeholder="Descreva o motivo..." className="input-base w-full min-h-[100px] resize-none text-sm" maxLength={500} />
+      </div>
+      {requestDrop.isError && (
+        <ErrorAlert message={requestDrop.error instanceof Error ? requestDrop.error.message : 'Erro'} className="mt-2" />
+      )}
+      <div className="flex gap-3 justify-end pt-2">
+        <Button variant="ghost" onClick={() => { onClose(); setDropReason('') }}>Cancelar</Button>
+        <Button
+          variant="danger"
+          loading={requestDrop.isPending}
+          disabled={dropReason.trim().length < 10}
+          onClick={() => requestDrop.mutate(dropReason.trim(), { onSuccess: () => { onClose(); setDropReason('') } })}
+        >
+          Enviar Solicitação
+        </Button>
+      </div>
+    </Modal>
   )
 }
 
@@ -510,17 +419,18 @@ export function OrderDetailPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const currency = useCurrency()
+  const [chatOpen, setChatOpen] = useState(false)
+  const [dropModalOpen, setDropModalOpen] = useState(false)
+  const [showDisputeModal, setShowDisputeModal] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
 
   const { data: order, isLoading, isError, refetch } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
   const { data: customerState } = useCustomerOrderState(id)
   const syncMatches = useSyncOrderMatches(id ?? '')
-  // Dispara a busca do chat em paralelo com o pedido, em vez de esperar
-  // isLoading resolver pra só então montar <OrderChat> -- mesma query key do
-  // hook interno dele, então o resultado já vem do cache quando ele monta.
-  useOrderChat(id)
-  // Chamado incondicionalmente (regra dos hooks) mesmo antes de `order`
-  // existir -- enabled: !!id internamente cobre o caso undefined.
+  const chat = useOrderChat(id)
+  const confirmCompletion = useConfirmOrderCompletion(id ?? '')
+  const disputeCompletion = useDisputeOrderCompletion(id ?? '')
   const { data: coachPackage } = useBoosterServiceDetails(order?.booster_service_id ?? undefined)
 
   useEffect(() => {
@@ -566,29 +476,50 @@ export function OrderDetailPage() {
     : order.service_type === 'md5' ? 'MD5'
     : order.service_type === 'win_boost' ? 'Vitórias'
     : getServiceLabel(order.service_type)
-  const detailStats = [
-    ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo', value: modeLabel }] : []),
+
+  const infoItems: OrderInfoGridItem[] = [
+    ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo do pedido', value: modeLabel }] : []),
     ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
-    ...((isBoostFlow || order.service_type === 'clash') && order.riot_id ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id }] : []),
-    ...(order.estimated_hours ? [{ icon: Clock, label: 'Entrega Estimada', value: formatEstimatedDelivery(order.estimated_hours) }] : []),
+    ...((isBoostFlow || order.service_type === 'clash') ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id ?? 'Não informado' }] : []),
+    { icon: Clock, label: 'Entrega estimada', value: order.estimated_hours ? formatEstimatedDelivery(order.estimated_hours) : 'Não disponível' },
     ...(order.service_type === 'coaching' && order.sessions_purchased
       ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
       : []),
+    { icon: UserCheck, label: 'Booster associado', value: <AssignedBoosterValue order={order} /> },
     { icon: Wallet, label: t('customer.order.totalPaid'), value: currency(order.total_price) },
   ]
 
+  const dropVisible = CUSTOMER_DROPPABLE_STATUSES.includes(order.status)
+  const dropLimitReached = order.drop_count >= 2
+  const canConfirm = !!customerState?.can_confirm_completion
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button asChild variant="ghost" size="icon" aria-label="Voltar">
-          <Link to="/orders"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-bold text-ink">
-              {t('customer.order.id', { id: order.id.slice(0, 8).toUpperCase() })}
-            </h1>
+    <div className="mx-auto w-full max-w-4xl">
+      <Card padding="lg" className="space-y-6">
+        <OrderActionBar
+          backHref="/orders"
+          onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
+          dropDisabled={dropLimitReached}
+          dropTooltip="Limite de drops atingido."
+          onChat={() => setChatOpen(true)}
+          chatUnavailable={chat.data ? !chat.data.chat_available : true}
+          primary={canConfirm ? (
+            <>
+              <Button variant="danger-ghost" size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
+                Disputar
+              </Button>
+              <Button variant="success" size="sm" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={confirmCompletion.isPending} onClick={() => confirmCompletion.mutate()}>
+                Confirmar conclusão
+              </Button>
+            </>
+          ) : undefined}
+        />
+
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-ink">
+            {t('customer.order.id', { id: order.id.slice(0, 8).toUpperCase() })}
+          </h1>
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
             <OrderStatusBadge status={order.status} />
             {order.drop_count > 0 && (
               <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
@@ -596,120 +527,101 @@ export function OrderDetailPage() {
                 Pedido reatribuído · valor e prazo atualizados
               </span>
             )}
+            {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+              <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+            )}
           </div>
-          <p className="text-sm text-ink-secondary mt-0.5">
+          <p className="text-sm text-ink-secondary mt-1">
             {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
           </p>
         </div>
-        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
-        )}
-      </div>
 
-      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-        <LateOrderSupportBanner order={order} />
-      )}
-
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* Main info */}
-        <div className="lg:col-span-2 space-y-5">
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-ink mb-4">{t('customer.order.details')}</h3>
-
-            {order.service_type === 'coaching' && coachPackage && (
-              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
-                <p className="text-base font-bold text-ink">{coachPackage.title}</p>
-                {coachPackage.description && (
-                  <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
-                )}
-                {coachPackage.tempo && (
-                  <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
-                )}
-              </div>
-            )}
-
-            {order.service_type === 'clash' && order.clash_tier && (
-              <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
-                <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
-                <p className="text-sm text-ink-secondary leading-relaxed">
-                  {order.boost_mode === 'duo'
-                    ? 'Você vai jogar junto com o booster.'
-                    : 'O booster vai jogar na sua conta.'}
-                </p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
-                  <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
-                  {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
-                </div>
-              </div>
-            )}
-
-            <OrderRankSummary order={order} />
-
-            {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
-              <OrderProgress order={order} hideRankBadges />
-            )}
-
-            {detailStats.length > 0 && (
-              <div className="flex justify-center">
-                <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-center">
-                  {detailStats.map(({ icon: Icon, label, value }) => (
-                    <div key={label}>
-                      <p className="text-xs text-ink-muted flex items-center justify-center gap-1"><Icon className="h-3 w-3 shrink-0" />{label}</p>
-                      <p className="text-sm font-semibold text-ink mt-0.5" data-tabular>{value}</p>
-                    </div>
-                  ))}
-                  <AssignedBoosterStat order={order} />
-                </div>
-              </div>
-            )}
-
-            {order.extras?.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border-subtle">
-                <p className="text-xs text-ink-muted mb-2">Extras</p>
-                <div className="space-y-1.5">
-                  {sortOrderExtras(order.extras).map((extra) => (
-                    <div key={extra.extra_id} className="flex items-center justify-between text-sm">
-                      <span className="text-ink-secondary">{extra.name}</span>
-                      <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Cupom fixo aplicado automaticamente no configurador — mesmo
-                cupom/desconto já mostrados no resumo do order-builder
-                (OrderBuilder.tsx), agora também no pedido já pago. */}
-            {order.discount_price > 0 && (
-              <div className="mt-4 pt-4 border-t border-border-subtle space-y-2">
-                <div className="flex items-center gap-1.5 text-xs text-success font-medium">
-                  <Tag className="h-3.5 w-3.5 shrink-0" />
-                  {order.coupon_code ? `Cupom ${order.coupon_code} aplicado` : 'Desconto aplicado'}
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-ink-secondary">Subtotal</span>
-                  <span className="text-ink-muted line-through" data-tabular>{currency(order.base_price + order.extras_price)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-ink-secondary">Desconto</span>
-                  <span className="font-semibold text-success" data-tabular>-{currency(order.discount_price)}</span>
-                </div>
-              </div>
-            )}
-
-            {order.customer_notes && (
-              <div className="mt-4 pt-4 border-t border-border-subtle">
-                <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
-                <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
-              </div>
-            )}
+        {confirmCompletion.isError && <ErrorAlert message={confirmCompletion.error instanceof Error ? confirmCompletion.error.message : 'Erro ao confirmar'} />}
+        <DropLockedBanner order={order} />
+        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && <LateOrderSupportBanner order={order} />}
+        {order.status === 'completed' && (
+          <Card padding="md" className="ring-1 ring-success/20">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+              <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
+            </div>
           </Card>
+        )}
 
-          {order.service_type === 'coaching'
-            ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+        <PendingPaymentSection order={order} />
+
+        {/* Detalhes do pedido */}
+        <div>
+          <h3 className="text-sm font-semibold text-ink mb-4 text-center">{t('customer.order.details')}</h3>
+
+          {order.service_type === 'coaching' && coachPackage && (
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
+              <p className="text-base font-bold text-ink">{coachPackage.title}</p>
+              {coachPackage.description && (
+                <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
+              )}
+              {coachPackage.tempo && (
+                <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
+              )}
+            </div>
+          )}
+
+          {order.service_type === 'clash' && order.clash_tier && (
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
+              <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+              <p className="text-sm text-ink-secondary leading-relaxed">
+                {order.boost_mode === 'duo'
+                  ? 'Você vai jogar junto com o booster.'
+                  : 'O booster vai jogar na sua conta.'}
+              </p>
+              <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+                {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+              </div>
+            </div>
+          )}
+
+          <OrderRankSummary order={order} />
+
+          {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
+            <OrderProgress order={order} hideRankBadges />
+          )}
+
+          <OrderInfoGrid items={infoItems} />
+
+          {order.extras?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
+              <p className="text-xs text-ink-muted mb-2">Extras</p>
+              <div className="space-y-1.5">
+                {sortOrderExtras(order.extras).map((extra) => (
+                  <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                    <span className="text-ink-secondary">{extra.name}</span>
+                    <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {order.customer_notes && (
+            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
+              <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
+              <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
+            </div>
+          )}
+        </div>
+
+        <CredentialsSection order={order} state={customerState} />
+
+        {/* Histórico de partidas / coaching */}
+        {order.service_type === 'coaching'
+          ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+            <div className="border-t border-border-subtle pt-5">
               <OrderCoachingTopics orderId={order.id} />
-            )
-            : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
+            </div>
+          )
+          : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
+            <div className="border-t border-border-subtle pt-5">
               <OrderMatchHistory
                 orderId={order.id}
                 sync={order.status === 'in_progress' || order.status === 'paused' ? {
@@ -727,35 +639,51 @@ export function OrderDetailPage() {
                   ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
                   : null}
               />
-            )}
-        </div>
-
-        {/* Sidebar -- ordem padronizada com booster/admin: ações do papel,
-            depois o card mais "sensível" (aqui, credenciais) logo acima do
-            chat, depois chat, depois histórico do pedido. */}
-        <div className="space-y-4">
-          <PendingPaymentSection order={order} />
-          <CompletionConfirmationSection order={order} state={customerState} />
-          <CustomerDropRequestSection order={order} />
-
-          {order.status === 'completed' && (
-            <Card padding="md" className="ring-1 ring-success/20">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
-              </div>
-            </Card>
+            </div>
           )}
 
+        <div className="border-t border-border-subtle pt-5">
           <OrderReviewSection order={order} />
+        </div>
 
-          <CredentialsSection order={order} state={customerState} />
-
-          <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
-
+        <div className="border-t border-border-subtle pt-5">
           <OrderTimeline history={history} />
         </div>
-      </div>
+      </Card>
+
+      <OrderChatModal
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        orderId={order.id}
+        viewerRole="customer"
+        orderStatus={order.status}
+        orderShortId={order.id.slice(0, 8).toUpperCase()}
+      />
+
+      <CustomerDropModal order={order} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />
+
+      <Modal
+        open={showDisputeModal}
+        onOpenChange={(open) => { if (!open) { setShowDisputeModal(false); setDisputeReason('') } }}
+        title="Abrir disputa"
+        description="Conte o que não foi entregue conforme contratado. Um administrador vai revisar o pedido."
+      >
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary block mb-1.5">
+            Motivo <span className="text-danger">*</span>
+          </label>
+          <textarea value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Descreva o que aconteceu..." className="input-base w-full min-h-[100px] resize-none text-sm" />
+        </div>
+        {disputeCompletion.isError && (
+          <ErrorAlert message={disputeCompletion.error instanceof Error ? disputeCompletion.error.message : 'Erro'} className="mt-2" />
+        )}
+        <div className="flex gap-3 justify-end pt-2">
+          <Button variant="ghost" onClick={() => { setShowDisputeModal(false); setDisputeReason('') }}>Cancelar</Button>
+          <Button variant="danger" loading={disputeCompletion.isPending} disabled={disputeReason.trim().length < 10} onClick={() => disputeCompletion.mutate(disputeReason.trim(), { onSuccess: () => setShowDisputeModal(false) })}>
+            Enviar disputa
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

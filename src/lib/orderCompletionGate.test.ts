@@ -8,6 +8,7 @@ function order(overrides: Partial<CompletionGateOrder>): CompletionGateOrder {
     losses_played: 0,
     wins_purchased: null,
     match_sync_started_at: '2026-08-01T12:00:00.000Z',
+    target_rank: null,
     ...overrides,
   }
 }
@@ -26,6 +27,14 @@ describe('canMarkOrderComplete', () => {
   it('elo_boost with at least one synced match is allowed', () => {
     const result = canMarkOrderComplete(order({ service_type: 'elo_boost', wins_played: 0, losses_played: 1 }), new Date())
     expect(result).toEqual({ allowed: true })
+  })
+
+  it('elo_boost with a target_rank set requires Riot rank verification instead of match evidence alone', () => {
+    const result = canMarkOrderComplete(
+      order({ service_type: 'elo_boost', wins_played: 5, losses_played: 1, target_rank: { tier: 'gold', division: 'II' } }),
+      new Date(),
+    )
+    expect(result).toEqual({ allowed: false, reason: 'requires_rank_verification' })
   })
 
   it('placement_matches follows the same match-evidence rule as elo_boost', () => {

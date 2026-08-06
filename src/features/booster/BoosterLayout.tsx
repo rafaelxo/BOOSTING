@@ -1,19 +1,22 @@
+import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Briefcase, ClipboardList, Wrench, Landmark, Wallet, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LayoutDashboard, Briefcase, ClipboardList, Wrench, Landmark, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { LogoMark, PageLoader } from '@/components/ui'
+import { LogoMark, PageLoader, Avatar } from '@/components/ui'
 import { useTranslation } from 'react-i18next'
 import { UserAccountBadge } from '@/components/UserAccountBadge'
+import { UserProfilePanel } from '@/components/UserProfilePanel'
 import { useAuthStore } from '@/stores/authStore'
-import { useSidebarCollapse } from '@/hooks/useSidebarCollapse'
+import { AppSidebar, type SidebarNavSection } from '@/components/layout/AppSidebar'
 import { useBoosterStatus, useBoosterHeartbeat } from '@/api/boosters'
 import { PendingScreen, RejectedScreen, SuspendedScreen, RemovedScreen, NoApplicationScreen, BoosterStatusErrorScreen } from '@/features/booster/components/BoosterStatusScreens'
 import { useNewOrderSound } from '@/features/booster/hooks/useNewOrderSound'
 
 function ApprovedBoosterPanel() {
   const { pathname } = useLocation()
+  const { profile } = useAuthStore()
   const { t } = useTranslation()
-  const { collapsed, toggle } = useSidebarCollapse('booster')
+  const [panelOpen, setPanelOpen] = useState(false)
   useNewOrderSound()
   useBoosterHeartbeat(true)
 
@@ -25,76 +28,21 @@ function ApprovedBoosterPanel() {
     { href: '/booster/services', icon: Wrench,           label: t('booster.nav.services')  },
     { href: '/booster/accounts', icon: Landmark,         label: t('booster.nav.accounts')  },
   ]
+  const sections: SidebarNavSection[] = [{ items: navItems }]
 
   return (
     <div className="min-h-screen flex">
-      <aside className={cn(
-        'hidden md:flex flex-col border-r border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0 transition-all duration-200',
-        collapsed ? 'w-[76px]' : 'w-64',
-      )}>
-        <div className={cn('h-[68px] flex items-center border-b border-bg-elevated gap-3 shrink-0', collapsed ? 'justify-center px-0' : 'px-6')}>
-          <Link to="/" className="flex items-center gap-2.5 min-w-0">
-            <LogoMark className="h-8 w-8 shrink-0" />
-            {!collapsed && <span className="font-bold text-ink truncate">Elo<span className="text-brand">Peak</span></span>}
-          </Link>
-          {!collapsed && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-success/15 text-success border border-success/25 shrink-0">
-              {t('booster.nav.role')}
-            </span>
-          )}
-        </div>
-
-        <nav className="flex-1 px-3 py-5 space-y-1">
-          {navItems.map(({ href, icon: Icon, label }) => {
-            const active = pathname === href || (href !== '/booster' && pathname.startsWith(href))
-            return (
-              <Link
-                key={label}
-                to={href}
-                title={collapsed ? label : undefined}
-                className={cn(
-                  'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
-                  collapsed ? 'justify-center px-2' : 'px-3',
-                  active
-                    ? 'bg-brand/15 text-brand border border-brand/20'
-                    : 'text-ink-secondary hover:text-ink hover:bg-bg-elevated border border-transparent'
-                )}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                {!collapsed && <span className="truncate">{label}</span>}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-bg-elevated shrink-0">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
-            className="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-ink-secondary hover:text-ink hover:bg-bg-elevated transition-colors"
-          >
-            {collapsed ? <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" /> : (
-              <>
-                <PanelLeftClose className="h-[18px] w-[18px] shrink-0" />
-                <span className="text-xs font-medium">Recolher</span>
-              </>
-            )}
-          </button>
-        </div>
-      </aside>
+      <AppSidebar
+        scope="booster"
+        homeHref="/booster"
+        sections={sections}
+        roleBadge={{ label: t('booster.nav.role'), className: 'bg-success/15 text-success border-success/25' }}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">
-          <div className="md:hidden font-bold text-ink">Elo<span className="text-brand">Peak</span></div>
-          <div className="hidden md:block" />
-          <UserAccountBadge />
-        </header>
-        {/* Largura padronizada — mesma régua do painel de cliente e admin.
-            Com a sidebar recolhida, o teto cresce junto pra aproveitar o
-            espaço liberado em vez de deixar como margem em branco. */}
+        {/* Largura padronizada — mesma régua do painel de cliente e admin. */}
         <main className="flex-1 overflow-auto p-6 lg:p-9">
-          <div className={cn('mx-auto w-full transition-all duration-200', collapsed ? 'max-w-[1600px]' : 'max-w-7xl')}>
+          <div className="mx-auto w-full max-w-[1600px]">
             <Outlet />
           </div>
         </main>
@@ -116,8 +64,18 @@ function ApprovedBoosterPanel() {
               </Link>
             )
           })}
+          {/* Perfil/notificações no mobile -- antes vinham do header, removido. */}
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-3 text-[10px] font-semibold text-ink-muted"
+          >
+            <Avatar src={profile?.avatar_url} name={profile?.username} size="xs" />
+            <span className="w-full truncate text-center">Perfil</span>
+          </button>
         </nav>
       </div>
+
+      <UserProfilePanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </div>
   )
 }
@@ -133,7 +91,9 @@ export function BoosterLayout() {
   if (isLoading || !access) return <PageLoader />
   const state = access.state
 
-  // Common app shell (header only for restricted states)
+  // Telas de status de candidatura (pendente/rejeitado/etc.) não têm sidebar
+  // de navegação -- não são o painel principal, então mantêm um cabeçalho
+  // mínimo próprio só pra dar acesso a perfil/notificações/logout.
   const shell = (content: React.ReactNode) => (
     <div className="min-h-screen flex flex-col">
       <header className="h-[68px] flex items-center justify-between px-6 border-b border-bg-elevated bg-bg-surface/80 backdrop-blur-md shrink-0">

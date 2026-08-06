@@ -10,6 +10,7 @@ import { Avatar, Button, RankBadge, HexGridBackground } from '@/components/ui'
 import { formatRank } from '@/lib/utils'
 import type { RankTier } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
+import { SectionTint } from '../components/SectionTint'
 import { useTopBoosters } from '@/api/boosters'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -130,7 +131,8 @@ export function HomePage() {
       </section>
 
       {/* ── SERVICES ─────────────────────────────────────────────────────── */}
-      <section id="services" className="py-16 lg:py-20 bg-bg-surface/35 backdrop-blur-sm scroll-mt-20">
+      <section id="services" className="relative py-16 lg:py-20 scroll-mt-20">
+        <SectionTint />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -222,7 +224,8 @@ export function HomePage() {
       </section>
 
       {/* ── TRUST & SECURITY ─────────────────────────────────────────────── */}
-      <section className="py-16 lg:py-20 bg-bg-surface/35 backdrop-blur-sm">
+      <section className="relative py-16 lg:py-20">
+        <SectionTint />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
 
@@ -325,7 +328,7 @@ export function HomePage() {
                     <div className="mt-auto grid grid-cols-2 gap-3 pt-3 border-t border-bg-elevated">
                       <div>
                         <p className="text-[10px] text-ink-muted">Winrate</p>
-                        <p className="text-sm font-extrabold text-brand">{booster.win_rate_pct > 0 ? `${booster.win_rate_pct}%` : '—'}</p>
+                        <p className="text-sm font-extrabold text-brand">{booster.win_rate_pct > 0 ? `${booster.win_rate_pct}%` : 'Sem partidas'}</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-ink-muted">Partidas</p>
@@ -341,7 +344,12 @@ export function HomePage() {
       )}
 
       {/* ── CUSTOMER REVIEWS ─────────────────────────────────────────────── */}
-      <section className={`py-16 lg:py-20 overflow-hidden ${featuredBoosters.length > 0 ? 'bg-bg-surface/35 backdrop-blur-sm' : ''}`}>
+      {/* Sempre com o mesmo tratamento visual, independente de existir ou não
+          a seção de Boosters acima -- antes o tint dependia de
+          featuredBoosters.length, o que deixava a alternância de peso visual
+          inconsistente conforme os dados (fonte da quebra perceptível). */}
+      <section className="relative py-16 lg:py-20 overflow-hidden">
+        <SectionTint />
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
@@ -357,7 +365,10 @@ export function HomePage() {
       </section>
 
       {/* ── FINAL CTA ────────────────────────────────────────────────────── */}
-      <section className={`py-16 lg:py-20 relative overflow-hidden ${featuredBoosters.length > 0 ? '' : 'bg-bg-surface/35 backdrop-blur-sm'}`}>
+      {/* Sempre com o glow próprio (igual ao Hero), nunca o tint plano --
+          antes alternava com base em featuredBoosters.length, mesma
+          inconsistência de dados corrigida na seção de Reviews acima. */}
+      <section className="py-16 lg:py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
         <HexGridBackground />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">

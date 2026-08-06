@@ -305,7 +305,7 @@ export function BoosterDashboard() {
                 label="KDA médio"
                 icon={Swords}
                 color="text-brand bg-brand/10"
-                value={performance.average_kda != null ? performance.average_kda.toFixed(1) : '—'}
+                value={performance.average_kda != null ? performance.average_kda.toFixed(1) : 'Não disponível'}
               />
               <StatCard
                 label="Avaliação"
@@ -323,7 +323,7 @@ export function BoosterDashboard() {
                 label="Farm/min"
                 icon={Gamepad2}
                 color="text-brand bg-brand/10"
-                value={performance.avg_cs_per_min != null ? performance.avg_cs_per_min.toFixed(1) : '—'}
+                value={performance.avg_cs_per_min != null ? performance.avg_cs_per_min.toFixed(1) : 'Não disponível'}
               />
               <StatCard
                 label="MVPs"

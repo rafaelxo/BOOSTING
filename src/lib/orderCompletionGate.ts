@@ -1,6 +1,6 @@
 import type { ServiceType } from '@/types'
 
-export type CompletionBlockReason = 'no_matches_played' | 'clash_completion_window_closed' | 'objective_not_reached'
+export type CompletionBlockReason = 'no_matches_played' | 'clash_completion_window_closed' | 'objective_not_reached' | 'requires_rank_verification'
 
 export interface CompletionGateOrder {
   service_type: ServiceType
@@ -8,6 +8,7 @@ export interface CompletionGateOrder {
   losses_played: number
   wins_purchased: number | null
   match_sync_started_at: string | null
+  target_rank: unknown | null
 }
 
 const CLASH_TIMEZONE = 'America/Sao_Paulo'
@@ -51,6 +52,15 @@ export function canMarkOrderComplete(
   now: Date,
 ): { allowed: boolean; reason?: CompletionBlockReason } {
   if (order.service_type === 'coaching') return { allowed: true }
+
+  // elo_boost (e qualquer outro tipo que preencha target_rank) só pode ser
+  // concluído via verificação real de rank na Riot API (verify-order-rank ->
+  // complete_verified_order) -- nunca pelo botão direto "Concluir", que só
+  // confere partidas jogadas. Sem essa checagem aqui, o botão aparecia
+  // habilitado depois de 1 partida mesmo sem o rank alvo ter sido alcançado
+  // (o backend já bloqueia isso -- migration 152 -- mas o botão não devia
+  // nem ser oferecido nesse caso).
+  if (order.target_rank != null) return { allowed: false, reason: 'requires_rank_verification' }
 
   if (order.service_type === 'clash') {
     if (!order.match_sync_started_at || !clashCompletionUnlocked(order.match_sync_started_at, now)) {

@@ -95,7 +95,7 @@ export function useAvailableJobs() {
 }
 
 export function useBoosterOrdersInfinite(boosterId: string | undefined, tab: BoosterOrdersTab, pageSize: number) {
-  return useInfiniteQuery({
+  const query = useInfiniteQuery({
     queryKey: queryKeys.orders.boosterList(boosterId ?? '', { tab, pageSize }),
     queryFn: ({ pageParam }) => listBoosterOrdersPage({ boosterId: boosterId!, tab, offset: pageParam, pageSize }),
     enabled: !!boosterId,
@@ -103,6 +103,19 @@ export function useBoosterOrdersInfinite(boosterId: string | undefined, tab: Boo
     getNextPageParam: (lastPage) => lastPage.nextOffset,
     refetchInterval: 30_000,
   })
+  // Sem isso, a lista "Meus pedidos" do booster (diferente da tela de
+  // detalhe de UM pedido, que já tem sua própria assinatura) só refletia
+  // status/drop mudando após até 30s de poll -- ex.: admin aprova/rejeita um
+  // drop e o pedido não reaparecia/mudava de coluna na lista sem F5 ou essa
+  // espera. RLS de order_status_events já restringe ao que este booster pode ver.
+  useRealtimeInvalidate({
+    channel: `booster-orders-list-${boosterId ?? 'none'}`,
+    table: 'order_status_events',
+    event: 'INSERT',
+    queryKeys: boosterId ? [queryKeys.orders.boosterList(boosterId, { tab, pageSize })] : [],
+    enabled: !!boosterId,
+  })
+  return query
 }
 
 export function useAdminOrders(status?: OrderStatus | 'all', serviceType?: ServiceType | 'all') {
@@ -171,12 +184,23 @@ export function useSetOrderCoachingTopicDone(orderId: string) {
 }
 
 export function usePendingDropRequest(orderId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? '').concat(['drop-request']),
     queryFn: () => getPendingDropRequest(orderId!),
     enabled: !!orderId,
     refetchInterval: 30_000,
   })
+  // Sem isso, o banner "pedido travado" ficava até 30s desatualizado depois
+  // do admin aprovar/rejeitar -- order_drop_requests não tinha nenhuma
+  // assinatura própria aqui, só o refetchInterval genérico.
+  useRealtimeInvalidate({
+    channel: `order-drop-request-${orderId ?? 'none'}`,
+    table: 'order_drop_requests',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.detail(orderId).concat(['drop-request'])] : [],
+    enabled: !!orderId,
+  })
+  return query
 }
 
 export function useCustomerOrderState(orderId: string | undefined) {

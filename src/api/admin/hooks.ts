@@ -66,7 +66,17 @@ export function useResolveDropRequest() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: resolveDropRequest,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.admin.drops() }),
+    // Além da própria fila de drops, invalida a lista de pedidos do admin e
+    // qualquer pedido/solicitação de drop pendente em cache -- sem isso, só
+    // o order_status_events (que já propaga pra cliente/booster via
+    // realtime) refletia a mudança; a própria tela do admin que acabou de
+    // aprovar/rejeitar só se atualizava no próximo poll de 30s, parecendo
+    // que o pedido "sumiu" ou não voltou pra listagem certa até F5.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.drops() })
+      void queryClient.invalidateQueries({ queryKey: ['orders', 'admin'] })
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey.includes('drop-request') })
+    },
   })
 }
 

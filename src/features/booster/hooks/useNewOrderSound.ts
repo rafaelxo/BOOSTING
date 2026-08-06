@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/api/core/queryKeys'
 import { useBoosterSoundStore } from '@/stores/boosterSoundStore'
 import { playOrderSound } from './orderSoundLibrary'
 
@@ -64,7 +65,7 @@ export function useNewOrderSound() {
 
       if (hasNewOrder) {
         playNotification()
-        void queryClient.invalidateQueries({ queryKey: ['available-jobs'] })
+        void queryClient.invalidateQueries({ queryKey: queryKeys.orders.availableJobs() })
       }
     } finally {
       syncingRef.current = false
