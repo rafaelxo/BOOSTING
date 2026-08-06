@@ -3,8 +3,12 @@ import { ArrowLeft, MessageCircle, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
-interface OrderActionBarProps {
+interface OrderPageHeaderProps {
   backHref: string
+  orderIdShort: string
+  statusBadge: React.ReactNode
+  /** Badges/infos extras abaixo do título (ex.: "pedido reatribuído", countdown). */
+  extra?: React.ReactNode
   onDrop?: () => void
   dropDisabled?: boolean
   dropTooltip?: string
@@ -14,18 +18,29 @@ interface OrderActionBarProps {
 }
 
 /**
- * Barra superior única do card de pedido: voltar + dropar à esquerda, chat +
- * ação principal (iniciar/concluir/confirmar) à direita. Substitui o antigo
- * cabeçalho de página espalhado + card de drop separado -- tudo fica dentro
- * do mesmo card, reaproveitado por cliente/booster/admin.
+ * Header de página normal do dashboard (voltar + título+status à esquerda,
+ * ações à direita) -- substitui o antigo card "barra de ações" que existia
+ * dentro do card único do pedido. Reaproveitado por cliente/booster/admin.
  */
-export function OrderActionBar({ backHref, onDrop, dropDisabled, dropTooltip, onChat, chatUnavailable, primary }: OrderActionBarProps) {
+export function OrderPageHeader({
+  backHref, orderIdShort, statusBadge, extra, onDrop, dropDisabled, dropTooltip, onChat, chatUnavailable, primary,
+}: OrderPageHeaderProps) {
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap">
-      <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="icon" aria-label="Voltar">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex items-center gap-3 min-w-0">
+        <Button asChild variant="ghost" size="icon" aria-label="Voltar" className="shrink-0">
           <Link to={backHref}><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-bold text-ink truncate">Pedido #{orderIdShort}</h1>
+            {statusBadge}
+          </div>
+          {extra && <div className="flex items-center gap-2 flex-wrap mt-1.5">{extra}</div>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
         {onDrop && (
           <Button
             variant="danger-ghost"
@@ -38,8 +53,6 @@ export function OrderActionBar({ backHref, onDrop, dropDisabled, dropTooltip, on
             Dropar
           </Button>
         )}
-      </div>
-      <div className="flex items-center gap-2">
         <Button
           variant="secondary"
           size="icon"

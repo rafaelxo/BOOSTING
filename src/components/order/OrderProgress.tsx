@@ -95,7 +95,6 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
   const current = latest?.fetched_tier
     ? { tier: latest.fetched_tier, division: latest.fetched_division }
     : initial
-  const done = latest?.passed === true
 
   // Progresso RELATIVO a este pedido (0% = rank em que ele começou, 100% =
   // rank alvo) -- nunca a posição absoluta na escada inteira. Sem isso, um
@@ -111,13 +110,6 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
-      {done && (
-        <div className="flex justify-end mb-3">
-          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-bold text-success">
-            Rank alvo atingido!
-          </span>
-        </div>
-      )}
       <RankProgressionRail
         currentTier={current.tier}
         currentDivision={current.division}

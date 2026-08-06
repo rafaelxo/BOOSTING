@@ -6,9 +6,9 @@ import {
   Gamepad2, Users, Shuffle, Trophy, CalendarDays, Wallet, User, Hash, Copy, Check, Clock, CreditCard,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
-import { OrderActionBar } from '@/components/order/OrderActionBar'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatModal } from '@/components/order/OrderChatModal'
+import { OrderChatPanel } from '@/components/order/OrderChatPanel'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderProgress } from '@/components/order/OrderProgress'
@@ -211,26 +211,14 @@ export function AdminOrderDetailPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <Card padding="lg" className="space-y-6">
-        <OrderActionBar
-          backHref="/admin/orders"
-          onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
-          dropDisabled={dropLimitReached}
-          dropTooltip="Limite de drops atingido."
-          onChat={() => setChatOpen(true)}
-          chatUnavailable={chat.data ? !chat.data.chat_available : true}
-          primary={(
-            <Button variant="secondary" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => setShowStatusPanel((v) => !v)}>
-              Alterar status
-            </Button>
-          )}
-        />
-
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-ink">Pedido #{order.id.slice(0, 8).toUpperCase()}</h1>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-            <OrderStatusBadge status={order.status} />
+    <div className="space-y-6">
+      <OrderPageHeader
+        backHref="/admin/orders"
+        orderIdShort={order.id.slice(0, 8).toUpperCase()}
+        statusBadge={<OrderStatusBadge status={order.status} />}
+        extra={(
+          <>
+            <span className="text-xs text-ink-muted">Criado em {formatDateTime(order.created_at)}</span>
             {order.drop_count > 0 && (
               <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
                 <History className="h-3 w-3" />
@@ -241,11 +229,21 @@ export function AdminOrderDetailPage() {
             {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
               <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
             )}
-          </div>
-          <p className="text-xs text-ink-muted mt-1">Criado em {formatDateTime(order.created_at)}</p>
-        </div>
+          </>
+        )}
+        onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
+        dropDisabled={dropLimitReached}
+        dropTooltip="Limite de drops atingido."
+        onChat={() => setChatOpen(true)}
+        chatUnavailable={chat.data ? !chat.data.chat_available : true}
+        primary={(
+          <Button variant="secondary" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => setShowStatusPanel((v) => !v)}>
+            Alterar status
+          </Button>
+        )}
+      />
 
-        {order.status === 'drop_requested' && (
+      {order.status === 'drop_requested' && (
           <Card padding="md" className="border border-warning/30 bg-warning/5">
             <h3 className="text-sm font-semibold text-warning mb-1 flex items-center gap-2">
               <Lock className="h-4 w-4" />
@@ -306,12 +304,12 @@ export function AdminOrderDetailPage() {
         )}
 
         {/* Detalhes do pedido */}
-        <div>
-          <h3 className="text-sm font-semibold text-ink mb-4 text-center">Detalhes do pedido</h3>
+        <Card padding="lg">
+          <h3 className="text-sm font-semibold text-ink mb-5">Detalhes do pedido</h3>
 
           {order.service_type === 'clash' && order.clash_tier && (
-            <div className="mb-4 pb-4 border-b border-border-subtle text-center">
-              <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-ink-muted">
+            <div className="mb-4 pb-4 border-b border-border-subtle">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-muted">
                 <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
                 {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
               </div>
@@ -321,12 +319,14 @@ export function AdminOrderDetailPage() {
           <OrderRankSummary order={order} />
           <OrderProgress order={order} />
 
-          <OrderInfoGrid items={infoItems} />
+          <div className="mt-5">
+            <OrderInfoGrid items={infoItems} />
+          </div>
 
           {order.extras?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
+            <div className="mt-5 pt-4 border-t border-border-subtle">
               <p className="text-xs text-ink-muted mb-2">Extras selecionados</p>
-              <div className="space-y-1.5">
+              <div className="grid sm:grid-cols-2 gap-1.5">
                 {sortOrderExtras(order.extras).map((extra) => (
                   <div key={extra.extra_id} className="flex items-center justify-between text-sm">
                     <span className="text-ink-secondary">{extra.name}{extra.code ? ` (${extra.code})` : ''}</span>
@@ -336,43 +336,37 @@ export function AdminOrderDetailPage() {
               </div>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Histórico de partidas */}
         {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
-          <div className="border-t border-border-subtle pt-5">
-            <OrderMatchHistory
-              orderId={order.id}
-              sync={order.status === 'in_progress' || order.status === 'paused' ? {
-                onSync: () => syncMatches.mutate(),
-                syncing: syncMatches.isPending,
-                cooldownSeconds: syncMatches.cooldownSeconds,
-                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
-                resultMessage: syncMatches.data
-                  ? (syncMatches.data.synced
-                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
-                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
-                  : null,
-              } : undefined}
-              pdlEstimate={order.service_type === 'elo_boost'
-                ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
-                : null}
-            />
-          </div>
+          <OrderMatchHistory
+            orderId={order.id}
+            sync={order.status === 'in_progress' || order.status === 'paused' ? {
+              onSync: () => syncMatches.mutate(),
+              syncing: syncMatches.isPending,
+              cooldownSeconds: syncMatches.cooldownSeconds,
+              error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+              resultMessage: syncMatches.data
+                ? (syncMatches.data.synced
+                  ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                  : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                : null,
+            } : undefined}
+            pdlEstimate={order.service_type === 'elo_boost'
+              ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+              : null}
+          />
         )}
 
-        <div className="border-t border-border-subtle pt-5">
-          <OrderTimeline history={history} />
-        </div>
-      </Card>
+        <OrderTimeline history={history} />
 
-      <OrderChatModal
+      <OrderChatPanel
         open={chatOpen}
         onOpenChange={setChatOpen}
         orderId={order.id}
         viewerRole="admin"
         orderStatus={order.status}
-        orderShortId={order.id.slice(0, 8).toUpperCase()}
       />
 
       <AdminDropModal orderId={order.id} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />

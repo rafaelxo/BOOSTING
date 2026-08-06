@@ -31,7 +31,7 @@ function ApprovedBoosterPanel() {
   const sections: SidebarNavSection[] = [{ items: navItems }]
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       <AppSidebar
         scope="booster"
         homeHref="/booster"

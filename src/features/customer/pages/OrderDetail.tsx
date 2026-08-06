@@ -7,9 +7,9 @@ import {
   MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, GuaranteeNotice } from '@/components/ui'
-import { OrderActionBar } from '@/components/order/OrderActionBar'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatModal } from '@/components/order/OrderChatModal'
+import { OrderChatPanel } from '@/components/order/OrderChatPanel'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
@@ -223,7 +223,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const expired = remaining === 0
 
   return (
-    <div id="payment" className="border-t border-border-subtle pt-5">
+    <Card id="payment" padding="lg">
       <div className="flex items-center gap-2 mb-3">
         <QrCode className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
@@ -288,7 +288,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
       )}
 
       {error && <div className="mt-3"><ErrorAlert message={error} /></div>}
-    </div>
+    </Card>
   )
 }
 
@@ -314,7 +314,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
   }
 
   return (
-    <div id="credentials" className="scroll-mt-24 border-t border-border-subtle pt-5">
+    <Card id="credentials" padding="lg" className="scroll-mt-24">
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Conta do pedido</h3>
@@ -353,7 +353,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -494,33 +494,16 @@ export function OrderDetailPage() {
   const canConfirm = !!customerState?.can_confirm_completion
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <Card padding="lg" className="space-y-6">
-        <OrderActionBar
-          backHref="/orders"
-          onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
-          dropDisabled={dropLimitReached}
-          dropTooltip="Limite de drops atingido."
-          onChat={() => setChatOpen(true)}
-          chatUnavailable={chat.data ? !chat.data.chat_available : true}
-          primary={canConfirm ? (
-            <>
-              <Button variant="danger-ghost" size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
-                Disputar
-              </Button>
-              <Button variant="success" size="sm" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={confirmCompletion.isPending} onClick={() => confirmCompletion.mutate()}>
-                Confirmar conclusão
-              </Button>
-            </>
-          ) : undefined}
-        />
-
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-ink">
-            {t('customer.order.id', { id: order.id.slice(0, 8).toUpperCase() })}
-          </h1>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-            <OrderStatusBadge status={order.status} />
+    <div className="space-y-6">
+      <OrderPageHeader
+        backHref="/orders"
+        orderIdShort={order.id.slice(0, 8).toUpperCase()}
+        statusBadge={<OrderStatusBadge status={order.status} />}
+        extra={(
+          <>
+            <span className="text-xs text-ink-muted">
+              {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
+            </span>
             {order.drop_count > 0 && (
               <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
                 <History className="h-3 w-3" />
@@ -530,134 +513,139 @@ export function OrderDetailPage() {
             {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
               <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
             )}
-          </div>
-          <p className="text-sm text-ink-secondary mt-1">
-            {getServiceLabel(order.service_type)} · {t('customer.order.created', { date: formatDateTime(order.created_at) })}
-          </p>
-        </div>
+          </>
+        )}
+        onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
+        dropDisabled={dropLimitReached}
+        dropTooltip="Limite de drops atingido."
+        onChat={() => setChatOpen(true)}
+        chatUnavailable={chat.data ? !chat.data.chat_available : true}
+        primary={canConfirm ? (
+          <>
+            <Button variant="danger-ghost" size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
+              Disputar
+            </Button>
+            <Button variant="success" size="sm" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={confirmCompletion.isPending} onClick={() => confirmCompletion.mutate()}>
+              Confirmar conclusão
+            </Button>
+          </>
+        ) : undefined}
+      />
 
-        {confirmCompletion.isError && <ErrorAlert message={confirmCompletion.error instanceof Error ? confirmCompletion.error.message : 'Erro ao confirmar'} />}
-        <DropLockedBanner order={order} />
-        {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && <LateOrderSupportBanner order={order} />}
-        {order.status === 'completed' && (
-          <Card padding="md" className="ring-1 ring-success/20">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
-            </div>
-          </Card>
+      {confirmCompletion.isError && <ErrorAlert message={confirmCompletion.error instanceof Error ? confirmCompletion.error.message : 'Erro ao confirmar'} />}
+      <DropLockedBanner order={order} />
+      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && <LateOrderSupportBanner order={order} />}
+      {order.status === 'completed' && (
+        <Card padding="md" className="ring-1 ring-success/20">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+            <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
+          </div>
+        </Card>
+      )}
+
+      <PendingPaymentSection order={order} />
+
+      {/* Detalhes do pedido */}
+      <Card padding="lg">
+        <h3 className="text-sm font-semibold text-ink mb-5">{t('customer.order.details')}</h3>
+
+        {order.service_type === 'coaching' && coachPackage && (
+          <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+            <p className="text-base font-bold text-ink">{coachPackage.title}</p>
+            {coachPackage.description && (
+              <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
+            )}
+            {coachPackage.tempo && (
+              <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
+            )}
+          </div>
         )}
 
-        <PendingPaymentSection order={order} />
-
-        {/* Detalhes do pedido */}
-        <div>
-          <h3 className="text-sm font-semibold text-ink mb-4 text-center">{t('customer.order.details')}</h3>
-
-          {order.service_type === 'coaching' && coachPackage && (
-            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
-              <p className="text-base font-bold text-ink">{coachPackage.title}</p>
-              {coachPackage.description && (
-                <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
-              )}
-              {coachPackage.tempo && (
-                <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
-              )}
+        {order.service_type === 'clash' && order.clash_tier && (
+          <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+            <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+            <p className="text-sm text-ink-secondary leading-relaxed">
+              {order.boost_mode === 'duo'
+                ? 'Você vai jogar junto com o booster.'
+                : 'O booster vai jogar na sua conta.'}
+            </p>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+              <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+              {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
             </div>
-          )}
+          </div>
+        )}
 
-          {order.service_type === 'clash' && order.clash_tier && (
-            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
-              <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
-              <p className="text-sm text-ink-secondary leading-relaxed">
-                {order.boost_mode === 'duo'
-                  ? 'Você vai jogar junto com o booster.'
-                  : 'O booster vai jogar na sua conta.'}
-              </p>
-              <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
-                <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
-                {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
-              </div>
-            </div>
-          )}
+        <OrderRankSummary order={order} />
 
-          <OrderRankSummary order={order} />
+        {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
+          <OrderProgress order={order} hideRankBadges />
+        )}
 
-          {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
-            <OrderProgress order={order} hideRankBadges />
-          )}
-
+        <div className="mt-5">
           <OrderInfoGrid items={infoItems} />
-
-          {order.extras?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
-              <p className="text-xs text-ink-muted mb-2">Extras</p>
-              <div className="space-y-1.5">
-                {sortOrderExtras(order.extras).map((extra) => (
-                  <div key={extra.extra_id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink-secondary">{extra.name}</span>
-                    <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {order.customer_notes && (
-            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
-              <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
-              <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
-            </div>
-          )}
         </div>
 
-        <CredentialsSection order={order} state={customerState} />
-
-        {/* Histórico de partidas / coaching */}
-        {order.service_type === 'coaching'
-          ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <div className="border-t border-border-subtle pt-5">
-              <OrderCoachingTopics orderId={order.id} />
+        {order.extras?.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-border-subtle">
+            <p className="text-xs text-ink-muted mb-2">Extras</p>
+            <div className="grid sm:grid-cols-2 gap-1.5">
+              {sortOrderExtras(order.extras).map((extra) => (
+                <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                  <span className="text-ink-secondary">{extra.name}</span>
+                  <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
+                </div>
+              ))}
             </div>
-          )
-          : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
-            <div className="border-t border-border-subtle pt-5">
-              <OrderMatchHistory
-                orderId={order.id}
-                sync={order.status === 'in_progress' || order.status === 'paused' ? {
-                  onSync: () => syncMatches.mutate(),
-                  syncing: syncMatches.isPending,
-                  cooldownSeconds: syncMatches.cooldownSeconds,
-                  error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
-                  resultMessage: syncMatches.data
-                    ? (syncMatches.data.synced
-                      ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
-                      : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
-                    : null,
-                } : undefined}
-                pdlEstimate={order.service_type === 'elo_boost'
-                  ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
-                  : null}
-              />
-            </div>
-          )}
+          </div>
+        )}
 
-        <div className="border-t border-border-subtle pt-5">
-          <OrderReviewSection order={order} />
-        </div>
-
-        <div className="border-t border-border-subtle pt-5">
-          <OrderTimeline history={history} />
-        </div>
+        {order.customer_notes && (
+          <div className="mt-5 pt-4 border-t border-border-subtle">
+            <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
+            <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
+          </div>
+        )}
       </Card>
 
-      <OrderChatModal
+      <CredentialsSection order={order} state={customerState} />
+
+      {/* Histórico de partidas / coaching */}
+      {order.service_type === 'coaching'
+        ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
+          <OrderCoachingTopics orderId={order.id} />
+        )
+        : order.riot_id && order.service_type !== 'clash' && ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
+          <OrderMatchHistory
+            orderId={order.id}
+            sync={order.status === 'in_progress' || order.status === 'paused' ? {
+              onSync: () => syncMatches.mutate(),
+              syncing: syncMatches.isPending,
+              cooldownSeconds: syncMatches.cooldownSeconds,
+              error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+              resultMessage: syncMatches.data
+                ? (syncMatches.data.synced
+                  ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                  : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                : null,
+            } : undefined}
+            pdlEstimate={order.service_type === 'elo_boost'
+              ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+              : null}
+          />
+        )}
+
+      <OrderReviewSection order={order} />
+
+      <OrderTimeline history={history} />
+
+      <OrderChatPanel
         open={chatOpen}
         onOpenChange={setChatOpen}
         orderId={order.id}
         viewerRole="customer"
         orderStatus={order.status}
-        orderShortId={order.id.slice(0, 8).toUpperCase()}
       />
 
       <CustomerDropModal order={order} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />

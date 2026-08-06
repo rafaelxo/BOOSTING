@@ -7,9 +7,9 @@ import {
   Gamepad2, Users, Shuffle, Trophy, Wallet, Hash, Clock,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
-import { OrderActionBar } from '@/components/order/OrderActionBar'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatModal } from '@/components/order/OrderChatModal'
+import { OrderChatPanel } from '@/components/order/OrderChatPanel'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
@@ -462,29 +462,23 @@ export function JobDetailPage() {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <Card padding="lg" className="space-y-6">
-        <OrderActionBar
-          backHref="/booster/jobs"
-          onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
-          dropDisabled={dropLimitReached}
-          dropTooltip="Limite de drops atingido."
-          onChat={() => setChatOpen(true)}
-          chatUnavailable={chat.data ? !chat.data.chat_available : true}
-          primary={primaryAction}
-        />
+    <div className="space-y-6">
+      <OrderPageHeader
+        backHref="/booster/orders"
+        orderIdShort={order.id.slice(0, 8).toUpperCase()}
+        statusBadge={<OrderStatusBadge status={order.status} />}
+        extra={['in_progress', 'paused', 'awaiting_customer'].includes(order.status) ? (
+          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+        ) : undefined}
+        onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
+        dropDisabled={dropLimitReached}
+        dropTooltip="Limite de drops atingido."
+        onChat={() => setChatOpen(true)}
+        chatUnavailable={chat.data ? !chat.data.chat_available : true}
+        primary={primaryAction}
+      />
 
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-ink">#{order.id.slice(0, 8).toUpperCase()}</h1>
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-            <OrderStatusBadge status={order.status} />
-            {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-              <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
-            )}
-          </div>
-        </div>
-
-        {updateStatus.isError && (
+      {updateStatus.isError && (
           <ErrorAlert message={(() => {
             const code = updateStatus.error instanceof Error ? updateStatus.error.message : null
             if (code === 'objective_not_reached') return 'Ainda faltam vitórias contratadas para marcar como concluído.'
@@ -543,11 +537,11 @@ export function JobDetailPage() {
         )}
 
         {/* Detalhes do pedido */}
-        <div>
-          <h3 className="text-sm font-semibold text-ink mb-4 text-center">{t('booster.job.details')}</h3>
+        <Card padding="lg">
+          <h3 className="text-sm font-semibold text-ink mb-5">{t('booster.job.details')}</h3>
 
           {order.service_type === 'coaching' && coachPackage && (
-            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
               <p className="text-base font-bold text-ink">{coachPackage.title}</p>
               {coachPackage.description && <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>}
               {coachPackage.tempo && <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>}
@@ -555,14 +549,14 @@ export function JobDetailPage() {
           )}
 
           {order.service_type === 'clash' && order.clash_tier && (
-            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2 text-center">
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
               <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
               <p className="text-sm text-ink-secondary leading-relaxed">
                 {order.boost_mode === 'duo'
                   ? 'Cliente joga junto com você — monte o restante do time dentro do jogo.'
                   : 'Você entra na conta do cliente e monta o time dentro do jogo.'}
               </p>
-              <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
                 <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
                 {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
                 {order.riot_id && (
@@ -585,12 +579,14 @@ export function JobDetailPage() {
           <OrderRankSummary order={order} />
           <OrderProgress order={order} hideRankBadges />
 
-          <OrderInfoGrid items={infoItems} />
+          <div className="mt-5">
+            <OrderInfoGrid items={infoItems} />
+          </div>
 
           {order.extras?.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border-subtle max-w-md mx-auto">
+            <div className="mt-5 pt-4 border-t border-border-subtle">
               <p className="text-xs text-ink-muted mb-1.5">Extras</p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {sortOrderExtras(order.extras).map((extra) => (
                   <span key={extra.extra_id} className="text-[11px] font-medium bg-bg-elevated text-ink-secondary px-2 py-1 rounded-lg">{extra.name}</span>
                 ))}
@@ -598,25 +594,25 @@ export function JobDetailPage() {
             </div>
           )}
           {order.customer_notes && (
-            <div className="mt-4 bg-bg-elevated rounded-xl p-3 max-w-md mx-auto">
+            <div className="mt-5 bg-bg-elevated rounded-xl p-3">
               <p className="text-xs text-ink-muted mb-1">{t('booster.job.customerNotes')}</p>
               <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Conta do pedido -- Duo (própria/plataforma) e token de acesso, entre
             Detalhes e Histórico de partidas. */}
         {(order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
           && ['assigned', 'in_progress', 'paused'].includes(order.status)) && (
-          <div className="border-t border-border-subtle pt-5">
+          <Card padding="lg">
             <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
-          </div>
+          </Card>
         )}
 
         {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
           && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-          <div className="border-t border-border-subtle pt-5">
+          <Card padding="lg">
             <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
               <KeyRound className="h-4 w-4 text-brand" />
               Conta do pedido
@@ -651,50 +647,42 @@ export function JobDetailPage() {
             {revealAccessToken.isError && (
               <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
             )}
-          </div>
+          </Card>
         )}
 
         {/* Histórico de partidas / coaching */}
         {order.service_type === 'coaching'
           ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
-            <div className="border-t border-border-subtle pt-5">
-              <OrderCoachingTopics orderId={order.id} />
-            </div>
+            <OrderCoachingTopics orderId={order.id} />
           )
           : ['in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
-            <div className="border-t border-border-subtle pt-5">
-              <OrderMatchHistory
-                orderId={order.id}
-                sync={order.status === 'in_progress' || order.status === 'paused' ? {
-                  onSync: () => syncMatches.mutate(),
-                  syncing: syncMatches.isPending,
-                  cooldownSeconds: syncMatches.cooldownSeconds,
-                  error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
-                  resultMessage: syncMatches.data
-                    ? (syncMatches.data.synced
-                      ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
-                      : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
-                    : null,
-                } : undefined}
-                pdlEstimate={order.service_type === 'elo_boost'
-                  ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
-                  : null}
-              />
-            </div>
+            <OrderMatchHistory
+              orderId={order.id}
+              sync={order.status === 'in_progress' || order.status === 'paused' ? {
+                onSync: () => syncMatches.mutate(),
+                syncing: syncMatches.isPending,
+                cooldownSeconds: syncMatches.cooldownSeconds,
+                error: syncMatches.isError ? (syncMatches.error instanceof Error ? syncMatches.error.message : 'Erro ao sincronizar partidas') : null,
+                resultMessage: syncMatches.data
+                  ? (syncMatches.data.synced
+                    ? (syncMatches.data.new_matches ? `${syncMatches.data.new_matches} nova(s) partida(s) registrada(s).` : 'Nenhuma partida nova encontrada.')
+                    : 'Conta Riot não encontrada. Confira o Riot ID cadastrado no pedido.')
+                  : null,
+              } : undefined}
+              pdlEstimate={order.service_type === 'elo_boost'
+                ? { gain: order.avg_pdl_gain, loss: order.avg_pdl_loss, label: order.pdl_bracket ? 'PDL' : 'LP' }
+                : null}
+            />
           )}
 
-        <div className="border-t border-border-subtle pt-5">
-          <OrderTimeline history={history} />
-        </div>
-      </Card>
+        <OrderTimeline history={history} />
 
-      <OrderChatModal
+      <OrderChatPanel
         open={chatOpen}
         onOpenChange={setChatOpen}
         orderId={order.id}
         viewerRole="booster"
         orderStatus={order.status}
-        orderShortId={order.id.slice(0, 8).toUpperCase()}
       />
 
       <BoosterDropModal order={order} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />

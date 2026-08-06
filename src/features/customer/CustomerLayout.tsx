@@ -25,7 +25,7 @@ export function CustomerLayout() {
   const sections: SidebarNavSection[] = [{ items: NAV_ITEMS }]
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       <AppSidebar scope="customer" homeHref="/dashboard" sections={sections} />
 
       {/* ── Main area ──────────────────────────────────────────────── */}

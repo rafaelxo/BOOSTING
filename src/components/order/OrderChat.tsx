@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { Lock, MessageCircle, Send, ShieldCheck, Unlock } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent, type UIEvent } from 'react'
+import { Lock, MessageCircle, Send, ShieldCheck, Unlock, X } from 'lucide-react'
 import { Avatar, Button, Card, ErrorAlert, Skeleton } from '@/components/ui'
 import { cn, formatDateTime } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -22,19 +22,32 @@ const MESSAGE_MAX_LENGTH = 4000
 // travado (pedido concluído trava sozinho -- ver trigger
 // trg_lock_chat_on_order_completed, migration 085 -- e não deve soar como se
 // um admin tivesse bloqueado manualmente).
-export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: string; viewerRole: UserRole; orderStatus?: OrderStatus }) {
+export function OrderChat({ orderId, viewerRole, orderStatus, onClose }: { orderId: string; viewerRole: UserRole; orderStatus?: OrderStatus; onClose?: () => void }) {
   const { profile } = useAuthStore()
   const [message, setMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Guarda se o usuário estava perto do fim da lista ANTES da mensagem nova
+  // chegar (atualizado só em eventos reais de scroll) -- sem isso, calcular
+  // "está perto do fim?" depois que o DOM já cresceu com a mensagem nova
+  // sempre dava uma distância maior que o threshold pra mensagens longas,
+  // fazendo o auto-scroll nunca disparar mesmo com o usuário já no fim.
+  const nearBottomRef = useRef(true)
 
   const chat = useOrderChat(orderId)
   const sendMessage = useSendOrderMessage(orderId)
   const setLocked = useSetOrderChatLock(orderId)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    if (nearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
   }, [chat.data?.messages.length])
+
+  function handleListScroll(event: UIEvent<HTMLDivElement>) {
+    const el = event.currentTarget
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  }
 
   // Caixa cresce junto com o texto (até um teto) em vez de ficar fixa em 2
   // linhas -- sem isso, Shift+Enter já quebra a linha (handleKeyDown abaixo),
@@ -58,6 +71,9 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
       onSuccess: () => {
         setMessage('')
         if (textareaRef.current) textareaRef.current.style.height = ''
+        // Quem envia espera ver a própria mensagem, independente de onde
+        // estava rolado antes.
+        nearBottomRef.current = true
       },
     })
   }
@@ -89,29 +105,40 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
   const { chat_available: available, chat_locked: locked, messages, can_send: canSend } = chat.data
 
   return (
-    <Card padding="none" className="overflow-hidden">
-      <div className="flex min-h-14 flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-3">
+    <Card padding="none" className="overflow-hidden h-full flex flex-col">
+      <div className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b border-border-subtle px-4 py-3">
         <MessageCircle className="h-4 w-4 text-brand" />
         <div>
           <h3 className="text-sm font-semibold text-ink">Chat do pedido</h3>
           <p className="text-[11px] text-ink-muted">{messages.length} {messages.length === 1 ? 'mensagem' : 'mensagens'}</p>
         </div>
-        {viewerRole === 'admin' && available && (
-          <Button
-            className="ml-auto"
-            size="sm"
-            variant={locked ? 'secondary' : 'danger-ghost'}
-            loading={setLocked.isPending}
-            onClick={() => setLocked.mutate(!locked)}
-            leftIcon={locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          >
-            {locked ? 'Desbloquear chat' : 'Bloquear chat'}
-          </Button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {viewerRole === 'admin' && available && (
+            <Button
+              size="sm"
+              variant={locked ? 'secondary' : 'danger-ghost'}
+              loading={setLocked.isPending}
+              onClick={() => setLocked.mutate(!locked)}
+              leftIcon={locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            >
+              {locked ? 'Desbloquear chat' : 'Bloquear chat'}
+            </Button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fechar chat"
+              className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-bg-elevated transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {!available ? (
-        <div className="flex min-h-48 flex-col items-center justify-center px-5 py-10 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 text-center">
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-bg-elevated">
             <Lock className="h-5 w-5 text-ink-muted" />
           </div>
@@ -123,7 +150,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
       ) : (
         <>
           {locked && (
-            <div className="flex items-start gap-2 border-b border-warning/20 bg-warning/10 px-4 py-3 text-xs text-warning">
+            <div className="flex items-start gap-2 border-b border-warning/20 bg-warning/10 px-4 py-3 text-xs text-warning shrink-0">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 {orderStatus === 'completed'
@@ -133,7 +160,11 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
             </div>
           )}
 
-          <div className="min-h-64 max-h-[430px] space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5" aria-live="polite">
+          <div
+            className="flex-1 min-h-0 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5"
+            aria-live="polite"
+            onScroll={handleListScroll}
+          >
             {messages.length === 0 ? (
               <p className="py-12 text-center text-xs text-ink-muted">Nenhuma mensagem enviada.</p>
             ) : (
@@ -148,11 +179,12 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
                         nunca fica menor que seu min-content, então uma palavra
                         longa sem espaço (link, token) empurrava a área toda pra
                         rolagem horizontal em vez de quebrar linha, mesmo com
-                        break-words no filho. max-w em `ch` (largura do caractere
-                        "0" na fonte atual) força a quebra de linha automática a
-                        cada ~35 caracteres, em vez de esticar até 82% do card
-                        inteiro -- bolha de chat, não parede de texto. */}
-                    <div className={cn('flex min-w-0 max-w-[35ch] flex-col', isMe ? 'items-end' : 'items-start')}>
+                        break-words no filho. max-w em % (não mais em `ch` fixo)
+                        agora que o painel é bem mais largo -- ~78% do painel,
+                        nunca a largura toda, mas acompanha o tamanho real do
+                        painel em vez de travar num valor pensado pra sidebar
+                        estreita. */}
+                    <div className={cn('flex min-w-0 max-w-[78%] flex-col', isMe ? 'items-end' : 'items-start')}>
                       <div className="mb-1 flex flex-wrap items-center gap-x-2 px-1 text-[10px] text-ink-muted">
                         <span className="font-semibold text-ink-secondary">{item.sender_name}</span>
                         <span>{ROLE_LABEL[item.sender_role]}</span>
@@ -179,7 +211,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
           </div>
 
           {canSend ? (
-            <div className="border-t border-border-subtle p-3">
+            <div className="border-t border-border-subtle p-3 shrink-0">
               <div className="flex items-end gap-2">
                 <textarea
                   ref={textareaRef}
@@ -191,7 +223,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus }: { orderId: strin
                   placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
                   aria-label="Escrever mensagem"
                   style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
-                  className="input-base min-h-11 flex-1 max-w-[35ch] resize-none overflow-y-auto py-2.5 text-sm"
+                  className="input-base min-h-11 flex-1 resize-none overflow-y-auto py-2.5 text-sm"
                   disabled={sendMessage.isPending}
                 />
                 <Button

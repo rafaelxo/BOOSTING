@@ -44,7 +44,7 @@ export function AdminLayout() {
   const isActive = (href: string) => pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`))
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       <AppSidebar scope="admin" homeHref="/admin" sections={NAV_SECTIONS} breakpoint="lg" />
 
       {/* ── Main area ──────────────────────────────────────────────── */}
