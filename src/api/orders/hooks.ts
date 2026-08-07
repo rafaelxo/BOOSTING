@@ -134,11 +134,20 @@ export function useAdminOrders(status?: OrderStatus | 'all', serviceType?: Servi
 }
 
 export function useOrderStatusHistory(orderId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.orders.detail(orderId ?? '').concat(['history']),
     queryFn: () => listOrderStatusHistory(orderId!),
     enabled: !!orderId,
   })
+  useRealtimeInvalidate({
+    channel: `order-history-${orderId ?? 'none'}`,
+    table: 'order_status_events',
+    event: 'INSERT',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.detail(orderId).concat(['history'])] : [],
+    enabled: !!orderId,
+  })
+  return query
 }
 
 export function useOrderMatches(orderId: string | undefined) {
@@ -204,11 +213,25 @@ export function usePendingDropRequest(orderId: string | undefined) {
 }
 
 export function useCustomerOrderState(orderId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.orders.state(orderId ?? ''),
     queryFn: () => getCustomerOrderState(orderId),
     enabled: !!orderId,
+    refetchInterval: 30_000,
   })
+  // can_confirm_completion/requires_credentials só eram recalculados por
+  // mutations locais (ex.: o próprio cliente confirmando) -- sem isso, o
+  // botão "Confirmar conclusão" só aparecia depois de recarregar a página
+  // quando era o BOOSTER quem disparava a mudança (ex.: finalizar pedido).
+  useRealtimeInvalidate({
+    channel: `order-state-${orderId ?? 'none'}`,
+    table: 'order_status_events',
+    event: 'INSERT',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.state(orderId)] : [],
+    enabled: !!orderId,
+  })
+  return query
 }
 
 export function useBoosterSlotInfo(boosterId: string | undefined, enabled: boolean) {

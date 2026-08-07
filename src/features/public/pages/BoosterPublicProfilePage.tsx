@@ -308,6 +308,21 @@ export function BoosterPublicProfilePage() {
         </div>
         {!reviews.length ? (
           <EmptyState icon={MessageSquare} title="Este booster ainda não recebeu avaliações." />
+        ) : reviews.length < 5 ? (
+          // Poucas avaliações reais -- lista estática, sem duplicar o array
+          // pro efeito de marquee (com 1-2 cards, o loop duplicado só parecia
+          // avaliação repetida, não um carrossel de verdade).
+          <div className="flex flex-wrap gap-4">
+            {reviews.map((review) => (
+              <div key={review.id} className="w-72 shrink-0 rounded-xl border border-bg-elevated bg-bg-card p-4">
+                <div className="flex items-center justify-between mb-1.5">
+                  <StarRating rating={review.rating} size="xs" showValue={false} />
+                  <span className="text-[10px] text-ink-muted">{formatDate(review.created_at)}</span>
+                </div>
+                {review.content && <p className="text-xs text-ink-secondary leading-relaxed line-clamp-4">{review.content}</p>}
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">
             <div className="flex w-max gap-4 animate-marquee group-hover:[animation-play-state:paused]">

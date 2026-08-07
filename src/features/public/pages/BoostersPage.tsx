@@ -203,16 +203,26 @@ export function BoostersPage() {
               </p>
 
               <div className="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                {top3.map((entry, idx) => (
-                  <motion.div
-                    key={entry.booster_id}
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: idx * 0.08 }}
-                  >
-                    <TopBoosterCard entry={entry} position={idx + 1} />
-                  </motion.div>
-                ))}
+                {/* Pódio: 2º à esquerda, 1º no meio (mais destaque visual),
+                    3º à direita -- position continua vindo do rank real
+                    (top3 já chega ordenado 1º->3º), só a ORDEM DE EXIBIÇÃO
+                    muda. */}
+                {top3
+                  .map((entry, idx) => ({ entry, position: idx + 1 }))
+                  .sort((a, b) => {
+                    const podiumIndex = (p: number) => (p === 1 ? 1 : p === 2 ? 0 : 2)
+                    return podiumIndex(a.position) - podiumIndex(b.position)
+                  })
+                  .map(({ entry, position }, idx) => (
+                    <motion.div
+                      key={entry.booster_id}
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: idx * 0.08 }}
+                    >
+                      <TopBoosterCard entry={entry} position={position} />
+                    </motion.div>
+                  ))}
               </div>
             </section>
           )}

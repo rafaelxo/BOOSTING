@@ -6,7 +6,7 @@ import {
   TrendingUp, MessageCircle, Swords,
   ArrowRight, Lock, Star,
 } from 'lucide-react'
-import { Avatar, Button, RankBadge, HexGridBackground } from '@/components/ui'
+import { Avatar, Button, RankBadge } from '@/components/ui'
 import { formatRank } from '@/lib/utils'
 import type { RankTier } from '@/types'
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel'
@@ -87,7 +87,6 @@ export function HomePage() {
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow pointer-events-none" />
-        <HexGridBackground />
         <div className="absolute -top-60 right-0 w-[700px] h-[700px] rounded-full bg-brand/6 blur-[140px] pointer-events-none" />
 
         <div className="max-w-screen-xl mx-auto px-5 sm:px-8 py-20 lg:py-24 relative">
@@ -370,7 +369,6 @@ export function HomePage() {
           inconsistência de dados corrigida na seção de Reviews acima. */}
       <section className="py-16 lg:py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-glow opacity-60 pointer-events-none" />
-        <HexGridBackground />
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center relative">
           <motion.div
             initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}

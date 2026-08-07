@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { RankBadge } from '@/components/ui/RankBadge'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
-import { listOrderRankVerifications } from '@/api/orders'
-import { queryKeys } from '@/api/core/queryKeys'
+import { useLatestVerification } from './useOrderRankProgress'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn } from '@/lib/utils'
 import { rankStep } from '@/lib/pricing'
@@ -55,14 +54,6 @@ function WinBoostProgress({ order }: { order: Order }) {
   )
 }
 
-function useLatestVerification(orderId: string, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.orders.latestRankVerification(orderId),
-    queryFn: async () => (await listOrderRankVerifications(orderId, 1))[0] ?? null,
-    enabled,
-  })
-}
-
 // Corte atual (PDL do último colocado) das ligas GM/Challenger na Riot --
 // mesma fonte cacheada (riot_league_cutoffs) e mesmo padrão de busca de
 // StepConfigure.tsx, aqui usado pra manter a trilha de progresso do pedido
@@ -99,14 +90,32 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
   // Progresso RELATIVO a este pedido (0% = rank em que ele começou, 100% =
   // rank alvo) -- nunca a posição absoluta na escada inteira. Sem isso, um
   // pedido que já começa em Platina nasceria com a barra ~60% cheia mesmo
-  // sem nenhuma partida jogada ainda (o antigo comportamento). "Só carrega
-  // se realmente tiver jogado": enquanto não há verificação registrada,
-  // current === initial, então o span percorrido é sempre 0.
+  // sem nenhuma partida jogada ainda.
   const startStep = rankStep(initial.tier, initial.division)
   const targetStep = rankStep(target.tier, target.division)
-  const currentStep = rankStep(current.tier, current.division)
   const span = targetStep - startStep
-  const relativePct = locked ? 0 : span > 0 ? Math.max(0, Math.min(100, ((currentStep - startStep) / span) * 100)) : 0
+
+  // Sem verificação real ainda (só acontece na tentativa de conclusão), a
+  // barra ficava travada em 0% a partida inteira -- rank_verifications só
+  // existe perto do fim. Enquanto isso, estima o progresso a partir das
+  // partidas já sincronizadas (wins_played/losses_played) e do PDL médio
+  // ganho/perdido informado no pedido -- mesma estimativa já usada no
+  // histórico de partidas (OrderMatchHistory pdlEstimate), só que acumulada
+  // aqui pra mover a barra a cada sincronização em vez de só no final. Cada
+  // rankStep equivale a uma divisão inteira (ver shared/pricing.ts), por
+  // isso *100 abaixo -- mesma régua usada pelo restante do produto pra LP.
+  let currentStep: number
+  let usedEstimate = false
+  if (latest?.fetched_tier) {
+    currentStep = rankStep(current.tier, current.division)
+  } else if (span > 0) {
+    const estimatedLp = order.wins_played * (order.avg_pdl_gain ?? 0) - order.losses_played * (order.avg_pdl_loss ?? 0)
+    currentStep = startStep + Math.max(0, estimatedLp) / 100
+    usedEstimate = estimatedLp > 0
+  } else {
+    currentStep = startStep
+  }
+  const relativePct = locked || span <= 0 ? 0 : Math.max(0, Math.min(100, ((currentStep - startStep) / span) * 100))
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
@@ -126,7 +135,9 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
           ? 'O progresso começa a contar assim que o pagamento for confirmado.'
           : latest?.fetched_tier
           ? 'Verificado automaticamente via Riot API na última tentativa de conclusão.'
-          : 'Ainda sem verificação de rank registrada — o booster verifica o rank ao concluir o pedido.'}
+          : usedEstimate
+          ? 'Progresso estimado com base nas partidas sincronizadas — a Riot não expõe o LP ganho por partida.'
+          : 'Ainda sem partidas sincronizadas para este pedido.'}
       </p>
     </div>
   )

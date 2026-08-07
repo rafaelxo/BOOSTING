@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
+import { useRealtimeInvalidate } from '@/api/core/realtime'
 import {
   getAdminBoosterDetail, getBoosterAccessState, getBoosterActiveDropWarnings, getBoosterBlockedUntil, getBoosterPerformanceByRank, getOwnBoosterProfileId,
   getOwnBoosterTop3Status, getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters,
@@ -44,7 +45,7 @@ export function useOwnBoosterTop3Status(userId: string | undefined) {
 }
 
 export function usePublicBoosters() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.boosters.publicList(),
     queryFn: listPublicBoosters,
     staleTime: 60_000,
@@ -53,14 +54,29 @@ export function usePublicBoosters() {
     // mesmo intervalo já usado em useAdminOrders/booster-month-orders.
     refetchInterval: 30_000,
   })
+  useRealtimeInvalidate({
+    channel: 'public-boosters',
+    table: 'booster_profile_events',
+    event: 'INSERT',
+    queryKeys: [queryKeys.boosters.publicList()],
+  })
+  return query
 }
 
 export function usePublicBooster(boosterId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.boosters.publicProfile(boosterId ?? ''),
     queryFn: () => getPublicBooster(boosterId!),
     enabled: !!boosterId,
   })
+  useRealtimeInvalidate({
+    channel: `public-booster-${boosterId ?? 'none'}`,
+    table: 'booster_profile_events',
+    event: 'INSERT',
+    queryKeys: boosterId ? [queryKeys.boosters.publicProfile(boosterId)] : [],
+    enabled: !!boosterId,
+  })
+  return query
 }
 
 export function useBoostersPerformance(boosterUserIds: string[]) {
@@ -81,28 +97,50 @@ export function useBoosterPerformanceByRank(boosterUserId: string | undefined) {
 }
 
 export function useTopBoosters(limit: number) {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['boosters', 'top', limit] as const,
     queryFn: () => getTopBoosters({ limit }),
     staleTime: 60_000,
   })
+  useRealtimeInvalidate({
+    channel: `top-boosters-${limit}`,
+    table: 'booster_profile_events',
+    event: 'INSERT',
+    queryKeys: [['boosters', 'top', limit]],
+  })
+  return query
 }
 
 export function useAdminBoosters(status?: string) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.boosters.adminList({ status }),
     queryFn: () => listAdminBoosters(status),
     refetchInterval: 20_000,
   })
+  useRealtimeInvalidate({
+    channel: 'admin-boosters',
+    table: 'booster_profile_events',
+    event: 'INSERT',
+    queryKeys: [queryKeys.boosters.adminList({ status })],
+  })
+  return query
 }
 
 export function useAdminBoosterDetail(boosterId: string | undefined) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.boosters.adminDetail(boosterId ?? ''),
     queryFn: () => getAdminBoosterDetail(boosterId!),
     enabled: !!boosterId,
     refetchInterval: 20_000,
   })
+  useRealtimeInvalidate({
+    channel: `admin-booster-detail-${boosterId ?? 'none'}`,
+    table: 'booster_profile_events',
+    event: 'INSERT',
+    queryKeys: boosterId ? [queryKeys.boosters.adminDetail(boosterId)] : [],
+    enabled: !!boosterId,
+  })
+  return query
 }
 
 export function useBoosterActiveDropWarnings(boosterUserId: string | undefined) {

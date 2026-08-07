@@ -20,6 +20,22 @@ export function useOrderChat(orderId: string | undefined) {
     enabled: !!orderId,
   })
 
+  // chat_available/can_send vêm de get_order_chat, que depende de
+  // assigned_booster_id/chat_locked em orders -- nenhum dos dois é uma nova
+  // linha em order_messages, então a assinatura acima nunca via um booster
+  // ser atribuído (ou o chat ser bloqueado/desbloqueado). Sem isso, o chat
+  // só destravava no próximo poll de 15s em vez de assim que o pedido
+  // mudasse -- mesmo evento (order_status_events) já usado por useOrder/
+  // useBoosterOrder pra tudo mais.
+  useRealtimeInvalidate({
+    channel: `order-chat-status-${orderId ?? 'none'}`,
+    table: 'order_status_events',
+    event: 'INSERT',
+    filter: orderId ? `order_id=eq.${orderId}` : undefined,
+    queryKeys: orderId ? [queryKeys.orders.chat(orderId)] : [],
+    enabled: !!orderId,
+  })
+
   return query
 }
 

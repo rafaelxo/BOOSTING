@@ -5,11 +5,18 @@ import { getAdminDashboardStats, getOrderSupportEscalation, listAdminDropRequest
 import { adminResolveOrderSupport, resolveDropRequest, waiveDropPenalty } from './mutations'
 
 export function useAdminDashboardStats() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.admin.dashboardStats(),
     queryFn: getAdminDashboardStats,
     refetchInterval: 30_000,
   })
+  useRealtimeInvalidate({
+    channel: 'admin-dashboard-stats',
+    table: 'order_status_events',
+    event: 'INSERT',
+    queryKeys: [queryKeys.admin.dashboardStats()],
+  })
+  return query
 }
 
 export function useAdminRefunds() {

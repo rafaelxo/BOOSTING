@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
+import { useRealtimeInvalidate } from '@/api/core/realtime'
 import { getDuoAccountReservationHistory, listAdminDuoAccounts, listDuoAccounts, lookupDuoAccountRiotRank } from './queries'
 import {
   adminDeleteDuoAccount, adminReleaseDuoAccount, adminSaveDuoAccount, adminSetDuoAccountActive,
@@ -10,19 +11,33 @@ import {
 import type { AdminDuoAccount, BoosterVisibleDuoAccount } from './types'
 
 export function useBoosterDuoAccounts() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.duoAccounts.list(),
     queryFn: () => listDuoAccounts<BoosterVisibleDuoAccount>(),
     refetchInterval: 15_000,
   })
+  useRealtimeInvalidate({
+    channel: 'booster-duo-accounts',
+    table: 'duo_account_events',
+    event: 'INSERT',
+    queryKeys: [queryKeys.duoAccounts.list()],
+  })
+  return query
 }
 
 export function useAdminDuoAccounts() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.duoAccounts.adminList(),
     queryFn: listAdminDuoAccounts,
     refetchInterval: 15_000,
   })
+  useRealtimeInvalidate({
+    channel: 'admin-duo-accounts',
+    table: 'duo_account_events',
+    event: 'INSERT',
+    queryKeys: [queryKeys.duoAccounts.adminList()],
+  })
+  return query
 }
 
 export function useDuoAccountReservationHistory(accountId: string | undefined) {
