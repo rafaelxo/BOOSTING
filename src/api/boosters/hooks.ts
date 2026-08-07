@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import { useRealtimeInvalidate } from '@/api/core/realtime'
 import {
-  getAdminBoosterDetail, getBoosterAccessState, getBoosterActiveDropWarnings, getBoosterBlockedUntil, getBoosterPerformanceByRank, getOwnBoosterProfileId,
+  getAdminBoosterDetail, getBoosterAccessState, getBoosterActiveDropWarnings, getBoosterBlockedUntil, getBoosterPerformanceByRank, getOwnBoosterDisplayName,
   getOwnBoosterTop3Status, getOwnProfessionalProfile, getPublicBooster, getTopBoosters, listAdminBoosters,
   listBoosterAdminNotes, listBoostersPerformance, listBoosterNames, listPublicBoosters,
 } from './queries'
@@ -28,10 +28,10 @@ export function useOwnProfessionalProfile(userId: string | undefined) {
   })
 }
 
-export function useOwnBoosterProfileId(userId: string | undefined) {
+export function useOwnBoosterDisplayName(userId: string | undefined) {
   return useQuery({
-    queryKey: ['boosters', 'own-profile-id', userId ?? ''],
-    queryFn: () => getOwnBoosterProfileId(userId!),
+    queryKey: ['boosters', 'own-display-name', userId ?? ''],
+    queryFn: () => getOwnBoosterDisplayName(userId!),
     enabled: !!userId,
   })
 }
@@ -63,18 +63,18 @@ export function usePublicBoosters() {
   return query
 }
 
-export function usePublicBooster(boosterId: string | undefined) {
+export function usePublicBooster(displayName: string | undefined) {
   const query = useQuery({
-    queryKey: queryKeys.boosters.publicProfile(boosterId ?? ''),
-    queryFn: () => getPublicBooster(boosterId!),
-    enabled: !!boosterId,
+    queryKey: queryKeys.boosters.publicProfile(displayName ?? ''),
+    queryFn: () => getPublicBooster(displayName!),
+    enabled: !!displayName,
   })
   useRealtimeInvalidate({
-    channel: `public-booster-${boosterId ?? 'none'}`,
+    channel: `public-booster-${displayName ?? 'none'}`,
     table: 'booster_profile_events',
     event: 'INSERT',
-    queryKeys: boosterId ? [queryKeys.boosters.publicProfile(boosterId)] : [],
-    enabled: !!boosterId,
+    queryKeys: displayName ? [queryKeys.boosters.publicProfile(displayName)] : [],
+    enabled: !!displayName,
   })
   return query
 }

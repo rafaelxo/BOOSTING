@@ -33,10 +33,10 @@ export async function getOwnProfessionalProfile(userId: string): Promise<Profess
   return data as unknown as ProfessionalProfileData | null
 }
 
-export async function getOwnBoosterProfileId(userId: string): Promise<string | null> {
-  const { data, error } = await supabase.from('booster_profiles').select('id').eq('user_id', userId).maybeSingle()
+export async function getOwnBoosterDisplayName(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('booster_profiles').select('display_name').eq('user_id', userId).maybeSingle()
   if (error) throw normalizeApiError(error)
-  return data?.id ?? null
+  return data?.display_name ?? null
 }
 
 // Usado só pra calcular a divisão de ganhos (boosterEarningsShare) na tela de
@@ -53,8 +53,8 @@ export async function listPublicBoosters(): Promise<BoosterProfile[]> {
   return (data ?? []) as unknown as BoosterProfile[]
 }
 
-export async function getPublicBooster(boosterId: string): Promise<BoosterProfile | null> {
-  const { data, error } = await supabase.from('public_booster_profiles').select('*').eq('id', boosterId).maybeSingle()
+export async function getPublicBooster(displayName: string): Promise<BoosterProfile | null> {
+  const { data, error } = await supabase.from('public_booster_profiles').select('*').eq('display_name', displayName).maybeSingle()
   if (error) throw normalizeApiError(error)
   return data as unknown as BoosterProfile | null
 }

@@ -12,6 +12,7 @@ const REQUEST_PAYOUT_MESSAGES: Record<string, string> = {
   booster_not_approved: 'Sua conta de booster ainda não está aprovada.',
   insufficient_balance: 'O valor solicitado é maior que o seu saldo disponível.',
   unauthorized: 'Sua sessão expirou. Entre novamente para continuar.',
+  withdrawal_window_closed: 'Saques só podem ser solicitados nos dias 15 e 30 de cada mês.',
 }
 
 export async function requestPayout(amount: number): Promise<{ requestId: string }> {

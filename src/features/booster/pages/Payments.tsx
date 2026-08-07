@@ -2,12 +2,13 @@ import { useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Wallet, Banknote, PiggyBank, Hourglass, Send, FileText, XCircle, ShieldAlert } from 'lucide-react'
+import { Wallet, Banknote, PiggyBank, Hourglass, Send, FileText, XCircle, ShieldAlert, CalendarClock } from 'lucide-react'
 import { Button, Card, Skeleton, EmptyState, StatCard, ErrorAlert, CurrencyMaskedInput } from '@/components/ui'
 import { formatDateTime, cn, PAYOUT_REQUEST_STATUS_LABEL, PAYOUT_REQUEST_STATUS_COLOR } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoosterActiveDropWarnings, useBoosterBlockedUntil } from '@/api/boosters'
+import { isWithdrawalWindowOpen, nextWithdrawalDayLabel } from '@/lib/payoutWithdrawalWindow'
 import {
   useBoosterPayoutTotals, useBoosterPayoutRequests, useRequestPayout, useCancelPayoutRequest,
   getPayoutProofSignedUrl, MIN_PAYOUT_AMOUNT,
@@ -116,9 +117,25 @@ function RequestPayoutCard({ available }: { available: number }) {
   )
 }
 
+function WithdrawalWindowClosedCard() {
+  return (
+    <Card padding="md" className="ring-1 ring-border-subtle">
+      <div className="flex items-center gap-2 mb-1">
+        <CalendarClock className="h-4 w-4 text-ink-muted" />
+        <h3 className="text-sm font-semibold text-ink">Solicitação de saque fechada</h3>
+      </div>
+      <p className="text-xs text-ink-secondary">
+        Saques só podem ser solicitados nos dias 15 e 30 de cada mês. Próxima janela:{' '}
+        <span className="font-bold text-ink">{nextWithdrawalDayLabel(new Date())}</span>.
+      </p>
+    </Card>
+  )
+}
+
 export function BoosterPaymentsPage() {
   const { profile } = useAuthStore()
   const currency = useCurrency()
+  const withdrawalWindowOpen = isWithdrawalWindowOpen(new Date())
 
   const { data: totals, isLoading: loadingTotals } = useBoosterPayoutTotals(profile?.id)
   const { data: requests, isLoading: loadingRequests } = useBoosterPayoutRequests(profile?.id)
@@ -167,7 +184,11 @@ export function BoosterPaymentsPage() {
         ))}
       </div>
 
-      <RequestPayoutCard available={totals?.available_balance ?? 0} />
+      {withdrawalWindowOpen ? (
+        <RequestPayoutCard available={totals?.available_balance ?? 0} />
+      ) : (
+        <WithdrawalWindowClosedCard />
+      )}
 
       <Card padding="md">
         <h3 className="text-sm font-semibold text-ink mb-4">Histórico de solicitações</h3>

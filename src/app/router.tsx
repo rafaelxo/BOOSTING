@@ -65,7 +65,7 @@ export const router = createBrowserRouter([
       { path: '/terms',    element: <SuspensePage><TermsPage /></SuspensePage> },
       { path: '/privacy',  element: <SuspensePage><PrivacyPage /></SuspensePage> },
       { path: '/boosters',     element: <SuspensePage><BoostersPage /></SuspensePage> },
-      { path: '/boosters/:id', element: <SuspensePage><BoosterPublicProfilePage /></SuspensePage> },
+      { path: '/boosters/:displayName', element: <SuspensePage><BoosterPublicProfilePage /></SuspensePage> },
     ],
   },
 

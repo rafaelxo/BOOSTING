@@ -1,4 +1,5 @@
 import { useParams } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { AUTO_SYNC_INTERVAL_MS, shouldAutoSync } from '@/lib/matchSync'
 import { useTranslation } from 'react-i18next'
@@ -30,7 +31,7 @@ import { useOwnBoosterTop3Status } from '@/api/boosters'
 import { useBoosterServiceDetails } from '@/api/coaching'
 import {
   useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation,
-  useSetDuoOwnRiotId, useClearDuoOwnRiotId,
+  useSetDuoOwnRiotId, useClearDuoOwnRiotId, lookupDuoAccountRiotRank,
 } from '@/api/duoAccounts'
 import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
 import { rankStep } from '@/lib/pricing'
@@ -77,11 +78,22 @@ function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () =>
     return true
   })
 
-  function doSaveOwnAccount() {
-    setOwnAccount.mutate({ orderId: order.id, riotId: ownRiotId.trim() }, {
-      onSuccess: () => { setOwnRiotId(''); onLinked?.() },
-    })
-  }
+  // set_duo_own_riot_id (RPC) só valida o FORMATO "Nome#TAG" -- nunca
+  // confere se a conta existe de verdade na Riot. Sem essa checagem aqui, um
+  // Riot ID digitado errado só falharia silenciosamente no próximo sync
+  // (best-effort: booster_duo_matches nunca reflete a estatística do
+  // booster, sem nenhum aviso). Mesma consulta usada pelo admin ao cadastrar
+  // conta do pool (DuoAccounts.tsx) -- só confere existência, não precisa
+  // do rank aqui (não filtra/lista a conta própria em lugar nenhum).
+  const saveOwnAccount = useMutation({
+    mutationFn: async () => {
+      const trimmed = ownRiotId.trim()
+      const lookup = await lookupDuoAccountRiotRank(trimmed)
+      if (!lookup.found) throw new Error('Conta Riot não encontrada. Confira o Riot ID digitado.')
+      await setOwnAccount.mutateAsync({ orderId: order.id, riotId: trimmed })
+    },
+    onSuccess: () => { setOwnRiotId(''); onLinked?.() },
+  })
 
   function doClearOwnAccount() {
     clearOwnAccount.mutate(order.id)
@@ -158,15 +170,15 @@ function DuoAccountSection({ order, onLinked }: { order: Order; onLinked?: () =>
                 placeholder="Nome#TAG"
                 className="input-base flex-1 text-sm"
               />
-              <Button size="sm" disabled={!ownRiotId.trim()} loading={setOwnAccount.isPending} onClick={doSaveOwnAccount}>
+              <Button size="sm" disabled={!ownRiotId.trim()} loading={saveOwnAccount.isPending} onClick={() => saveOwnAccount.mutate()}>
                 Salvar
               </Button>
             </div>
           )}
-          {(setOwnAccount.isError || clearOwnAccount.isError) && (
+          {(saveOwnAccount.isError || clearOwnAccount.isError) && (
             <ErrorAlert
               message={
-                (setOwnAccount.error instanceof Error && setOwnAccount.error.message) ||
+                (saveOwnAccount.error instanceof Error && saveOwnAccount.error.message) ||
                 (clearOwnAccount.error instanceof Error && clearOwnAccount.error.message) ||
                 'Erro ao salvar conta'
               }

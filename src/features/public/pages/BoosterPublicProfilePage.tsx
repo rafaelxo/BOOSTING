@@ -22,10 +22,10 @@ const RANK_GROUPS: { key: RankGroup; label: string; sublabel: string; tiers: Ran
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function BoosterPublicProfilePage() {
-  const { id } = useParams<{ id: string }>()
+  const { displayName } = useParams<{ displayName: string }>()
   const currency = useCurrency()
 
-  const { data: booster, isLoading } = usePublicBooster(id)
+  const { data: booster, isLoading } = usePublicBooster(displayName)
   const { data: services = [] } = usePublicCoachingPackages(booster?.user_id)
   const { data: reviews = [] } = useBoosterReviews(booster?.user_id)
 

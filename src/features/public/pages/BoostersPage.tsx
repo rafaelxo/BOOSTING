@@ -26,7 +26,7 @@ function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position:
 
   return (
     <Link
-      to={`/boosters/${entry.booster_profile_id}`}
+      to={`/boosters/${encodeURIComponent(entry.display_name)}`}
       className={cn(
         'card flex flex-col gap-3 p-5 border-2 transition-all hover:-translate-y-1 hover:shadow-card-hover',
         medal.border,
@@ -75,7 +75,7 @@ function TopBoosterCard({ entry, position }: { entry: TopBoosterEntry; position:
 
 function BoosterCard({ booster, winRate }: { booster: BoosterProfile; winRate: number }) {
   return (
-    <Link to={`/boosters/${booster.id}`}>
+    <Link to={`/boosters/${encodeURIComponent(booster.display_name)}`}>
       <div className="card flex flex-col items-center text-center gap-3 p-4 hover:border-brand/30 hover:shadow-card-hover transition-all cursor-pointer h-full">
         <Avatar src={booster.avatar_url} name={booster.display_name} size="lg" />
 

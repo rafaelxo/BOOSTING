@@ -55,7 +55,7 @@ function AssignedBoosterValue({ order }: { order: Order }) {
   if (isLoading) return <Skeleton className="h-5 w-20 mx-auto" />
   if (!booster) return <span>Não associado</span>
   return (
-    <Link to={`/boosters/${booster.id}`} className="text-brand hover:underline">
+    <Link to={`/boosters/${encodeURIComponent(booster.display_name)}`} className="text-brand hover:underline">
       {booster.display_name}
     </Link>
   )

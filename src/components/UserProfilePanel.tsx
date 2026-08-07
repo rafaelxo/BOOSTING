@@ -11,6 +11,7 @@ import { DiscordAccountNotice } from '@/components/DiscordAccountNotice'
 import type { UserRole } from '@/types'
 import { useBoosterPanelFields, useUpdateMyUsername, useUpdateMyAvatar, useBoosterPanelMutations } from '@/api/auth'
 import { ApiError } from '@/api/core/errors'
+import { displayNameCooldownDaysRemaining } from '@/lib/displayNameCooldown'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,9 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     }
   }, [boosterData])
 
+  const displayNameDaysRemaining = displayNameCooldownDaysRemaining(boosterData?.display_name_changed_at ?? null, new Date())
+  const displayNameLocked = displayNameDaysRemaining > 0
+
   function formatCpf(raw: string) {
     const d = raw.replace(/\D/g, '')
     if (d.length !== 11) return raw
@@ -125,8 +129,8 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
       await boosterMutations.updateDisplayName.mutateAsync({ userId: profile.id, displayName: displayName.trim() })
       setDisplayNameSaved(true)
       setTimeout(() => setDisplayNameSaved(false), 3000)
-    } catch {
-      setDisplayNameError('Erro ao salvar')
+    } catch (err) {
+      setDisplayNameError(err instanceof ApiError ? err.message : 'Erro ao salvar')
     } finally {
       setDisplayNameSaving(false)
     }
@@ -262,19 +266,28 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
                     onChange={e => { setDisplayName(e.target.value); setDisplayNameError(null) }}
                     placeholder="Nome público"
                     maxLength={32}
+                    disabled={displayNameLocked}
                     className="input-base flex-1 text-sm"
                   />
                   <button
                     type="button"
                     onClick={handleSaveDisplayName}
-                    disabled={displayNameSaving || !displayName.trim() || displayName.trim() === boosterData?.display_name}
+                    disabled={displayNameLocked || displayNameSaving || !displayName.trim() || displayName.trim() === boosterData?.display_name}
                     className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
                   >
                     {displayNameSaving ? '...' : 'Salvar'}
                   </button>
                 </div>
-                {displayNameError && <p className="text-xs text-danger">{displayNameError}</p>}
-                {displayNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
+                {displayNameLocked ? (
+                  <p className="text-xs text-ink-muted">
+                    Você só pode trocar seu nome de exibição em {displayNameDaysRemaining} dia{displayNameDaysRemaining === 1 ? '' : 's'}.
+                  </p>
+                ) : (
+                  <>
+                    {displayNameError && <p className="text-xs text-danger">{displayNameError}</p>}
+                    {displayNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
+                  </>
+                )}
               </div>
 
               {/* Full name */}
