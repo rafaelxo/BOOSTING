@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { RankBadge } from '@/components/ui/RankBadge'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
 import { useLatestVerification, computeEffectivePoints } from './useOrderRankProgress'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
@@ -28,19 +27,14 @@ function WinBoostProgress({ order }: { order: Order }) {
   const remaining = Math.max(0, purchased - order.wins_played)
   const percent = purchased > 0 ? (completed / purchased) * 100 : 0
   const done = remaining === 0
-  const rank = order.current_rank as { tier: RankTier; division: Division | null } | null
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          {rank && <RankBadge tier={rank.tier} division={rank.division} size="xs" showLabel={false} />}
-          <span className="text-sm font-bold text-ink">
-            {locked ? `${purchased} vitória${purchased === 1 ? '' : 's'} contratada${purchased === 1 ? '' : 's'}` : `${remaining} vitória${remaining === 1 ? '' : 's'} restante${remaining === 1 ? '' : 's'}`}
-          </span>
+      {!locked && (
+        <div className="flex items-center justify-end mb-2">
+          <span className="font-semibold text-ink text-sm">{percent.toFixed(0)}%</span>
         </div>
-        {!locked && <span className="font-semibold text-ink text-sm">{percent.toFixed(0)}%</span>}
-      </div>
+      )}
       <ProgressBar percent={locked ? 0 : percent} tone={done ? 'success' : 'brand'} locked={locked} />
       <p className="text-xs text-ink-muted mt-2">
         {locked

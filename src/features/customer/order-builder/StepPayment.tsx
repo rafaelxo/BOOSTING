@@ -270,6 +270,7 @@ export function StepPayment({ insideModal = false }: { insideModal?: boolean } =
         ...base,
         boost_mode: store.boostMode,
         wins_purchased: store.winsPurchased,
+        addon_codes: addonCodes,
         riot_id: store.riotId,
       }
     }

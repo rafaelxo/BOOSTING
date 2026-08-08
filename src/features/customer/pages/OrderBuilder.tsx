@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
 import { Stepper, Button, Card, Modal } from '@/components/ui'
@@ -12,6 +12,7 @@ import type { ServiceType, Rank } from '@/types'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getCustomerOrderState } from '@/api/orders'
+import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 
 const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'clash', 'coaching']
 
@@ -105,6 +106,7 @@ export function OrderBuilderPage() {
     clashTier, clashDay,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
+  const queryClient = useQueryClient()
   // Popup do PIX aberto por cima da própria revisão -- "Ir para Pagamento"
   // não navega mais pro step 'payment' (esse continua existindo só pra
   // retomar um pedido pendente após reload, ver efeito de resumableOrder
@@ -147,6 +149,38 @@ export function OrderBuilderPage() {
   useEffect(() => {
     if (step !== 'review') setPixModalOpen(false)
   }, [step])
+
+  // Clicar em "Voltar" na revisão é a única forma de reconfigurar (extras,
+  // rank etc.) DEPOIS de já ter gerado um PIX/pedido pendente pra essa
+  // revisão (StepPayment persiste o pedido e gera o PIX sozinho assim que o
+  // popup abre, ver auto-start em StepPayment.tsx). Só derrubar ?order= não
+  // bastava: o pedido antigo continuava "aguardando pagamento" órfão em Meus
+  // Pedidos pra sempre (só some quando o cron de expiração do PIX o cancela,
+  // minutos depois) -- e cada ida-e-volta na revisão criava outro, dando a
+  // real impressão de pedidos duplicados. Cancela esse pedido abandonado no
+  // servidor antes de sair -- mesma edge function/RPC usada quando o cliente
+  // cancela manualmente ou quando o PIX expira sozinho (já defensiva contra
+  // um pagamento que tenha acabado de ser aprovado: recusa cancelar nesse
+  // caso). Fire-and-forget -- nunca trava a navegação por causa disso.
+  function goBackFromReview() {
+    const orderId = searchParams.get('order')
+    if (orderId) {
+      void invokeEdgeFunction('cancel-pending-order', {
+        body: { order_id: orderId },
+        timeoutMs: 20_000,
+        requireAuth: true,
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['orders', 'customer'] })
+        queryClient.invalidateQueries({ queryKey: ['resumable-customer-order'] })
+      }).catch(() => {})
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('order')
+        return next
+      }, { replace: true })
+    }
+    prevStep()
+  }
 
   // Mesma regra de StepExtras.tsx/StepPayment.tsx — Clash reaproveita
   // solo_standard/duo_standard pela modalidade, sem currentRank envolvido.
@@ -450,7 +484,7 @@ export function OrderBuilderPage() {
 
               {step === 'review' && (
                 <div className="flex gap-2.5 pt-4">
-                  <Button variant="ghost" onClick={prevStep} className="shrink-0">
+                  <Button variant="ghost" onClick={goBackFromReview} className="shrink-0">
                     Voltar
                   </Button>
                   <Button onClick={() => setPixModalOpen(true)} className="flex-1" rightIcon={<ChevronRight className="h-4 w-4" />}>

@@ -362,6 +362,7 @@ export interface OrderChatMessage {
   sender_avatar_url: string | null
   content: string
   created_at: string
+  is_read: boolean
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────

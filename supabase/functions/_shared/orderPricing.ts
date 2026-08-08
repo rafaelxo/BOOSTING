@@ -187,6 +187,7 @@ const md5IntentSchema = z.object({
   // division required except Master+.
   current_rank: genericRankSchema,
   wins_purchased: z.number().int().min(1).max(5),
+  addon_codes: z.array(z.string().min(1)).max(10).default([]),
   customer_notes: z.string().max(500).nullable().default(null),
   riot_id: riotIdSchema,
   coupon_code: couponCodeSchema,
@@ -511,7 +512,7 @@ export async function validateAndPriceIntent(
       avgLpLoss: 15,
       winsPurchased: md5.wins_purchased,
       sessionsPurchased: null,
-      addonCodes: [],
+      addonCodes: md5.addon_codes,
       winPackage: null,
       customerNotes: md5.customer_notes,
       currentPdl: null,

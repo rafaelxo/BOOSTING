@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/core/queryKeys'
 import { useRealtimeInvalidate } from '@/api/core/realtime'
 import { getOrderChat } from './queries'
-import { sendOrderMessage, setOrderChatLock } from './mutations'
+import { sendOrderMessage, setOrderChatLock, markOrderChatRead } from './mutations'
 
 export function useOrderChat(orderId: string | undefined) {
   const query = useQuery({
@@ -51,6 +51,14 @@ export function useSetOrderChatLock(orderId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (locked: boolean) => setOrderChatLock({ orderId, locked }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.chat(orderId) }),
+  })
+}
+
+export function useMarkOrderChatRead(orderId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => markOrderChatRead(orderId),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.orders.chat(orderId) }),
   })
 }

@@ -31,3 +31,9 @@ export async function setOrderChatLock(params: { orderId: string; locked: boolea
   if (error) throw normalizeApiError(error)
   return assertChatSuccess(data as unknown as ChatRpcResult)
 }
+
+export async function markOrderChatRead(orderId: string) {
+  const { data, error } = await supabase.rpc('mark_order_chat_read', { p_order_id: orderId })
+  if (error) throw normalizeApiError(error)
+  return assertChatSuccess(data as unknown as ChatRpcResult)
+}

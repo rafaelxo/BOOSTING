@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ShoppingBag, Search } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
-import { OrderRow } from '@/components/order/OrderRow'
+import { CustomerOrderCard } from '@/components/order/CustomerOrderCard'
 import { useAuthStore } from '@/stores/authStore'
-import { getServiceLabel } from '@/lib/utils'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useCustomerOrders } from '@/api/orders'
 import type { OrderStatus } from '@/types'
@@ -63,10 +62,10 @@ export function OrderHistoryPage() {
         </div>
       </div>
 
-      {/* Order list */}
+      {/* Order grid */}
       {isLoading ? (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
         </div>
       ) : !filtered.length ? (
         <EmptyState
@@ -76,15 +75,9 @@ export function OrderHistoryPage() {
           action={filter === 'all' ? { label: t('customer.history.startBoost'), onClick: () => navigate('/orders/new?new=1') } : undefined}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((order) => (
-            <OrderRow
-              key={order.id}
-              order={order}
-              currency={currency}
-              subtitle={getServiceLabel(order.service_type)}
-              showIcon={false}
-            />
+            <CustomerOrderCard key={order.id} order={order} currency={currency} />
           ))}
         </div>
       )}

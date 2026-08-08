@@ -50,10 +50,10 @@ const ORDER_STATUS_ACCENT: Record<OrderStatus, string> = {
 // Compartilhada entre cliente/booster/admin -- antes cada tela tinha seu
 // próprio visual pro mesmo dado (o admin usava uma lista simples de pontos
 // soltos, sem a linha conectando as etapas).
-export function OrderTimeline({ history }: { history: OrderStatusHistory[] | undefined }) {
-  return (
-    <Card padding="md">
-      <h3 className="text-sm font-semibold text-ink mb-4">Histórico do Pedido</h3>
+export function OrderTimeline({ history, bare = false }: { history: OrderStatusHistory[] | undefined; bare?: boolean }) {
+  const content = (
+    <>
+      {!bare && <h3 className="text-sm font-semibold text-ink mb-4">Histórico do Pedido</h3>}
       {!history?.length ? (
         <p className="text-xs text-ink-muted">Sem histórico ainda.</p>
       ) : (
@@ -83,6 +83,9 @@ export function OrderTimeline({ history }: { history: OrderStatusHistory[] | und
           </div>
         </div>
       )}
-    </Card>
+    </>
   )
+
+  if (bare) return content
+  return <Card padding="md">{content}</Card>
 }

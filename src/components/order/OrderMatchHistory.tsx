@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Trophy, XCircle, Clock, RefreshCw, Crown, Gamepad2 } from 'lucide-react'
-import { Card, Skeleton, Button, ErrorAlert } from '@/components/ui'
+import { Card, Skeleton, ErrorAlert } from '@/components/ui'
 import { cn, formatDateTime } from '@/lib/utils'
 import { useOrderMatches } from '@/api/orders'
 
@@ -78,16 +78,15 @@ export function OrderMatchHistory({ orderId, sync, pdlEstimate }: { orderId: str
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-ink">Histórico de partidas</h3>
         {sync && (
-          <Button
-            size="xs"
-            variant="secondary"
-            leftIcon={<RefreshCw className="h-3 w-3" />}
-            loading={sync.syncing}
-            disabled={(sync.cooldownSeconds ?? 0) > 0}
+          <button
+            type="button"
             onClick={sync.onSync}
+            disabled={sync.syncing || (sync.cooldownSeconds ?? 0) > 0}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold shrink-0 text-ink-secondary hover:text-ink transition-colors disabled:opacity-60"
           >
+            <RefreshCw className={cn('h-3.5 w-3.5', sync.syncing && 'animate-spin')} />
             {sync.cooldownSeconds ? `Aguarde ${sync.cooldownSeconds}s` : 'Sincronizar'}
-          </Button>
+          </button>
         )}
       </div>
 

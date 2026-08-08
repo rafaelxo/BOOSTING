@@ -1,39 +1,60 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useOrderSupportEscalation } from '@/api/admin'
+import { useMarkOrderChatRead, useOrderChat } from '@/api/chat'
+import { useBoosterServiceDetails } from '@/api/coaching'
+import type { CustomerOrderState } from '@/api/orders'
 import {
-  Clock, History, KeyRound, Lock, ShieldCheck, QrCode, XCircle, CheckCircle2, AlertTriangle,
-  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, Trophy,
-} from 'lucide-react'
-import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, GuaranteeNotice } from '@/components/ui'
-import { OrderPageHeader } from '@/components/order/OrderPageHeader'
-import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatPanel } from '@/components/order/OrderChatPanel'
-import { PixWaitingPanel } from '@/components/order/PixWaitingPanel'
-import { useOrderChat } from '@/api/chat'
-import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+    getCustomerOrderState,
+    useCancelPendingOrder,
+    useConfirmOrderCompletion,
+    useCustomerOrderState,
+    useDisputeOrderCompletion, useGeneratePix,
+    useOrder, useOrderStatusHistory,
+    useRequestCustomerOrderDrop,
+    useRequestOrderSupport,
+    useSetOrderCredentials,
+    useSyncOrderMatches,
+} from '@/api/orders'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
+import { OrderChat } from '@/components/order/OrderChat'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
+import { OrderDetailWidget } from '@/components/order/OrderDetailWidget'
+import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
+import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderRankSummary } from '@/components/order/OrderRankSummary'
-import { OrderTimeline } from '@/components/order/OrderTimeline'
 import { OrderReviewSection } from '@/components/order/OrderReviewSection'
-import { CountdownTimer } from '@/components/order/CountdownTimer'
-import { supabase } from '@/lib/supabase'
-import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
-import { formatDateTime, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
-import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
+import { OrderTimeline } from '@/components/order/OrderTimeline'
+import { PixWaitingPanel } from '@/components/order/PixWaitingPanel'
+import { Button, Card, ErrorAlert, GuaranteeNotice, Modal, OrderStatusBadge, Skeleton } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
+import { CLASH_DAY_LABEL, CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL } from '@/lib/clashDomain'
+import { EdgeFunctionError } from '@/lib/invokeEdgeFunction'
+import { supabase } from '@/lib/supabase'
+import { formatDateTime, formatEstimatedDelivery, getServiceLabel, sortOrderExtras } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+import type { BoosterProfile, Order, OrderStatus } from '@/types'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  useOrder, useOrderStatusHistory, useCustomerOrderState, useSetOrderCredentials,
-  useConfirmOrderCompletion, useDisputeOrderCompletion, useGeneratePix, useCancelPendingOrder,
-  useRequestOrderSupport, useRequestCustomerOrderDrop, useSyncOrderMatches, getCustomerOrderState,
-} from '@/api/orders'
-import { useOrderSupportEscalation } from '@/api/admin'
-import { useBoosterServiceDetails } from '@/api/coaching'
-import type { Order, BoosterProfile, OrderStatus } from '@/types'
-import type { CustomerOrderState } from '@/api/orders'
-import { useQuery } from '@tanstack/react-query'
+    AlertTriangle,
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    Hash,
+    History, KeyRound, Lock,
+    MessageCircleWarning,
+    QrCode,
+    ShieldCheck,
+    Shuffle,
+    Trophy,
+    UserCheck,
+    Users,
+    Wallet,
+    XCircle,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 function useAssignedBooster(boosterId: string | null) {
   return useQuery({
@@ -62,9 +83,16 @@ function AssignedBoosterValue({ order }: { order: Order }) {
   )
 }
 
-// Prazo estourado: acionamento de suporte auditado no backend (migration 083),
-// não só o link estático que já existia no CountdownTimer.
-function LateOrderSupportBanner({ order }: { order: Order }) {
+// Link do Discord de suporte, mesmo usado em BoosterStatusScreens.tsx/FAQPage.tsx.
+const SUPPORT_DISCORD_URL = 'https://discord.gg/aRPXe9pnwP'
+
+// Prazo estourado: acionamento de suporte auditado no backend (migration 083)
+// continua acontecendo (fire-and-forget) no primeiro clique, mas agora o
+// botão em si direciona pro Discord -- é lá que o suporte de fato responde,
+// o registro interno é só auditoria. Rende como pill compacta ao lado do
+// código do pedido (ver OrderPageHeader `statusActions`) em vez de um card
+// cheio.
+function LateOrderSupportBadge({ order }: { order: Order }) {
   const { data: escalation } = useOrderSupportEscalation(order.id)
   const requestSupport = useRequestOrderSupport(order.id)
 
@@ -73,31 +101,17 @@ function LateOrderSupportBanner({ order }: { order: Order }) {
   if (Date.now() <= deadline) return null
 
   return (
-    <Card padding="md" className="ring-1 ring-danger/25 bg-danger/5">
-      <div className="flex items-start gap-3">
-        <MessageCircleWarning className="h-5 w-5 text-danger shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-ink">Prazo estimado excedido</p>
-          <p className="text-xs text-ink-secondary mt-1">
-            {escalation
-              ? 'Suporte já foi acionado para este pedido — nossa equipe está acompanhando.'
-              : 'Este pedido está demorando mais que o estimado. Você pode acionar o suporte para acompanhamento prioritário.'}
-          </p>
-          {!escalation && (
-            <Button
-              size="sm"
-              variant="danger"
-              className="mt-3"
-              loading={requestSupport.isPending}
-              onClick={() => requestSupport.mutate()}
-              leftIcon={<MessageCircleWarning className="h-4 w-4" />}
-            >
-              Acionar suporte
-            </Button>
-          )}
-        </div>
-      </div>
-    </Card>
+    <a
+      href={SUPPORT_DISCORD_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => { if (!escalation) requestSupport.mutate() }}
+      title="Prazo estimado excedido — fale com o suporte no Discord"
+      className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-danger/15 text-danger border border-danger/30 hover:bg-danger/25 transition-colors"
+    >
+      <MessageCircleWarning className="h-3 w-3" />
+      {escalation ? 'Suporte acionado · Discord' : 'Atrasado · Discord'}
+    </a>
   )
 }
 
@@ -141,6 +155,18 @@ function PendingPaymentSection({ order }: { order: Order }) {
   // cliente fechar sem pagar, o pedido continua pendente e o banner
   // compacto abaixo permite reabrir o popup quando quiser.
   const [open, setOpen] = useState(order.status === 'awaiting_payment')
+  // React Router não remonta OrderDetailPage só porque o :id da URL mudou --
+  // navegar de um pedido já pago direto pra outro "aguardando pagamento"
+  // reaproveita esta MESMA instância de PendingPaymentSection, então o
+  // useState acima (só roda uma vez, no primeiro mount) nunca reabriria o
+  // popup sozinho pro pedido novo. Resincroniza a cada troca de order.id
+  // (ignora o primeiro render, que já foi coberto pelo useState acima).
+  const lastOrderIdRef = useRef(order.id)
+  useEffect(() => {
+    if (lastOrderIdRef.current === order.id) return
+    lastOrderIdRef.current = order.id
+    setOpen(order.status === 'awaiting_payment')
+  }, [order.id, order.status])
   const { remaining, label } = useCountdown(pix?.expires_at ?? null)
 
   const generatePix = useGeneratePix(order.id)
@@ -284,7 +310,7 @@ function PendingPaymentSection({ order }: { order: Order }) {
   )
 }
 
-function CredentialsSection({ order, state }: { order: Order; state?: CustomerOrderState }) {
+function CredentialsSection({ order, state, forceOpenSignal }: { order: Order; state?: CustomerOrderState; forceOpenSignal?: unknown }) {
   const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [saved, setSaved] = useState(false)
@@ -306,7 +332,12 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
   }
 
   return (
-    <Card id="credentials" padding="lg" className="scroll-mt-24">
+    <OrderDetailWidget
+      icon={KeyRound}
+      label="Conta do pedido"
+      status={state.credentials_set ? 'Salvas' : 'Pendente'}
+      forceOpenSignal={forceOpenSignal}
+    >
       <div className="flex items-center gap-2 mb-4">
         <KeyRound className="h-4 w-4 text-brand" />
         <h3 className="text-sm font-semibold text-ink">Conta do pedido</h3>
@@ -327,7 +358,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
         </GuaranteeNotice>
       </div>
       {canSet && (
-        <div className="space-y-3 max-w-md">
+        <div className="space-y-3">
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Login / E-mail da conta</label>
             <input type="text" value={login} onChange={(e) => setLogin(e.target.value)} placeholder="Ex: SeuUsuario#BR1" className="input-base w-full text-sm" autoComplete="username" maxLength={160} />
@@ -345,25 +376,22 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
           )}
         </div>
       )}
-    </Card>
+    </OrderDetailWidget>
   )
 }
 
 const CUSTOMER_DROPPABLE_STATUSES: OrderStatus[] = ['assigned', 'in_progress', 'paused', 'awaiting_customer']
 
-function DropLockedBanner({ order }: { order: Order }) {
+function DropLockedBadge({ order }: { order: Order }) {
   if (order.status !== 'drop_requested') return null
   return (
-    <Card padding="md" className="border border-warning/30 bg-warning/5">
-      <div className="flex items-center gap-2 text-warning text-sm font-semibold">
-        <Lock className="h-4 w-4" />
-        Pedido travado · solicitação em análise
-      </div>
-      <p className="text-xs text-ink-secondary mt-1">
-        O admin está analisando o motivo da troca de booster. Nenhuma nova ação de boost acontece
-        enquanto isso — chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
-      </p>
-    </Card>
+    <span
+      title="O admin está analisando o motivo da troca de booster. Chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente."
+      className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30"
+    >
+      <Lock className="h-3 w-3" />
+      Travado · em análise
+    </span>
   )
 }
 
@@ -411,7 +439,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const currency = useCurrency()
-  const [chatOpen, setChatOpen] = useState(false)
+  const { profile } = useAuthStore()
   const [dropModalOpen, setDropModalOpen] = useState(false)
   const [showDisputeModal, setShowDisputeModal] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
@@ -425,13 +453,25 @@ export function OrderDetailPage() {
   const disputeCompletion = useDisputeOrderCompletion(id ?? '')
   const { data: coachPackage } = useBoosterServiceDetails(order?.booster_service_id ?? undefined)
 
+  // Chat agora fica sempre visível na página (ver grid de 2 colunas abaixo) --
+  // "estar na página" já é "ter o chat aberto", então marca como lida
+  // qualquer mensagem nova assim que aparece, sem depender de um popup aberto.
+  const unreadChatCount = (chat.data?.messages ?? [])
+    .filter((m) => m.sender_id !== profile?.id && !m.is_read).length
+  const markChatRead = useMarkOrderChatRead(id ?? '')
   useEffect(() => {
-    if (!order || window.location.hash !== '#credentials' || !customerState?.requires_credentials) return
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('credentials')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [order, customerState?.requires_credentials])
+    if (unreadChatCount > 0) markChatRead.mutate()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadChatCount])
+
+  // Deep link pós-pagamento (StepPayment.tsx navega pra cá com #credentials
+  // quando o pedido exige credenciais) -- vira sinal pro widget "Conta do
+  // pedido" abrir seu popover sozinho, no lugar do scrollIntoView antigo (a
+  // seção agora vive dentro de um popover fechado por padrão, não mais um
+  // card sempre visível na página).
+  const credentialsDeepLink = window.location.hash === '#credentials' && !!order && !!customerState?.requires_credentials
+    ? true
+    : undefined
 
   useEffect(() => {
     if (order?.status === 'canceled') navigate('/orders/new?new=1', { replace: true })
@@ -475,7 +515,7 @@ export function OrderDetailPage() {
     ...((isBoostFlow || order.service_type === 'clash') ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id ?? 'Não informado' }] : []),
     { icon: Clock, label: 'Entrega estimada', value: order.estimated_hours ? formatEstimatedDelivery(order.estimated_hours) : 'Não disponível' },
     ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null
-      ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+      ? [{ icon: Trophy, label: 'Vitórias Contratadas', value: `${order.wins_purchased}` }]
       : []),
     ...(order.service_type === 'coaching' && order.sessions_purchased
       ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
@@ -494,6 +534,16 @@ export function OrderDetailPage() {
         backHref="/orders"
         orderIdShort={order.id.slice(0, 8).toUpperCase()}
         statusBadge={<OrderStatusBadge status={order.status} />}
+        statusActions={(
+          // "Concluído" já é o texto do próprio statusBadge -- só o que
+          // adiciona algo novo (ação de avaliar, alerta de atraso, link pra
+          // análise de drop) fica aqui, nunca repetindo o rótulo do status.
+          <>
+            <OrderReviewSection order={order} />
+            <DropLockedBadge order={order} />
+            {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && <LateOrderSupportBadge order={order} />}
+          </>
+        )}
         extra={(
           <>
             <span className="text-xs text-ink-muted">
@@ -513,8 +563,6 @@ export function OrderDetailPage() {
         onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
         dropDisabled={dropLimitReached}
         dropTooltip="Limite de drops atingido."
-        onChat={() => setChatOpen(true)}
-        chatUnavailable={chat.data ? !chat.data.chat_available : true}
         primary={canConfirm ? (
           <>
             <Button variant="danger-ghost" size="sm" leftIcon={<AlertTriangle className="h-4 w-4" />} onClick={() => setShowDisputeModal(true)}>
@@ -528,83 +576,86 @@ export function OrderDetailPage() {
       />
 
       {confirmCompletion.isError && <ErrorAlert message={confirmCompletion.error instanceof Error ? confirmCompletion.error.message : 'Erro ao confirmar'} />}
-      <DropLockedBanner order={order} />
-      {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && <LateOrderSupportBanner order={order} />}
-      {order.status === 'completed' && (
-        <Card padding="md" className="ring-1 ring-success/20">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-            <p className="text-sm text-ink-secondary">Serviço concluído! Seu pedido foi finalizado com sucesso.</p>
-          </div>
-        </Card>
-      )}
 
       <PendingPaymentSection order={order} />
 
-      {/* Detalhes do pedido */}
-      <Card padding="lg">
-        <h3 className="text-sm font-semibold text-ink mb-5">{t('customer.order.details')}</h3>
-
-        {order.service_type === 'coaching' && coachPackage && (
-          <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
-            <p className="text-base font-bold text-ink">{coachPackage.title}</p>
-            {coachPackage.description && (
-              <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
-            )}
-            {coachPackage.tempo && (
-              <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
-            )}
+      {/* Detalhes do pedido (60%) + chat sempre visível (40%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <Card padding="lg" className="lg:col-span-3 h-[450px] overflow-y-auto">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-sm font-semibold text-ink">{t('customer.order.details')}</h3>
+            <OrderDetailWidget icon={History} label="Histórico do Pedido" compact>
+              <OrderTimeline history={history} bare />
+            </OrderDetailWidget>
           </div>
-        )}
 
-        {order.service_type === 'clash' && order.clash_tier && (
-          <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
-            <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
-            <p className="text-sm text-ink-secondary leading-relaxed">
-              {order.boost_mode === 'duo'
-                ? 'Você vai jogar junto com o booster.'
-                : 'O booster vai jogar na sua conta.'}
-            </p>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
-              <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
-              {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+          <div className="flex flex-wrap gap-2.5 mb-5">
+            <CredentialsSection order={order} state={customerState} forceOpenSignal={credentialsDeepLink} />
+          </div>
+
+          {order.service_type === 'coaching' && coachPackage && (
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+              <p className="text-base font-bold text-ink">{coachPackage.title}</p>
+              {coachPackage.description && (
+                <p className="text-sm text-ink-secondary leading-relaxed">{coachPackage.description}</p>
+              )}
+              {coachPackage.tempo && (
+                <p className="text-xs text-ink-muted">Duração: <span className="font-semibold text-ink">{coachPackage.tempo}</span></p>
+              )}
             </div>
+          )}
+
+          {order.service_type === 'clash' && order.clash_tier && (
+            <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
+              <p className="text-base font-bold text-ink">{order.boost_mode === 'duo' ? 'Duo Clash' : 'Solo Clash'}</p>
+              <p className="text-sm text-ink-secondary leading-relaxed">
+                {order.boost_mode === 'duo'
+                  ? 'Você vai jogar junto com o booster.'
+                  : 'O booster vai jogar na sua conta.'}
+              </p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-xs text-ink-muted">
+                <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+                {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+              </div>
+            </div>
+          )}
+
+          <OrderRankSummary order={order} />
+
+          {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
+            <OrderProgress order={order} hideRankBadges />
+          )}
+
+          <div className="mt-5">
+            <OrderInfoGrid items={infoItems} />
           </div>
-        )}
 
-        <OrderRankSummary order={order} />
+          {order.extras?.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-border-subtle">
+              <p className="text-xs text-ink-muted mb-2">Extras</p>
+              <div className="grid sm:grid-cols-2 gap-1.5">
+                {sortOrderExtras(order.extras).map((extra) => (
+                  <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                    <span className="text-ink-secondary">{extra.name}</span>
+                    <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-        {['awaiting_payment', 'paid', 'awaiting_assignment', 'assigned', 'in_progress', 'paused', 'drop_requested', 'awaiting_customer', 'completed', 'disputed'].includes(order.status) && (
-          <OrderProgress order={order} hideRankBadges />
-        )}
+          {order.customer_notes && (
+            <div className="mt-5 pt-4 border-t border-border-subtle">
+              <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
+              <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
+            </div>
+          )}
+        </Card>
 
-        <div className="mt-5">
-          <OrderInfoGrid items={infoItems} />
+        <div className="lg:col-span-2 h-[450px]">
+          <OrderChat orderId={order.id} viewerRole="customer" orderStatus={order.status} />
         </div>
-
-        {order.extras?.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-border-subtle">
-            <p className="text-xs text-ink-muted mb-2">Extras</p>
-            <div className="grid sm:grid-cols-2 gap-1.5">
-              {sortOrderExtras(order.extras).map((extra) => (
-                <div key={extra.extra_id} className="flex items-center justify-between text-sm">
-                  <span className="text-ink-secondary">{extra.name}</span>
-                  <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {order.customer_notes && (
-          <div className="mt-5 pt-4 border-t border-border-subtle">
-            <p className="text-xs text-ink-muted mb-1">{t('customer.order.notes')}</p>
-            <p className="text-sm text-ink-secondary">{order.customer_notes}</p>
-          </div>
-        )}
-      </Card>
-
-      <CredentialsSection order={order} state={customerState} />
+      </div>
 
       {/* Histórico de partidas / coaching */}
       {order.service_type === 'coaching'
@@ -630,18 +681,6 @@ export function OrderDetailPage() {
               : null}
           />
         )}
-
-      <OrderReviewSection order={order} />
-
-      <OrderTimeline history={history} />
-
-      <OrderChatPanel
-        open={chatOpen}
-        onOpenChange={setChatOpen}
-        orderId={order.id}
-        viewerRole="customer"
-        orderStatus={order.status}
-      />
 
       <CustomerDropModal order={order} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />
 

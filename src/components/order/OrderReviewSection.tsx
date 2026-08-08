@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Star, MessageSquareText } from 'lucide-react'
-import { Button, Card, ErrorAlert, Modal, Skeleton, StarRating } from '@/components/ui'
+import { Star } from 'lucide-react'
+import { Button, ErrorAlert, Modal } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useOwnReview, useCreateReview } from '@/api/reviews'
 import type { Order } from '@/types'
@@ -29,6 +29,10 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 // Só existe pra pedidos 'completed' -- a policy reviews_customer_insert
 // (migration archive 137) exige isso no banco também, então tentar antes
 // sempre falharia. Uma review por pedido (order_id é unique em reviews).
+//
+// Rende como pill compacta ao lado do código do pedido (ver OrderPageHeader
+// `statusActions`) em vez de um card cheio na página -- antes existiam os
+// dois ao mesmo tempo (duplicado).
 export function OrderReviewSection({ order }: { order: Order }) {
   const isCompleted = order.status === 'completed'
   const { data: review, isLoading } = useOwnReview(isCompleted ? order.id : undefined)
@@ -37,15 +41,7 @@ export function OrderReviewSection({ order }: { order: Order }) {
   const [rating, setRating] = useState(0)
   const [content, setContent] = useState('')
 
-  if (!isCompleted) return null
-
-  if (isLoading) {
-    return (
-      <Card padding="md">
-        <Skeleton className="h-12 w-full" />
-      </Card>
-    )
-  }
+  if (!isCompleted || isLoading) return null
 
   function closeModal() {
     setShowModal(false)
@@ -55,28 +51,26 @@ export function OrderReviewSection({ order }: { order: Order }) {
 
   if (review) {
     return (
-      <Card padding="md">
-        <div className="flex items-center gap-2 mb-2">
-          <MessageSquareText className="h-4 w-4 text-brand shrink-0" />
-          <h3 className="text-sm font-semibold text-ink">Sua avaliação</h3>
-        </div>
-        <StarRating rating={review.rating} showValue={false} size="md" />
-        {review.content && <p className="text-sm text-ink-secondary mt-2">{review.content}</p>}
-      </Card>
+      <span
+        title={review.content ?? undefined}
+        className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30"
+      >
+        <Star className="h-3 w-3 fill-warning" />
+        Avaliado · {review.rating}/5
+      </span>
     )
   }
 
   return (
-    <Card padding="md">
-      <div className="flex items-center gap-2 mb-2">
-        <MessageSquareText className="h-4 w-4 text-brand shrink-0" />
-        <h3 className="text-sm font-semibold text-ink">Avalie seu booster</h3>
-      </div>
-      <p className="text-xs text-ink-secondary mb-3">Conte como foi sua experiência com o serviço.</p>
-
-      <Button className="w-full" variant="success" leftIcon={<Star className="h-4 w-4" />} onClick={() => setShowModal(true)}>
-        Avaliar
-      </Button>
+    <>
+      <button
+        type="button"
+        onClick={() => setShowModal(true)}
+        className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-success/15 text-success border border-success/30 hover:bg-success/25 transition-colors"
+      >
+        <Star className="h-3 w-3" />
+        Avaliar booster
+      </button>
 
       <Modal
         open={showModal}
@@ -114,6 +108,6 @@ export function OrderReviewSection({ order }: { order: Order }) {
           </Button>
         </div>
       </Modal>
-    </Card>
+    </>
   )
 }

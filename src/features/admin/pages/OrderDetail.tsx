@@ -1,28 +1,39 @@
-import { useParams, Link } from 'react-router-dom'
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import {
-  History, Lock, RefreshCw, MessageCircleWarning,
-  Gamepad2, Users, Shuffle, Trophy, CalendarDays, Wallet, User, Hash, Copy, Check, Clock, CreditCard,
-} from 'lucide-react'
-import { Button, Card, OrderStatusBadge, ErrorAlert, PageLoader, Modal } from '@/components/ui'
-import { OrderPageHeader } from '@/components/order/OrderPageHeader'
+import { useAdminResolveOrderSupport, useOrderSupportEscalation } from '@/api/admin'
+import { useAdminDuoAccounts } from '@/api/duoAccounts'
+import { useAdminDropOrder, useAdminOverrideOrderStatus, useOrder, useOrderStatusHistory, useSyncOrderMatches } from '@/api/orders'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
+import { OrderChat } from '@/components/order/OrderChat'
+import { OrderDetailWidget } from '@/components/order/OrderDetailWidget'
 import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatPanel } from '@/components/order/OrderChatPanel'
-import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderRankSummary } from '@/components/order/OrderRankSummary'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
-import { CountdownTimer } from '@/components/order/CountdownTimer'
-import { supabase } from '@/lib/supabase'
-import { formatDateTime, timeAgo, getServiceLabel, PAYMENT_STATUS_LABEL, formatEstimatedDelivery, sortOrderExtras } from '@/lib/utils'
+import { Button, Card, ErrorAlert, Modal, OrderStatusBadge, PageLoader } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
-import { useOrder, useOrderStatusHistory, useAdminOverrideOrderStatus, useAdminDropOrder, useSyncOrderMatches } from '@/api/orders'
-import { useOrderSupportEscalation, useAdminResolveOrderSupport } from '@/api/admin'
-import { useAdminDuoAccounts } from '@/api/duoAccounts'
-import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
+import { CLASH_DAY_LABEL, CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL } from '@/lib/clashDomain'
+import { supabase } from '@/lib/supabase'
+import { formatDateTime, formatEstimatedDelivery, getServiceLabel, PAYMENT_STATUS_LABEL, sortOrderExtras, timeAgo } from '@/lib/utils'
 import type { OrderStatus } from '@/types'
+import { useQuery } from '@tanstack/react-query'
+import {
+    CalendarDays,
+    Check, Clock,
+    Copy,
+    CreditCard,
+    Gamepad2,
+    Hash,
+    History, Lock,
+    MessageCircleWarning,
+    RefreshCw,
+    Shuffle, Trophy,
+    User,
+    Users,
+    Wallet,
+} from 'lucide-react'
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 
 type BoosterRef = { id: string; user_id: string; display_name: string } | undefined
 
@@ -115,13 +126,11 @@ export function AdminOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const currency = useCurrency()
   const [dropModalOpen, setDropModalOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
   const [nickCopied, setNickCopied] = useState(false)
   const [showStatusPanel, setShowStatusPanel] = useState(false)
 
   const { data: order, isLoading: loadingOrder, isError: orderError, refetch: refetchOrder } = useOrder(id)
   const { data: history } = useOrderStatusHistory(id)
-  const chat = useOrderChat(id)
 
   const { data: parties } = useQuery({
     queryKey: ['admin', 'order-parties', order?.customer_id, order?.assigned_booster_id, order?.preferred_booster_id],
@@ -198,7 +207,7 @@ export function AdminOrderDetailPage() {
         : 'Não associado',
     },
     ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased
-      ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+      ? [{ icon: Trophy, label: 'Vitórias Contratadas', value: `${order.wins_purchased}` }]
       : []),
     ...(order.service_type === 'coaching' && order.sessions_purchased
       ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
@@ -216,6 +225,16 @@ export function AdminOrderDetailPage() {
         backHref="/admin/orders"
         orderIdShort={order.id.slice(0, 8).toUpperCase()}
         statusBadge={<OrderStatusBadge status={order.status} />}
+        statusActions={order.status === 'drop_requested' ? (
+          <Link
+            to="/admin/drops"
+            title="Existe uma solicitação de drop pendente pra este pedido — nenhuma nova ação de boost acontece até você aprovar ou rejeitar."
+            className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30 hover:bg-warning/25 transition-colors"
+          >
+            <Lock className="h-3 w-3" />
+            Travado · Analisar solicitação
+          </Link>
+        ) : undefined}
         extra={(
           <>
             <span className="text-xs text-ink-muted">Criado em {formatDateTime(order.created_at)}</span>
@@ -234,8 +253,6 @@ export function AdminOrderDetailPage() {
         onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
         dropDisabled={dropLimitReached}
         dropTooltip="Limite de drops atingido."
-        onChat={() => setChatOpen(true)}
-        chatUnavailable={chat.data ? !chat.data.chat_available : true}
         primary={(
           <Button variant="secondary" size="sm" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={() => setShowStatusPanel((v) => !v)}>
             Alterar status
@@ -243,24 +260,7 @@ export function AdminOrderDetailPage() {
         )}
       />
 
-      {order.status === 'drop_requested' && (
-          <Card padding="md" className="border border-warning/30 bg-warning/5">
-            <h3 className="text-sm font-semibold text-warning mb-1 flex items-center gap-2">
-              <Lock className="h-4 w-4" />
-              Pedido travado · aguardando análise
-            </h3>
-            <p className="text-xs text-ink-secondary mb-3">
-              Existe uma solicitação de drop pendente pra este pedido. Nenhuma nova ação de boost
-              acontece (credenciais, tokens e sincronização de partidas ficam bloqueados) até você
-              aprovar ou rejeitar — chat e histórico continuam disponíveis normalmente.
-            </p>
-            <Button asChild size="sm" className="w-full">
-              <Link to="/admin/drops">Analisar solicitação</Link>
-            </Button>
-          </Card>
-        )}
-
-        <SupportEscalationCard orderId={order.id} />
+      <SupportEscalationCard orderId={order.id} />
 
         {showStatusPanel && (
           <Card padding="md">
@@ -303,40 +303,51 @@ export function AdminOrderDetailPage() {
           </Card>
         )}
 
-        {/* Detalhes do pedido */}
-        <Card padding="lg">
-          <h3 className="text-sm font-semibold text-ink mb-5">Detalhes do pedido</h3>
-
-          {order.service_type === 'clash' && order.clash_tier && (
-            <div className="mb-4 pb-4 border-b border-border-subtle">
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-muted">
-                <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
-                {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
-              </div>
+        {/* Detalhes do pedido (60%) + chat sempre visível (40%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <Card padding="lg" className="lg:col-span-3 h-[450px] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-sm font-semibold text-ink">Detalhes do pedido</h3>
+              <OrderDetailWidget icon={History} label="Histórico do Pedido" compact>
+                <OrderTimeline history={history} bare />
+              </OrderDetailWidget>
             </div>
-          )}
 
-          <OrderRankSummary order={order} />
-          <OrderProgress order={order} />
+            {order.service_type === 'clash' && order.clash_tier && (
+              <div className="mb-4 pb-4 border-b border-border-subtle">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-muted">
+                  <span>{CLASH_TIER_LABEL[order.clash_tier]}: <span className="font-semibold text-ink">{CLASH_TIER_RANGE_LABEL[order.clash_tier]}</span></span>
+                  {order.clash_day && <span>Dia: <span className="font-semibold text-ink">{CLASH_DAY_LABEL[order.clash_day]}</span></span>}
+                </div>
+              </div>
+            )}
 
-          <div className="mt-5">
-            <OrderInfoGrid items={infoItems} />
+            <OrderRankSummary order={order} />
+            <OrderProgress order={order} />
+
+            <div className="mt-5">
+              <OrderInfoGrid items={infoItems} />
+            </div>
+
+            {order.extras?.length > 0 && (
+              <div className="mt-5 pt-4 border-t border-border-subtle">
+                <p className="text-xs text-ink-muted mb-2">Extras selecionados</p>
+                <div className="grid sm:grid-cols-2 gap-1.5">
+                  {sortOrderExtras(order.extras).map((extra) => (
+                    <div key={extra.extra_id} className="flex items-center justify-between text-sm">
+                      <span className="text-ink-secondary">{extra.name}{extra.code ? ` (${extra.code})` : ''}</span>
+                      <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <div className="lg:col-span-2 h-[450px]">
+            <OrderChat orderId={order.id} viewerRole="admin" orderStatus={order.status} />
           </div>
-
-          {order.extras?.length > 0 && (
-            <div className="mt-5 pt-4 border-t border-border-subtle">
-              <p className="text-xs text-ink-muted mb-2">Extras selecionados</p>
-              <div className="grid sm:grid-cols-2 gap-1.5">
-                {sortOrderExtras(order.extras).map((extra) => (
-                  <div key={extra.extra_id} className="flex items-center justify-between text-sm">
-                    <span className="text-ink-secondary">{extra.name}{extra.code ? ` (${extra.code})` : ''}</span>
-                    <span className="font-semibold text-ink" data-tabular>{currency(extra.price)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
+        </div>
 
         {/* Histórico de partidas */}
         {['assigned', 'in_progress', 'paused', 'awaiting_customer', 'drop_requested', 'completed'].includes(order.status) && (
@@ -358,16 +369,6 @@ export function AdminOrderDetailPage() {
               : null}
           />
         )}
-
-        <OrderTimeline history={history} />
-
-      <OrderChatPanel
-        open={chatOpen}
-        onOpenChange={setChatOpen}
-        orderId={order.id}
-        viewerRole="admin"
-        orderStatus={order.status}
-      />
 
       <AdminDropModal orderId={order.id} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />
     </div>

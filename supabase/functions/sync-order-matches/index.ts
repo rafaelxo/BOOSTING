@@ -11,12 +11,23 @@ import {
   fetchMatchIdsSince,
   fetchMatchBody,
   parseMatchDetail,
+  fetchLeagueEntries,
   RIOT_QUEUE_TYPE,
+  RIOT_TIER_MAP,
+  RIOT_DIVISION_MAP,
+  NO_DIVISION_TIERS,
   type RiotMatchV5Body,
 } from '../_shared/riotLookup.ts'
 
 const RIOT_API_KEY = Deno.env.get('RIOT_API_KEY') ?? ''
 const REGIONAL_ROUTE = 'americas'
+// Brasil-only hoje (orders.server nunca é de fato trocado na UI) -- mesmo
+// roteamento fixo usado em verify-order-rank/orderPricing.ts.
+const PLATFORM_ROUTE = 'br1'
+// Serviços cujo current_rank é tier+divisão (elo_boost/win_boost/md5) --
+// Clash não tem rank (usa clash_tier fixo) e Coaching/Placement Matches não
+// dependem de current_rank pra nada que este sync alimente.
+const RANK_TRACKED_SERVICE_TYPES = new Set(['elo_boost', 'win_boost', 'md5'])
 // Backfill de atribuição duo: quantas das últimas partidas do CLIENTE
 // checamos em busca da conta duo, além das que já entraram no loop
 // principal por serem novas em order_matches. Cobre o caso "booster jogou
@@ -64,7 +75,7 @@ serve(async (req) => {
     // aceitar qualquer um dos três, não só o booster.
     const { data: order, error: orderErr } = await userClient
       .from('orders')
-      .select('id, status, customer_id, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased, duo_own_riot_id')
+      .select('id, status, customer_id, assigned_booster_id, riot_id, boost_mode, queue_type, match_sync_started_at, wins_purchased, duo_own_riot_id, service_type')
       .eq('id', orderId)
       .maybeSingle()
     if (orderErr) return errorResponse(req, 'Failed to load order', 500)
@@ -138,6 +149,37 @@ serve(async (req) => {
       return errorResponse(req, 'Falha ao consultar conta Riot', 502)
     }
     const clientPuuid = clientAccountResult.account.puuid
+
+    // Reverifica o rank atual do cliente via League-V4 (mesma fonte de
+    // verdade que verify-order-rank usa pra gate de finalização) e atualiza
+    // orders.current_rank se mudou -- mantém o filtro de +-1 divisão de
+    // contas duo reserváveis (DuoAccountSection) e a estimativa de progresso
+    // em cima do rank real, não de uma foto do dia da criação do pedido.
+    // Best-effort: nunca aborta o sync de partidas por causa disso.
+    if (RANK_TRACKED_SERVICE_TYPES.has(order.service_type as string)) {
+      const leagueResult = await fetchLeagueEntries(clientPuuid, RIOT_API_KEY, PLATFORM_ROUTE)
+      if (leagueResult.ok) {
+        const leagueQueue = RIOT_QUEUE_TYPE[order.queue_type as 'solo_duo' | 'flex'].leagueQueue
+        const entry = leagueResult.entries.find((e) => e.queueType === leagueQueue)
+        const verifiedTier = entry?.tier ? RIOT_TIER_MAP[entry.tier] ?? null : null
+        if (verifiedTier) {
+          const verifiedDivision = NO_DIVISION_TIERS.includes(verifiedTier)
+            ? null
+            : entry?.rank ? RIOT_DIVISION_MAP[entry.rank] ?? null : null
+          if (NO_DIVISION_TIERS.includes(verifiedTier) || verifiedDivision) {
+            const { error: rankErr } = await serviceClient.rpc('update_order_current_rank', {
+              p_order_id: orderId,
+              p_tier: verifiedTier,
+              p_division: verifiedDivision,
+              p_lp: Math.max(0, Number(entry?.leaguePoints ?? 0)),
+            })
+            if (rankErr) console.error('update_order_current_rank failed', orderId, rankErr.message)
+          }
+        }
+      } else if (leagueResult.reason !== 'rate_limited') {
+        console.error('Riot league-v4 error (rank sync)', leagueResult.status)
+      }
+    }
 
     // Conta duo: best-effort. Se falhar (não encontrada, rate limit), não
     // aborta a sincronização inteira -- o histórico do pedido (lado do

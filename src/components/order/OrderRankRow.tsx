@@ -1,6 +1,6 @@
 import { ChevronRight } from 'lucide-react'
 import { RankBadge } from '@/components/ui/RankBadge'
-import { formatRank } from '@/lib/utils'
+import { cn, formatRank } from '@/lib/utils'
 import type { Division, RankTier } from '@/types'
 
 export interface OrderRankRowProps {
@@ -16,6 +16,12 @@ export interface OrderRankRowProps {
    * badge, rótulo diferente (a conta está em colocação, sem rank atual de
    * verdade nesta fila). */
   currentLabel?: string
+  /** Substitui o badge de rank alvo (seta + bloco à direita) por um
+   * conteúdo customizado -- win_boost/md5 não tem rank alvo de verdade, mas
+   * o badge de "vitórias restantes" ocupa exatamente essa posição/estrutura
+   * (como se fosse o rank alvo de um elo_boost), não fica solto perto do
+   * ícone de rank atual. */
+  targetSlot?: React.ReactNode
 }
 
 // Linha "rank atual ↔ pontos ↔ rank alvo" -- markup puro, sem buscar dado
@@ -25,12 +31,13 @@ export interface OrderRankRowProps {
 // configurou). Os dois PRECISAM ficar visualmente idênticos: o cliente vê o
 // resumo antes de pagar e depois na página do pedido em andamento, então
 // qualquer diferença de layout ali soa como "mudou o pedido".
-export function OrderRankRow({ currentTier, currentDivision, targetTier, targetDivision, centerContent, currentLabel = 'Rank Atual' }: OrderRankRowProps) {
+export function OrderRankRow({ currentTier, currentDivision, targetTier, targetDivision, centerContent, currentLabel = 'Rank Atual', targetSlot }: OrderRankRowProps) {
   const hasTarget = !!targetTier
+  const showTargetArea = hasTarget || !!targetSlot
 
   return (
-    <div className="mb-2 flex justify-center">
-      <div className="flex items-center gap-6 sm:gap-10">
+    <div className="mb-8 flex justify-center">
+      <div className={cn('flex items-center', showTargetArea ? 'gap-6 sm:gap-10' : 'gap-3')}>
         <div className="flex items-center gap-3 min-w-0 shrink-0">
           <RankBadge tier={currentTier} division={currentDivision} size="lg" showLabel={false} />
           <div className="min-w-0">
@@ -39,7 +46,7 @@ export function OrderRankRow({ currentTier, currentDivision, targetTier, targetD
           </div>
         </div>
 
-        {hasTarget && (
+        {showTargetArea && (
           <>
             {/* Coluna central: conteúdo do consumidor empilhado sobre a
                 seta -- largura fixa (não flex-1) pra não espalhar os ranks
@@ -53,13 +60,17 @@ export function OrderRankRow({ currentTier, currentDivision, targetTier, targetD
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-              <RankBadge tier={targetTier!} division={targetDivision ?? null} size="lg" showLabel={false} />
-              <div className="min-w-0">
-                <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Alvo</p>
-                <p className="text-base font-bold text-ink truncate">{formatRank(targetTier!, targetDivision ?? null)}</p>
+            {hasTarget ? (
+              <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+                <RankBadge tier={targetTier!} division={targetDivision ?? null} size="lg" showLabel={false} />
+                <div className="min-w-0">
+                  <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Alvo</p>
+                  <p className="text-base font-bold text-ink truncate">{formatRank(targetTier!, targetDivision ?? null)}</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="shrink-0">{targetSlot}</div>
+            )}
           </>
         )}
       </div>

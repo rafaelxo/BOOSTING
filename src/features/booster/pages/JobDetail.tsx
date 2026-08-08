@@ -1,41 +1,65 @@
-import { useParams } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
-import { AUTO_SYNC_INTERVAL_MS, shouldAutoSync } from '@/lib/matchSync'
-import { useTranslation } from 'react-i18next'
+import { useOwnBoosterTop3Status } from '@/api/boosters'
+import { useMarkOrderChatRead, useOrderChat } from '@/api/chat'
+import { useBoosterServiceDetails } from '@/api/coaching'
+import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
 import {
-  Play, CheckCircle2, Lock, KeyRound, Copy, Check, Landmark, RefreshCcw,
-  Gamepad2, Users, Shuffle, Trophy, Wallet, Hash, Clock,
-} from 'lucide-react'
-import { Button, Card, OrderStatusBadge, RankBadge, Modal, ErrorAlert, PageLoader } from '@/components/ui'
-import { OrderPageHeader } from '@/components/order/OrderPageHeader'
-import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
-import { OrderChatPanel } from '@/components/order/OrderChatPanel'
-import { useOrderChat } from '@/api/chat'
-import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+    lookupDuoAccountRiotRank,
+    useBoosterDuoAccounts,
+    useClearDuoOwnRiotId,
+    useGetDuoAccountAccessToken, useReleaseDuoAccountReservation,
+    useReserveDuoAccount,
+    useSetDuoOwnRiotId,
+} from '@/api/duoAccounts'
+import {
+    useBoosterOrder,
+    useOrderStatusHistory,
+    usePendingDropRequest,
+    useRequestOrderDrop,
+    useRevealOrderCredentials,
+    useSyncOrderMatches,
+    useUpdateOrderStatus,
+    useVerifyOrderRank,
+} from '@/api/orders'
+import { CountdownTimer } from '@/components/order/CountdownTimer'
+import { OrderChat } from '@/components/order/OrderChat'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
+import { OrderDetailWidget } from '@/components/order/OrderDetailWidget'
+import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
+import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
+import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderProgress } from '@/components/order/OrderProgress'
 import { OrderRankSummary } from '@/components/order/OrderRankSummary'
 import { OrderTimeline } from '@/components/order/OrderTimeline'
-import { CountdownTimer } from '@/components/order/CountdownTimer'
-import { useAuthStore } from '@/stores/authStore'
+import { Button, Card, ErrorAlert, Modal, OrderStatusBadge, PageLoader, RankBadge } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
-import { formatRank, RANK_TIER_LABEL, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras, orderRequiresAccountAccess } from '@/lib/utils'
-import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
+import { CLASH_DAY_LABEL, CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL } from '@/lib/clashDomain'
+import { AUTO_SYNC_INTERVAL_MS, shouldAutoSync } from '@/lib/matchSync'
 import { canMarkOrderComplete } from '@/lib/orderCompletionGate'
-import {
-  useBoosterOrder, usePendingDropRequest, useUpdateOrderStatus, useSyncOrderMatches, useVerifyOrderRank,
-  useRevealOrderCredentials, useRequestOrderDrop, useOrderStatusHistory,
-} from '@/api/orders'
-import { useOwnBoosterTop3Status } from '@/api/boosters'
-import { useBoosterServiceDetails } from '@/api/coaching'
-import {
-  useBoosterDuoAccounts, useReserveDuoAccount, useGetDuoAccountAccessToken, useReleaseDuoAccountReservation,
-  useSetDuoOwnRiotId, useClearDuoOwnRiotId, lookupDuoAccountRiotRank,
-} from '@/api/duoAccounts'
-import type { BoosterVisibleDuoAccount } from '@/api/duoAccounts'
 import { rankStep } from '@/lib/pricing'
-import type { Order, RankTier, Division } from '@/types'
+import { boosterEarningsShare, formatRank, getOrderModeType, getServiceLabel, orderRequiresAccountAccess, RANK_TIER_LABEL, sortOrderExtras } from '@/lib/utils'
+import { useAuthStore } from '@/stores/authStore'
+import type { Division, Order, RankTier } from '@/types'
+import { useMutation } from '@tanstack/react-query'
+import {
+    Check,
+    CheckCircle2,
+    Clock,
+    Copy,
+    Gamepad2,
+    Hash,
+    History,
+    KeyRound,
+    Landmark,
+    Lock,
+    Play,
+    RefreshCcw,
+    Shuffle, Trophy,
+    Users,
+    Wallet,
+} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useParams } from 'react-router-dom'
 
 // Janela de proximidade de elo pra filtrar contas Duo disponíveis
 // automaticamente: até Esmeralda I, aceita ±1 divisão inteira (4 degraus de
@@ -321,7 +345,6 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuthStore()
   const [dropModalOpen, setDropModalOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null)
   const [tokenSecondsLeft, setTokenSecondsLeft] = useState(0)
@@ -337,6 +360,16 @@ export function JobDetailPage() {
   const { data: history } = useOrderStatusHistory(id)
   const chat = useOrderChat(id)
   const { data: coachPackage } = useBoosterServiceDetails(order?.booster_service_id ?? undefined)
+
+  // Chat agora fica sempre visível na página (grid de 2 colunas abaixo) --
+  // "estar na página" já é "ter o chat aberto".
+  const unreadChatCount = (chat.data?.messages ?? [])
+    .filter((m) => m.sender_id !== profile?.id && !m.is_read).length
+  const markChatRead = useMarkOrderChatRead(id ?? '')
+  useEffect(() => {
+    if (unreadChatCount > 0) markChatRead.mutate()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unreadChatCount])
 
   const updateStatus = useUpdateOrderStatus(id ?? '')
   const syncMatches = useSyncOrderMatches(id ?? '')
@@ -411,6 +444,10 @@ export function JobDetailPage() {
   const objectiveReached = completionGate.allowed
   const dropVisible = ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && !pendingDrop
   const dropLimitReached = order.drop_count >= 2
+  const showDuoAccountWidget = order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
+    && ['assigned', 'in_progress', 'paused'].includes(order.status)
+  const showAccessTokenWidget = orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
+    && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status)
   const nicknameVisible = !!order.riot_id && (order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5')
 
   // Ação principal única, alterna Iniciar -> Finalizar (spec seção 4) --
@@ -468,7 +505,7 @@ export function JobDetailPage() {
       : []),
     { icon: Clock, label: 'Entrega estimada', value: order.estimated_hours ? formatEstimatedDeliveryLabel(order.estimated_hours) : 'Não disponível' },
     ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null
-      ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+      ? [{ icon: Trophy, label: 'Vitórias Contratadas', value: `${order.wins_purchased}` }]
       : []),
     { icon: Wallet, label: t('booster.job.earnings'), value: currency(order.total_price * boosterEarningsShare(isTop3)) },
   ]
@@ -479,14 +516,29 @@ export function JobDetailPage() {
         backHref="/booster/orders"
         orderIdShort={order.id.slice(0, 8).toUpperCase()}
         statusBadge={<OrderStatusBadge status={order.status} />}
-        extra={['in_progress', 'paused', 'awaiting_customer'].includes(order.status) ? (
-          <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
-        ) : undefined}
+        statusActions={(
+          // "Concluído"/"Aguardando confirmação do cliente" já são o texto
+          // do próprio statusBadge -- só o que soma informação nova (aviso
+          // de bloqueio por drop pendente) fica aqui.
+          <>
+            {(order.status === 'drop_requested' || pendingDrop) && (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide bg-warning/15 text-warning border border-warning/30">
+                <Lock className="h-3 w-3" />
+                Travado · em análise
+              </span>
+            )}
+          </>
+        )}
+        extra={(
+          <>
+            {['in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
+              <CountdownTimer startedAt={order.match_sync_started_at} estimatedHours={order.estimated_hours} />
+            )}
+          </>
+        )}
         onDrop={dropVisible ? () => setDropModalOpen(true) : undefined}
         dropDisabled={dropLimitReached}
         dropTooltip="Limite de drops atingido."
-        onChat={() => setChatOpen(true)}
-        chatUnavailable={chat.data ? !chat.data.chat_available : true}
         primary={primaryAction}
       />
 
@@ -516,41 +568,61 @@ export function JobDetailPage() {
           </div>
         )}
 
-        {(order.status === 'drop_requested' || pendingDrop) && (
-          <div className="rounded-xl p-3 border border-warning/30 bg-warning/5">
-            <div className="flex items-center gap-2 text-warning text-sm font-semibold">
-              <Lock className="h-4 w-4" />
-              Pedido travado · solicitação de drop em análise
-            </div>
-            <p className="text-xs text-ink-secondary mt-1">
-              Aguardando o admin analisar o motivo. Nenhuma nova ação pode ser feita enquanto isso
-              (credenciais, tokens de acesso e sincronização de partidas ficam bloqueados) —
-              chat, histórico de partidas e histórico do pedido continuam disponíveis normalmente.
-            </p>
+      {/* Detalhes do pedido (60%) + chat sempre visível (40%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <Card padding="lg" className="lg:col-span-3 h-[450px] overflow-y-auto">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-sm font-semibold text-ink">{t('booster.job.details')}</h3>
+            <OrderDetailWidget icon={History} label="Histórico do Pedido" compact>
+              <OrderTimeline history={history} bare />
+            </OrderDetailWidget>
           </div>
-        )}
 
-        {order.status === 'awaiting_customer' && (
-          <Card padding="md" className="ring-1 ring-accent/20">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-accent shrink-0" />
-              <p className="text-sm text-ink-secondary">Objetivo alcançado! Aguardando a confirmação final do cliente.</p>
-            </div>
-          </Card>
-        )}
+          <div className="flex flex-wrap gap-2.5 mb-5">
+            {(showDuoAccountWidget || showAccessTokenWidget) && (
+              <OrderDetailWidget icon={KeyRound} label="Conta do pedido">
+                {showDuoAccountWidget && <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />}
+                {showAccessTokenWidget && (
+                  <div className={showDuoAccountWidget ? 'mt-4 pt-4 border-t border-border-subtle' : ''}>
+                    <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                      <KeyRound className="h-4 w-4 text-brand" />
+                      Token de acesso
+                    </h3>
+                    <p className="text-xs text-ink-secondary mb-3">
+                      Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
+                    </p>
 
-        {order.status === 'completed' && (
-          <Card padding="md" className="ring-1 ring-success/20">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              <p className="text-sm text-ink-secondary">Serviço concluído! O cliente confirmou a entrega e seus ganhos foram liberados.</p>
-            </div>
-          </Card>
-        )}
+                    {!order.credentials_set ? (
+                      <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+                        O cliente ainda não cadastrou as credenciais de acesso.
+                      </div>
+                    ) : accessToken ? (
+                      <div className="space-y-2">
+                        <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
+                        <p className="text-[11px] text-ink-muted text-center">
+                          Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
+                        </p>
+                        <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
+                          {tokenCopied ? 'Copiado' : 'Copiar token'}
+                        </Button>
+                        <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                          Criar novo token
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" className="w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
+                        Criar token
+                      </Button>
+                    )}
 
-        {/* Detalhes do pedido */}
-        <Card padding="lg">
-          <h3 className="text-sm font-semibold text-ink mb-5">{t('booster.job.details')}</h3>
+                    {revealAccessToken.isError && (
+                      <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
+                    )}
+                  </div>
+                )}
+              </OrderDetailWidget>
+            )}
+          </div>
 
           {order.service_type === 'coaching' && coachPackage && (
             <div className="mb-4 pb-4 border-b border-border-subtle space-y-2">
@@ -613,56 +685,12 @@ export function JobDetailPage() {
           )}
         </Card>
 
-        {/* Conta do pedido -- Duo (própria/plataforma) e token de acesso, entre
-            Detalhes e Histórico de partidas. */}
-        {(order.boost_mode === 'duo' && order.assigned_booster_id === profile?.id
-          && ['assigned', 'in_progress', 'paused'].includes(order.status)) && (
-          <Card padding="lg">
-            <DuoAccountSection order={order} onLinked={() => syncMatches.mutate()} />
-          </Card>
-        )}
+        <div className="lg:col-span-2 h-[450px]">
+          <OrderChat orderId={order.id} viewerRole="booster" orderStatus={order.status} />
+        </div>
+      </div>
 
-        {orderRequiresAccountAccess(order) && order.assigned_booster_id === profile?.id
-          && ['assigned', 'in_progress', 'paused', 'awaiting_customer'].includes(order.status) && (
-          <Card padding="lg">
-            <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
-              <KeyRound className="h-4 w-4 text-brand" />
-              Conta do pedido
-            </h3>
-            <p className="text-xs text-ink-secondary mb-3">
-              Cada token é de uso único e vale só 5 minutos. Use-o apenas no aplicativo autorizado para inicializar o client — login e senha não são exibidos.
-            </p>
-
-            {!order.credentials_set ? (
-              <div className="text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 max-w-md">
-                O cliente ainda não cadastrou as credenciais de acesso.
-              </div>
-            ) : accessToken ? (
-              <div className="space-y-2 max-w-md">
-                <textarea readOnly value={accessToken} className="input-base w-full min-h-[96px] text-[11px] font-mono resize-none" spellCheck={false} />
-                <p className="text-[11px] text-ink-muted text-center">
-                  Expira em {Math.floor(tokenSecondsLeft / 60)}:{String(tokenSecondsLeft % 60).padStart(2, '0')}
-                </p>
-                <Button size="sm" className="w-full" variant={tokenCopied ? 'success' : 'secondary'} leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyAccessToken()}>
-                  {tokenCopied ? 'Copiado' : 'Copiar token'}
-                </Button>
-                <Button size="sm" className="w-full" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                  Criar novo token
-                </Button>
-              </div>
-            ) : (
-              <Button size="sm" className="max-w-md w-full" leftIcon={<KeyRound className="h-3.5 w-3.5" />} loading={revealAccessToken.isPending} onClick={doRevealToken}>
-                Criar token
-              </Button>
-            )}
-
-            {revealAccessToken.isError && (
-              <ErrorAlert message={revealAccessToken.error instanceof Error ? revealAccessToken.error.message : 'Erro ao buscar token'} className="mt-2" />
-            )}
-          </Card>
-        )}
-
-        {/* Histórico de partidas / coaching */}
+      {/* Histórico de partidas / coaching */}
         {order.service_type === 'coaching'
           ? ['assigned', 'in_progress', 'paused', 'awaiting_customer', 'completed'].includes(order.status) && (
             <OrderCoachingTopics orderId={order.id} />
@@ -687,15 +715,6 @@ export function JobDetailPage() {
             />
           )}
 
-        <OrderTimeline history={history} />
-
-      <OrderChatPanel
-        open={chatOpen}
-        onOpenChange={setChatOpen}
-        orderId={order.id}
-        viewerRole="booster"
-        orderStatus={order.status}
-      />
 
       <BoosterDropModal order={order} open={dropModalOpen} onClose={() => setDropModalOpen(false)} />
     </div>
