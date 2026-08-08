@@ -13,8 +13,8 @@ const SERVICE_TYPE_OPTS: { label: string; value: ServiceType | 'all' }[] = [
   { label: 'Todos', value: 'all' },
   { label: 'Elo Boost', value: 'elo_boost' },
   { label: 'Vitórias / MD5', value: 'win_boost' },
-  { label: 'Coaching', value: 'coaching' },
   { label: 'Clash', value: 'clash' },
+  { label: 'Coaching', value: 'coaching' },
 ]
 
 export function AdminOrdersPage() {

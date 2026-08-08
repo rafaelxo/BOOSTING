@@ -23,7 +23,6 @@ export interface SlotInfo {
   duo_count?: number
   total_count?: number
   max_total?: number
-  max_duo?: number
   is_top3?: boolean
   exclusive_slot_used?: boolean
   max_exclusive?: number

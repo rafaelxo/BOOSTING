@@ -21,7 +21,7 @@ export function OrderChatPanel({ open, onOpenChange, orderId, viewerRole, orderS
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in" />
         <Dialog.Content
-          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-full flex-col border-l border-bg-elevated bg-bg-surface shadow-2xl focus:outline-none sm:w-[420px] md:w-[38vw] md:min-w-[380px] md:max-w-[500px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right duration-300"
+          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-full flex-col border-l border-bg-elevated bg-bg-surface shadow-2xl focus:outline-none sm:w-[480px] md:w-[46vw] md:min-w-[440px] md:max-w-[640px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right duration-300"
         >
           <Dialog.Title className="sr-only">Chat do pedido</Dialog.Title>
           <Dialog.Description className="sr-only">Conversa entre cliente, booster e administração sobre este pedido.</Dialog.Description>

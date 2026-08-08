@@ -6,8 +6,8 @@ import { TrendingUp, Zap, Users, Swords, CheckCircle2 } from 'lucide-react'
 const SERVICES: { type: ServiceType; name: string; desc: string; icon: React.ElementType; badge?: string }[] = [
   { type: 'elo_boost', name: 'Solo Boost / Duo Boost', desc: 'Suba do seu rank atual para a divisão desejada — solo ou duo.', icon: TrendingUp, badge: 'Mais Popular' },
   { type: 'win_boost', name: 'Vitórias / MD5', desc: 'Compre vitórias avulsas ou, se ainda não jogou o posicionamento, ative a garantia MD5 automaticamente.', icon: Zap, badge: 'Rápido' },
-  { type: 'coaching', name: 'Coaching', desc: 'Sessões individuais com coaches de alto ELO para evolução real.', icon: Users },
   { type: 'clash', name: 'Clash', desc: 'Solo ou Duo Clash no sábado ou domingo — o booster monta o time dentro do jogo.', icon: Swords },
+  { type: 'coaching', name: 'Coaching', desc: 'Sessões individuais com coaches de alto ELO para evolução real.', icon: Users },
 ]
 
 export function StepService() {

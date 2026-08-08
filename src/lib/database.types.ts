@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       audit_logs: {
@@ -171,6 +146,92 @@ export type Database = {
           },
         ]
       }
+      booster_duo_matches: {
+        Row: {
+          assists: number
+          booster_id: string
+          champion: string | null
+          created_at: string
+          deaths: number
+          duration_seconds: number | null
+          external_match_id: string
+          id: string
+          is_mvp: boolean
+          kills: number
+          minions_killed: number | null
+          neutral_minions_killed: number | null
+          order_id: string
+          played_at: string
+          queue_id: number | null
+          result: string
+        }
+        Insert: {
+          assists?: number
+          booster_id: string
+          champion?: string | null
+          created_at?: string
+          deaths?: number
+          duration_seconds?: number | null
+          external_match_id: string
+          id?: string
+          is_mvp?: boolean
+          kills?: number
+          minions_killed?: number | null
+          neutral_minions_killed?: number | null
+          order_id: string
+          played_at: string
+          queue_id?: number | null
+          result: string
+        }
+        Update: {
+          assists?: number
+          booster_id?: string
+          champion?: string | null
+          created_at?: string
+          deaths?: number
+          duration_seconds?: number | null
+          external_match_id?: string
+          id?: string
+          is_mvp?: boolean
+          kills?: number
+          minions_killed?: number | null
+          neutral_minions_killed?: number | null
+          order_id?: string
+          played_at?: string
+          queue_id?: number | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booster_duo_matches_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "booster_duo_matches_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "booster_duo_matches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booster_duo_matches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booster_ledger_entries: {
         Row: {
           actor_id: string | null
@@ -283,9 +344,9 @@ export type Database = {
           account_type: string
           adjusted_rating: number
           adjusted_win_rate: number
-          avg_cs_per_min: number | null
           average_kda: number | null
           average_rating: number | null
+          avg_cs_per_min: number | null
           booster_id: string
           calculated_at: string
           id: string
@@ -307,9 +368,9 @@ export type Database = {
           account_type?: string
           adjusted_rating?: number
           adjusted_win_rate?: number
-          avg_cs_per_min?: number | null
           average_kda?: number | null
           average_rating?: number | null
+          avg_cs_per_min?: number | null
           booster_id: string
           calculated_at?: string
           id?: string
@@ -331,9 +392,9 @@ export type Database = {
           account_type?: string
           adjusted_rating?: number
           adjusted_win_rate?: number
-          avg_cs_per_min?: number | null
           average_kda?: number | null
           average_rating?: number | null
+          avg_cs_per_min?: number | null
           booster_id?: string
           calculated_at?: string
           id?: string
@@ -367,6 +428,24 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      booster_profile_events: {
+        Row: {
+          booster_id: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          booster_id: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          booster_id?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
       }
       booster_profiles: {
         Row: {
@@ -584,6 +663,97 @@ export type Database = {
           },
         ]
       }
+      duo_account_events: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      duo_account_reservations: {
+        Row: {
+          account_id: string
+          booster_id: string
+          id: string
+          order_id: string | null
+          released_at: string | null
+          released_by: string | null
+          reserved_at: string
+        }
+        Insert: {
+          account_id: string
+          booster_id: string
+          id?: string
+          order_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          reserved_at?: string
+        }
+        Update: {
+          account_id?: string
+          booster_id?: string
+          id?: string
+          order_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+          reserved_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duo_account_reservations_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "duo_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_booster_id_fkey"
+            columns: ["booster_id"]
+            isOneToOne: false
+            referencedRelation: "public_booster_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "available_boost_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duo_account_reservations_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       duo_accounts: {
         Row: {
           access_token_consumed_at: string | null
@@ -696,65 +866,6 @@ export type Database = {
             columns: ["reserved_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      duo_account_reservations: {
-        Row: {
-          account_id: string
-          booster_id: string
-          id: string
-          order_id: string | null
-          released_at: string | null
-          released_by: string | null
-          reserved_at: string
-        }
-        Insert: {
-          account_id: string
-          booster_id: string
-          id?: string
-          order_id?: string | null
-          released_at?: string | null
-          released_by?: string | null
-          reserved_at?: string
-        }
-        Update: {
-          account_id?: string
-          booster_id?: string
-          id?: string
-          order_id?: string | null
-          released_at?: string | null
-          released_by?: string | null
-          reserved_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "duo_account_reservations_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "duo_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "duo_account_reservations_booster_id_fkey"
-            columns: ["booster_id"]
-            isOneToOne: false
-            referencedRelation: "booster_profiles"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "duo_account_reservations_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "duo_account_reservations_released_by_fkey"
-            columns: ["released_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1063,7 +1174,10 @@ export type Database = {
           duration_seconds: number | null
           external_match_id: string
           id: string
+          is_mvp: boolean
           kills: number
+          minions_killed: number | null
+          neutral_minions_killed: number | null
           order_id: string
           played_at: string
           queue_id: number | null
@@ -1077,7 +1191,10 @@ export type Database = {
           duration_seconds?: number | null
           external_match_id: string
           id?: string
+          is_mvp?: boolean
           kills?: number
+          minions_killed?: number | null
+          neutral_minions_killed?: number | null
           order_id: string
           played_at: string
           queue_id?: number | null
@@ -1091,7 +1208,10 @@ export type Database = {
           duration_seconds?: number | null
           external_match_id?: string
           id?: string
+          is_mvp?: boolean
           kills?: number
+          minions_killed?: number | null
+          neutral_minions_killed?: number | null
           order_id?: string
           played_at?: string
           queue_id?: number | null
@@ -1418,6 +1538,7 @@ export type Database = {
           discord_voice_channel_id: string | null
           discount_price: number
           drop_count: number
+          duo_own_riot_id: string | null
           estimated_hours: number | null
           exclusive_until: string | null
           extras: Json
@@ -1480,6 +1601,7 @@ export type Database = {
           discord_voice_channel_id?: string | null
           discount_price?: number
           drop_count?: number
+          duo_own_riot_id?: string | null
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json
@@ -1542,6 +1664,7 @@ export type Database = {
           discord_voice_channel_id?: string | null
           discount_price?: number
           drop_count?: number
+          duo_own_riot_id?: string | null
           estimated_hours?: number | null
           exclusive_until?: string | null
           extras?: Json
@@ -2121,6 +2244,8 @@ export type Database = {
           avg_pdl_gain: number | null
           avg_pdl_loss: number | null
           boost_mode: string | null
+          clash_day: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier: Database["public"]["Enums"]["clash_tier"] | null
           created_at: string | null
           current_pdl: number | null
           current_rank: Json | null
@@ -2139,6 +2264,7 @@ export type Database = {
           rank_before_last_drop: Json | null
           server: string | null
           service_id: string | null
+          service_type: Database["public"]["Enums"]["service_type"] | null
           sessions_purchased: number | null
           status: Database["public"]["Enums"]["order_status"] | null
           target_rank: Json | null
@@ -2152,6 +2278,8 @@ export type Database = {
           avg_pdl_gain?: number | null
           avg_pdl_loss?: number | null
           boost_mode?: string | null
+          clash_day?: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           created_at?: string | null
           current_pdl?: number | null
           current_rank?: Json | null
@@ -2170,6 +2298,7 @@ export type Database = {
           rank_before_last_drop?: Json | null
           server?: string | null
           service_id?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
           sessions_purchased?: number | null
           status?: Database["public"]["Enums"]["order_status"] | null
           target_rank?: Json | null
@@ -2183,6 +2312,8 @@ export type Database = {
           avg_pdl_gain?: number | null
           avg_pdl_loss?: number | null
           boost_mode?: string | null
+          clash_day?: Database["public"]["Enums"]["clash_day"] | null
+          clash_tier?: Database["public"]["Enums"]["clash_tier"] | null
           created_at?: string | null
           current_pdl?: number | null
           current_rank?: Json | null
@@ -2201,6 +2332,7 @@ export type Database = {
           rank_before_last_drop?: Json | null
           server?: string | null
           service_id?: string | null
+          service_type?: Database["public"]["Enums"]["service_type"] | null
           sessions_purchased?: number | null
           status?: Database["public"]["Enums"]["order_status"] | null
           target_rank?: Json | null
@@ -2288,15 +2420,26 @@ export type Database = {
         Args: { p_locked: boolean; p_order_id: string }
         Returns: Json
       }
-      apply_order_drop: {
-        Args: {
-          p_actor_id: string
-          p_from_status: string
-          p_order_id: string
-          p_reason: string
-        }
-        Returns: Json
-      }
+      apply_order_drop:
+        | {
+            Args: {
+              p_actor_id: string
+              p_from_status: string
+              p_order_id: string
+              p_reason: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_actor_id: string
+              p_from_status: string
+              p_order_id: string
+              p_reason: string
+              p_target_status?: string
+            }
+            Returns: Json
+          }
       approve_booster: {
         Args: { p_booster_id: string; p_new_status: string }
         Returns: Json
@@ -2311,6 +2454,10 @@ export type Database = {
       }
       booster_available_balance: {
         Args: { p_booster_id: string }
+        Returns: number
+      }
+      booster_display_name_cooldown_days_remaining: {
+        Args: { p_user_id: string }
         Returns: number
       }
       booster_has_active_exclusive_slot: {
@@ -2336,6 +2483,7 @@ export type Database = {
         Args: { p_limit: number; p_scope: string; p_window_seconds: number }
         Returns: boolean
       }
+      clear_duo_own_riot_id: { Args: { p_order_id: string }; Returns: Json }
       complete_verified_order: {
         Args: {
           p_fetched_division: string
@@ -2369,6 +2517,11 @@ export type Database = {
         Args: { p_display_name?: string }
         Returns: undefined
       }
+      expel_booster: {
+        Args: { p_actor_id: string; p_booster_id: string; p_reason: string }
+        Returns: Json
+      }
+      expire_stale_booster_suspensions: { Args: never; Returns: undefined }
       expire_stale_pix_orders: { Args: never; Returns: undefined }
       get_customer_order_state: { Args: { p_order_id?: string }; Returns: Json }
       get_duo_account_access_token: {
@@ -2557,10 +2710,6 @@ export type Database = {
         Args: { p_order_id: string; p_riot_id: string }
         Returns: Json
       }
-      clear_duo_own_riot_id: {
-        Args: { p_order_id: string }
-        Returns: Json
-      }
       set_order_coaching_topic_done: {
         Args: { p_done: boolean; p_order_id: string; p_topic_id: string }
         Returns: Json
@@ -2587,6 +2736,10 @@ export type Database = {
       }
       update_duo_account_rank: {
         Args: { p_account_id: string; p_division: string; p_tier: string }
+        Returns: Json
+      }
+      update_my_display_name: {
+        Args: { p_display_name: string }
         Returns: Json
       }
       update_my_username: { Args: { p_username: string }; Returns: Json }
@@ -2657,456 +2810,6 @@ export type Database = {
         | "md5"
         | "clash"
       user_role: "customer" | "booster" | "admin"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  storage: {
-    Tables: {
-      buckets: {
-        Row: {
-          allowed_mime_types: string[] | null
-          avif_autodetection: boolean | null
-          created_at: string | null
-          file_size_limit: number | null
-          id: string
-          name: string
-          owner: string | null
-          owner_id: string | null
-          public: boolean | null
-          type: Database["storage"]["Enums"]["buckettype"]
-          updated_at: string | null
-        }
-        Insert: {
-          allowed_mime_types?: string[] | null
-          avif_autodetection?: boolean | null
-          created_at?: string | null
-          file_size_limit?: number | null
-          id: string
-          name: string
-          owner?: string | null
-          owner_id?: string | null
-          public?: boolean | null
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string | null
-        }
-        Update: {
-          allowed_mime_types?: string[] | null
-          avif_autodetection?: boolean | null
-          created_at?: string | null
-          file_size_limit?: number | null
-          id?: string
-          name?: string
-          owner?: string | null
-          owner_id?: string | null
-          public?: boolean | null
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      buckets_analytics: {
-        Row: {
-          created_at: string
-          deleted_at: string | null
-          format: string
-          id: string
-          name: string
-          type: Database["storage"]["Enums"]["buckettype"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          deleted_at?: string | null
-          format?: string
-          id?: string
-          name: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          deleted_at?: string | null
-          format?: string
-          id?: string
-          name?: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      buckets_vectors: {
-        Row: {
-          created_at: string
-          id: string
-          type: Database["storage"]["Enums"]["buckettype"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          type?: Database["storage"]["Enums"]["buckettype"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      migrations: {
-        Row: {
-          executed_at: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Insert: {
-          executed_at?: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Update: {
-          executed_at?: string | null
-          hash?: string
-          id?: number
-          name?: string
-        }
-        Relationships: []
-      }
-      objects: {
-        Row: {
-          bucket_id: string | null
-          created_at: string | null
-          id: string
-          last_accessed_at: string | null
-          metadata: Json | null
-          name: string | null
-          owner: string | null
-          owner_id: string | null
-          path_tokens: string[] | null
-          updated_at: string | null
-          user_metadata: Json | null
-          version: string | null
-        }
-        Insert: {
-          bucket_id?: string | null
-          created_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          owner?: string | null
-          owner_id?: string | null
-          path_tokens?: string[] | null
-          updated_at?: string | null
-          user_metadata?: Json | null
-          version?: string | null
-        }
-        Update: {
-          bucket_id?: string | null
-          created_at?: string | null
-          id?: string
-          last_accessed_at?: string | null
-          metadata?: Json | null
-          name?: string | null
-          owner?: string | null
-          owner_id?: string | null
-          path_tokens?: string[] | null
-          updated_at?: string | null
-          user_metadata?: Json | null
-          version?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "objects_bucketId_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      s3_multipart_uploads: {
-        Row: {
-          bucket_id: string
-          created_at: string
-          id: string
-          in_progress_size: number
-          key: string
-          metadata: Json | null
-          owner_id: string | null
-          upload_signature: string
-          user_metadata: Json | null
-          version: string
-        }
-        Insert: {
-          bucket_id: string
-          created_at?: string
-          id: string
-          in_progress_size?: number
-          key: string
-          metadata?: Json | null
-          owner_id?: string | null
-          upload_signature: string
-          user_metadata?: Json | null
-          version: string
-        }
-        Update: {
-          bucket_id?: string
-          created_at?: string
-          id?: string
-          in_progress_size?: number
-          key?: string
-          metadata?: Json | null
-          owner_id?: string | null
-          upload_signature?: string
-          user_metadata?: Json | null
-          version?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "s3_multipart_uploads_bucket_id_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      s3_multipart_uploads_parts: {
-        Row: {
-          bucket_id: string
-          created_at: string
-          etag: string
-          id: string
-          key: string
-          owner_id: string | null
-          part_number: number
-          size: number
-          upload_id: string
-          version: string
-        }
-        Insert: {
-          bucket_id: string
-          created_at?: string
-          etag: string
-          id?: string
-          key: string
-          owner_id?: string | null
-          part_number: number
-          size?: number
-          upload_id: string
-          version: string
-        }
-        Update: {
-          bucket_id?: string
-          created_at?: string
-          etag?: string
-          id?: string
-          key?: string
-          owner_id?: string | null
-          part_number?: number
-          size?: number
-          upload_id?: string
-          version?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "s3_multipart_uploads_parts_bucket_id_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "s3_multipart_uploads_parts_upload_id_fkey"
-            columns: ["upload_id"]
-            isOneToOne: false
-            referencedRelation: "s3_multipart_uploads"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      vector_indexes: {
-        Row: {
-          bucket_id: string
-          created_at: string
-          data_type: string
-          dimension: number
-          distance_metric: string
-          id: string
-          metadata_configuration: Json | null
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          bucket_id: string
-          created_at?: string
-          data_type: string
-          dimension: number
-          distance_metric: string
-          id?: string
-          metadata_configuration?: Json | null
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          bucket_id?: string
-          created_at?: string
-          data_type?: string
-          dimension?: number
-          distance_metric?: string
-          id?: string
-          metadata_configuration?: Json | null
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vector_indexes_bucket_id_fkey"
-            columns: ["bucket_id"]
-            isOneToOne: false
-            referencedRelation: "buckets_vectors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      allow_any_operation: {
-        Args: { expected_operations: string[] }
-        Returns: boolean
-      }
-      allow_only_operation: {
-        Args: { expected_operation: string }
-        Returns: boolean
-      }
-      can_insert_object: {
-        Args: { bucketid: string; metadata: Json; name: string; owner: string }
-        Returns: undefined
-      }
-      extension: { Args: { name: string }; Returns: string }
-      filename: { Args: { name: string }; Returns: string }
-      foldername: { Args: { name: string }; Returns: string[] }
-      get_common_prefix: {
-        Args: { p_delimiter: string; p_key: string; p_prefix: string }
-        Returns: string
-      }
-      get_size_by_bucket: {
-        Args: never
-        Returns: {
-          bucket_id: string
-          size: number
-        }[]
-      }
-      list_multipart_uploads_with_delimiter: {
-        Args: {
-          bucket_id: string
-          delimiter_param: string
-          max_keys?: number
-          next_key_token?: string
-          next_upload_token?: string
-          prefix_param: string
-        }
-        Returns: {
-          created_at: string
-          id: string
-          key: string
-        }[]
-      }
-      list_objects_with_delimiter: {
-        Args: {
-          _bucket_id: string
-          delimiter_param: string
-          max_keys?: number
-          next_token?: string
-          prefix_param: string
-          sort_order?: string
-          start_after?: string
-        }
-        Returns: {
-          created_at: string
-          id: string
-          last_accessed_at: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }[]
-      }
-      operation: { Args: never; Returns: string }
-      search: {
-        Args: {
-          bucketname: string
-          levels?: number
-          limits?: number
-          offsets?: number
-          prefix: string
-          search?: string
-          sortcolumn?: string
-          sortorder?: string
-        }
-        Returns: {
-          created_at: string
-          id: string
-          last_accessed_at: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }[]
-      }
-      search_by_timestamp: {
-        Args: {
-          p_bucket_id: string
-          p_level: number
-          p_limit: number
-          p_prefix: string
-          p_sort_column: string
-          p_sort_column_after: string
-          p_sort_order: string
-          p_start_after: string
-        }
-        Returns: {
-          created_at: string
-          id: string
-          key: string
-          last_accessed_at: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }[]
-      }
-      search_v2: {
-        Args: {
-          bucket_name: string
-          levels?: number
-          limits?: number
-          prefix: string
-          sort_column?: string
-          sort_column_after?: string
-          sort_order?: string
-          start_after?: string
-        }
-        Returns: {
-          created_at: string
-          id: string
-          key: string
-          last_accessed_at: string
-          metadata: Json
-          name: string
-          updated_at: string
-        }[]
-      }
-    }
-    Enums: {
-      buckettype: "STANDARD" | "ANALYTICS" | "VECTOR"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3232,9 +2935,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       booster_status: [
@@ -3300,11 +3000,6 @@ export const Constants = {
         "clash",
       ],
       user_role: ["customer", "booster", "admin"],
-    },
-  },
-  storage: {
-    Enums: {
-      buckettype: ["STANDARD", "ANALYTICS", "VECTOR"],
     },
   },
 } as const

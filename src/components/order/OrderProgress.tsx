@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { RankBadge } from '@/components/ui/RankBadge'
 import { RankProgressionRail } from '@/components/rank/RankProgressionRail'
-import { useLatestVerification } from './useOrderRankProgress'
+import { useLatestVerification, computeEffectivePoints } from './useOrderRankProgress'
 import { invokeEdgeFunction } from '@/lib/invokeEdgeFunction'
 import { cn } from '@/lib/utils'
 import { rankStep } from '@/lib/pricing'
@@ -44,7 +44,7 @@ function WinBoostProgress({ order }: { order: Order }) {
       <ProgressBar percent={locked ? 0 : percent} tone={done ? 'success' : 'brand'} locked={locked} />
       <p className="text-xs text-ink-muted mt-2">
         {locked
-          ? 'O progresso começa a contar assim que o pagamento for confirmado.'
+          ? 'O progresso começa a contar assim que o booster iniciar o pedido.'
           : done ? 'Objetivo de vitórias atingido!' : `${completed} de ${purchased} vitórias concluídas.`}
       </p>
       {!locked && order.losses_played > 0 && (
@@ -116,13 +116,18 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
     currentStep = startStep
   }
   const relativePct = locked || span <= 0 ? 0 : Math.max(0, Math.min(100, ((currentStep - startStep) / span) * 100))
+  // PDL/LP atual mostrado sempre, mesmo com a barra ainda bloqueada -- cai no
+  // valor capturado na compra (current_pdl / current_rank.lp) enquanto não
+  // há verificação nem partida sincronizada. Só a barra em si (locked prop
+  // abaixo) continua desfocada até o booster iniciar o pedido.
+  const { points: currentPoints } = computeEffectivePoints(order, latest)
 
   return (
     <div className="mb-4 pb-4 border-b border-border-subtle">
       <RankProgressionRail
         currentTier={current.tier}
         currentDivision={current.division}
-        currentLp={locked ? null : latest?.fetched_tier ? latest.fetched_lp : null}
+        currentLp={currentPoints}
         targetTier={target.tier}
         targetDivision={target.division}
         liveCutoffLp={locked ? null : liveCutoffLp}
@@ -132,7 +137,7 @@ function EloBoostProgress({ order, hideRankBadges = false }: { order: Order; hid
       />
       <p className="text-xs text-ink-muted mt-3">
         {locked
-          ? 'O progresso começa a contar assim que o pagamento for confirmado.'
+          ? 'O progresso começa a contar assim que o booster iniciar o pedido.'
           : latest?.fetched_tier
           ? 'Verificado automaticamente via Riot API na última tentativa de conclusão.'
           : usedEstimate

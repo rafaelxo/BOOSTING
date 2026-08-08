@@ -580,7 +580,10 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (!input.winsPurchased || !input.currentRank) break
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getWinBoostPrice(input.queueType, input.currentRank.tier, input.currentRank.division)
-      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
+      const winsCents = input.winsPurchased * moneyToCents(pricePerWin)
+      basePrice = input.boostMode === 'duo'
+        ? centsToMoney(winsCents + percentageOfCents(winsCents, DUO_BOOST_PCT))
+        : centsToMoney(winsCents)
       estimatedHours = expectedMatchesForWins(input.winsPurchased) * MATCH_DURATION_HOURS
       break
     }
@@ -588,7 +591,10 @@ export function computeOrderPrice(input: OrderPriceInput): OrderPriceResult {
       if (!input.winsPurchased || !input.currentRank) break
       if (input.winsPurchased < 1 || input.winsPurchased > 5) break
       const pricePerWin = getMd5WinPrice(input.queueType, input.currentRank.tier)
-      basePrice = centsToMoney(input.winsPurchased * moneyToCents(pricePerWin))
+      const winsCents = input.winsPurchased * moneyToCents(pricePerWin)
+      basePrice = input.boostMode === 'duo'
+        ? centsToMoney(winsCents + percentageOfCents(winsCents, DUO_BOOST_PCT))
+        : centsToMoney(winsCents)
       estimatedHours = expectedMatchesForWins(input.winsPurchased) * MATCH_DURATION_HOURS
       break
     }

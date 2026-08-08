@@ -181,6 +181,7 @@ const md5IntentSchema = z.object({
   service_id: z.string().uuid(),
   game_id: z.string().uuid(),
   queue_type: z.enum(['solo_duo', 'flex']),
+  boost_mode: z.enum(['solo', 'duo']),
   server: z.string().trim().min(2).max(16),
   // "Rank da última temporada" — no LP/PDL, no target. Iron–Challenger valid;
   // division required except Master+.
@@ -490,12 +491,18 @@ export async function validateAndPriceIntent(
     }
   } else if (routed.data.service_type === 'md5') {
     const md5 = parsedIntent.data as z.infer<typeof md5IntentSchema>
+    // Mesma regra do fluxo padrão de elo_boost -- Duo nunca disponível a
+    // partir de Mestre+ (rank "da última temporada" informado pelo cliente,
+    // nunca reverificado ao vivo pra MD5/Vitórias com conta em colocação).
+    if (md5.boost_mode === 'duo' && isMasterPlusCurrentTier(md5.current_rank.tier)) {
+      return { ok: false, response: badRequest(req, 'Duo não é aceito para Mestre ou superior') }
+    }
     normalized = {
       serviceType: 'md5',
       serviceId: md5.service_id,
       gameId: md5.game_id,
       queueType: md5.queue_type,
-      boostMode: 'solo',
+      boostMode: md5.boost_mode,
       server: md5.server,
       currentRank: { tier: md5.current_rank.tier, division: md5.current_rank.division ?? null },
       targetRank: null,
@@ -641,6 +648,12 @@ export async function validateAndPriceIntent(
     const verifiedMasterPlus = isMasterPlusCurrentTier(verifiedTier)
     if (normalized.serviceType === 'elo_boost' && verifiedMasterPlus !== (flow === 'master_plus')) {
       return { ok: false, response: badRequest(req, 'Seu elo mudou desde a consulta. Verifique a conta novamente antes de pagar.') }
+    }
+    // Mesma regra do fluxo padrão de elo_boost -- Duo Vitórias nunca
+    // disponível a partir de Mestre+, agora com o rank confirmado ao vivo
+    // pela Riot (Vitórias sempre reverifica, diferente de MD5 acima).
+    if (normalized.serviceType === 'win_boost' && normalized.boostMode === 'duo' && verifiedMasterPlus) {
+      return { ok: false, response: badRequest(req, 'Duo não é aceito para Mestre ou superior') }
     }
 
     normalized.currentRank = { tier: verifiedTier, division: verifiedDivision }
@@ -811,9 +824,9 @@ export async function validateAndPriceIntent(
   // contra 'duo_standard' (mesmo de Duo Boost) — mesmos extras, decisão de
   // produto (não tem whitelist própria de Clash).
   const addonFlow: BoostFlow | null = flow ?? (
-    normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' ? 'solo_standard'
-    : normalized.serviceType === 'clash' ? (normalized.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
-    : null
+    normalized.serviceType === 'win_boost' || normalized.serviceType === 'md5' || normalized.serviceType === 'clash'
+      ? (normalized.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+      : null
   )
 
   if (addonFlow) {

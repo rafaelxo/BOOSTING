@@ -365,7 +365,7 @@ export function BoosterDashboard() {
                 )}
               </p>
               <p className="text-xs text-ink-muted mt-0.5">
-                {slotInfo.is_top3 ? 'Top3: máx 3 pedidos (máx 2 duo)' : 'Normal: máx 3 pedidos (máx 1 duo)'} + 1 exclusivo
+                {slotInfo.is_top3 ? 'Top3: máx 4 pedidos' : 'Normal: máx 3 pedidos'} + 1 exclusivo
               </p>
             </div>
           </div>
@@ -378,7 +378,7 @@ export function BoosterDashboard() {
             <div className="flex items-center gap-2 text-sm">
               <Users className="h-4 w-4 text-ink-muted" />
               <span className="text-ink-secondary">Duo:</span>
-              <span className="font-bold text-ink">{slotInfo.duo_count}/{slotInfo.max_duo}</span>
+              <span className="font-bold text-ink">{slotInfo.duo_count}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-ink-secondary">Total:</span>

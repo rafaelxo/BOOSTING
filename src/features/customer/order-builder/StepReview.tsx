@@ -1,16 +1,18 @@
 import { useOrderBuilderStore } from '@/stores/orderBuilderStore'
-import { formatEstimatedDelivery, formatRank, orderRequiresAccountAccess } from '@/lib/utils'
+import { formatEstimatedDelivery, orderRequiresAccountAccess } from '@/lib/utils'
 import { isMasterPlusCurrentTier } from '@/lib/boostDomain'
 import { CLASH_TIER_LABEL, CLASH_TIER_RANGE_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
-import { RankBadge, GuaranteeNotice } from '@/components/ui'
-import { Shuffle, Users, Hash, Clock, ChevronRight } from 'lucide-react'
+import { GuaranteeNotice } from '@/components/ui'
+import { OrderRankRow } from '@/components/order/OrderRankRow'
+import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
+import { Shuffle, Users, Hash, Clock, Trophy } from 'lucide-react'
 
 export function StepReview() {
   const {
     serviceType, currentRank, targetRank, queueType, boostMode,
     isMd5, riotId,
     currentLp, currentPdl,
-    estimatedHours, customerNotes,
+    estimatedHours, customerNotes, winsPurchased,
     setNotes, selectedCoachPackage, sessionsPurchased,
     clashTier, clashDay,
   } = useOrderBuilderStore()
@@ -22,20 +24,23 @@ export function StepReview() {
   const modoLabel = serviceType === 'elo_boost'
     ? (boostMode === 'duo' ? 'Duo Boost' : 'Solo Boost')
     : serviceType === 'md5'
-      ? 'MD5'
+      ? (boostMode === 'duo' ? 'Duo MD5' : 'MD5')
       : serviceType === 'win_boost'
-        ? 'Vitórias'
+        ? (boostMode === 'duo' ? 'Duo Vitórias' : 'Vitórias')
         : ''
 
   // Mesmos campos exibidos no "Detalhes do Pedido" de um pedido em
-  // andamento (OrderDetail.tsx) -- ícone acima do rótulo, valor em negrito
-  // embaixo -- só que restrito ao que já existe antes do pedido nascer:
-  // sem preço, sem booster, sem contagem de partidas jogadas.
-  const detailStats = [
+  // andamento (OrderDetail.tsx) -- via OrderInfoGrid, o mesmo componente,
+  // não uma cópia -- só que restrito ao que já existe antes do pedido
+  // nascer: sem preço, sem booster, sem contagem de partidas jogadas.
+  const infoItems: OrderInfoGridItem[] = [
     ...(isBoostFlow ? [{ icon: Shuffle, label: 'Modo', value: modoLabel }] : []),
     ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: queueType === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
     ...((isBoostFlow || serviceType === 'clash') && riotId.trim() ? [{ icon: Hash, label: 'Riot ID', value: riotId.trim() }] : []),
     ...(estimatedHours ? [{ icon: Clock, label: 'Entrega Estimada', value: formatEstimatedDelivery(estimatedHours) }] : []),
+    ...((serviceType === 'win_boost' || serviceType === 'md5') && winsPurchased
+      ? [{ icon: Trophy, label: 'Vitórias', value: `${winsPurchased}` }]
+      : []),
   ]
 
   return (
@@ -49,7 +54,7 @@ export function StepReview() {
         {/* Order details */}
         <div>
           <p className="section-label mb-3">Detalhes do Pedido</p>
-          <div className="card p-4">
+          <div className="card p-6">
             {serviceType === 'coaching' && selectedCoachPackage && (
               <div className="space-y-2">
                 <p className="text-base font-bold text-ink">{selectedCoachPackage.title}</p>
@@ -80,49 +85,22 @@ export function StepReview() {
 
             {currentRank && (
               <div className="mb-4 pb-5 border-b border-border-subtle">
-                <div className="flex items-center justify-center gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <RankBadge tier={currentRank.tier} division={currentRank.division} size="lg" showLabel={false} />
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Atual</p>
-                      <p className="text-base font-bold text-ink truncate">{formatRank(currentRank.tier, currentRank.division)}</p>
-                    </div>
-                  </div>
-
-                  {serviceType === 'elo_boost' && targetRank && (
-                    <>
-                      <div className="flex flex-col items-center gap-1 shrink-0">
-                        <ChevronRight className="h-5 w-5 text-ink-muted" />
-                        <span className="text-sm font-bold text-brand whitespace-nowrap">
-                          {currentIsMasterPlus ? `${currentPdl} PDL` : `${currentLp} LP`}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <RankBadge tier={targetRank.tier} division={targetRank.division} size="lg" showLabel={false} />
-                        <div className="min-w-0">
-                          <p className="text-[11px] text-ink-muted uppercase tracking-wide">Rank Alvo</p>
-                          <p className="text-base font-bold text-ink truncate">{formatRank(targetRank.tier, targetRank.division)}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                <OrderRankRow
+                  currentTier={currentRank.tier}
+                  currentDivision={currentRank.division}
+                  targetTier={serviceType === 'elo_boost' ? targetRank?.tier ?? null : null}
+                  targetDivision={serviceType === 'elo_boost' ? targetRank?.division ?? null : null}
+                  currentLabel={isMd5 ? 'Rank na Temporada Passada' : 'Rank Atual'}
+                  centerContent={
+                    <span className="text-sm font-bold text-brand whitespace-nowrap" data-tabular>
+                      {currentIsMasterPlus ? `${currentPdl} PDL` : `${currentLp} LP`}
+                    </span>
+                  }
+                />
               </div>
             )}
 
-            {detailStats.length > 0 && (
-              <div className="flex justify-center">
-                <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-center">
-                  {detailStats.map(({ icon: Icon, label, value }) => (
-                    <div key={label}>
-                      <p className="text-xs text-ink-muted flex items-center justify-center gap-1"><Icon className="h-3 w-3 shrink-0" />{label}</p>
-                      <p className="text-sm font-semibold text-ink mt-0.5">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <OrderInfoGrid items={infoItems} />
           </div>
         </div>
 

@@ -35,6 +35,17 @@ export function useNewOrderSound() {
     if (!context) return
     const { soundId: id, volume: vol, muted: isMuted } = settingsRef.current
     if (isMuted) return
+    // Chrome/Safari auto-suspendem o AudioContext depois de um tempo sem
+    // produzir som (ou com a aba em segundo plano) -- sem isso, o primeiro
+    // clique/tecla desbloqueava o áudio uma vez (unlockAudio abaixo), mas
+    // depois que o browser suspendia de novo por conta própria o alerta
+    // ficava mudo pro resto da sessão (playOrderSound não toca nada com
+    // state !== 'running', sem erro nenhum). resume() após o desbloqueio
+    // inicial não exige um novo gesto do usuário.
+    if (context.state === 'suspended') {
+      void context.resume().then(() => playOrderSound(context, id, vol))
+      return
+    }
     playOrderSound(context, id, vol)
   }, [])
 

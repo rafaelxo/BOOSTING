@@ -43,14 +43,13 @@ interface SlotInfo {
   duo_count: number
   total_count: number
   max_total: number
-  max_duo: number
   is_top3: boolean
   exclusive_slot_used: boolean
   max_exclusive: number
 }
 
 function SlotIndicator({ slots }: { slots: SlotInfo }) {
-  const { solo_count, duo_count, total_count, max_total, max_duo, is_top3, exclusive_slot_used } = slots
+  const { solo_count, duo_count, total_count, max_total, is_top3, exclusive_slot_used } = slots
   const remaining = max_total - total_count
   const color = remaining === 0 ? 'text-danger' : remaining === 1 ? 'text-warning' : 'text-success'
 
@@ -73,7 +72,7 @@ function SlotIndicator({ slots }: { slots: SlotInfo }) {
         </span>
         <span className="flex items-center gap-1">
           <Users className="h-3 w-3" />
-          Duo: {duo_count}/{max_duo}
+          Duo: {duo_count}
         </span>
       </div>
       <div className="h-3 w-px bg-bg-elevated" />
@@ -141,7 +140,6 @@ export function AvailableJobsPage() {
     duo_count: slotInfoRaw.duo_count ?? 0,
     total_count: slotInfoRaw.total_count ?? 0,
     max_total: slotInfoRaw.max_total ?? 3,
-    max_duo: slotInfoRaw.max_duo ?? 1,
     is_top3: slotInfoRaw.is_top3 ?? false,
     exclusive_slot_used: slotInfoRaw.exclusive_slot_used ?? false,
     max_exclusive: slotInfoRaw.max_exclusive ?? 1,
@@ -164,7 +162,6 @@ export function AvailableJobsPage() {
     // (máx 1), independente dos 3 slots normais estarem cheios ou não.
     if (exclusiveTimeLeft(job, profile?.id)) return !slotInfo.exclusive_slot_used
     if (slotInfo.total_count >= slotInfo.max_total) return false
-    if (job.boost_mode === 'duo' && slotInfo.duo_count >= slotInfo.max_duo) return false
     return true
   }
 
@@ -320,7 +317,6 @@ export function AvailableJobsPage() {
           {filtered.map((job) => {
             const isDuo = job.boost_mode === 'duo'
             const blocked = slotInfo && !canAcceptJob(job)
-            const duoBlocked = slotInfo && isDuo && slotInfo.duo_count >= slotInfo.max_duo && slotInfo.total_count < slotInfo.max_total
             const exclusiveLabel = exclusiveTimeLeft(job, profile?.id)
 
             return (
@@ -417,9 +413,6 @@ export function AvailableJobsPage() {
                         </span>
                       ))}
                     </div>
-                  )}
-                  {duoBlocked && (
-                    <p className="text-[10px] text-warning mt-0.5">Slot Duo cheio — libere um slot duo para aceitar.</p>
                   )}
                   <p className="text-xs text-ink-muted mt-0.5">{t('booster.jobs.posted', { time: timeAgo(job.created_at) })}</p>
                 </div>

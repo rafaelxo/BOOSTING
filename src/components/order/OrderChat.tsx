@@ -18,6 +18,27 @@ const ROLE_LABEL: Record<UserRole, string> = {
 // vez pra também alimentar o contador visual abaixo da caixa.
 const MESSAGE_MAX_LENGTH = 4000
 
+// Último recurso depois que overflow-wrap/min-w-0 (CSS) não bastaram nesse
+// layout -- força quebra de linha real (\n) a cada 36 caracteres, mas só
+// dentro de um trecho SEM espaço que já passou de 36 (link, token, spam de
+// teste tipo "aaaaaaa..."). Texto normal com espaços continua quebrando
+// pelo fluxo natural do CSS -- só o "mesmo que não haja espaço" do pedido
+// vira quebra forçada aqui.
+const HARD_WRAP_TOKEN_LENGTH = 36
+function hardWrapLongTokens(text: string): string {
+  return text
+    .split(/(\s+)/)
+    .map((token) => {
+      if (/^\s+$/.test(token) || token.length <= HARD_WRAP_TOKEN_LENGTH) return token
+      const chunks: string[] = []
+      for (let i = 0; i < token.length; i += HARD_WRAP_TOKEN_LENGTH) {
+        chunks.push(token.slice(i, i + HARD_WRAP_TOKEN_LENGTH))
+      }
+      return chunks.join('\n')
+    })
+    .join('')
+}
+
 // orderStatus é opcional só pra decidir a mensagem certa quando o chat está
 // travado (pedido concluído trava sozinho -- ver trigger
 // trg_lock_chat_on_order_completed, migration 085 -- e não deve soar como se
@@ -161,7 +182,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus, onClose }: { order
           )}
 
           <div
-            className="flex-1 min-h-0 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5"
+            className="flex-1 min-h-0 min-w-0 space-y-4 overflow-x-hidden overflow-y-auto px-4 py-5"
             aria-live="polite"
             onScroll={handleListScroll}
           >
@@ -191,13 +212,13 @@ export function OrderChat({ orderId, viewerRole, orderStatus, onClose }: { order
                       </div>
                       <div
                         className={cn(
-                          'whitespace-pre-wrap break-words rounded-xl px-3.5 py-2.5 text-sm leading-relaxed',
+                          'min-w-0 whitespace-pre-wrap break-words rounded-xl px-3.5 py-2.5 text-sm leading-relaxed',
                           isMe && !isAdmin && 'rounded-tr-sm bg-brand text-white',
                           !isMe && !isAdmin && 'rounded-tl-sm bg-bg-elevated text-ink',
                           isAdmin && 'border border-accent/30 bg-accent/10 text-ink',
                         )}
                       >
-                        {item.content}
+                        {hardWrapLongTokens(item.content)}
                       </div>
                       <time className="mt-1 px-1 text-[10px] text-ink-muted" dateTime={item.created_at}>
                         {formatDateTime(item.created_at)}
@@ -223,7 +244,7 @@ export function OrderChat({ orderId, viewerRole, orderStatus, onClose }: { order
                   placeholder={viewerRole === 'admin' && locked ? 'Mensagem administrativa...' : 'Escreva uma mensagem...'}
                   aria-label="Escrever mensagem"
                   style={{ maxHeight: TEXTAREA_MAX_HEIGHT_PX }}
-                  className="input-base min-h-11 flex-1 resize-none overflow-y-auto py-2.5 text-sm"
+                  className="input-base min-h-11 min-w-0 flex-1 resize-none overflow-y-auto py-2.5 text-sm"
                   disabled={sendMessage.isPending}
                 />
                 <Button

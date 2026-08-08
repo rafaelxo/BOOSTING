@@ -39,11 +39,9 @@ export function StepExtras() {
   // 'duo_standard' (mesmo de Duo Boost) — mesmos extras, decisão de produto.
   const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
-    : serviceType === 'win_boost' || serviceType === 'md5'
-      ? 'solo_standard'
-      : isClash
-        ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
-        : null
+    : serviceType === 'win_boost' || serviceType === 'md5' || isClash
+      ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+      : null
   const currentIsMasterPlus = currentRank ? isMasterPlusCurrentTier(currentRank.tier) : false
 
   // Pacote de vitórias não existe no Master+ — o preço lá vem da tabela

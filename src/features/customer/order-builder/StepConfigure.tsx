@@ -329,14 +329,16 @@ export function StepConfigure() {
     } else if (serviceType === 'win_boost') {
       if (!winsPurchased || !currentRank) return
       const pricePerWin = getWinBoostPrice(queueType, currentRank.tier, currentRank.division ?? null)
-      setBasePrice(Math.round(winsPurchased * pricePerWin * 100) / 100)
+      const winsTotal = winsPurchased * pricePerWin
+      setBasePrice(Math.round((boostMode === 'duo' ? winsTotal * (1 + DUO_BOOST_PCT / 100) : winsTotal) * 100) / 100)
       setEstimatedHours(expectedMatchesForWins(winsPurchased) * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'md5') {
       if (!winsPurchased || !currentRank) return
       const cappedWins = Math.min(5, winsPurchased)
       const pricePerWin = getMd5WinPrice(queueType, currentRank.tier)
-      setBasePrice(Math.round(cappedWins * pricePerWin * 100) / 100)
+      const winsTotal = cappedWins * pricePerWin
+      setBasePrice(Math.round((boostMode === 'duo' ? winsTotal * (1 + DUO_BOOST_PCT / 100) : winsTotal) * 100) / 100)
       setEstimatedHours(expectedMatchesForWins(cappedWins) * MATCH_DURATION_HOURS * DELIVERY_ESTIMATE_MULTIPLIER)
       setPdlModifierPct(null)
     } else if (serviceType === 'coaching') {
@@ -455,6 +457,49 @@ export function StepConfigure() {
                 : isMd5
                   ? 'Conta ainda no posicionamento nesta fila — MD5 ativado, garantia de 80%+ de win rate.'
                   : 'Conta já possui rank nesta fila — MD5 indisponível (anti-fraude).'}
+            </p>
+          </FormField>
+        )}
+
+        {/* Solo/Duo Vitórias — vale tanto pra Vitórias quanto MD5 (mesma
+            escolha, mesmo padrão visual do Modalidade do Elo Boost acima).
+            Duo indisponível em Mestre+, igual Duo Boost -- currentIsMasterPlus
+            já é genérico (calculado a partir de currentRank, não do
+            serviceType). */}
+        {(serviceType === 'win_boost' || serviceType === 'md5') && (
+          <FormField label="Modalidade">
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBoostMode('solo')}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                  boostMode === 'solo'
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                )}
+              >
+                {isMd5 ? 'Solo MD5' : 'Solo Vitórias'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBoostMode('duo')}
+                disabled={currentIsMasterPlus}
+                className={cn(
+                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                  boostMode === 'duo'
+                    ? 'border-brand bg-brand/10 text-brand'
+                    : 'border-bg-elevated bg-bg-card text-ink-secondary hover:border-brand/30',
+                  currentIsMasterPlus && 'opacity-50 cursor-not-allowed hover:border-bg-elevated',
+                )}
+              >
+                {isMd5 ? 'Duo MD5' : 'Duo Vitórias'} <span className="font-normal opacity-70">(+{DUO_BOOST_PCT}%)</span>
+              </button>
+            </div>
+            <p className="text-xs text-ink-muted mt-1.5">
+              {currentIsMasterPlus
+                ? `Duo ${isMd5 ? 'MD5' : 'Vitórias'} indisponível para Mestre ou superior.`
+                : `Duo ${isMd5 ? 'MD5' : 'Vitórias'}: o booster joga com Riot ID próprio ou conta da plataforma, junto com você na duo queue.`}
             </p>
           </FormField>
         )}

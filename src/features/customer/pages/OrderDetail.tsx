@@ -3,13 +3,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Clock, History, KeyRound, Lock, ShieldCheck, QrCode, Copy, XCircle, CheckCircle2, AlertTriangle,
-  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash,
+  Clock, History, KeyRound, Lock, ShieldCheck, QrCode, XCircle, CheckCircle2, AlertTriangle,
+  MessageCircleWarning, Users, Shuffle, CalendarDays, Wallet, UserCheck, Hash, Trophy,
 } from 'lucide-react'
 import { Button, Card, OrderStatusBadge, Skeleton, ErrorAlert, Modal, GuaranteeNotice } from '@/components/ui'
 import { OrderPageHeader } from '@/components/order/OrderPageHeader'
 import { OrderInfoGrid, type OrderInfoGridItem } from '@/components/order/OrderInfoGrid'
 import { OrderChatPanel } from '@/components/order/OrderChatPanel'
+import { PixWaitingPanel } from '@/components/order/PixWaitingPanel'
 import { useOrderChat } from '@/api/chat'
 import { OrderMatchHistory } from '@/components/order/OrderMatchHistory'
 import { OrderCoachingTopics } from '@/components/order/OrderCoachingTopics'
@@ -131,11 +132,15 @@ function useCountdown(expiresAt: string | null) {
 function PendingPaymentSection({ order }: { order: Order }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const currency = useCurrency()
   const [pix, setPix] = useState<{ qr_code?: string; qr_code_base64?: string | null; total_price: number; expires_at: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Popup em vez de card fixo no topo -- abre sozinho ao entrar na página
+  // (mesmo momento em que loadPix() já dispara sozinho, abaixo). Se o
+  // cliente fechar sem pagar, o pedido continua pendente e o banner
+  // compacto abaixo permite reabrir o popup quando quiser.
+  const [open, setOpen] = useState(order.status === 'awaiting_payment')
   const { remaining, label } = useCountdown(pix?.expires_at ?? null)
 
   const generatePix = useGeneratePix(order.id)
@@ -223,17 +228,26 @@ function PendingPaymentSection({ order }: { order: Order }) {
   const expired = remaining === 0
 
   return (
-    <Card id="payment" padding="lg">
-      <div className="flex items-center gap-2 mb-3">
-        <QrCode className="h-4 w-4 text-brand" />
-        <h3 className="text-sm font-semibold text-ink">Pagamento PIX</h3>
+    <>
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-warning/25 bg-warning/10 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-warning min-w-0">
+          <QrCode className="h-4 w-4 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">Pagamento pendente</span>
+          <span className="text-ink-muted truncate hidden sm:inline">— este pedido ainda não foi pago.</span>
+        </div>
+        <Button size="sm" onClick={() => setOpen(true)} leftIcon={<QrCode className="h-4 w-4" />} className="shrink-0">
+          Ver PIX
+        </Button>
       </div>
 
-      <p className="text-xs text-ink-muted mb-4">
-        Este pedido ainda não foi pago. Você pode recuperar o PIX enquanto ele estiver válido ou cancelar o pedido.
-      </p>
-
-      {!pix ? (
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title="Pagamento PIX"
+        description="Este pedido ainda não foi pago. Você pode recuperar o PIX enquanto ele estiver válido ou cancelar o pedido."
+        maxWidth="xl"
+      >
+        {!pix ? (
         <div className="grid grid-cols-2 gap-3 max-w-md">
           <Button className="w-full" loading={generatePix.isPending} onClick={loadPix} leftIcon={<QrCode className="h-4 w-4" />}>
             Efetuar pagamento
@@ -250,45 +264,23 @@ function PendingPaymentSection({ order }: { order: Order }) {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4 max-w-md">
-          <div className="flex items-center justify-between rounded-xl bg-bg-elevated px-4 py-3">
-            <div>
-              <p className="text-xs text-ink-muted">Total</p>
-              <p className="text-lg font-bold text-ink" data-tabular>{currency(Number(pix.total_price))}</p>
-            </div>
-            <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`} data-tabular>
-              <Clock className="h-4 w-4" />
-              {label}
-            </div>
-          </div>
-
-          {pix.qr_code_base64 && (
-            <div className="flex justify-center">
-              <div className="rounded-2xl border border-border-subtle bg-white p-3">
-                <img src={`data:image/png;base64,${pix.qr_code_base64}`} alt="QR Code PIX" className="h-48 w-48" />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase text-ink-secondary">Código PIX Copia e Cola</p>
-            <textarea className="input-base min-h-24 w-full resize-none font-mono text-xs" value={pix.qr_code ?? ''} readOnly />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button className="w-full" variant={copied ? 'success' : 'secondary'} onClick={copyPix} leftIcon={copied ? <ShieldCheck className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>
-              {copied ? 'Copiado' : 'Copiar'}
-            </Button>
-            <Button className="w-full" variant="danger" loading={cancelOrderMutation.isPending} onClick={cancelOrder} leftIcon={<XCircle className="h-4 w-4" />}>
-              Cancelar pedido
-            </Button>
-          </div>
-          {copyError && <p className="text-xs text-danger">{copyError}</p>}
-        </div>
+        <PixWaitingPanel
+          totalPrice={Number(pix.total_price)}
+          qrCode={pix.qr_code ?? ''}
+          qrCodeBase64={pix.qr_code_base64 ?? null}
+          remaining={remaining}
+          countdownLabel={label}
+          copied={copied}
+          copyError={copyError}
+          onCopy={copyPix}
+          onCancel={cancelOrder}
+          cancelling={cancelOrderMutation.isPending}
+        />
       )}
 
       {error && <div className="mt-3"><ErrorAlert message={error} /></div>}
-    </Card>
+      </Modal>
+    </>
   )
 }
 
@@ -342,7 +334,7 @@ function CredentialsSection({ order, state }: { order: Order; state?: CustomerOr
           </div>
           <div>
             <label className="text-xs font-semibold text-ink-secondary block mb-1">Senha da conta</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input-base w-full text-sm" autoComplete="new-password" maxLength={256} />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input-base w-full text-sm" autoComplete="current-password" maxLength={256} />
             <p className="text-[10px] text-ink-muted mt-1">O valor enviado é transformado em payload criptografado no banco. Não compartilhe a senha no chat.</p>
           </div>
           <Button size="sm" className="w-full" loading={saveCredentials.isPending} disabled={!login.trim() || password.length < 4} onClick={submit} variant={saved ? 'success' : 'primary'}>
@@ -473,8 +465,8 @@ export function OrderDetailPage() {
   const isBoostFlow = order.service_type === 'elo_boost' || order.service_type === 'win_boost' || order.service_type === 'md5'
   const modeLabel = order.service_type === 'elo_boost'
     ? (order.boost_mode === 'duo' ? 'Duo Boost' : 'Solo Boost')
-    : order.service_type === 'md5' ? 'MD5'
-    : order.service_type === 'win_boost' ? 'Vitórias'
+    : order.service_type === 'md5' ? (order.boost_mode === 'duo' ? 'Duo MD5' : 'MD5')
+    : order.service_type === 'win_boost' ? (order.boost_mode === 'duo' ? 'Duo Vitórias' : 'Vitórias')
     : getServiceLabel(order.service_type)
 
   const infoItems: OrderInfoGridItem[] = [
@@ -482,6 +474,9 @@ export function OrderDetailPage() {
     ...(isBoostFlow ? [{ icon: Users, label: 'Fila', value: order.queue_type === 'solo_duo' ? 'Solo/Duo' : 'Flex' }] : []),
     ...((isBoostFlow || order.service_type === 'clash') ? [{ icon: Hash, label: 'Riot ID', value: order.riot_id ?? 'Não informado' }] : []),
     { icon: Clock, label: 'Entrega estimada', value: order.estimated_hours ? formatEstimatedDelivery(order.estimated_hours) : 'Não disponível' },
+    ...((order.service_type === 'win_boost' || order.service_type === 'md5') && order.wins_purchased != null
+      ? [{ icon: Trophy, label: 'Vitórias Compradas', value: `${order.wins_purchased}` }]
+      : []),
     ...(order.service_type === 'coaching' && order.sessions_purchased
       ? [{ icon: CalendarDays, label: 'Sessões', value: `${order.sessions_purchased}` }]
       : []),

@@ -235,7 +235,9 @@ const CLEARED_LOOKUP_STATE = {
 // currentRank) mas ainda tem fluxo — reaproveita solo_standard/duo_standard
 // direto da modalidade, mesma regra de StepExtras.tsx/StepPayment.tsx.
 function flowFor(serviceType: ServiceType | null, rank: Rank | null, mode: BoostMode): BoostFlow | null {
-  if (serviceType === 'clash') return mode === 'duo' ? 'duo_standard' : 'solo_standard'
+  if (serviceType === 'clash' || serviceType === 'win_boost' || serviceType === 'md5') {
+    return mode === 'duo' ? 'duo_standard' : 'solo_standard'
+  }
   if (!rank) return null
   return getBoostFlow(rank.tier, mode as BoostFlowMode)
 }

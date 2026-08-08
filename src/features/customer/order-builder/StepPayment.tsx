@@ -9,10 +9,11 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { applyCoupon } from '@/lib/pricing'
 import { getBoostFlow } from '@/lib/boostDomain'
-import { isUuid } from '@/lib/utils'
+import { cn, isUuid } from '@/lib/utils'
+import { PixWaitingPanel } from '@/components/order/PixWaitingPanel'
 import { getCustomerOrderState, savePendingOrderFromIntent, generatePix as generatePixRequest } from '@/api/orders'
 import type { PixPaymentResponse } from '@/api/orders'
-import { Copy, CheckCircle2, Clock, QrCode, ShieldCheck, Info, ChevronLeft, X } from 'lucide-react'
+import { CheckCircle2, Clock, QrCode, ShieldCheck, Info, ChevronLeft } from 'lucide-react'
 
 // PIX states
 type PixState =
@@ -64,7 +65,7 @@ function useCountdown(expiresAt: string | null) {
   return { remaining, label: `${mm}:${ss}` }
 }
 
-export function StepPayment() {
+export function StepPayment({ insideModal = false }: { insideModal?: boolean } = {}) {
   const { profile } = useAuthStore()
   const store = useOrderBuilderStore()
   const navigate = useNavigate()
@@ -91,11 +92,9 @@ export function StepPayment() {
   // Solo Clash usa 'solo_standard', Duo Clash usa 'duo_standard'.
   const flow = store.serviceType === 'elo_boost' && store.currentRank
     ? getBoostFlow(store.currentRank.tier, store.boostMode)
-    : store.serviceType === 'win_boost' || store.serviceType === 'md5'
-      ? 'solo_standard'
-      : isClash
-        ? (store.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
-        : null
+    : store.serviceType === 'win_boost' || store.serviceType === 'md5' || isClash
+      ? (store.boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+      : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache. Precisamos
   // do catálogo aqui só para traduzir os ids selecionados em códigos
   // estáveis (addon_codes) — o payload nunca envia o id interno do banco.
@@ -269,6 +268,7 @@ export function StepPayment() {
     if (store.serviceType === 'md5') {
       return {
         ...base,
+        boost_mode: store.boostMode,
         wins_purchased: store.winsPurchased,
         riot_id: store.riotId,
       }
@@ -513,6 +513,22 @@ export function StepPayment() {
     }
   }
 
+  // Gera o PIX sozinho assim que a tela fica pronta -- clicar em "Ir para
+  // Pagamento" na revisão já é a intenção de pagar, não deveria precisar de
+  // um segundo clique aqui dentro. Só dispara na primeira vez (guard via ref,
+  // já que catalogReady/addonsReady mudam de valor até estabilizar) e nunca
+  // quando já existe um pedido pendente restaurado por ?order= -- esse caso
+  // já tem o próprio efeito de retomada abaixo (mostra o PIX salvo, nunca
+  // gera um novo).
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (autoStartedRef.current || pendingOrderId || pix.phase !== 'idle') return
+    if (!profile || !catalogReady || !addonsReady) return
+    autoStartedRef.current = true
+    void generatePix()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, catalogReady, addonsReady, pendingOrderId, pix.phase])
+
   async function copyPix() {
     if (pix.phase !== 'waiting') return
     try {
@@ -554,99 +570,37 @@ export function StepPayment() {
   // ── Waiting (QR code shown) ───────────────────────────────────────────────
   if (pix.phase === 'waiting') {
     return (
-      <div className="space-y-5">
-        {/* Amount + timer */}
-        <div className="flex items-center justify-between bg-bg-elevated rounded-2xl px-5 py-4">
-          <div>
-            <p className="text-xs text-ink-muted">Total a pagar</p>
-            <p className="text-2xl font-extrabold text-brand mt-0.5">{currency(totalPrice)}</p>
-          </div>
-          <div className={`flex items-center gap-1.5 text-sm font-bold ${(remaining ?? Number.POSITIVE_INFINITY) < 120 ? 'text-danger' : 'text-ink-secondary'}`}>
-            <Clock className="h-4 w-4" />
-            {countdownLabel}
-          </div>
-        </div>
-
-        {/* QR code */}
-        <div className="flex flex-col items-center gap-4">
-          {pix.qr_base64 ? (
-            <div className="p-3 bg-white rounded-2xl shadow-sm border border-bg-elevated">
-              <img
-                src={`data:image/png;base64,${pix.qr_base64}`}
-                alt="QR Code PIX"
-                className="w-52 h-52"
-              />
-            </div>
-          ) : (
-            <div className="w-52 h-52 bg-bg-elevated rounded-2xl flex flex-col items-center justify-center gap-2 text-center px-4">
-              <QrCode className="h-12 w-12 text-ink-muted animate-pulse" />
-              <p className="text-[11px] text-ink-muted">Gerando imagem do QR code… use o código copia-e-cola abaixo enquanto isso.</p>
-            </div>
-          )}
-          <p className="text-xs text-ink-muted">Válido por 30 minutos</p>
-        </div>
-
-        {/* Copy code */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-ink-secondary uppercase tracking-wide">
-            Ou copie o código PIX Copia e Cola
-          </p>
-          <div className="bg-bg-elevated rounded-xl px-3 py-2.5 text-xs font-mono text-ink-secondary truncate">
-            {pix.qr_code.slice(0, 60)}…
-          </div>
-          {copyError && <p className="text-xs text-danger">{copyError}</p>}
-        </div>
-
-        {/* Status indicator */}
-        <div className="flex items-center gap-2 text-xs text-ink-secondary bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl px-4 py-3">
-          <div className="h-2 w-2 rounded-full bg-brand animate-pulse" />
-          Aguardando confirmação do pagamento…
-        </div>
-
-        <p className="text-[11px] text-center text-ink-muted">
-          Este pedido continuará salvo em Meus pedidos para você pagar depois.
-        </p>
-
-        {/* Security */}
-        <div className="flex items-start gap-2.5 text-xs text-ink-muted">
-          <ShieldCheck className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" />
-          Pagamento processado com segurança pelo Mercado Pago. Seus dados bancários nunca passam por nossos servidores.
-        </div>
-
-        <div className="flex items-center justify-between">
-          <Button
-            size="lg"
-            variant="danger-ghost"
-            onClick={handleCancelOrder}
-            loading={isCancelling}
-            leftIcon={<X className="h-4 w-4" />}
-            className="w-40 shrink-0"
-          >
-            Cancelar
-          </Button>
-          <Button
-            size="lg"
-            variant={copied ? 'success' : 'secondary'}
-            leftIcon={copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            onClick={copyPix}
-            className="w-40 shrink-0"
-          >
-            {copied ? 'Copiado!' : 'Copiar'}
-          </Button>
-        </div>
-      </div>
+      <PixWaitingPanel
+        totalPrice={totalPrice}
+        qrCode={pix.qr_code}
+        qrCodeBase64={pix.qr_base64}
+        remaining={remaining}
+        countdownLabel={countdownLabel}
+        copied={copied}
+        copyError={copyError}
+        onCopy={copyPix}
+        onCancel={handleCancelOrder}
+        cancelling={isCancelling}
+      />
     )
   }
 
   // ── Idle / Generating (initial state) ────────────────────────────────────────
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-ink mb-1">Pagamento via PIX</h2>
-        <p className="text-sm text-ink-secondary">
-          Instantâneo, gratuito e 100% seguro. Pague em segundos pelo app do seu banco.
-        </p>
-      </div>
+      {/* Título/descrição só quando NÃO está dentro do Modal do popup --
+          o Modal já mostra "Pagamento via PIX" no próprio cabeçalho
+          (ver OrderBuilder.tsx); repetir aqui duplicava o título. Continua
+          aparecendo normalmente no fluxo de retomada em tela cheia
+          (step 'payment' após reload, sem Modal nenhum por cima). */}
+      {!insideModal && (
+        <div>
+          <h2 className="text-lg font-bold text-ink mb-1">Pagamento via PIX</h2>
+          <p className="text-sm text-ink-secondary">
+            Instantâneo, gratuito e 100% seguro. Pague em segundos pelo app do seu banco.
+          </p>
+        </div>
+      )}
 
       {/* Seu pedido ainda não existe no banco neste ponto -- só é criado
           quando o cliente clica em "Gerar PIX" (ver comentário perto de
@@ -670,19 +624,23 @@ export function StepPayment() {
         </div>
       </div>
 
-      {/* How it works */}
-      <div className="space-y-2">
-        {[
-          '1. Clique em "Gerar PIX" abaixo',
-          '2. Escaneie o QR code ou copie o código no app do seu banco',
-          '3. Confirme o pagamento — seu pedido entra na fila automaticamente',
-        ].map((step) => (
-          <div key={step} className="flex items-center gap-2.5 text-xs text-ink-secondary">
-            <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
-            {step}
-          </div>
-        ))}
-      </div>
+      {/* How it works -- "1. Clique em Gerar PIX" não faz sentido dentro do
+          popup, que já gera sozinho ao abrir (ver efeito de auto-start em
+          generatePix). */}
+      {!insideModal && (
+        <div className="space-y-2">
+          {[
+            '1. Clique em "Gerar PIX" abaixo',
+            '2. Escaneie o QR code ou copie o código no app do seu banco',
+            '3. Confirme o pagamento — seu pedido entra na fila automaticamente',
+          ].map((step) => (
+            <div key={step} className="flex items-center gap-2.5 text-xs text-ink-secondary">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
+              {step}
+            </div>
+          ))}
+        </div>
+      )}
 
       {pix.phase === 'error' && <ErrorAlert message={pix.message} />}
       {saveError && pix.phase !== 'error' && <ErrorAlert message={saveError} />}
@@ -693,16 +651,21 @@ export function StepPayment() {
         </p>
       )}
 
-      <div className="flex items-center justify-between">
-        <Button
-          size="lg"
-          variant="ghost"
-          onClick={store.prevStep}
-          leftIcon={<ChevronLeft className="h-4 w-4" />}
-          className="w-40 shrink-0"
-        >
-          Voltar
-        </Button>
+      <div className={cn('flex items-center', insideModal ? 'justify-center' : 'justify-between')}>
+        {/* "Voltar" (troca de step do wizard) não faz sentido dentro do
+            popup -- fechar o popup (X do Modal) já volta pra revisão, que
+            continua por baixo. */}
+        {!insideModal && (
+          <Button
+            size="lg"
+            variant="ghost"
+            onClick={store.prevStep}
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
+            className="w-40 shrink-0"
+          >
+            Voltar
+          </Button>
+        )}
 
         <Button
           size="lg"

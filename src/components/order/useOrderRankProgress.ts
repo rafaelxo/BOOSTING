@@ -26,7 +26,11 @@ export function computeEffectivePoints(
   order: Order,
   latest: { fetched_lp?: number | null } | null | undefined,
 ): EffectivePoints {
-  if (!order.match_sync_started_at) return { points: null, isEstimate: false }
+  // Antes do booster iniciar o pedido (match_sync_started_at null) ainda não
+  // existe verificação nem partida sincronizada -- os ramos abaixo caem
+  // naturalmente no PDL/LP capturado na compra (order.current_pdl /
+  // order.current_rank.lp), que é exatamente o "PDL atual" que o cliente
+  // quer ver sempre, mesmo com a barra de progresso ainda bloqueada.
   if (latest?.fetched_lp != null) return { points: latest.fetched_lp, isEstimate: false }
 
   if (order.pdl_bracket) {

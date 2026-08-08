@@ -213,13 +213,13 @@ export function AdminBoosterDetailPage() {
           <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
             Uso de Slots
             <span className="text-[10px] font-normal text-ink-muted">
-              ({slotInfo.is_top3 ? 'Top3: máx 3 / 2 duo' : 'Normal: máx 3 / 1 duo'})
+              ({slotInfo.is_top3 ? 'Top3: máx 4 pedidos' : 'Normal: máx 3 pedidos'})
             </span>
           </h3>
           <div className="grid grid-cols-4 gap-4">
             {[
               { label: 'Solo', value: slotInfo.solo_count, icon: Swords, color: 'text-brand bg-brand/10' },
-              { label: 'Duo',  value: `${slotInfo.duo_count}/${slotInfo.max_duo}`, icon: Users, color: 'text-accent bg-accent/10' },
+              { label: 'Duo',  value: `${slotInfo.duo_count}`, icon: Users, color: 'text-accent bg-accent/10' },
               { label: 'Exclusivo', value: `${slotInfo.exclusive_slot_used ? 1 : 0}/${slotInfo.max_exclusive ?? 1}`, icon: Trophy,
                 color: slotInfo.exclusive_slot_used ? 'text-danger bg-danger/10' : 'text-success bg-success/10' },
               { label: 'Total', value: `${slotInfo.total_count}/${slotInfo.max_total}`, icon: Trophy,

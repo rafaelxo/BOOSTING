@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useOrderBuilderStore, type OrderBuilderStep } from '@/stores/orderBuilderStore'
-import { Stepper, Button, Card } from '@/components/ui'
+import { Stepper, Button, Card, Modal } from '@/components/ui'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useBoostAddons, EMPTY_ADDONS } from '@/hooks/useBoostAddons'
 import { applyCoupon, getWinBoostPrice } from '@/lib/pricing'
@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { getCustomerOrderState } from '@/api/orders'
 
-const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'coaching', 'clash']
+const VALID_SERVICES: ServiceType[] = ['elo_boost', 'win_boost', 'clash', 'coaching']
 
 // Step components
 import { StepService } from '../order-builder/StepService'
@@ -105,6 +105,13 @@ export function OrderBuilderPage() {
     clashTier, clashDay,
   } = useOrderBuilderStore()
   const [searchParams, setSearchParams] = useSearchParams()
+  // Popup do PIX aberto por cima da própria revisão -- "Ir para Pagamento"
+  // não navega mais pro step 'payment' (esse continua existindo só pra
+  // retomar um pedido pendente após reload, ver efeito de resumableOrder
+  // abaixo). Fecha sozinho se o step sair de 'review' por qualquer motivo
+  // (ex.: PIX expirou e o fluxo reinicia em 'service') -- sem isso, reabrir
+  // a revisão numa sessão nova podia reabrir o popup por engano.
+  const [pixModalOpen, setPixModalOpen] = useState(false)
   const currency = useCurrency()
   const pendingOrderId = searchParams.get('order')
   const explicitlyStartingNewOrder = searchParams.get('new') === '1'
@@ -137,15 +144,17 @@ export function OrderBuilderPage() {
     setStep, setSearchParams,
   ])
 
+  useEffect(() => {
+    if (step !== 'review') setPixModalOpen(false)
+  }, [step])
+
   // Mesma regra de StepExtras.tsx/StepPayment.tsx — Clash reaproveita
   // solo_standard/duo_standard pela modalidade, sem currentRank envolvido.
   const flow = serviceType === 'elo_boost' && currentRank
     ? getBoostFlow(currentRank.tier, boostMode)
-    : serviceType === 'win_boost' || serviceType === 'md5'
-      ? 'solo_standard'
-      : serviceType === 'clash'
-        ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
-        : null
+    : serviceType === 'win_boost' || serviceType === 'md5' || serviceType === 'clash'
+      ? (boostMode === 'duo' ? 'duo_standard' : 'solo_standard')
+      : null
   // Mesma queryKey usada em StepExtras/StepReview — já em cache.
   const { data: addonData } = useBoostAddons(flow)
   const addonCatalog = addonData ?? EMPTY_ADDONS
@@ -366,6 +375,17 @@ export function OrderBuilderPage() {
               </div>
             )}
           </Card>
+
+          {/* Popup do PIX -- só existe enquanto o step continua 'review'
+              (a revisão nunca some por trás, ver useEffect de segurança
+              acima). O próprio StepPayment já gera o PIX sozinho assim que
+              monta (ver efeito de auto-start nele), sem precisar de um
+              segundo clique aqui dentro. */}
+          {step === 'review' && (
+            <Modal open={pixModalOpen} onOpenChange={setPixModalOpen} title="Pagamento via PIX" maxWidth="xl">
+              <StepPayment insideModal />
+            </Modal>
+          )}
         </div>
 
         {/* Summary panel — acompanha o pedido em todas as etapas (sticky),
@@ -433,7 +453,7 @@ export function OrderBuilderPage() {
                   <Button variant="ghost" onClick={prevStep} className="shrink-0">
                     Voltar
                   </Button>
-                  <Button onClick={nextStep} className="flex-1" rightIcon={<ChevronRight className="h-4 w-4" />}>
+                  <Button onClick={() => setPixModalOpen(true)} className="flex-1" rightIcon={<ChevronRight className="h-4 w-4" />}>
                     {serviceType === 'coaching' ? 'Confirmar' : 'Ir para Pagamento'}
                   </Button>
                 </div>
