@@ -11,7 +11,6 @@ import { DiscordAccountNotice } from '@/components/DiscordAccountNotice'
 import type { UserRole } from '@/types'
 import { useBoosterPanelFields, useUpdateMyUsername, useUpdateMyAvatar, useBoosterPanelMutations } from '@/api/auth'
 import { ApiError } from '@/api/core/errors'
-import { displayNameCooldownDaysRemaining } from '@/lib/displayNameCooldown'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
@@ -47,12 +46,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
   const [usernameError, setUsernameError]   = useState<string | null>(null)
   const [usernameSaved, setUsernameSaved]   = useState(false)
 
-  // ── Booster: display_name ──
-  const [displayName, setDisplayName]           = useState('')
-  const [displayNameSaving, setDisplayNameSaving] = useState(false)
-  const [displayNameError, setDisplayNameError]   = useState<string | null>(null)
-  const [displayNameSaved, setDisplayNameSaved]   = useState(false)
-
   // ── Booster: full_name ──
   const [fullName, setFullName]           = useState('')
   const [fullNameSaving, setFullNameSaving] = useState(false)
@@ -72,14 +65,10 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
 
   useEffect(() => {
     if (boosterData) {
-      setDisplayName(boosterData.display_name ?? '')
       setFullName(boosterData.full_name ?? '')
       setCpf(boosterData.cpf ? formatCpf(boosterData.cpf) : '')
     }
   }, [boosterData])
-
-  const displayNameDaysRemaining = displayNameCooldownDaysRemaining(boosterData?.display_name_changed_at ?? null, new Date())
-  const displayNameLocked = displayNameDaysRemaining > 0
 
   function formatCpf(raw: string) {
     const d = raw.replace(/\D/g, '')
@@ -119,21 +108,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
     if (!profile) return
     await updateAvatar.mutateAsync({ userId: profile.id, avatarUrl: url })
     setProfile({ ...profile, avatar_url: url })
-  }
-
-  async function handleSaveDisplayName() {
-    if (!profile || !displayName.trim()) return
-    setDisplayNameSaving(true)
-    setDisplayNameError(null)
-    try {
-      await boosterMutations.updateDisplayName.mutateAsync({ userId: profile.id, displayName: displayName.trim() })
-      setDisplayNameSaved(true)
-      setTimeout(() => setDisplayNameSaved(false), 3000)
-    } catch (err) {
-      setDisplayNameError(err instanceof ApiError ? err.message : 'Erro ao salvar')
-    } finally {
-      setDisplayNameSaving(false)
-    }
   }
 
   async function handleSaveFullName() {
@@ -256,39 +230,6 @@ export function UserProfilePanel({ open, onClose }: UserProfilePanelProps) {
           {isBooster && (
             <div className="border-t border-bg-elevated pt-4 space-y-5">
               <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Conta Booster</p>
-
-              {/* Display name */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted">Nome de exibição</p>
-                <div className="flex gap-2">
-                  <input
-                    value={displayName}
-                    onChange={e => { setDisplayName(e.target.value); setDisplayNameError(null) }}
-                    placeholder="Nome público"
-                    maxLength={32}
-                    disabled={displayNameLocked}
-                    className="input-base flex-1 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveDisplayName}
-                    disabled={displayNameLocked || displayNameSaving || !displayName.trim() || displayName.trim() === boosterData?.display_name}
-                    className="px-3 py-2 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand/90 disabled:opacity-40 transition-colors shrink-0"
-                  >
-                    {displayNameSaving ? '...' : 'Salvar'}
-                  </button>
-                </div>
-                {displayNameLocked ? (
-                  <p className="text-xs text-ink-muted">
-                    Você só pode trocar seu nome de exibição em {displayNameDaysRemaining} dia{displayNameDaysRemaining === 1 ? '' : 's'}.
-                  </p>
-                ) : (
-                  <>
-                    {displayNameError && <p className="text-xs text-danger">{displayNameError}</p>}
-                    {displayNameSaved && <p className="text-xs text-success">Nome salvo!</p>}
-                  </>
-                )}
-              </div>
 
               {/* Full name */}
               <div className="space-y-2">

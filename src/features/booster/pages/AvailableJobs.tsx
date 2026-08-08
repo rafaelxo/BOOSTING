@@ -1,41 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Briefcase, History, Lock, Sparkles, Swords, Users, TrendingUp, Zap } from 'lucide-react'
+import { Briefcase, History, Lock, Search, Sparkles, Swords, Users } from 'lucide-react'
 import { Button, Card, EmptyState, Skeleton, RankBadge } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { timeAgo, formatRank, boosterEarningsShare, getServiceLabel, getOrderModeType, sortOrderExtras } from '@/lib/utils'
-import { CLASH_TIER_LABEL, CLASH_DAY_LABEL } from '@/lib/clashDomain'
-import type { ClashDay, ClashTier, Division, Order, QueueType, RankTier, ServiceType } from '@/types'
+import type { Division, Order, RankTier } from '@/types'
 import { useTranslation } from 'react-i18next'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useAvailableJobs, useBoosterSlotInfo, useAcceptBoostOrder } from '@/api/orders'
 import { OrderSoundSettings } from '@/features/booster/components/OrderSoundSettings'
-
-// Categoria de filtro por tipo de serviço — agrupa 'win_boost'/'md5'/
-// 'placement_matches' (legado) num único balde "Vitórias / MD5", espelhando
-// o agrupamento já usado em StepService.tsx (o cliente também só escolhe
-// entre essas 4 categorias, nunca md5/win_boost como opções separadas).
-type JobCategory = 'all' | 'elo_boost' | 'win_boost' | 'clash' | 'coaching'
-
-const SERVICE_CATEGORIES: { value: JobCategory; label: string; icon: React.ElementType }[] = [
-  { value: 'all', label: 'Todos', icon: Briefcase },
-  { value: 'elo_boost', label: 'Elo Boost', icon: TrendingUp },
-  { value: 'win_boost', label: 'Vitórias / MD5', icon: Zap },
-  { value: 'clash', label: 'Clash', icon: Swords },
-  { value: 'coaching', label: 'Coaching', icon: Users },
-]
-
-function jobCategory(serviceType: ServiceType | null): JobCategory {
-  if (serviceType === 'elo_boost') return 'elo_boost'
-  if (serviceType === 'win_boost' || serviceType === 'md5' || serviceType === 'placement_matches') return 'win_boost'
-  if (serviceType === 'clash') return 'clash'
-  if (serviceType === 'coaching') return 'coaching'
-  return 'all'
-}
-
-const CLASH_TIERS: ClashTier[] = ['tier_4', 'tier_3', 'tier_2', 'tier_1']
-const CLASH_DAYS: ClashDay[] = ['saturday', 'sunday']
+import { ServiceFilterBar } from '@/components/order/ServiceFilterBar'
+import { useServiceFilters } from '@/components/order/useServiceFilters'
 
 
 interface SlotInfo {
@@ -97,28 +73,9 @@ function exclusiveTimeLeft(job: Order, myUserId?: string): string | null {
 
 export function AvailableJobsPage() {
   const { profile } = useAuthStore()
-  const [category, setCategory] = useState<JobCategory>('all')
-  const [queue, setQueue] = useState<QueueType | 'all'>('all')
-  const [clashTierFilter, setClashTierFilter] = useState<ClashTier | 'all'>('all')
-  const [clashDayFilter, setClashDayFilter] = useState<ClashDay | 'all'>('all')
+  const [search, setSearch] = useState('')
   const { t } = useTranslation()
   const currency = useCurrency()
-
-  // Trocar de categoria zera os filtros de subtipo da categoria anterior —
-  // um filtro de fila escolhido em Elo Boost não deve sobreviver ao trocar
-  // pra Clash (onde fila nem existe) e voltar.
-  function handleCategoryChange(next: JobCategory) {
-    setCategory(next)
-    setQueue('all')
-    setClashTierFilter('all')
-    setClashDayFilter('all')
-  }
-
-  const QUEUE_OPTIONS: { label: string; value: QueueType | 'all' }[] = [
-    { label: 'Todas as Filas', value: 'all' },
-    { label: t('booster.jobs.soloQueue'), value: 'solo_duo' },
-    { label: t('booster.jobs.flexQueue'), value: 'flex' },
-  ]
 
   const { data: boosterProfile } = useQuery({
     queryKey: ['booster-profile-slots', profile?.id],
@@ -165,21 +122,10 @@ export function AvailableJobsPage() {
     return true
   }
 
-  const categoryCounts = (jobs ?? []).reduce<Record<JobCategory, number>>((acc, j) => {
-    const c = jobCategory(j.service_type)
-    acc[c] = (acc[c] ?? 0) + 1
-    return acc
-  }, { all: jobs?.length ?? 0, elo_boost: 0, win_boost: 0, clash: 0, coaching: 0 })
-
-  const filtered = jobs?.filter((j) => {
-    if (category !== 'all' && jobCategory(j.service_type) !== category) return false
-    if ((category === 'elo_boost' || category === 'win_boost') && queue !== 'all' && j.queue_type !== queue) return false
-    if (category === 'clash') {
-      if (clashTierFilter !== 'all' && j.clash_tier !== clashTierFilter) return false
-      if (clashDayFilter !== 'all' && j.clash_day !== clashDayFilter) return false
-    }
-    return true
-  }) ?? []
+  const serviceFilters = useServiceFilters(jobs)
+  const filtered = serviceFilters.filtered.filter((j) =>
+    !search || j.id.toLowerCase().includes(search.toLowerCase())
+  )
 
   if (boosterProfile && boosterProfile.status !== 'approved') {
     const statusMessages: Record<string, { title: string; desc: string }> = {
@@ -222,89 +168,31 @@ export function AvailableJobsPage() {
         </div>
       )}
 
-      {/* Filters — tipo de serviço, com subtipos específicos de cada um abaixo */}
-      <div className="space-y-3">
-        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 flex-wrap">
-          {SERVICE_CATEGORIES.map(({ value, label, icon: Icon }) => (
-            <button
-              key={value}
-              onClick={() => handleCategoryChange(value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                category === value ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-              <span className={`text-[10px] ${category === value ? 'text-white/80' : 'text-ink-muted'}`}>
-                {categoryCounts[value]}
-              </span>
-            </button>
-          ))}
+      {/* Filters -- busca + categoria de serviço + subfiltros, mesmo padrão de "Pedidos" (sem status aqui: todo job já é awaiting_assignment). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-48 shrink-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por código do pedido..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-base pl-8 py-1.5 text-xs"
+          />
         </div>
-
-        {(category === 'elo_boost' || category === 'win_boost') && (
-          <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 w-fit">
-            {QUEUE_OPTIONS.map(({ label, value }) => (
-              <button
-                key={value}
-                onClick={() => setQueue(value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  queue === value ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {category === 'clash' && (
-          <div className="flex gap-3 flex-wrap">
-            <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 w-fit">
-              <button
-                onClick={() => setClashTierFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  clashTierFilter === 'all' ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                Todos os Tiers
-              </button>
-              {CLASH_TIERS.map((tier) => (
-                <button
-                  key={tier}
-                  onClick={() => setClashTierFilter(tier)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    clashTierFilter === tier ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                  }`}
-                >
-                  {CLASH_TIER_LABEL[tier]}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1 w-fit">
-              <button
-                onClick={() => setClashDayFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  clashDayFilter === 'all' ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                Todos os Dias
-              </button>
-              {CLASH_DAYS.map((day) => (
-                <button
-                  key={day}
-                  onClick={() => setClashDayFilter(day)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    clashDayFilter === day ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink'
-                  }`}
-                >
-                  {CLASH_DAY_LABEL[day]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <ServiceFilterBar
+          category={serviceFilters.category}
+          onCategoryChange={serviceFilters.setCategory}
+          counts={serviceFilters.counts}
+          queue={serviceFilters.queue}
+          onQueueChange={serviceFilters.setQueue}
+          mode={serviceFilters.mode}
+          onModeChange={serviceFilters.setMode}
+          clashTier={serviceFilters.clashTier}
+          onClashTierChange={serviceFilters.setClashTier}
+          clashDay={serviceFilters.clashDay}
+          onClashDayChange={serviceFilters.setClashDay}
+        />
       </div>
 
       {/* Jobs */}

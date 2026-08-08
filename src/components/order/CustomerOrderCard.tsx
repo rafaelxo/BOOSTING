@@ -7,18 +7,21 @@ import type { Division, Order, RankTier } from '@/types'
 interface CustomerOrderCardProps {
   order: Order
   currency: (amount: number) => string
+  /** Prefixo de rota pro link do card -- cliente usa /orders (padrão), admin reaproveita com /admin/orders. */
+  basePath?: string
 }
 
 // Mesmo padrão visual do CompletedOrderCard (booster) -- grid de cards com
 // mais respiro/detalhe em vez da lista compacta (OrderRow) que ficava tudo
-// muito junto em "Meus Pedidos".
-export function CustomerOrderCard({ order, currency }: CustomerOrderCardProps) {
+// muito junto em "Meus Pedidos". Reaproveitado também pela lista de pedidos
+// do admin (via basePath) pra manter os 3 papéis com o mesmo padrão visual.
+export function CustomerOrderCard({ order, currency, basePath = '/orders' }: CustomerOrderCardProps) {
   const currentRank = order.current_rank as { tier: RankTier; division: Division | null } | null
   const targetRank = order.target_rank as { tier: RankTier; division: Division | null } | null
   const hasWinProgress = order.wins_purchased != null
 
   return (
-    <Link to={`/orders/${order.id}`}>
+    <Link to={`${basePath}/${order.id}`}>
       <Card className="h-full hover:border-brand/20 hover:shadow-card-hover transition-all cursor-pointer">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">

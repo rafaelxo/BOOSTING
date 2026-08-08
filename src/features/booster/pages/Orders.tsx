@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, Search } from 'lucide-react'
 import { EmptyState, Skeleton } from '@/components/ui'
 import { useAuthStore } from '@/stores/authStore'
-import { cn } from '@/lib/utils'
+import { cn, ORDER_STATUS_LABEL } from '@/lib/utils'
 import { CompletedOrderCard } from '@/features/booster/components/CompletedOrderCard'
+import { ServiceFilterBar } from '@/components/order/ServiceFilterBar'
+import { useServiceFilters } from '@/components/order/useServiceFilters'
 import { useBoosterOrdersInfinite } from '@/api/orders'
 import type { BoosterOrdersTab } from '@/api/orders'
 import { useOwnBoosterTop3Status } from '@/api/boosters'
@@ -11,10 +13,11 @@ import { useOwnBoosterTop3Status } from '@/api/boosters'
 // Agrupa o enum real de order_status em abas — nenhum status é excluído,
 // só reorganizado para o contexto de "pedidos do booster" (o pool de pedidos
 // ainda não aceitos, awaiting_assignment, é responsabilidade da página Jobs).
+// Mesmo rótulo de status usado em todo o resto do produto (ORDER_STATUS_LABEL).
 const TABS: { key: BoosterOrdersTab; label: string }[] = [
-  { key: 'active',    label: 'Em andamento' },
-  { key: 'completed', label: 'Concluídos'   },
-  { key: 'canceled',  label: 'Cancelados'   },
+  { key: 'active',    label: ORDER_STATUS_LABEL.in_progress },
+  { key: 'completed', label: ORDER_STATUS_LABEL.completed   },
+  { key: 'canceled',  label: ORDER_STATUS_LABEL.canceled    },
 ]
 
 type TabKey = BoosterOrdersTab
@@ -34,6 +37,7 @@ export function BoosterOrdersPage() {
   const pageSize = useMemo(getPageSize, [])
   const sentinelRef = useRef<HTMLDivElement>(null)
   const [tab, setTab] = useState<TabKey>('active')
+  const [search, setSearch] = useState('')
 
   const { data: isTop3 } = useOwnBoosterTop3Status(profile?.id)
 
@@ -41,7 +45,10 @@ export function BoosterOrdersPage() {
     data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage,
   } = useBoosterOrdersInfinite(profile?.id, tab, pageSize)
 
-  const orders = data?.pages.flatMap((p) => p.orders) ?? []
+  const rawOrders = data?.pages.flatMap((p) => p.orders) ?? []
+  const serviceFilters = useServiceFilters(rawOrders)
+  const orders = serviceFilters.filtered
+    .filter((o) => !search || o.id.toLowerCase().includes(search.toLowerCase()))
 
   useEffect(() => {
     const el = sentinelRef.current
@@ -62,21 +69,44 @@ export function BoosterOrdersPage() {
         <p className="text-sm text-ink-secondary mt-1">Todos os pedidos atribuídos a você, organizados por status.</p>
       </div>
 
-      <div className="flex gap-1.5 border-b border-bg-elevated">
-        {TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={cn(
-              'px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors',
-              tab === key
-                ? 'border-brand text-brand'
-                : 'border-transparent text-ink-secondary hover:text-ink',
-            )}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-48 shrink-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar por código do pedido..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-base pl-8 py-1.5 text-xs"
+          />
+        </div>
+        <div className="flex gap-1 bg-bg-surface/80 backdrop-blur-sm border border-bg-elevated rounded-xl p-1">
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                tab === key ? 'bg-brand text-white' : 'text-ink-secondary hover:text-ink',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <ServiceFilterBar
+          category={serviceFilters.category}
+          onCategoryChange={serviceFilters.setCategory}
+          counts={serviceFilters.counts}
+          queue={serviceFilters.queue}
+          onQueueChange={serviceFilters.setQueue}
+          mode={serviceFilters.mode}
+          onModeChange={serviceFilters.setMode}
+          clashTier={serviceFilters.clashTier}
+          onClashTierChange={serviceFilters.setClashTier}
+          clashDay={serviceFilters.clashDay}
+          onClashDayChange={serviceFilters.setClashDay}
+        />
       </div>
 
       {isLoading ? (

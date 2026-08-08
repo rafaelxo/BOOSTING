@@ -323,7 +323,7 @@ export function AdminOrderDetailPage() {
             )}
 
             <OrderRankSummary order={order} />
-            <OrderProgress order={order} />
+            <OrderProgress order={order} hideRankBadges />
 
             <div className="mt-5">
               <OrderInfoGrid items={infoItems} />

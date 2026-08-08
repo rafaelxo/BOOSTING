@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, ShoppingBag, MessageCircle, Zap, Sparkles } from 'lucide-react'
 import { Button, Skeleton, EmptyState, StatCard } from '@/components/ui'
 import { OrderRow } from '@/components/order/OrderRow'
+import { CustomerOrderCard } from '@/components/order/CustomerOrderCard'
 import { useAuthStore } from '@/stores/authStore'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useCustomerOrders } from '@/api/orders'
@@ -81,10 +82,8 @@ export function CustomerDashboard() {
         </div>
 
         {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="card p-4"><Skeleton className="h-12 w-full" /></div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
           </div>
         ) : !orders?.length ? (
           <EmptyState
@@ -96,9 +95,9 @@ export function CustomerDashboard() {
         ) : !recentOrders.length ? (
           <p className="text-sm text-ink-muted py-6 text-center">{t('customer.dashboard.allActive')}</p>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {recentOrders.slice(0, 5).map((order) => (
-              <OrderRow key={order.id} order={order} currency={currency} />
+              <CustomerOrderCard key={order.id} order={order} currency={currency} />
             ))}
           </div>
         )}
